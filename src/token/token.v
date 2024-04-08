@@ -5,6 +5,13 @@ pub struct Token {
 	value string
 }
 
+pub fn (t Token) kind() Kind {
+	return t.kind
+}
+pub fn (t Token) value() string {
+	return t.value
+}
+
 pub enum Kind {
 	eof
 	op_plus

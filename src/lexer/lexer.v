@@ -2,7 +2,7 @@ module lexer
 
 import token
 
-// @[heap]
+@[heap]
 pub struct Lexer {
 	source string
 	total  int
@@ -16,15 +16,7 @@ mut:
 const invalid_token_message = 'Invalid Token'
 
 fn run(source string) !Lexer {
-	mut lexer0 := Lexer{
-		source: source
-		total: source.len
-	}
-	lexer0.check_has_empty_file()!
-
-	if lexer0.source.len == 0 {
-		return error(lexer0.show_error_custom_error('Empty file'))
-	}
+	mut lexer0 := new(source)!
 	for lexer0.next_pos != -1 {
 		token0 := lexer0.parse_token() or {
 			return error(lexer0.show_error_with_position(err.msg()))
@@ -32,6 +24,18 @@ fn run(source string) !Lexer {
 		lexer0.tokens << token0
 	}
 
+	return lexer0
+}
+
+fn new(source string) !Lexer {
+	lexer0 := Lexer{
+		source: source
+		total: source.len
+	}
+	lexer0.check_has_empty_file()!
+	if lexer0.source.len == 0 {
+		return error(lexer0.show_error_custom_error('Empty file'))
+	}
 	return lexer0
 }
 
@@ -46,7 +50,9 @@ fn (mut lexer0 Lexer) next_position() {
 	}
 	lexer0.pos = pos
 }
-
+pub fn (mut lexer0 Lexer) read_next_token() !token.Token {
+	return lexer0.parse_token()!
+}
 fn (mut lexer0 Lexer) parse_token() !token.Token {
 	if lexer0.next_pos == -1 {
 		return token.generate_eof()
@@ -95,16 +101,16 @@ fn (mut lexer0 Lexer) is_breaking_term() bool {
 	return true
 }
 
-fn (mut lexer0 Lexer) show_error_with_position(msg string) string {
+fn (lexer0 Lexer) show_error_with_position(msg string) string {
 	code := [lexer0.source[lexer0.pos]].bytestr()
 	return utils_show('ERROR: ${msg} `${code}` on source[${lexer0.line}:${lexer0.pos + 1}]')
 }
 
-fn (mut lexer0 Lexer) show_error_custom_error(str string) string {
+fn (lexer0 Lexer) show_error_custom_error(str string) string {
 	return utils_show('ERROR: ${str}')
 }
 
-fn (mut lexer0 Lexer) check_has_empty_file() !bool {
+fn (lexer0 Lexer) check_has_empty_file() !bool {
 	source := lexer0.source
 	mut show_error := false
 	if source.len == 0 {
