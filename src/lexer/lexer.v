@@ -25,8 +25,6 @@ fn run(source string) !Lexer {
 	if lexer0.source.len == 0 {
 		return error(lexer0.show_error_custom_error('Empty file'))
 	}
-
-	// lexer0.next_position()
 	for lexer0.next_pos != -1 {
 		token0 := lexer0.parse_token() or {
 			return error(lexer0.show_error_with_position(err.msg()))
@@ -56,7 +54,7 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 	current := lexer0.source[lexer0.pos]
 
 	return match current {
-		` ` {
+		` `, `\n` {
 			lexer0.next_position()
 			lexer0.parse_token()!
 		}
@@ -108,6 +106,7 @@ fn (mut lexer0 Lexer) check_has_empty_file() !bool {
 
 fn (mut lexer0 Lexer) parse_number() !token.Token {
 	mut dg := lexer0.source[lexer0.pos]
+	mut kind := token.Kind.lit_int
 	mut num := [dg]
 	lexer0.next_position()
 	mut next := true
@@ -116,32 +115,33 @@ fn (mut lexer0 Lexer) parse_number() !token.Token {
 		if utils_is_digit(dg) {
 			num << dg
 			lexer0.next_position()
+		} else if lexer0.verify_char_inside(`_`, dg) { // ignore _ inside number
+			dg0 := lexer0.source[lexer0.pos + 1]
+			num << dg0
+			lexer0.next_position()
+			lexer0.next_position()
+		} else if lexer0.verify_char_inside(`.`, dg) { // verify if the number is a float
+			dg0 := lexer0.source[lexer0.pos + 1]
+			kind = token.Kind.lit_float
+			num << dg
+			num << dg0
+			lexer0.next_position()
+			lexer0.next_position()
+		} else if lexer0.is_breaking_term() { // verify if reach end of number
+			break
 		} else {
-			if lexer0.pos + 1 < lexer0.total {
-				dg0 := lexer0.source[lexer0.pos + 1]
-				if utils_has_underscore_before_number(dg, dg0) {
-					num << dg0
-					lexer0.next_position()
-					lexer0.next_position()
-				} else {
-					next = false
-					if lexer0.is_breaking_term() {
-						break
-					} else {
-						return error(lexer.invalid_token_message)
-					}
-				}
-			} else {
-				next = false
-				if lexer0.is_breaking_term() {
-					break
-				} else {
-					return error(lexer.invalid_token_message)
-				}
-			}
+			return error(lexer.invalid_token_message)
 		}
 	}
-	return lexer0.new_token(.lit_int, num.bytestr())
+	return lexer0.new_token(kind, num.bytestr())
+}
+
+fn (lexer0 Lexer) verify_char_inside(c rune, dg rune) bool {
+	if lexer0.pos + 1 < lexer0.total {
+		dg0 := lexer0.source[lexer0.pos + 1]
+		return utils_has_char_before_number(c, dg, dg0)
+	}
+	return false
 }
 
 fn (lexer0 Lexer) new_token(kind token.Kind, value string) token.Token {

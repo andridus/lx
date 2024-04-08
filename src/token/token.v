@@ -11,6 +11,7 @@ pub enum Kind {
 	op_minus
 	op_star
 	op_slash
+	lit_float
 	lit_int
 	lit_string
 }

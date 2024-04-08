@@ -9,8 +9,8 @@ fn utils_is_digit(a u8) bool {
 	return a >= `0` && a <= `9`
 }
 
-fn utils_has_underscore_before_number(a u8, b u8) bool {
-	return a == `_` && utils_is_digit(b)
+fn utils_has_char_before_number(a u8, b u8, c u8) bool {
+	return a == b && utils_is_digit(c)
 }
 
 fn utils_is_letter(a u8) bool {

@@ -93,7 +93,7 @@ fn test_expect_parse_bigger_integer_with_underscore_and_with_space_after() {
 }
 
 fn test_expect_parse_two_integers() {
-	source := '14 5_12_7'
+	source := '14\n5_12_7'
 	expected := Lexer{
 		source: source
 		total: source.len
@@ -119,4 +119,59 @@ fn test_expect_error_when_parse_bigger_integer_with_underscore() {
 	mut received0 := ''
 	run(source) or { received0 = err.msg() }
 	assert expected == received0
+}
+
+fn test_expect_parse_float() {
+	source := '1.0'
+	expected := Lexer{
+		source: source
+		total: source.len
+		pos: 3
+		next_pos: -1
+		tokens: [
+			token.Token{
+				kind: .lit_float
+				value: '1.0'
+			},
+		]
+	}
+	assert expected == run(source)!
+}
+
+fn test_expect_parse_float_with_underscore() {
+	source := '1.0_0'
+	expected := Lexer{
+		source: source
+		total: source.len
+		pos: 5
+		next_pos: -1
+		tokens: [
+			token.Token{
+				kind: .lit_float
+				value: '1.00'
+			},
+		]
+	}
+	assert expected == run(source)!
+}
+
+fn test_expect_float_and_integer() {
+	source := '1\n1.0'
+	expected := Lexer{
+		source: source
+		total: source.len
+		pos: 5
+		next_pos: -1
+		tokens: [
+			token.Token{
+				kind: .lit_int
+				value: '1'
+			},
+			token.Token{
+				kind: .lit_float
+				value: '1.0'
+			},
+		]
+	}
+	assert expected == run(source)!
 }
