@@ -175,3 +175,65 @@ fn test_expect_float_and_integer() {
 	}
 	assert expected == run(source)!
 }
+
+fn test_expect_operators() {
+	source0 := '+'
+	expected0 := Lexer{
+		source: source0
+		total: source0.len
+		pos: 1
+		next_pos: -1
+		tokens: [
+			token.Token{
+				kind: .op_plus
+				value: '+'
+			},
+		]
+	}
+	assert expected0 == run(source0)!
+
+	source1 := '-'
+	expected1 := Lexer{
+		source: source1
+		total: source1.len
+		pos: 1
+		next_pos: -1
+		tokens: [
+			token.Token{
+				kind: .op_minus
+				value: '-'
+			},
+		]
+	}
+	assert expected1 == run(source1)!
+
+	source2 := '/'
+	expected2 := Lexer{
+		source: source2
+		total: source2.len
+		pos: 1
+		next_pos: -1
+		tokens: [
+			token.Token{
+				kind: .op_div
+				value: '/'
+			},
+		]
+	}
+	assert expected2 == run(source2)!
+
+	source3 := '*'
+	expected3 := Lexer{
+		source: source3
+		total: source3.len
+		pos: 1
+		next_pos: -1
+		tokens: [
+			token.Token{
+				kind: .op_mult
+				value: '*'
+			},
+		]
+	}
+	assert expected3 == run(source3)!
+}

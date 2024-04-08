@@ -61,6 +61,22 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 		`0`...`9` {
 			lexer0.parse_number()!
 		}
+		`+` {
+			lexer0.next_position()
+			lexer0.new_token(.op_plus, '+')
+		}
+		`-` {
+			lexer0.next_position()
+			lexer0.new_token(.op_minus, '-')
+		}
+		`*` {
+			lexer0.next_position()
+			lexer0.new_token(.op_mult, '*')
+		}
+		`/` {
+			lexer0.next_position()
+			lexer0.new_token(.op_div, '/')
+		}
 		else {
 			error(lexer.invalid_token_message)
 		}

@@ -9,8 +9,8 @@ pub enum Kind {
 	eof
 	op_plus
 	op_minus
-	op_star
-	op_slash
+	op_mult
+	op_div
 	lit_float
 	lit_int
 	lit_string
