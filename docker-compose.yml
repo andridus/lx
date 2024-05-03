@@ -1,0 +1,8 @@
+version: "3"
+services:
+  v:
+    image: andridus/vlang:4.5.up
+    tty: true # Keeps your container running
+    volumes:
+      - .:/home/v
+    working_dir: /home/v
