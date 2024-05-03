@@ -8,7 +8,7 @@ fn test_parse_integer_stmt() {
 		kind: ast.NodeKind(ast.Integer{})
 		nodes: []
 	}
-	assert expected == parser.parse_stmt(source)!
+	assert expected == parse_stmt(source)!
 }
 
 fn test_parse_float_stmt() {
@@ -18,5 +18,27 @@ fn test_parse_float_stmt() {
 		kind: ast.NodeKind(ast.Float{})
 		nodes: []
 	}
-	assert expected == parser.parse_stmt(source)!
+	assert expected == parse_stmt(source)!
 }
+
+fn test_parse_float_stmt_1() {
+	source := '1.0 1'
+	expected := ast.Node{
+		left: ast.NodeLeft(1.0)
+		kind: ast.NodeKind(ast.Float{})
+		nodes: []
+	}
+	assert expected == parse_stmt(source)!
+}
+
+// fn test_fail_when_parse_integer_and_float_stmt() {
+// 	source := '1 1.0'
+// 	expected := '** (SyntaxError) [file:line:col] syntax error before "1.0"
+// 	  |
+// 	1 | 1 1.0
+// 	  |   ^
+// 	'
+// 	mut received := ''
+// 	parse_stmt(source) or { received = err.msg() }
+// 	assert expected == received
+// }

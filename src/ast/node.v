@@ -1,12 +1,5 @@
 module ast
 
-// node artifact
-pub type NodeLeft = Node | f64 | int | string
-pub type NodeKind = Nil
-	| Integer
-	| Float
-
-
 pub struct Node{
 	left NodeLeft
 	kind NodeKind
@@ -16,12 +9,18 @@ pub mut:
 	meta Meta
 }
 
-pub struct Meta {
-	line int
-	start_pos int
-	end_pos int
+pub fn new_node_2(value string,  kind NodeKind) Node {
+	value0 := str_to_node_left(value, kind)
+	return Node{left: value0, kind: kind}
 }
-
-pub struct Nil {}
-pub struct Integer {}
-pub struct Float {}
+pub fn new_node_4(value string,  kind NodeKind, nodes []Node, meta Meta) Node {
+	value0 := str_to_node_left(value, kind)
+	return Node{left: value0, kind: kind, nodes: nodes, meta: meta}
+}
+fn str_to_node_left(value string, kind NodeKind) NodeLeft {
+	return match kind {
+		Integer{ NodeLeft(value.int())}
+		Float{ NodeLeft(value.f64())}
+		else { NodeLeft(value) }
+	}
+}

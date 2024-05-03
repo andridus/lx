@@ -1,6 +1,7 @@
 module token
 
 pub struct Token {
+pub:
 	kind  Kind = .eof
 	value string
 }
@@ -14,6 +15,7 @@ pub fn (t Token) value() string {
 
 pub enum Kind {
 	eof
+	newline
 	op_plus
 	op_minus
 	op_mult

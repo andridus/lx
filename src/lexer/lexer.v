@@ -1,6 +1,7 @@
 module lexer
 
 import token
+import ast
 
 @[heap]
 pub struct Lexer {
@@ -27,7 +28,7 @@ fn run(source string) !Lexer {
 	return lexer0
 }
 
-fn new(source string) !Lexer {
+pub fn new(source string) !Lexer {
 	lexer0 := Lexer{
 		source: source
 		total: source.len
@@ -171,4 +172,7 @@ fn (lexer0 Lexer) new_token(kind token.Kind, value string) token.Token {
 		kind: kind
 		value: value
 	}
+}
+fn (lexer0 Lexer) to_meta() ast.Meta {
+	return ast.new_meta(0,0,0)
 }
