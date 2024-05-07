@@ -7,13 +7,14 @@ import token
 struct Options {
 	build_path string = '_build'
 }
+
 struct Parser {
 	filename string
-	options &Options = unsafe {nil}
-	mut:
-		lexer &lexer.Lexer
-		current_token token.Token
-		next_token token.Token
+	options  &Options = unsafe { nil }
+mut:
+	lexer         &lexer.Lexer
+	current_token token.Token
+	next_token    token.Token
 }
 
 pub fn parse_stmt(text string) !ast.Node {
@@ -62,8 +63,8 @@ fn (p Parser) expr() !ast.Node {
 		}
 	}
 }
+
 fn (p Parser) check_end_expr() !bool {
-	println(p.next_token.kind())
 	if p.next_token.kind() in [.eof, .newline] {
 		return true
 	} else {

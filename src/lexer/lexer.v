@@ -22,7 +22,9 @@ fn run(source string) !Lexer {
 		token0 := lexer0.parse_token() or {
 			return error(lexer0.show_error_with_position(err.msg()))
 		}
-		lexer0.tokens << token0
+		if token0.kind != .eof {
+			lexer0.tokens << token0
+		}
 	}
 
 	return lexer0
@@ -44,27 +46,32 @@ fn (mut lexer0 Lexer) next_position() {
 	pos := lexer0.pos + 1
 	next_pos := pos + 1
 
-	if next_pos < lexer0.total {
+	if next_pos <= lexer0.total {
 		lexer0.next_pos = next_pos
 	} else {
 		lexer0.next_pos = -1
 	}
 	lexer0.pos = pos
 }
+
 pub fn (mut lexer0 Lexer) read_next_token() !token.Token {
 	return lexer0.parse_token()!
 }
+
 fn (mut lexer0 Lexer) parse_token() !token.Token {
 	if lexer0.next_pos == -1 {
 		return token.generate_eof()
 	}
 	current := lexer0.source[lexer0.pos]
-
 	return match current {
 		` `, `\n` {
 			lexer0.next_position()
 			lexer0.parse_token()!
 		}
+		// `\n` {
+		// 	lexer0.next_position()
+		// 	lexer0.new_token(.newline, '\\n')
+		// }
 		`0`...`9` {
 			lexer0.parse_number()!
 		}
@@ -135,6 +142,7 @@ fn (mut lexer0 Lexer) parse_number() !token.Token {
 	mut next := true
 	for lexer0.pos < lexer0.total && next {
 		dg = lexer0.source[lexer0.pos]
+
 		if utils_is_digit(dg) {
 			num << dg
 			lexer0.next_position()
@@ -173,6 +181,7 @@ fn (lexer0 Lexer) new_token(kind token.Kind, value string) token.Token {
 		value: value
 	}
 }
+
 fn (lexer0 Lexer) to_meta() ast.Meta {
-	return ast.new_meta(0,0,0)
+	return ast.new_meta(0, 0, 0)
 }

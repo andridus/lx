@@ -9,6 +9,7 @@ pub:
 pub fn (t Token) kind() Kind {
 	return t.kind
 }
+
 pub fn (t Token) value() string {
 	return t.value
 }

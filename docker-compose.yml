@@ -3,6 +3,7 @@ services:
   v:
     image: andridus/vlang:4.5.up
     tty: true # Keeps your container running
+    stdin_open: true
     volumes:
       - .:/home/v
     working_dir: /home/v

@@ -22,6 +22,12 @@ fn test_expect_fail_empty_file() {
 	mut received1 := ''
 	run(source1) or { received1 = err.msg() }
 	assert expected1 == received1
+
+	source2 := ' \n  '
+	expected2 := 'ERROR: Empty file'
+	mut received2 := ''
+	run(source2) or { received2 = err.msg() }
+	assert expected2 == received2
 }
 
 fn test_expect_parse_integer() {
@@ -80,7 +86,7 @@ fn test_expect_parse_bigger_integer_with_underscore_and_with_space_after() {
 	expected := Lexer{
 		source: source
 		total: source.len
-		pos: 7
+		pos: 8
 		next_pos: -1
 		tokens: [
 			token.Token{
@@ -174,6 +180,25 @@ fn test_expect_float_and_integer() {
 		]
 	}
 	assert expected == run(source)!
+
+	source1 := '1.0\n1'
+	expected1 := Lexer{
+		source: source1
+		total: source1.len
+		pos: 5
+		next_pos: -1
+		tokens: [
+			token.Token{
+				kind: .lit_float
+				value: '1.0'
+			},
+			token.Token{
+				kind: .lit_int
+				value: '1'
+			},
+		]
+	}
+	assert expected1 == run(source1)!
 }
 
 fn test_expect_operators() {

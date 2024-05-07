@@ -1,9 +1,9 @@
 module ast
 
 pub struct Meta {
-	line int
+	line      int
 	start_pos int
-	end_pos int
+	end_pos   int
 }
 
 pub fn new_meta(line int, start_pos int, end_pos int) Meta {
