@@ -22,14 +22,22 @@ fn test_parse_float_stmt() {
 	assert expected == parse_stmt(source)!
 }
 
-// fn test_parse_float_stmt_1() {
-// 	source := '1.0 1'
-//   expected := '** (SyntaxError) [source:1:4] syntax error before "1.0"
-// 	  |
-// 	1 | 1 1.0
-// 	  |   ^
-// 	'
-// 	mut received := ''
-// 	parse_stmt(source) or { received = err.msg() }
-// 	assert expected == received
-// }
+fn test_parse_float_stmt_tuple_generated() {
+	source := '1.00'
+	expected := '1.0'
+	assert expected == parse_stmt(source)!.elixir()
+}
+
+fn test_fail_parse_float_stmt() {
+	source := '1.0 1'
+	expected := '
+** (SyntaxError) [source:1:4] syntax error before "1"
+  |
+1 | 1.0 1
+  |     ^
+
+'
+	mut received := ''
+	parse_stmt(source) or { received = err.msg() }
+	assert expected == received
+}

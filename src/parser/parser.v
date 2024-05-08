@@ -68,6 +68,6 @@ fn (p Parser) check_end_expr() !bool {
 	if p.next_token.kind() in [.eof, .newline] {
 		return true
 	} else {
-		return error('ERROR: trouble at end of expression')
+		return error(p.gen_syntax_error())
 	}
 }
