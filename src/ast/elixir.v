@@ -9,6 +9,9 @@ pub fn (n Node) elixir() string {
 			}
 			'{${n.left.str()}, [], [${mapped.join(',')}]}'
 		}
+		Atom {
+			n.left.value
+		}
 		f64 {
 			n.left.str()
 		}

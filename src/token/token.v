@@ -30,6 +30,10 @@ pub fn (token0 &Token) is_valid() bool {
 	return token0.kind == .eof
 }
 
+pub fn (token0 &Token) is_infix() bool {
+	return token0.kind in [.op_plus, .op_minus, .op_mult, .op_div]
+}
+
 pub fn generate_eof() Token {
 	return Token{
 		kind: .eof

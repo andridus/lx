@@ -27,7 +27,12 @@ pub fn parse_stmt(text string) !ast.Node {
 	return p.stmt()!
 }
 
-fn (p Parser) stmt() !ast.Node {
+fn (mut p Parser) call_next_token() ! {
+	p.current_token = p.next_token
+	p.next_token = p.lexer.read_next_token()!
+}
+
+fn (mut p Parser) stmt() !ast.Node {
 	curr := p.current_token
 	match curr.kind() {
 		// .lit_int {
@@ -45,22 +50,35 @@ fn (p Parser) stmt() !ast.Node {
 	}
 }
 
-fn (p Parser) expr() !ast.Node {
+fn (mut p Parser) expr() !ast.Node {
 	curr := p.current_token
-	match curr.kind() {
+	node := match curr.kind() {
 		.lit_int {
-			node := ast.new_node_2(curr.value(), ast.Integer{})
-			p.check_end_expr()!
-			return node
+			ast.new_node_2(curr.value(), ast.Integer{})
+			// p.check_end_expr()!
+			// return node
 		}
 		.lit_float {
-			node := ast.new_node_2(curr.value(), ast.Float{})
-			p.check_end_expr()!
-			return node
+			ast.new_node_2(curr.value(), ast.Float{})
+			// p.check_end_expr()!
+			// return node
 		}
 		else {
 			return error('eof')
 		}
+	}
+	if p.next_token.is_infix() {
+		p.call_next_token()!
+		left := node
+		operator := p.current_token.value()
+		p.call_next_token()!
+		right := p.expr()!
+		p.call_next_token()!
+		return ast.new_node_3(operator, ast.Function{}, [left, right])
+	} else {
+		p.check_end_expr()!
+		p.call_next_token()!
+		return node
 	}
 }
 

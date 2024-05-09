@@ -1,4 +1,4 @@
 module ast
 
 // node artifact
-pub type NodeLeft = Node | f64 | int | string
+pub type NodeLeft = Atom | Node | f64 | int | string

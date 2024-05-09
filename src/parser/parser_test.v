@@ -41,3 +41,24 @@ fn test_fail_parse_float_stmt() {
 	parse_stmt(source) or { received = err.msg() }
 	assert expected == received
 }
+
+fn test_parse_sum_tow_integer_stmt() {
+	source := '1 + 2'
+	expected := ast.Node{
+		left: ast.NodeLeft(ast.Atom{
+			value: '+'
+		})
+		kind: ast.NodeKind(ast.Function{})
+		nodes: [
+			ast.Node{
+				left: ast.NodeLeft(1)
+				kind: ast.NodeKind(ast.Integer{})
+			},
+			ast.Node{
+				left: ast.NodeLeft(2)
+				kind: ast.NodeKind(ast.Integer{})
+			},
+		]
+	}
+	assert expected == parse_stmt(source)!
+}

@@ -1,6 +1,5 @@
 module parser
 
-import lexer
 import strings
 
 fn (p Parser) gen_syntax_error() string {
