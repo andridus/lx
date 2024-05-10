@@ -62,3 +62,9 @@ fn test_parse_sum_tow_integer_stmt() {
 	}
 	assert expected == parse_stmt(source)!
 }
+
+fn test_parse_sum_tow_integer_stmt_fmt_elixir() {
+	source := '1 + 2'
+	expected := '{:+, [], [1,2]}'
+	assert expected == parse_stmt(source)!.elixir()
+}

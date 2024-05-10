@@ -39,7 +39,7 @@ fn test_expect_parse_integer() {
 		next_pos: -1
 		tokens: [
 			token.Token{
-				kind: .lit_int
+				kind: ._int
 				value: '1'
 			},
 		]
@@ -56,7 +56,7 @@ fn test_expect_parse_bigger_integer() {
 		next_pos: -1
 		tokens: [
 			token.Token{
-				kind: .lit_int
+				kind: ._int
 				value: '145127'
 			},
 		]
@@ -73,7 +73,7 @@ fn test_expect_parse_bigger_integer_with_underscore() {
 		next_pos: -1
 		tokens: [
 			token.Token{
-				kind: .lit_int
+				kind: ._int
 				value: '145127'
 			},
 		]
@@ -90,7 +90,7 @@ fn test_expect_parse_bigger_integer_with_underscore_and_with_space_after() {
 		next_pos: -1
 		tokens: [
 			token.Token{
-				kind: .lit_int
+				kind: ._int
 				value: '145127'
 			},
 		]
@@ -107,11 +107,11 @@ fn test_expect_parse_two_integers() {
 		next_pos: -1
 		tokens: [
 			token.Token{
-				kind: .lit_int
+				kind: ._int
 				value: '14'
 			},
 			token.Token{
-				kind: .lit_int
+				kind: ._int
 				value: '5127'
 			},
 		]
@@ -136,7 +136,7 @@ fn test_expect_parse_float() {
 		next_pos: -1
 		tokens: [
 			token.Token{
-				kind: .lit_float
+				kind: ._flt
 				value: '1.0'
 			},
 		]
@@ -153,7 +153,7 @@ fn test_expect_parse_float_with_underscore() {
 		next_pos: -1
 		tokens: [
 			token.Token{
-				kind: .lit_float
+				kind: ._flt
 				value: '1.00'
 			},
 		]
@@ -170,11 +170,11 @@ fn test_expect_float_and_integer() {
 		next_pos: -1
 		tokens: [
 			token.Token{
-				kind: .lit_int
+				kind: ._int
 				value: '1'
 			},
 			token.Token{
-				kind: .lit_float
+				kind: ._flt
 				value: '1.0'
 			},
 		]
@@ -189,11 +189,11 @@ fn test_expect_float_and_integer() {
 		next_pos: -1
 		tokens: [
 			token.Token{
-				kind: .lit_float
+				kind: ._flt
 				value: '1.0'
 			},
 			token.Token{
-				kind: .lit_int
+				kind: ._int
 				value: '1'
 			},
 		]
@@ -210,7 +210,7 @@ fn test_expect_operators() {
 		next_pos: -1
 		tokens: [
 			token.Token{
-				kind: .op_plus
+				kind: ._dual_op
 				value: '+'
 			},
 		]
@@ -225,7 +225,7 @@ fn test_expect_operators() {
 		next_pos: -1
 		tokens: [
 			token.Token{
-				kind: .op_minus
+				kind: ._dual_op
 				value: '-'
 			},
 		]
@@ -240,7 +240,7 @@ fn test_expect_operators() {
 		next_pos: -1
 		tokens: [
 			token.Token{
-				kind: .op_div
+				kind: ._mult_op
 				value: '/'
 			},
 		]
@@ -255,7 +255,7 @@ fn test_expect_operators() {
 		next_pos: -1
 		tokens: [
 			token.Token{
-				kind: .op_mult
+				kind: ._mult_op
 				value: '*'
 			},
 		]

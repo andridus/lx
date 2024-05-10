@@ -53,12 +53,12 @@ fn (mut p Parser) stmt() !ast.Node {
 fn (mut p Parser) expr() !ast.Node {
 	curr := p.current_token
 	node := match curr.kind() {
-		.lit_int {
+		._int {
 			ast.new_node_2(curr.value(), ast.Integer{})
 			// p.check_end_expr()!
 			// return node
 		}
-		.lit_float {
+		._flt {
 			ast.new_node_2(curr.value(), ast.Float{})
 			// p.check_end_expr()!
 			// return node

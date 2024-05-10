@@ -7,10 +7,18 @@ pub fn (n Node) elixir() string {
 			for n0 in n.nodes {
 				mapped << n0.elixir()
 			}
-			'{${n.left.str()}, [], [${mapped.join(',')}]}'
+			'{${n.left.elixir()}, [], [${mapped.join(',')}]}'
 		}
 		Atom {
-			n.left.value
+			if n.nodes.len > 0 {
+				mut mapped := []string{}
+				for n0 in n.nodes {
+					mapped << n0.elixir()
+				}
+				'{:${n.left.value.str()}, [], [${mapped.join(',')}]}'
+			} else {
+				n.left.value
+			}
 		}
 		f64 {
 			n.left.str()

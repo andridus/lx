@@ -77,19 +77,19 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 		}
 		`+` {
 			lexer0.next_position()
-			lexer0.new_token(.op_plus, '+')
+			lexer0.new_token(._dual_op, '+')
 		}
 		`-` {
 			lexer0.next_position()
-			lexer0.new_token(.op_minus, '-')
+			lexer0.new_token(._dual_op, '-')
 		}
 		`*` {
 			lexer0.next_position()
-			lexer0.new_token(.op_mult, '*')
+			lexer0.new_token(._mult_op, '*')
 		}
 		`/` {
 			lexer0.next_position()
-			lexer0.new_token(.op_div, '/')
+			lexer0.new_token(._mult_op, '/')
 		}
 		else {
 			error(lexer.invalid_token_message)
@@ -136,7 +136,7 @@ fn (lexer0 Lexer) check_has_empty_file() !bool {
 
 fn (mut lexer0 Lexer) parse_number() !token.Token {
 	mut dg := lexer0.source[lexer0.pos]
-	mut kind := token.Kind.lit_int
+	mut kind := token.Kind._int
 	mut num := [dg]
 	lexer0.next_position()
 	mut next := true
@@ -153,7 +153,7 @@ fn (mut lexer0 Lexer) parse_number() !token.Token {
 			lexer0.next_position()
 		} else if lexer0.verify_char_inside(`.`, dg) { // verify if the number is a float
 			dg0 := lexer0.source[lexer0.pos + 1]
-			kind = token.Kind.lit_float
+			kind = token.Kind._flt
 			num << dg
 			num << dg0
 			lexer0.next_position()
