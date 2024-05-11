@@ -84,4 +84,12 @@ fn test_parse_function_with_precedence_stmt_fmt_elixir() {
 	source2 := '1 + 2 - 3 - 4 + 3 - 8'
 	expected2 := '{:-, [], [{:+, [], [{:-, [], [{:-, [], [{:+, [], [1,2]},3]},4]},3]},8]}'
 	assert expected2 == parse_stmt(source2)!.elixir()
+
+	source3 := '1 + 2 / 3 * 4'
+	expected3 := '{:+, [], [1,{:*, [], [{:/, [], [2,3]},4]}]}'
+	assert expected3 == parse_stmt(source3)!.elixir()
+
+	source4 := '1 + 2 / 3 * 4 + 5'
+	expected4 := '{:+, [], [{:+, [], [1,{:*, [], [{:/, [], [2,3]},4]}]},5]}'
+	assert expected4 == parse_stmt(source4)!.elixir()
 }
