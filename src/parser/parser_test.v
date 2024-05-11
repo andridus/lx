@@ -48,7 +48,10 @@ fn test_parse_sum_tow_integer_stmt() {
 		left: ast.NodeLeft(ast.Atom{
 			value: '+'
 		})
-		kind: ast.NodeKind(ast.Function{})
+		kind: ast.NodeKind(ast.Function{
+			precedence: 210
+			position: .infix
+		})
 		nodes: [
 			ast.Node{
 				left: ast.NodeLeft(1)
@@ -63,8 +66,22 @@ fn test_parse_sum_tow_integer_stmt() {
 	assert expected == parse_stmt(source)!
 }
 
-fn test_parse_sum_tow_integer_stmt_fmt_elixir() {
+fn test_parse_sum_two_integer_stmt_fmt_elixir() {
 	source := '1 + 2'
 	expected := '{:+, [], [1,2]}'
 	assert expected == parse_stmt(source)!.elixir()
+}
+
+fn test_parse_function_with_precedence_stmt_fmt_elixir() {
+	source0 := '1 + 2 - 3'
+	expected0 := '{:-, [], [{:+, [], [1,2]},3]}'
+	assert expected0 == parse_stmt(source0)!.elixir()
+
+	source1 := '1 + 2 - 3 - 4'
+	expected1 := '{:-, [], [{:-, [], [{:+, [], [1,2]},3]},4]}'
+	assert expected1 == parse_stmt(source1)!.elixir()
+
+	source2 := '1 + 2 - 3 - 4 + 3 - 8'
+	expected2 := '{:-, [], [{:+, [], [{:-, [], [{:-, [], [{:+, [], [1,2]},3]},4]},3]},8]}'
+	assert expected2 == parse_stmt(source2)!.elixir()
 }

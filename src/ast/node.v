@@ -1,6 +1,7 @@
 module ast
 
 pub struct Node {
+pub:
 	left  NodeLeft
 	kind  NodeKind
 	nodes []Node
@@ -33,14 +34,5 @@ pub fn new_node_4(value string, kind NodeKind, nodes []Node, meta Meta) Node {
 		kind: kind
 		nodes: nodes
 		meta: meta
-	}
-}
-
-fn str_to_node_left(value string, kind NodeKind) NodeLeft {
-	return match kind {
-		Integer { NodeLeft(value.int()) }
-		Float { NodeLeft(value.f64()) }
-		Function { NodeLeft(Atom{value}) }
-		else { NodeLeft(value) }
 	}
 }

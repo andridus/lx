@@ -55,31 +55,60 @@ fn (mut p Parser) expr() !ast.Node {
 	node := match curr.kind() {
 		._int {
 			ast.new_node_2(curr.value(), ast.Integer{})
-			// p.check_end_expr()!
-			// return node
 		}
 		._flt {
 			ast.new_node_2(curr.value(), ast.Float{})
-			// p.check_end_expr()!
-			// return node
 		}
 		else {
 			return error('eof')
 		}
 	}
-	if p.next_token.is_infix() {
+	return p.maybe_apply_precendence(node)
+}
+
+fn (mut p Parser) maybe_apply_precendence(node ast.Node) !ast.Node {
+	if prec := p.next_token.precedence() {
 		p.call_next_token()!
 		left := node
-		operator := p.current_token.value()
+		function_token := p.current_token
 		p.call_next_token()!
 		right := p.expr()!
 		p.call_next_token()!
-		return ast.new_node_3(operator, ast.Function{}, [left, right])
+		function_kind := ast.Function{
+			// name: function_token.value()
+			precedence: prec.get_precedence()
+			position: .infix
+		}
+		match prec.get_assoc() {
+			.left {
+				return p.insert_node_deep_left(function_token.value(), function_kind,
+					left, right)
+			}
+			else {
+				return ast.new_node_3(function_token.value(), function_kind, [left, right])
+			}
+		}
 	} else {
 		p.check_end_expr()!
 		p.call_next_token()!
 		return node
 	}
+}
+
+fn (mut p Parser) insert_node_deep_left(name string, function ast.Function, left ast.Node, right ast.Node) !ast.Node {
+	if right.kind is ast.Function {
+		function0 := right.kind as ast.Function
+		if function0.precedence > 0 {
+			if right.nodes.len == 2 {
+				left0 := right.nodes[0]
+				right0 := right.nodes[1]
+				node_left := p.insert_node_deep_left(name, function, left, left0)!
+				name0 := right.left.to_str()
+				return ast.new_node_3(name0, function0, [node_left, right0])
+			}
+		}
+	}
+	return ast.new_node_3(name, function, [left, right])
 }
 
 fn (p Parser) check_end_expr() !bool {

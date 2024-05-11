@@ -17,7 +17,7 @@ pub fn (t Token) value() string {
 pub enum Kind {
 	eof
 	newline
-	_dual_op // +, -
+	_add_op // +, -
 	_mult_op // *, /
 	_int // 1
 	_flt // 1.5
@@ -31,34 +31,38 @@ pub enum Associative {
 }
 
 pub struct TokenPrecedence {
-	assoc Associative
+	assoc      Associative
 	precedence int
-	kind Kind
 }
+
 pub fn (tp TokenPrecedence) get_assoc() Associative {
 	return tp.assoc
 }
+
+pub fn (tp TokenPrecedence) is_infix() bool {
+	return tp.assoc in [.right, .left]
+}
+
 pub fn (tp TokenPrecedence) get_precedence() int {
 	return tp.precedence
 }
 
-const precedences = [
-	TokenPrecedence{.left, 210, ._dual_op},
-	TokenPrecedence{.left, 220, ._mult_op}
-]
+const precedences = {
+	'_add_op':  TokenPrecedence{.left, 210}
+	'_mult_op': TokenPrecedence{.left, 220}
+}
+
 pub fn (token0 &Token) is_valid() bool {
 	return token0.kind == .eof
 }
 
 pub fn (token0 &Token) is_infix() bool {
-	return token0.kind in [._dual_op, ._mult_op]
+	prec := token0.precedence() or { return false }
+	return prec.is_infix()
 }
 
-pub fn (token0 &Token) precedence() TokenPrecedence {
-	for p in precedences {
-		if p.kind == token0.kind { return p}
-	}
-	panic('FATAL: token precedence not found!')
+pub fn (token0 &Token) precedence() !TokenPrecedence {
+	return token.precedences[token0.kind.str()] or { error('has no precedence') }
 }
 
 pub fn generate_eof() Token {

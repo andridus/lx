@@ -210,7 +210,7 @@ fn test_expect_operators() {
 		next_pos: -1
 		tokens: [
 			token.Token{
-				kind: ._dual_op
+				kind: ._add_op
 				value: '+'
 			},
 		]
@@ -225,7 +225,7 @@ fn test_expect_operators() {
 		next_pos: -1
 		tokens: [
 			token.Token{
-				kind: ._dual_op
+				kind: ._add_op
 				value: '-'
 			},
 		]

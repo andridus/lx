@@ -77,11 +77,11 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 		}
 		`+` {
 			lexer0.next_position()
-			lexer0.new_token(._dual_op, '+')
+			lexer0.new_token(._add_op, '+')
 		}
 		`-` {
 			lexer0.next_position()
-			lexer0.new_token(._dual_op, '-')
+			lexer0.new_token(._add_op, '-')
 		}
 		`*` {
 			lexer0.next_position()

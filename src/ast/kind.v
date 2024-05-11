@@ -12,4 +12,14 @@ pub struct Integer {}
 
 pub struct Float {}
 
-pub struct Function {}
+pub struct Function {
+pub:
+	precedence int
+	position   FunctionPosition = .prefix
+}
+
+pub enum FunctionPosition {
+	prefix
+	infix
+	postfix
+}
