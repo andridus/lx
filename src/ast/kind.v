@@ -3,6 +3,7 @@ module ast
 pub type NodeKind = Atom | Float | Function | Integer | Nil
 
 pub struct Atom {
+pub:
 	value string
 }
 
