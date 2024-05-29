@@ -1,7 +1,9 @@
 module epp
 
 import ast
+import binary
 
+const tag_version = u8(131)
 interface Term {
 	tag u8
 	len int
@@ -13,15 +15,41 @@ interface Number {
 	is_number bool
 }
 
+pub enum E_Atom_Kind {
+	cache_ref = 78
+	ext = 100
+	small_ext = 115
+	utf8_ext = 118
+}
+
+pub enum E_Integer_Kind {
+	uint8 = 97
+	int32 = 98
+	small_big = 110
+	large_big = 111
+}
+
 pub struct E_Atom {
-	tag u8 = u8(100)
+	tag u8 = u8(E_Atom_Kind.utf8_ext)
 	len int = 2
 	opt E_Atom_Kind = .utf8_ext
 	value string
 }
 
+pub struct E_Nil {
+	tag u8 = u8(100)
+	len int = 2
+	value u8 = u8(0)
+}
+
+pub struct E_Boolean {
+	tag u8 = u8(100)
+	len int = 2
+	value bool
+}
+
 pub struct E_Integer {
-	tag u8 = u8(98)
+	tag u8 = u8(E_Integer_Kind.int32)
 	len int = 4
 	opt E_Integer_Kind = .int32
 	value int
@@ -31,19 +59,6 @@ pub struct E_Float {
 	tag u8 = u8(99)
 	len int = 31
 	value f64
-}
-
-pub enum E_Atom_Kind {
-	ext
-	small_ext
-	cache_ref
-	utf8_ext
-}
-
-pub enum E_Integer_Kind {
-	int32
-	uint8
-	big
 }
 
 pub struct E_Tuple {
@@ -64,12 +79,18 @@ pub fn new_list(list []Term) Term {
 	return E_List{value: list}
 }
 
-pub fn new_integer(n int, kind E_Integer_Kind) Term {
-	return match kind {
-		.uint8 { E_Integer{value: n, opt: .uint8} }
-		.int32 { E_Integer{value: u8(n), opt: .int32} }
-		.big { E_Integer{value: n, opt: .big}}
+pub fn new_integer(n int) Term {
+	if n < 256 {
+		return E_Integer{value: u8(n), len: 1, opt: .uint8, tag: u8(E_Integer_Kind.uint8)}
+	} else {
+		return E_Integer{value: n, len: 4, opt: .int32, tag: u8(E_Integer_Kind.int32)}
 	}
+	// return match kind {
+	// 	.uint8 {  }
+	// 	.int32 {  }
+	// 	// .small_big { E_Integer{value: n, len: 11, opt: .small_big, tag: u8(E_Integer_Kind.small_big)}}
+	// 	// .large_big { E_Integer{value: n, len: 15, opt: .large_big, tag: u8(E_Integer_Kind.large_big)}}
+	// }
 }
 
 pub fn new_float(n f64) Term {
@@ -132,4 +153,30 @@ pub fn (term E_List) to_string() string {
 @[inline]
 pub fn (many []Term) to_string() string {
 	return many.map(|m| m.to_string()).join('.\n') + '.'
+}
+
+
+
+///// functions
+
+pub fn term_to_binary(term Term) []u8 {
+	return match term {
+		E_Integer {
+			match term.opt {
+				.uint8 { [tag_version, term.tag, u8(term.value)]}
+				.int32 {
+					mut buf := binary.write_int(term.value, binary.big_endian)
+					buf.prepend(term.tag)
+					buf.prepend(tag_version)
+					buf
+				}
+				.small_big { [tag_version, term.tag, u8(term.value)]}
+				.large_big { [tag_version, term.tag, u8(term.value)]}
+			}
+
+		}
+		else {
+			[u8(0)]
+		}
+	}
 }
