@@ -1,4 +1,4 @@
-module bytes
+module reader
 
 import os
 

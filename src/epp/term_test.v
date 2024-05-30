@@ -24,3 +24,17 @@ fn test_term_to_binary_integer() {
 	assert [u8(131),97,255] == term_to_binary(new_integer(255))
 	assert [u8(131),98,0,0,1,0] == term_to_binary(new_integer(256))
 }
+
+fn test_binary_to_term_integer() {
+	assert new_integer(1) == binary_to_term([u8(131),97,1])!
+	assert new_integer(255) == binary_to_term([u8(131),97,255])!
+	assert new_integer(256) == binary_to_term([u8(131),98,0,0,1,0])!
+}
+
+fn test_term_to_binary_float() {
+	assert [u8(131),70,63,240,0,0,0,0,0,0] == term_to_binary(new_float(1.0))
+}
+
+fn test_binary_to_term_float() {
+	assert new_float(1.0001) == binary_to_term([u8(131),70, 63, 240, 0, 104, 219, 139, 172, 113])!
+}

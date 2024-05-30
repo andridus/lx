@@ -1,6 +1,6 @@
 module binary
 
-import bytes
+import reader
 import math
 
 pub const (
@@ -127,7 +127,7 @@ pub fn write_int(value int, order ByteOrder) []u8 {
 	return order.put_u32(u32(value))
 }
 
-fn read_from(mut r bytes.Reader, data_size int) ![]u8 {
+fn read_from(mut r reader.Reader, data_size int) ![]u8 {
 	mut buf := []u8{cap: data_size}
 
 	for _ in 0 .. data_size {
@@ -136,53 +136,53 @@ fn read_from(mut r bytes.Reader, data_size int) ![]u8 {
 	return buf
 }
 
-pub fn read_bool(mut r bytes.Reader) !bool {
+pub fn read_bool(mut r reader.Reader) !bool {
 	data_size := 1
 	bs := read_from(mut r, data_size)!
 	return bs[0] != 0
 }
 
-pub fn read_f32(mut r bytes.Reader, order ByteOrder) !f32 {
+pub fn read_f32(mut r reader.Reader, order ByteOrder) !f32 {
 	data_size := 4
 	bs := read_from(mut r, data_size)!
 	return math.f32_from_bits(order.u32(bs))
 }
 
-pub fn read_f64(mut r bytes.Reader, order ByteOrder) !f64 {
+pub fn read_f64(mut r reader.Reader, order ByteOrder) !f64 {
 	data_size := 8
 	bs := read_from(mut r, data_size)!
 	return math.f64_from_bits(order.u64(bs))
 }
 
-// pub fn read_i8(r bytes.Reader, order ByteOrder) i8 {
+// pub fn read_i8(r reader.Reader, order ByteOrder) i8 {
 // 	data_size := 1
 
 // }
-// pub fn read_i16(r bytes.Reader, order ByteOrder) i16 {
+// pub fn read_i16(r reader.Reader, order ByteOrder) i16 {
 // 	data_size := 2
 // }
-pub fn read_i32(mut r bytes.Reader, order ByteOrder) !int {
+pub fn read_i32(mut r reader.Reader, order ByteOrder) !int {
 	data_size := 4
 	bs := read_from(mut r, data_size)!
 	return int(order.u32(bs))
 }
 
-// pub fn read_i64(r bytes.Reader, order ByteOrder) i64 {
+// pub fn read_i64(r reader.Reader, order ByteOrder) i64 {
 // 	data_size := 8
 // }
-pub fn read_u8(mut r bytes.Reader, order ByteOrder) !u8 {
+pub fn read_u8(mut r reader.Reader, order ByteOrder) !u8 {
 	data_size := 1
 	bs := read_from(mut r, data_size)!
 	return bs[0]
 }
 
-pub fn read_u16(mut r bytes.Reader, order ByteOrder) !u16 {
+pub fn read_u16(mut r reader.Reader, order ByteOrder) !u16 {
 	data_size := 2
 	bs := read_from(mut r, data_size)!
 	return order.u16(bs)
 }
 
-pub fn read_u32(mut r bytes.Reader, order ByteOrder) !u32 {
+pub fn read_u32(mut r reader.Reader, order ByteOrder) !u32 {
 	data_size := 4
 	bs := read_from(mut r, data_size)!
 	return order.u32(bs)
