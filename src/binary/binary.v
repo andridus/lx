@@ -109,7 +109,7 @@ pub fn (_be BigEndian) put_u16(v u16) []u8 {
 	return b
 }
 
-fn (_be BigEndian) put_u8(v u8) []u8 {
+pub fn (_be BigEndian) put_u8(v u8) []u8 {
 	mut b := []u8{}
 	b << u8(v)
 	return b

@@ -54,7 +54,7 @@ interface Term {
 // }
 
 pub struct E_Atom {
-	tag u8 = tag_atom_utf8_ext
+	tag u8 = tag_small_atom_utf8_ext
 	bytes int = 2
 	value string
 }
@@ -66,7 +66,7 @@ pub struct E_Nil {
 }
 
 pub struct E_Boolean {
-	tag u8 = u8(100)
+	tag u8 = tag_small_atom_utf8_ext
 	bytes int = 2
 	value bool
 }
@@ -127,6 +127,10 @@ pub fn new_atom(s string) Term {
 	return E_Atom{value: s}
 }
 
+pub fn new_boolean(s bool) Term {
+	return E_Boolean{value: s}
+}
+
 fn (mut t Term) append(element Term) {
 	match t {
 		E_Tuple {
@@ -161,6 +165,14 @@ pub fn (term E_Atom) to_string() string {
 	return term.value.str()
 }
 
+pub fn (term E_Boolean) to_string() string {
+	if term.value {
+		return "true"
+	} else {
+		return  "false"
+	}
+}
+
 pub fn (term E_Nil) to_string() string {
 	return 'nil'
 }
@@ -185,7 +197,7 @@ pub fn (many []Term) to_string() string {
 
 ///// functions
 
-pub fn term_to_binary(term Term) []u8 {
+pub fn term_to_binary(term Term) ![]u8 {
 	return match term {
 		E_Float {
 			match term.tag {
@@ -220,8 +232,31 @@ pub fn term_to_binary(term Term) []u8 {
 				else { [u8(0)]}
 			}
 		}
+		E_Atom {
+			length := term.value.len
+			mut buf := term.value.bytes()
+			if length < u64(1) << 8 {
+				buf.prepend(binary.big_endian.put_u8(u8(length)))
+				buf.prepend(term.tag) // is it Atom only small?
+				buf.prepend(tag_version)
+				buf
+			} else {
+				error('atom length must be less than system: ${term.value}')
+			}
+		}
+		E_Boolean {
+			mut value := "true"
+			if !term.value { value = "false" }
+			length := value.len
+			mut buf := value.bytes()
+			buf.prepend(binary.big_endian.put_u8(u8(length)))
+			buf.prepend(term.tag) // is it Atom only small?
+			buf.prepend(tag_version)
+			buf
+
+		}
 		else {
-			[u8(0)]
+			return error('ERROR')
 		}
 	}
 }
