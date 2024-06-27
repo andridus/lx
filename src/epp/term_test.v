@@ -60,3 +60,26 @@ fn test_binary_to_term_atom() {
 fn test_binary_to_term_boolean() {
 	assert [u8(131), 119, 4, 116, 114, 117, 101] == term_to_binary(new_boolean(true))!
 }
+
+fn test_term_to_binary_string() {
+	assert [u8(131), 109, 0, 0, 0, 6, 115, 116, 114, 105, 110, 103] == term_to_binary(new_string('string'))!
+	assert [u8(131), 109, 0, 0, 0, 0] == term_to_binary(new_string(''))!
+	assert [u8(131), 109, 0, 0, 0, 3, 110, 105, 108] == term_to_binary(new_string('nil'))!
+}
+
+fn test_binary_to_term_string() {
+	assert new_string('string') == binary_to_term([u8(131), 109, 0, 0, 0, 6, 115, 116, 114, 105, 110, 103])!
+	assert new_string('') == binary_to_term([u8(131), 109, 0, 0, 0, 0])!
+	assert new_string('nil') == binary_to_term([u8(131), 109, 0, 0, 0, 3, 110, 105, 108])!
+	assert new_string('The development work is currently') == binary_to_term([u8(131), 109, 0, 0, 0, 33, 84, 104, 101, 32, 100, 101, 118, 101, 108, 111, 112, 109, 101, 110, 116, 32, 119, 111, 114, 107, 32, 105, 115, 32, 99, 117, 114, 114, 101, 110, 116, 108, 121])!
+}
+
+
+fn test_term_to_binary_nil() {
+	assert [u8(131), 119, 3, 110, 105, 108] == term_to_binary(new_atom('nil'))!
+	assert [u8(131), 119, 3, 110, 105, 108] == term_to_binary(new_nil())!
+}
+
+fn test_binary_to_term_nil() {
+	assert new_nil() == binary_to_term([u8(131), 119, 3, 110, 105, 108])!
+}

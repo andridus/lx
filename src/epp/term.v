@@ -83,6 +83,12 @@ pub struct E_Float {
 	value f64
 }
 
+pub struct E_String {
+	tag u8 = tag_string_ext
+	bytes int = 8
+	value string
+}
+
 pub struct E_Tuple {
 	tag u8 = tag_small_tuple_ext
 	bytes int
@@ -114,7 +120,9 @@ pub fn new_integer(n int) Term {
 	// 	// .large_big { E_Integer{value: n, len: 15, opt: .large_big, tag: u8(E_Integer_Kind.large_big)}}
 	// }
 }
-
+pub fn new_nil() Term {
+	return E_Nil{}
+}
 pub fn new_float(n f64) Term {
 	return E_Float{value: n}
 }
@@ -129,6 +137,10 @@ pub fn new_atom(s string) Term {
 
 pub fn new_boolean(s bool) Term {
 	return E_Boolean{value: s}
+}
+
+pub fn new_string(s string) Term {
+	return E_String{value: s}
 }
 
 fn (mut t Term) append(element Term) {
@@ -162,6 +174,10 @@ pub fn (term E_Float) to_string() string {
 }
 
 pub fn (term E_Atom) to_string() string {
+	return term.value.str()
+}
+
+pub fn (term E_String) to_string() string {
 	return term.value.str()
 }
 
@@ -199,6 +215,9 @@ pub fn (many []Term) to_string() string {
 
 pub fn term_to_binary(term Term) ![]u8 {
 	return match term {
+		E_Nil{
+			[tag_version, tag_small_atom_utf8_ext, 3, 110, 105, 108]
+		}
 		E_Float {
 			match term.tag {
 				tag_new_float_ext {
@@ -253,7 +272,18 @@ pub fn term_to_binary(term Term) ![]u8 {
 			buf.prepend(term.tag) // is it Atom only small?
 			buf.prepend(tag_version)
 			buf
-
+		}
+		E_String {
+			length := term.value.len
+			if length == 0 {
+				[tag_version, tag_binary_ext, 0, 0, 0, 0]
+			} else {
+				mut buf := term.value.bytes()
+				buf.prepend(binary.big_endian.put_u32(u32(length)))
+				buf.prepend(tag_binary_ext)
+				buf.prepend(tag_version)
+				buf
+			}
 		}
 		else {
 			return error('ERROR')
@@ -275,6 +305,41 @@ fn do_binary_to_term(size int, mut r reader.Reader) !Term {
 	tag := r.read_byte() or { return err }
 	total_bytes++
 	term := match tag {
+		tag_small_atom_ext, tag_small_atom_utf8_ext {
+			val := binary.read_u8(mut r, binary.big_endian)!
+			bytes := int(val)
+			total_bytes+= bytes + 1
+			mut value := []u8{len: bytes}
+
+			if bytes > 0 {
+				value = r.read_bytes(bytes)!
+			}
+			str := value.bytestr()
+			match str {
+				'nil' {
+					new_nil()
+				}
+				'true' {
+					new_boolean(true)
+				}
+				'false' {
+					new_boolean(false)
+				}
+				'undefined' {
+					new_nil()
+				}
+				else {
+					match tag {
+						tag_atom_ext,tag_atom_utf8_ext,tag_small_atom_utf8_ext {
+							new_atom(str)
+						}
+						else {
+							return error('Invalid tag clause')
+						}
+					}
+				}
+			}
+		}
 		tag_small_integer_ext {
 			bytes := 1
 			val := r.read_byte() or { return err }
@@ -299,6 +364,28 @@ fn do_binary_to_term(size int, mut r reader.Reader) !Term {
 			fvalue := strconv.atof64(val.bytestr())!
 			total_bytes+=bytes
 			Term(E_Float{value: fvalue, bytes: bytes, tag: tag_float_ext})
+		}
+		tag_string_ext {
+			val := binary.read_u16(mut r, binary.big_endian)!
+			bytes := int(val)
+			total_bytes+=bytes
+			mut value := []u8{len: bytes}
+
+			if bytes > 0 {
+				value = r.read_bytes(bytes)!
+			}
+			str := value.bytestr()
+			Term(E_String{value: str, bytes: bytes})
+		}
+		tag_binary_ext {
+			val := binary.read_u32(mut r, binary.big_endian)!
+			bytes := int(val)
+			total_bytes+=bytes + 4
+			mut value := []u8{len: bytes}
+			if bytes > 0 {
+				value = r.read_bytes(bytes)!
+			}
+			new_string(value.bytestr())
 		}
 		else {
 			return error('Invalid TAG')
