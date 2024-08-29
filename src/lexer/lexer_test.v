@@ -33,13 +33,13 @@ fn test_expect_fail_empty_file() {
 fn test_expect_parse_integer() {
 	source := '1'
 	expected := Lexer{
-		source: source
-		total: source.len
-		pos: 1
+		source:   source
+		total:    source.len
+		pos:      1
 		next_pos: -1
-		tokens: [
+		tokens:   [
 			token.Token{
-				kind: ._int
+				kind:  ._int
 				value: '1'
 			},
 		]
@@ -50,13 +50,13 @@ fn test_expect_parse_integer() {
 fn test_expect_parse_bigger_integer() {
 	source := '145127'
 	expected := Lexer{
-		source: source
-		total: source.len
-		pos: 6
+		source:   source
+		total:    source.len
+		pos:      6
 		next_pos: -1
-		tokens: [
+		tokens:   [
 			token.Token{
-				kind: ._int
+				kind:  ._int
 				value: '145127'
 			},
 		]
@@ -67,13 +67,13 @@ fn test_expect_parse_bigger_integer() {
 fn test_expect_parse_bigger_integer_with_underscore() {
 	source := '14_5127'
 	expected := Lexer{
-		source: source
-		total: source.len
-		pos: 7
+		source:   source
+		total:    source.len
+		pos:      7
 		next_pos: -1
-		tokens: [
+		tokens:   [
 			token.Token{
-				kind: ._int
+				kind:  ._int
 				value: '145127'
 			},
 		]
@@ -84,13 +84,13 @@ fn test_expect_parse_bigger_integer_with_underscore() {
 fn test_expect_parse_bigger_integer_with_underscore_and_with_space_after() {
 	source := '14_5127 '
 	expected := Lexer{
-		source: source
-		total: source.len
-		pos: 8
+		source:   source
+		total:    source.len
+		pos:      8
 		next_pos: -1
-		tokens: [
+		tokens:   [
 			token.Token{
-				kind: ._int
+				kind:  ._int
 				value: '145127'
 			},
 		]
@@ -101,17 +101,17 @@ fn test_expect_parse_bigger_integer_with_underscore_and_with_space_after() {
 fn test_expect_parse_two_integers() {
 	source := '14\n5_12_7'
 	expected := Lexer{
-		source: source
-		total: source.len
-		pos: 9
+		source:   source
+		total:    source.len
+		pos:      9
 		next_pos: -1
-		tokens: [
+		tokens:   [
 			token.Token{
-				kind: ._int
+				kind:  ._int
 				value: '14'
 			},
 			token.Token{
-				kind: ._int
+				kind:  ._int
 				value: '5127'
 			},
 		]
@@ -130,13 +130,13 @@ fn test_expect_error_when_parse_bigger_integer_with_underscore() {
 fn test_expect_parse_float() {
 	source := '1.0'
 	expected := Lexer{
-		source: source
-		total: source.len
-		pos: 3
+		source:   source
+		total:    source.len
+		pos:      3
 		next_pos: -1
-		tokens: [
+		tokens:   [
 			token.Token{
-				kind: ._flt
+				kind:  ._flt
 				value: '1.0'
 			},
 		]
@@ -147,13 +147,13 @@ fn test_expect_parse_float() {
 fn test_expect_parse_float_with_underscore() {
 	source := '1.0_0'
 	expected := Lexer{
-		source: source
-		total: source.len
-		pos: 5
+		source:   source
+		total:    source.len
+		pos:      5
 		next_pos: -1
-		tokens: [
+		tokens:   [
 			token.Token{
-				kind: ._flt
+				kind:  ._flt
 				value: '1.00'
 			},
 		]
@@ -164,17 +164,17 @@ fn test_expect_parse_float_with_underscore() {
 fn test_expect_float_and_integer() {
 	source := '1\n1.0'
 	expected := Lexer{
-		source: source
-		total: source.len
-		pos: 5
+		source:   source
+		total:    source.len
+		pos:      5
 		next_pos: -1
-		tokens: [
+		tokens:   [
 			token.Token{
-				kind: ._int
+				kind:  ._int
 				value: '1'
 			},
 			token.Token{
-				kind: ._flt
+				kind:  ._flt
 				value: '1.0'
 			},
 		]
@@ -183,17 +183,17 @@ fn test_expect_float_and_integer() {
 
 	source1 := '1.0\n1'
 	expected1 := Lexer{
-		source: source1
-		total: source1.len
-		pos: 5
+		source:   source1
+		total:    source1.len
+		pos:      5
 		next_pos: -1
-		tokens: [
+		tokens:   [
 			token.Token{
-				kind: ._flt
+				kind:  ._flt
 				value: '1.0'
 			},
 			token.Token{
-				kind: ._int
+				kind:  ._int
 				value: '1'
 			},
 		]
@@ -204,13 +204,13 @@ fn test_expect_float_and_integer() {
 fn test_expect_operators() {
 	source0 := '+'
 	expected0 := Lexer{
-		source: source0
-		total: source0.len
-		pos: 1
+		source:   source0
+		total:    source0.len
+		pos:      1
 		next_pos: -1
-		tokens: [
+		tokens:   [
 			token.Token{
-				kind: ._add_op
+				kind:  ._add_op
 				value: '+'
 			},
 		]
@@ -219,13 +219,13 @@ fn test_expect_operators() {
 
 	source1 := '-'
 	expected1 := Lexer{
-		source: source1
-		total: source1.len
-		pos: 1
+		source:   source1
+		total:    source1.len
+		pos:      1
 		next_pos: -1
-		tokens: [
+		tokens:   [
 			token.Token{
-				kind: ._add_op
+				kind:  ._add_op
 				value: '-'
 			},
 		]
@@ -234,13 +234,13 @@ fn test_expect_operators() {
 
 	source2 := '/'
 	expected2 := Lexer{
-		source: source2
-		total: source2.len
-		pos: 1
+		source:   source2
+		total:    source2.len
+		pos:      1
 		next_pos: -1
-		tokens: [
+		tokens:   [
 			token.Token{
-				kind: ._mult_op
+				kind:  ._mult_op
 				value: '/'
 			},
 		]
@@ -249,13 +249,13 @@ fn test_expect_operators() {
 
 	source3 := '*'
 	expected3 := Lexer{
-		source: source3
-		total: source3.len
-		pos: 1
+		source:   source3
+		total:    source3.len
+		pos:      1
 		next_pos: -1
-		tokens: [
+		tokens:   [
 			token.Token{
-				kind: ._mult_op
+				kind:  ._mult_op
 				value: '*'
 			},
 		]

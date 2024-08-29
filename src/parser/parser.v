@@ -17,8 +17,8 @@ mut:
 	next_token    token.Token
 }
 
-pub fn parse_stmt(text string) !ast.Node {
-	mut l := lexer.new(text)!
+pub fn parse_stmt(data []u8) !ast.Node {
+	mut l := lexer.Lexer.init(data)!
 	mut p := Parser{
 		lexer: &l
 	}
@@ -56,11 +56,14 @@ fn (mut p Parser) expr() !ast.Node {
 		._int {
 			ast.new_node_2(curr.value(), ast.Integer{})
 		}
-		._flt {
+		._float {
 			ast.new_node_2(curr.value(), ast.Float{})
 		}
+		._string {
+			ast.new_node_2(curr.value(), ast.String{})
+		}
 		else {
-			return error('eof')
+			return error(p.lexer.show_error_custom_error('not parsed kind `${curr.kind()}`'))
 		}
 	}
 	return p.maybe_apply_precendence(node)
@@ -76,7 +79,7 @@ fn (mut p Parser) maybe_apply_precendence(node ast.Node) !ast.Node {
 		p.call_next_token()!
 		function_kind := ast.Function{
 			precedence: prec.get_precedence()
-			position: .infix
+			position:   .infix
 		}
 		match prec.get_assoc() {
 			.left {
@@ -109,10 +112,10 @@ fn (mut p Parser) insert_node_deep_left(name string, function ast.Function, left
 	return ast.new_node_3(name, function, [left, right])
 }
 
-fn (p Parser) check_end_expr() !bool {
+fn (mut p Parser) check_end_expr() !bool {
 	if p.next_token.kind() in [.eof, .newline] {
 		return true
 	} else {
-		return error(p.gen_syntax_error())
+		return error(p.lexer.show_error_custom_error(p.gen_syntax_error()))
 	}
 }

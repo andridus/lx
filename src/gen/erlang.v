@@ -47,6 +47,9 @@ fn (mut g ErlangGen) generate_from_node(node ast.Node) string {
 		ast.Float {
 			node.left.to_str()
 		}
+		ast.String {
+			node.left.to_str()
+		}
 		ast.Integer {
 			node.left.to_str()
 		}

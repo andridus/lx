@@ -1,6 +1,6 @@
 module ast
 
-pub type NodeKind = Atom | Float | Function | Integer | Nil
+pub type NodeKind = Atom | Float | Function | Integer | String | Nil
 
 pub struct Atom {
 pub:
@@ -8,6 +8,8 @@ pub:
 }
 
 pub struct Nil {}
+
+pub struct String {}
 
 pub struct Integer {}
 

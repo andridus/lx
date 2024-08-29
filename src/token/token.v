@@ -1,5 +1,12 @@
 module token
 
+pub const keywords = [
+	'defmodule',
+	'def',
+	'do',
+	'end',
+]
+
 pub struct Token {
 pub:
 	kind  Kind = .eof
@@ -17,11 +24,12 @@ pub fn (t Token) value() string {
 pub enum Kind {
 	eof
 	newline
-	_add_op // +, -
+	_add_op  // +, -
 	_mult_op // *, /
-	_int // 1
-	_flt // 1.5
-	_char // 'a'
+	_int     // 1
+	_float   // 1.5
+	_char    // 'a'
+	_string  // "abc"
 }
 
 pub enum Associative {
@@ -67,7 +75,7 @@ pub fn (token0 &Token) precedence() !TokenPrecedence {
 
 pub fn generate_eof() Token {
 	return Token{
-		kind: .eof
+		kind:  .eof
 		value: 'EOF'
 	}
 }

@@ -3,10 +3,8 @@ module binary
 import reader
 import math
 
-pub const (
-	little_endian = LittleEndian{}
-	big_endian    = BigEndian{}
-)
+pub const little_endian = LittleEndian{}
+pub const big_endian = BigEndian{}
 
 interface ByteOrder {
 	u16([]u8) u16
