@@ -2,3 +2,6 @@
 1 + 5
 "minha string"
 "minha \"string\" com delimiter\'"
+'a'
+true
+false

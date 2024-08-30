@@ -79,11 +79,25 @@ fn (mut p Parser) expr() !ast.Node {
 		._string {
 			ast.new_node_2(curr.value(), ast.String{})
 		}
+		._charlist {
+			ast.new_node_2(curr.value(), ast.Charlist{})
+		}
+		._true {
+			ast.new_node(ast.Boolean.new(true))
+		}
+		._false {
+			ast.new_node(ast.Boolean.new(false))
+		}
 		else {
 			return error(p.lexer.show_error_custom_error('not parsed kind `${curr.kind()}`'))
 		}
 	}
 	return p.maybe_apply_precendence(node)!
+}
+
+fn (mut p Parser) find_keyword() ?ast.Node {
+	println(p.current_token)
+	return none
 }
 
 fn (mut p Parser) maybe_apply_precendence(node ast.Node) !ast.Node {

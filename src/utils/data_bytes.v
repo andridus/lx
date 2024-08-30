@@ -126,6 +126,10 @@ pub fn (mut b DataBytes) expect_match(list []u8) ! {
 	}
 }
 
+pub fn (mut b DataBytes) peek_expect_match(list []u8) bool {
+	return b.data[(b.current_pos - 1)..(b.current_pos + list.len - 1)] == list
+}
+
 pub fn (mut b DataBytes) ignore_bytes(total int) ! {
 	b.get_next_bytes(u8(total))!
 }

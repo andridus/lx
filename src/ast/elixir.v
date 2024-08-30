@@ -27,7 +27,12 @@ pub fn (n Node) elixir() string {
 			n.left.str()
 		}
 		string {
-			n.left.str()
+			match n.kind {
+				String { "\"${n.left.str()}\"" }
+				Charlist { '\'${n.left.str()}\'' }
+				Boolean { n.kind.value.str() }
+				else { n.left.str() }
+			}
 		}
 	}
 }

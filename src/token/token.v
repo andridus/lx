@@ -1,6 +1,8 @@
 module token
 
 pub const keywords = [
+	'true',
+	'false',
 	'defmodule',
 	'def',
 	'do',
@@ -24,12 +26,15 @@ pub fn (t Token) value() string {
 pub enum Kind {
 	eof
 	newline
-	_add_op  // +, -
-	_mult_op // *, /
-	_int     // 1
-	_float   // 1.5
-	_char    // 'a'
-	_string  // "abc"
+	_keyword
+	_add_op   // +, -
+	_mult_op  // *, /
+	_int      // 1
+	_float    // 1.5
+	_charlist // 'a'
+	_string   // "abc"
+	_true
+	_false
 }
 
 pub enum Associative {

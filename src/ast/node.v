@@ -10,6 +10,13 @@ pub mut:
 	meta Meta
 }
 
+pub fn new_node(kind NodeKind) Node {
+	return Node{
+		left: ''
+		kind: kind
+	}
+}
+
 pub fn new_node_2(value string, kind NodeKind) Node {
 	value0 := str_to_node_left(value, kind)
 	return Node{
