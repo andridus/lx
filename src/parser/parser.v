@@ -13,8 +13,25 @@ struct Parser {
 	options  &Options = unsafe { nil }
 mut:
 	lexer         &lexer.Lexer
+	stmts         []ast.Node
 	current_token token.Token
 	next_token    token.Token
+}
+
+pub fn parse_stmts(data []u8) ![]ast.Node {
+	mut l := lexer.Lexer.init(data)!
+	mut p := Parser{
+		lexer: &l
+	}
+	p.call_next_token()!
+	p.call_next_token()!
+	for p.current_token.kind != .eof {
+		p.stmts << p.stmt()!
+		if p.current_token.kind == .newline {
+			p.call_next_token()!
+		}
+	}
+	return p.stmts
 }
 
 pub fn parse_stmt(data []u8) !ast.Node {
@@ -66,7 +83,7 @@ fn (mut p Parser) expr() !ast.Node {
 			return error(p.lexer.show_error_custom_error('not parsed kind `${curr.kind()}`'))
 		}
 	}
-	return p.maybe_apply_precendence(node)
+	return p.maybe_apply_precendence(node)!
 }
 
 fn (mut p Parser) maybe_apply_precendence(node ast.Node) !ast.Node {
@@ -76,7 +93,8 @@ fn (mut p Parser) maybe_apply_precendence(node ast.Node) !ast.Node {
 		function_token := p.current_token
 		p.call_next_token()!
 		right := p.expr()!
-		p.call_next_token()!
+
+		// p.call_next_token()!
 		function_kind := ast.Function{
 			precedence: prec.get_precedence()
 			position:   .infix

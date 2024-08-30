@@ -23,6 +23,10 @@ pub fn Lexer.init(source []u8) !Lexer {
 	return l
 }
 
+pub fn (mut l Lexer) eof() bool {
+	return l.source.eof()
+}
+
 pub fn (mut lexer0 Lexer) read_next_token() !token.Token {
 	return lexer0.parse_token()!
 }
@@ -33,8 +37,11 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 	}
 	current := lexer0.source.get_next_byte()!
 	return match current {
-		` `, `\n` {
+		` ` {
 			lexer0.parse_token()!
+		}
+		`\n` {
+			lexer0.new_token(.newline, '')
 		}
 		`0`...`9` {
 			lexer0.parse_number()!
@@ -50,6 +57,9 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 		}
 		`/` {
 			lexer0.new_token(._mult_op, '/')
+		}
+		`\"`, `'` {
+			lexer0.parse_delimiter()!
 		}
 		else {
 			error(lexer0.show_error_custom_error(lexer.invalid_token_message))
@@ -79,6 +89,28 @@ pub fn (mut lexer0 Lexer) show_error_with_position(msg string) string {
 
 pub fn (mut lexer0 Lexer) show_error_custom_error(str string) string {
 	return utils_show('ERROR: ${str}')
+}
+
+fn (mut lexer0 Lexer) parse_delimiter() !token.Token {
+	delimiter := lexer0.source.current()
+	mut data := []u8{}
+	mut byt := lexer0.source.get_next_byte()!
+	for byt != delimiter {
+		data << byt
+		byt = lexer0.source.get_next_byte()!
+		if byt == `\\` && lexer0.source.peek_next()! == delimiter {
+			data << `\\`
+			data << delimiter
+			lexer0.source.ignore_bytes(1)!
+			byt = lexer0.source.get_next_byte()!
+		}
+	}
+
+	return match delimiter {
+		`\"` { lexer0.new_token(._string, data.bytestr()) }
+		`'` { lexer0.new_token(._char, data.bytestr()) }
+		else { error(lexer0.show_error_custom_error('invalid delimiter')) }
+	}
 }
 
 fn (mut lexer0 Lexer) parse_number() !token.Token {

@@ -10,7 +10,9 @@ fn main() {
 	}
 	path := os.args[1]
 	source := os.read_bytes(path) or { panic(err) }
-	response := parser.parse_stmt(source) or { exit(1) }
-	println(response.elixir())
+	nodes := parser.parse_stmts(source) or { exit(1) }
+	for node in nodes {
+		println(node.elixir())
+	}
 	println('finish with success!')
 }
