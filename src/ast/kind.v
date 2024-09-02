@@ -1,6 +1,15 @@
 module ast
 
-pub type NodeKind = Atom | Float | Function | Integer | String | Charlist | List | Boolean | Nil
+pub type NodeKind = Atom
+	| Float
+	| Function
+	| Integer
+	| String
+	| Charlist
+	| List
+	| Boolean
+	| Comment
+	| Nil
 
 pub struct Atom {
 	value string
@@ -17,6 +26,8 @@ pub fn Atom.new(value string) Atom {
 pub struct Nil {}
 
 pub struct String {}
+
+pub struct Comment {}
 
 pub struct Charlist {}
 

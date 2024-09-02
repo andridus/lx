@@ -10,6 +10,14 @@ pub mut:
 	meta Meta
 }
 
+pub fn (n Node) is_comment() bool {
+	if n.kind is Comment {
+		return true
+	} else {
+		return false
+	}
+}
+
 pub fn new_node(kind NodeKind) Node {
 	return Node{
 		left: ''

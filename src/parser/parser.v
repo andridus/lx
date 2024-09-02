@@ -26,7 +26,10 @@ pub fn parse_stmts(data []u8) ![]ast.Node {
 	p.call_next_token()!
 	p.call_next_token()!
 	for p.current_token.kind != .eof {
-		p.stmts << p.stmt()!
+		stmt := p.stmt()!
+		if !stmt.is_comment() { // ignore comment
+			p.stmts << stmt
+		}
 		if p.current_token.kind == .newline {
 			p.call_next_token()!
 		}
@@ -90,6 +93,9 @@ fn (mut p Parser) expr() !ast.Node {
 		}
 		._atom {
 			ast.new_node_2(curr.value(), ast.Atom.new(curr.value()))
+		}
+		._comment {
+			ast.new_node_2(curr.value(), ast.Comment{})
 		}
 		else {
 			return error(p.lexer.show_error_custom_error('not parsed kind `${curr.kind()}`'))

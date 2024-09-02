@@ -50,6 +50,9 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 		`\n` {
 			lexer0.new_token(.newline, '')
 		}
+		`#` {
+			lexer0.parse_inline_comment()!
+		}
 		`0`...`9` {
 			lexer0.parse_number()!
 		}
@@ -90,11 +93,27 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 	}
 }
 
+fn (mut lexer0 Lexer) parse_inline_comment() !token.Token {
+	mut curr := lexer0.source.current()
+	mut next := lexer0.source.peek_next() or { return lexer0.new_token(._comment, '') }
+	mut data := []u8{}
+	if curr != `#` {
+		return error(lexer0.show_error_custom_error('is not a comment'))
+	}
+	for next != 10 {
+		curr = lexer0.source.get_next_byte() or { break }
+		next = lexer0.source.peek_next() or { break }
+		data << curr
+	}
+	return lexer0.new_token(._comment, data.bytestr())
+}
+
 fn (mut lexer0 Lexer) parse_atom() !token.Token {
 	mut curr := lexer0.source.current()
-	if curr == `:` {
-		curr = lexer0.source.get_next_byte()!
+	if curr != `:` {
+		return error(lexer0.show_error_custom_error('is not an atom'))
 	}
+	curr = lexer0.source.get_next_byte()!
 	mut data := []u8{}
 	if curr in [`'`, `\"`] {
 		_, data = lexer0.parse_bytes_from_delimiter()!
@@ -217,7 +236,6 @@ fn (mut lexer0 Lexer) continue_term(mut term []u8, kind token.Kind) !token.Token
 			if kind == ._float {
 				term << current
 				term << lexer0.source.get_while_number()
-				println(term)
 				lexer0.continue_term(mut term, ._string)!
 			} else {
 				term << current

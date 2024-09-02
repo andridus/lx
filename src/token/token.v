@@ -36,6 +36,7 @@ pub enum Kind {
 	_true
 	_false
 	_atom
+	_comment
 }
 
 pub enum Associative {
