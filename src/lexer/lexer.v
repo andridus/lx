@@ -65,6 +65,9 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 		`/` {
 			lexer0.new_token(._mult_op, '/')
 		}
+		`:` {
+			lexer0.parse_atom()!
+		}
 		`\"`, `'` {
 			lexer0.parse_delimiter()!
 		}
@@ -85,6 +88,32 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 			error(lexer0.show_error_custom_error(lexer.invalid_token_message))
 		}
 	}
+}
+
+fn (mut lexer0 Lexer) parse_atom() !token.Token {
+	mut curr := lexer0.source.current()
+	if curr == `:` {
+		curr = lexer0.source.get_next_byte()!
+	}
+	mut data := []u8{}
+	if curr in [`'`, `\"`] {
+		_, data = lexer0.parse_bytes_from_delimiter()!
+	} else if is_alpha(curr) {
+		data = lexer0.parse_alpha()!
+	}
+	if data.len == 0 {
+		return error(lexer0.show_error_custom_error('not is valid atom'))
+	}
+
+	return lexer0.new_token(._atom, data.bytestr())
+}
+
+fn (mut lexer0 Lexer) parse_alpha() ![]u8 {
+	mut byt := [lexer0.source.current()]
+	for is_alpha(lexer0.source.peek_next()!) {
+		byt << lexer0.source.get_next_byte()!
+	}
+	return byt
 }
 
 fn (mut lexer0 Lexer) match_keyword() ?string {
@@ -136,6 +165,21 @@ pub fn (mut lexer0 Lexer) show_error_custom_error(str string) string {
 }
 
 fn (mut lexer0 Lexer) parse_delimiter() !token.Token {
+	delimiter, data := lexer0.parse_bytes_from_delimiter()!
+	return match delimiter {
+		`\"` {
+			lexer0.new_token(._string, data.bytestr())
+		}
+		`'` {
+			lexer0.new_token(._charlist, data.bytestr())
+		}
+		else {
+			error(lexer0.show_error_custom_error('invalid delimiter'))
+		}
+	}
+}
+
+fn (mut lexer0 Lexer) parse_bytes_from_delimiter() !(rune, []u8) {
 	delimiter := lexer0.source.current()
 	mut data := []u8{}
 	mut byt := lexer0.source.get_next_byte()!
@@ -149,18 +193,7 @@ fn (mut lexer0 Lexer) parse_delimiter() !token.Token {
 			byt = lexer0.source.get_next_byte()!
 		}
 	}
-
-	return match delimiter {
-		`\"` {
-			lexer0.new_token(._string, data.bytestr())
-		}
-		`'` {
-			lexer0.new_token(._charlist, data.bytestr())
-		}
-		else {
-			error(lexer0.show_error_custom_error('invalid delimiter'))
-		}
-	}
+	return delimiter, data
 }
 
 fn (mut lexer0 Lexer) parse_number() !token.Token {

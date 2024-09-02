@@ -3,8 +3,15 @@ module ast
 pub type NodeKind = Atom | Float | Function | Integer | String | Charlist | List | Boolean | Nil
 
 pub struct Atom {
-pub:
 	value string
+	idx   int
+}
+
+pub fn Atom.new(value string) Atom {
+	return Atom{
+		value: value
+		idx:   1 // it will use atom table to ensure value
+	}
 }
 
 pub struct Nil {}

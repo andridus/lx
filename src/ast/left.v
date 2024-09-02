@@ -17,7 +17,7 @@ fn str_to_node_left(value string, kind NodeKind) NodeLeft {
 	return match kind {
 		Integer { NodeLeft(value.int()) }
 		Float { NodeLeft(value.f64()) }
-		Function { NodeLeft(Atom{value}) }
+		Function { NodeLeft(Atom.new(value)) }
 		else { NodeLeft(value) }
 	}
 }

@@ -35,6 +35,7 @@ pub enum Kind {
 	_string   // "abc"
 	_true
 	_false
+	_atom
 }
 
 pub enum Associative {

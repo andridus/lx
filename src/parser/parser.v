@@ -88,6 +88,9 @@ fn (mut p Parser) expr() !ast.Node {
 		._false {
 			ast.new_node(ast.Boolean.new(false))
 		}
+		._atom {
+			ast.new_node_2(curr.value(), ast.Atom.new(curr.value()))
+		}
 		else {
 			return error(p.lexer.show_error_custom_error('not parsed kind `${curr.kind()}`'))
 		}
@@ -96,7 +99,6 @@ fn (mut p Parser) expr() !ast.Node {
 }
 
 fn (mut p Parser) find_keyword() ?ast.Node {
-	println(p.current_token)
 	return none
 }
 
