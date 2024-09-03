@@ -232,6 +232,15 @@ fn (mut lexer0 Lexer) continue_term(mut term []u8, kind token.Kind) !token.Token
 			term << lexer0.source.get_while_number()
 			lexer0.continue_term(mut term, kind)!
 		}
+		`e` {
+			if kind == ._float {
+				term << current
+				term << lexer0.source.get_while_number()
+				lexer0.continue_term(mut term, ._float_e)!
+			} else {
+				error(lexer0.show_error_custom_error(lexer.invalid_token_message))
+			}
+		}
 		`.` {
 			if kind == ._float {
 				term << current

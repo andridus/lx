@@ -31,6 +31,7 @@ pub enum Kind {
 	_mult_op  // *, /
 	_int      // 1
 	_float    // 1.5
+	_float_e  // 1.5e1
 	_charlist // 'a'
 	_string   // "abc"
 	_true
