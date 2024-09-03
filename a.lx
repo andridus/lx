@@ -1,2 +1,16 @@
+# first with commment
+1
+1 + 5
+"minha string"
+"minha \"string\" com delimiter \""
+'a'
+true
+false
+:a
+:"my atom utf8 with double quotes (\") delimiter"
+# inside comment
+:'my atom utf8 with single quotes (\') delimiter'
+# comment # with comment
+#
 1.15
-1.1e10e
+1.1e10
