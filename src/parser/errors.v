@@ -16,3 +16,7 @@ fn (p Parser) gen_syntax_error() string {
 	sb.writeln('  |${' '.repeat(term_before.len + 2)}^\n')
 	return sb.str()
 }
+
+fn (mut p Parser) gen_token_error() string {
+	return p.lexer.gen_token_error(1, 4)
+}

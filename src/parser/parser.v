@@ -49,7 +49,10 @@ pub fn parse_stmt(data []u8) !ast.Node {
 
 fn (mut p Parser) call_next_token() ! {
 	p.current_token = p.next_token
-	p.next_token = p.lexer.read_next_token()!
+	p.next_token = p.lexer.read_next_token() or {
+		println(p.gen_token_error())
+		exit(1)
+	}
 }
 
 fn (mut p Parser) stmt() !ast.Node {

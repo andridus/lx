@@ -4,15 +4,92 @@ import encoding.binary
 
 pub struct DataBytes {
 mut:
-	data         []u8
-	current_pos  int
-	current_line int
+	data            []u8
+	current_pos     int
+	total_lines     int
+	lines_start_pos []int
+	current_line    int = 1
 }
 
 pub fn DataBytes.init(source []u8) DataBytes {
+	total_lines, lines_start_pos := count_lines(source)
 	return DataBytes{
-		data: source
+		data:            source
+		total_lines:     total_lines
+		lines_start_pos: lines_start_pos
 	}
+}
+
+pub fn count_lines(source []u8) (int, []int) {
+	mut total_lines := 0
+	mut lines_start_pos := [0]
+	mut idx := 0
+	for i in source {
+		if i == 10 {
+			total_lines++
+			lines_start_pos << idx
+		}
+		idx++
+	}
+	return total_lines, lines_start_pos
+}
+
+pub fn (mut b DataBytes) get_lines_about(num int) []string {
+	mut lines := []string{}
+	if b.total_lines == 1 {
+		mut line := []u8{}
+		mut line2 := []u8{}
+		mut pos := 0
+		for i in b.data {
+			if i != 10 {
+				line << i
+				pos++
+				if b.current_pos == pos {
+					line2 << `^`
+				} else {
+					line2 << ` `
+				}
+			}
+		}
+		lines << line.bytestr()
+		lines << line2.bytestr()
+	} else {
+		mut lines_before := b.current_line - num
+		mut lines_after := b.current_line + num
+		if lines_before <= 0 {
+			lines_before = 1
+		}
+		if lines_after > b.total_lines {
+			lines_after = b.total_lines
+		}
+		mut actual_line := lines_before
+		mut pos := b.lines_start_pos[actual_line - 1] + 1
+		for actual_line <= lines_after {
+			mut line := []u8{}
+			mut line2 := []u8{}
+			mut add_line_2 := false
+
+			for i in b.data[b.lines_start_pos[actual_line - 1]..b.lines_start_pos[actual_line]] {
+				if i != 10 {
+					line << i
+					if b.current_pos == pos {
+						line2 << `^`
+						add_line_2 = true
+					} else {
+						line2 << ` `
+					}
+				}
+				pos++
+			}
+			lines << '   ${actual_line}\t| ${line.bytestr()}'
+			if add_line_2 {
+				lines << '   \t| ${line2.bytestr()}'
+			}
+			actual_line++
+		}
+	}
+
+	return lines
 }
 
 pub fn (mut b DataBytes) is_empty_file() bool {

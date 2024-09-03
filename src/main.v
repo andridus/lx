@@ -14,5 +14,5 @@ fn main() {
 	for node in nodes {
 		println(node.elixir())
 	}
-	println('finish with success!')
+	println('->> finish with success!')
 }
