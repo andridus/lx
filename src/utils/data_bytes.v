@@ -1,6 +1,7 @@
 module utils
 
 import encoding.binary
+import color
 
 pub struct DataBytes {
 mut:
@@ -71,11 +72,12 @@ pub fn (mut b DataBytes) get_lines_about(num int) []string {
 
 			for i in b.data[b.lines_start_pos[actual_line - 1]..b.lines_start_pos[actual_line]] {
 				if i != 10 {
-					line << i
 					if b.current_pos == pos {
-						line2 << `^`
+						line << color.fg(.red, .default, [i].bytestr()).bytes()
+						line2 << color.fg(.red, .default, '^').bytes()
 						add_line_2 = true
 					} else {
+						line << i
 						line2 << ` `
 					}
 				}

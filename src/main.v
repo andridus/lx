@@ -2,6 +2,7 @@ module main
 
 import os
 import parser
+import color
 
 fn main() {
 	if os.args.len == 1 {
@@ -14,5 +15,5 @@ fn main() {
 	for node in nodes {
 		println(node.elixir())
 	}
-	println('->> finish with success!')
+	println(color.fg(.dark_green, .default, '->> compiled with success!'))
 }

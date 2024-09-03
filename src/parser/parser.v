@@ -79,7 +79,7 @@ fn (mut p Parser) expr() !ast.Node {
 		._int {
 			ast.new_node_2(curr.value(), ast.Integer{})
 		}
-		._float {
+		._float, ._float_e {
 			ast.new_node_2(curr.value(), ast.Float{})
 		}
 		._string {
