@@ -30,8 +30,12 @@ pub fn parse_stmts(data []u8) ![]ast.Node {
 		if !stmt.is_comment() { // ignore comment
 			p.stmts << stmt
 		}
-		if p.current_token.kind == .newline {
-			p.call_next_token()!
+		for {
+			if p.current_token.kind == .newline {
+				p.call_next_token()!
+			} else {
+				break
+			}
 		}
 	}
 	return p.stmts

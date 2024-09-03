@@ -1,16 +1,27 @@
-# first with commment
+# Integers
 1
+1_000
+5
+# Floats
+1.15
+1_100.13
+1.1e10
+
+# Simple function
 1 + 5
+
+#Strings
 "minha string"
 "minha \"string\" com delimiter \""
+
+# Charlist
 'a'
+
+# Boolean
 true
 false
+
+# Atoms
 :a
 :"my atom utf8 with double quotes (\") delimiter"
-# inside comment
 :'my atom utf8 with single quotes (\') delimiter'
-# comment # with comment
-#
-1.15
-1.1e10

@@ -222,9 +222,6 @@ fn (mut lexer0 Lexer) parse_number() !token.Token {
 }
 
 fn (mut lexer0 Lexer) continue_term(mut term []u8, kind token.Kind) !token.Token {
-	if lexer0.source.eof() {
-		return lexer0.new_token(kind, term.bytestr())
-	}
 	current := lexer0.source.current()
 	return match current {
 		`_` {
@@ -251,6 +248,9 @@ fn (mut lexer0 Lexer) continue_term(mut term []u8, kind token.Kind) !token.Token
 				term << lexer0.source.get_while_number()
 				lexer0.continue_term(mut term, ._float)!
 			}
+		}
+		`0`...`9` {
+			lexer0.new_token(kind, term.bytestr())
 		}
 		else {
 			lexer0.source.backwards_bytes(1)

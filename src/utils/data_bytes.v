@@ -9,7 +9,7 @@ mut:
 	current_pos     int
 	total_lines     int
 	lines_start_pos []int
-	current_line    int = 1
+	current_line    int
 }
 
 pub fn DataBytes.init(source []u8) DataBytes {
@@ -32,6 +32,7 @@ pub fn count_lines(source []u8) (int, []int) {
 		}
 		idx++
 	}
+	lines_start_pos << source.len
 	return total_lines, lines_start_pos
 }
 
@@ -61,7 +62,7 @@ pub fn (mut b DataBytes) get_lines_about(num int) []string {
 			lines_before = 1
 		}
 		if lines_after > b.total_lines {
-			lines_after = b.total_lines
+			lines_after = b.total_lines + 1
 		}
 		mut actual_line := lines_before
 		mut pos := b.lines_start_pos[actual_line - 1] + 1
@@ -104,8 +105,11 @@ pub fn (mut b DataBytes) is_empty_file() bool {
 }
 
 pub fn (mut b DataBytes) backwards_bytes(num int) {
-	if b.current_pos > 0 {
+	if b.current_pos >= 0 {
 		b.current_pos -= num
+		if b.data[b.current_pos] == 10 {
+			b.current_line--
+		}
 	}
 }
 
@@ -146,11 +150,15 @@ pub fn (mut b DataBytes) get_next_byte() !u8 {
 }
 
 pub fn (mut b DataBytes) get_while_number() []u8 {
-	mut val := b.get_next_byte() or { return [] }
+	// mut val := b.get_next_byte() or { return [] }
 	mut numbers := []u8{}
-	for val >= 48 && val <= 57 {
-		numbers << val
-		val = b.get_next_byte() or { return numbers }
+	for {
+		val := b.get_next_byte() or { return numbers }
+		if val >= 48 && val <= 57 {
+			numbers << val
+		} else {
+			break
+		}
 	}
 	return numbers
 }
