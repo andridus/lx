@@ -7,9 +7,6 @@
 1_100.13
 1.1e10
 
-# Simple function
-1 + 5
-
 #Strings
 "minha string"
 "minha \"string\" com delimiter \""
