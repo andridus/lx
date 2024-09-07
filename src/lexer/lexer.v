@@ -74,6 +74,12 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 		`]` {
 			lexer0.new_token(._rsbr, ']')
 		}
+		`{` {
+			lexer0.new_token(._lcbr, '{')
+		}
+		`}` {
+			lexer0.new_token(._rcbr, '}')
+		}
 		`,` {
 			lexer0.new_token(._comma, ',')
 		}

@@ -38,6 +38,8 @@ pub enum Kind {
 	_false
 	_atom
 	_comment
+	_lcbr // {
+	_rcbr // }
 	_lsbr // [
 	_rsbr // ]
 	_comma

@@ -48,6 +48,17 @@ pub fn (n Node) elixir() string {
 						n.str()
 					}
 				}
+				Tuple {
+					if n.nodes.len > 0 {
+						mut mapped := []string{}
+						for n0 in n.nodes {
+							mapped << n0.elixir()
+						}
+						'{${mapped.join(',')}}'
+					} else {
+						n.str()
+					}
+				}
 				else {
 					n.left.str()
 				}

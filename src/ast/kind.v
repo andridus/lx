@@ -7,6 +7,7 @@ pub type NodeKind = Atom
 	| String
 	| Charlist
 	| List
+	| Tuple
 	| Boolean
 	| Mixed
 	| Comment
@@ -31,6 +32,10 @@ mut:
 
 pub fn Mixed.new(kinds []NodeKind) Mixed {
 	return Mixed{kinds}
+}
+
+pub fn (m Mixed) kinds() []NodeKind {
+	return m.kinds
 }
 
 pub fn (mut m Mixed) put_if_required(kind NodeKind) {
@@ -68,6 +73,16 @@ pub struct List {
 pub fn List.new(kind NodeKind) List {
 	return List{
 		kind: kind
+	}
+}
+
+pub struct Tuple {
+	kinds []NodeKind
+}
+
+pub fn Tuple.new(kinds []NodeKind) Tuple {
+	return Tuple{
+		kinds: kinds
 	}
 }
 

@@ -31,3 +31,9 @@ false
 
 # Lists with mixed
 [1,:a,:b]
+
+# Tuple with integer
+{1,2,3}
+
+# Tuple with mixed
+{1,:a,:b}

@@ -5,6 +5,7 @@ import lexer
 import token
 
 const ending_kinds = [token.Kind.eof, .newline, ._comma, ._rcbr, ._rpar, ._rsbr]
+
 struct Options {
 	build_path string = '_build'
 }
@@ -59,6 +60,7 @@ fn (mut p Parser) call_next_token() ! {
 		exit(1)
 	}
 }
+
 fn (mut p Parser) call_match_and_next_token(kind token.Kind) ! {
 	if p.current_token.kind == kind {
 		p.call_next_token()!
@@ -68,7 +70,6 @@ fn (mut p Parser) call_match_and_next_token(kind token.Kind) ! {
 		error(p.lexer.show_error_custom_error(p.gen_expect_error(kind)))
 	}
 }
-
 
 fn (mut p Parser) stmt() !ast.Node {
 	curr := p.current_token
@@ -106,6 +107,15 @@ fn (mut p Parser) expr() !ast.Node {
 		._lsbr {
 			nodes, kind := p.parse_until(._rsbr)!
 			ast.new_node_3('[]', ast.List.new(kind), nodes)
+		}
+		._lcbr {
+			nodes, kind := p.parse_until(._rcbr)!
+			if kind is ast.Mixed {
+				k := kind as ast.Mixed
+				ast.new_node_3('{}', ast.Tuple.new(k.kinds()), nodes)
+			} else {
+				ast.new_node_3('{}', ast.Tuple.new([kind]), nodes)
+			}
 		}
 		._true {
 			ast.new_node(ast.Boolean.new(true))
@@ -175,11 +185,16 @@ fn (mut p Parser) insert_node_deep_left(name string, function ast.Function, left
 }
 
 fn (mut p Parser) check_end_token() !bool {
-	if p.next_token.kind() in ending_kinds { return true }
+	if p.next_token.kind() in parser.ending_kinds {
+		return true
+	}
 	return error(p.lexer.show_error_custom_error(p.gen_syntax_error()))
 }
+
 fn (mut p Parser) check_not_end_token() !bool {
-	if p.current_token.kind() !in ending_kinds { return true }
+	if p.current_token.kind() !in parser.ending_kinds {
+		return true
+	}
 	return error(p.lexer.show_error_custom_error(p.gen_syntax_error()))
 }
 
