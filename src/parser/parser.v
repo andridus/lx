@@ -61,6 +61,30 @@ fn (mut p Parser) call_next_token() ! {
 	}
 }
 
+fn (mut p Parser) expect(kind token.Kind) !token.Token {
+	curr := p.current_token
+	if p.current_token.kind == kind {
+		p.ignore_next_newline()
+		if p.next_token.kind != .eof {
+			p.call_next_token()!
+		}
+		return curr
+	} else {
+		return error(p.lexer.show_error_custom_error(p.gen_expect_error(kind)))
+	}
+}
+
+// fn (mut p Parser) expect_next(kind token.Kind) ! {
+// 	p.ignore_next_newline()
+// 	if p.next_token.kind == kind {
+// 		if p.next_token.kind != .eof {
+// 			p.call_next_token()!
+// 		}
+// 	} else {
+// 		error(p.lexer.show_error_custom_error(p.gen_expect_error(kind)))
+// 	}
+// }
+
 fn (mut p Parser) call_match_and_next_token(kind token.Kind) ! {
 	if p.current_token.kind == kind {
 		p.call_next_token()!
@@ -72,12 +96,9 @@ fn (mut p Parser) call_match_and_next_token(kind token.Kind) ! {
 fn (mut p Parser) stmt() !ast.Node {
 	curr := p.current_token
 	match curr.kind() {
-		// .lit_int {
-		// 	return ast.Node{left: curr.value().int(), kind: ast.Integer{}}
-		// }
-		// .lit_float {
-		// 	return ast.Node{left: curr.value().f64(), kind: ast.Float{}}
-		// }
+		._defmodule {
+			return p.parse_module()
+		}
 		.eof {
 			return error('eof')
 		}

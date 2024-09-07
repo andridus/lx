@@ -37,6 +37,9 @@ pub fn (n Node) elixir() string {
 				Boolean {
 					n.kind.value.str()
 				}
+				Module {
+					'<<binary module ${n.kind.name.str()}>>'
+				}
 				Aliases {
 					mut mapped := []string{}
 					for n0 in n.nodes {

@@ -40,12 +40,16 @@ pub enum Kind {
 	_comment
 	_lcbr // {
 	_rcbr // }
+	_lpar // (
+	_rpar // )
 	_lsbr // [
 	_rsbr // ]
 	_comma
 	_defmodule
 	_aliases
 	_dot
+	_do
+	_end
 }
 
 pub enum Associative {

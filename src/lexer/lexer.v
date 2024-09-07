@@ -71,6 +71,12 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 		`/` {
 			lexer0.new_token(._mult_op, '/')
 		}
+		`(` {
+			lexer0.new_token(._lpar, '(')
+		}
+		`)` {
+			lexer0.new_token(._rpar, ')')
+		}
 		`[` {
 			lexer0.new_token(._lsbr, '[')
 		}
@@ -106,6 +112,12 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 					}
 					'defmodule' {
 						lexer0.new_token(._defmodule, '')
+					}
+					'do' {
+						lexer0.new_token(._do, '')
+					}
+					'end' {
+						lexer0.new_token(._end, '')
 					}
 					else {
 						error(lexer0.show_error_custom_error('undefined matched keyword `${keyword}`'))
@@ -179,9 +191,10 @@ fn (mut lexer0 Lexer) match_keyword() ?string {
 	mut word := []u8{}
 	mut curr := lexer0.source.current()
 	mut tmp := lexer0.keywords.clone()
+
 	for {
 		word << curr
-		keyword0 := tmp.filter(it.len > word.len && it[word.len - 1] == curr)
+		keyword0 := tmp.filter(it.len >= word.len && it[word.len - 1] == curr)
 		if keyword0.len == 1 {
 			mut slice_keyword0 := keyword0[0][(word.len - 1)..]
 			if lexer0.source.peek_expect_match(slice_keyword0) {
