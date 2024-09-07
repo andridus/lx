@@ -5,16 +5,18 @@ import parser
 import color
 import testing
 import flag
+
 const version = '0.1.0'
+
 @[xdoc: 'Lx compiler']
-@[footer: '']
 @[version: version]
 @[name: 'lx']
+@[footer: '']
 struct Config {
-    show_version bool @[short: v; xdoc: 'Show version and exit']
-		show_help bool @[short: h; xdoc: 'Show help']
-		test_suite bool @[long: suite; xdoc: 'Run tests suite']
-		file string
+	show_version bool @[short: v; xdoc: 'Show version and exit']
+	show_help    bool @[short: h; xdoc: 'Show help']
+	test_suite   bool @[long: suite; xdoc: 'Run tests suite']
+	file         string
 }
 
 fn main() {
@@ -34,8 +36,8 @@ fn main() {
 	}
 
 	if no_matches.len != 1 {
-			println('Invalid command, show help with `-h`')
-			exit(0)
+		println('Invalid command, show help with `-h`')
+		exit(0)
 	}
 	path := os.args[1]
 	source := os.read_bytes(path) or {
