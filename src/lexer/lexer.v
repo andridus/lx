@@ -56,6 +56,9 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 		`0`...`9` {
 			lexer0.parse_number()!
 		}
+		`A`...`Z` {
+			lexer0.parse_module_name()!
+		}
 		`+` {
 			lexer0.new_token(._add_op, '+')
 		}
@@ -83,6 +86,9 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 		`,` {
 			lexer0.new_token(._comma, ',')
 		}
+		`.` {
+			lexer0.new_token(._dot, '.')
+		}
 		`:` {
 			lexer0.parse_atom()!
 		}
@@ -97,6 +103,9 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 					}
 					'false' {
 						lexer0.new_token(._false, '')
+					}
+					'defmodule' {
+						lexer0.new_token(._defmodule, '')
 					}
 					else {
 						error(lexer0.show_error_custom_error('undefined matched keyword `${keyword}`'))
@@ -123,8 +132,18 @@ fn (mut lexer0 Lexer) parse_inline_comment() !token.Token {
 	return lexer0.new_token(._comment, data.bytestr())
 }
 
+fn (mut lexer0 Lexer) parse_module_name() !token.Token {
+	data := lexer0.parse_alpha()
+	if data.len == 0 {
+		return error(lexer0.show_error_custom_error('not is valid module'))
+	}
+
+	return lexer0.new_token(._module, data.bytestr())
+}
+
 fn (mut lexer0 Lexer) parse_atom() !token.Token {
 	mut curr := lexer0.source.current()
+
 	if curr != `:` {
 		return error(lexer0.show_error_custom_error('is not an atom'))
 	}
@@ -132,8 +151,10 @@ fn (mut lexer0 Lexer) parse_atom() !token.Token {
 	mut data := []u8{}
 	if curr in [`'`, `\"`] {
 		_, data = lexer0.parse_bytes_from_delimiter()!
+	} else if is_capital(curr) {
+		return lexer0.parse_module_name()!
 	} else if is_alpha(curr) {
-		data = lexer0.parse_alpha()!
+		data = lexer0.parse_alpha()
 	}
 	if data.len == 0 {
 		return error(lexer0.show_error_custom_error('not is valid atom'))
@@ -142,10 +163,14 @@ fn (mut lexer0 Lexer) parse_atom() !token.Token {
 	return lexer0.new_token(._atom, data.bytestr())
 }
 
-fn (mut lexer0 Lexer) parse_alpha() ![]u8 {
+fn (mut lexer0 Lexer) parse_alpha() []u8 {
 	mut byt := [lexer0.source.current()]
-	for is_alpha(lexer0.source.peek_next()!) {
-		byt << lexer0.source.get_next_byte()!
+	for {
+		c := lexer0.source.peek_next() or { break }
+		if !is_alpha(c) {
+			break
+		}
+		byt << lexer0.source.get_next_byte() or { break }
 	}
 	return byt
 }
@@ -220,11 +245,15 @@ fn (mut lexer0 Lexer) parse_bytes_from_delimiter() !(rune, []u8) {
 	for byt != delimiter {
 		data << byt
 		byt = lexer0.source.get_next_byte()!
-		if byt == `\\` && lexer0.source.peek_next()! == delimiter {
+		if byt == `\\` {
+			d := lexer0.source.peek_next() or { break }
+			if d != delimiter {
+				break
+			}
 			data << `\\`
 			data << delimiter
 			lexer0.source.ignore_bytes(1)!
-			byt = lexer0.source.get_next_byte()!
+			byt = lexer0.source.get_next_byte() or { break }
 		}
 	}
 	return delimiter, data

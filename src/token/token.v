@@ -43,6 +43,9 @@ pub enum Kind {
 	_lsbr // [
 	_rsbr // ]
 	_comma
+	_defmodule
+	_module
+	_dot
 }
 
 pub enum Associative {

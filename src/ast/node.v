@@ -33,6 +33,18 @@ pub fn new_atom_node(value string) Node {
 	}
 }
 
+pub fn new_module_node(values []string) Node {
+	mut nodes := []Node{}
+	for value in values {
+		nodes << new_node_2(value, String{})
+	}
+	return Node{
+		left:  NodeLeft('__aliases__')
+		kind:  Aliases.new(values)
+		nodes: nodes
+	}
+}
+
 pub fn new_node_2(value string, kind NodeKind) Node {
 	value0 := str_to_node_left(value, kind)
 	return Node{

@@ -37,3 +37,8 @@ false
 
 # Tuple with mixed
 {1,:a,:b}
+
+# module name
+:A1
+A
+A.B.C

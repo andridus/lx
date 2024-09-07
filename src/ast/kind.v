@@ -9,6 +9,7 @@ pub type NodeKind = Atom
 	| List
 	| Tuple
 	| Boolean
+	| Aliases
 	| Mixed
 	| Comment
 	| Nil
@@ -22,6 +23,18 @@ pub fn Atom.new(value string) Atom {
 	return Atom{
 		value: value
 		idx:   1 // it will use atom table to ensure value
+	}
+}
+
+pub struct Aliases {
+	values []string
+	idx    int
+}
+
+pub fn Aliases.new(values []string) Aliases {
+	return Aliases{
+		values: values
+		idx:    1
 	}
 }
 

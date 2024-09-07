@@ -65,8 +65,6 @@ fn (mut p Parser) call_match_and_next_token(kind token.Kind) ! {
 	if p.current_token.kind == kind {
 		p.call_next_token()!
 	} else {
-		println(kind)
-		println(p.current_token.kind)
 		error(p.lexer.show_error_custom_error(p.gen_expect_error(kind)))
 	}
 }
@@ -101,6 +99,9 @@ fn (mut p Parser) expr() !ast.Node {
 		._string {
 			ast.new_node_2(curr.value(), ast.String{})
 		}
+		._module {
+			p.parse_deep_module_if_required()!
+		}
 		._charlist {
 			ast.new_node_2(curr.value(), ast.Charlist{})
 		}
@@ -134,6 +135,35 @@ fn (mut p Parser) expr() !ast.Node {
 		}
 	}
 	return p.maybe_apply_precendence(node)!
+}
+
+fn (mut p Parser) parse_deep_module_if_required() !ast.Node {
+	mut deep_modules := []string{}
+	for {
+		deep_modules << p.current_token.value()
+		if p.next_token.kind == ._dot {
+			p.ignore_next_newline()
+			p.call_next_token()!
+			p.call_next_token() or { break }
+		} else {
+			break
+		}
+
+		// p.call_next_token() or {break}
+	}
+
+	return ast.new_module_node(deep_modules)
+}
+
+fn (mut p Parser) ignore_next_newline() {
+	for {
+		if p.next_token.kind == .newline {
+			p.call_next_token() or { break }
+			p.call_next_token() or { break }
+		} else {
+			break
+		}
+	}
 }
 
 fn (mut p Parser) find_keyword() ?ast.Node {

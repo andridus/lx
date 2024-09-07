@@ -37,6 +37,13 @@ pub fn (n Node) elixir() string {
 				Boolean {
 					n.kind.value.str()
 				}
+				Aliases {
+					mut mapped := []string{}
+					for n0 in n.nodes {
+						mapped << n0.left as string
+					}
+					mapped.join('.')
+				}
 				List {
 					if n.nodes.len > 0 {
 						mut mapped := []string{}
