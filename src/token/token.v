@@ -44,7 +44,7 @@ pub enum Kind {
 	_rsbr // ]
 	_comma
 	_defmodule
-	_module
+	_aliases
 	_dot
 }
 

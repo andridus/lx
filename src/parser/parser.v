@@ -99,8 +99,8 @@ fn (mut p Parser) expr() !ast.Node {
 		._string {
 			ast.new_node_2(curr.value(), ast.String{})
 		}
-		._module {
-			p.parse_deep_module_if_required()!
+		._aliases {
+			p.parse_aliases()!
 		}
 		._charlist {
 			ast.new_node_2(curr.value(), ast.Charlist{})
@@ -137,10 +137,10 @@ fn (mut p Parser) expr() !ast.Node {
 	return p.maybe_apply_precendence(node)!
 }
 
-fn (mut p Parser) parse_deep_module_if_required() !ast.Node {
-	mut deep_modules := []string{}
+fn (mut p Parser) parse_aliases() !ast.Node {
+	mut aliases := []string{}
 	for {
-		deep_modules << p.current_token.value()
+		aliases << p.current_token.value()
 		if p.next_token.kind == ._dot {
 			p.ignore_next_newline()
 			p.call_next_token()!
@@ -148,11 +148,8 @@ fn (mut p Parser) parse_deep_module_if_required() !ast.Node {
 		} else {
 			break
 		}
-
-		// p.call_next_token() or {break}
 	}
-
-	return ast.new_module_node(deep_modules)
+	return ast.new_aliases_node(aliases)
 }
 
 fn (mut p Parser) ignore_next_newline() {

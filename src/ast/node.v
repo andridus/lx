@@ -33,7 +33,7 @@ pub fn new_atom_node(value string) Node {
 	}
 }
 
-pub fn new_module_node(values []string) Node {
+pub fn new_aliases_node(values []string) Node {
 	mut nodes := []Node{}
 	for value in values {
 		nodes << new_node_2(value, String{})

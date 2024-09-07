@@ -57,7 +57,7 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 			lexer0.parse_number()!
 		}
 		`A`...`Z` {
-			lexer0.parse_module_name()!
+			lexer0.parse_aliases()!
 		}
 		`+` {
 			lexer0.new_token(._add_op, '+')
@@ -132,13 +132,13 @@ fn (mut lexer0 Lexer) parse_inline_comment() !token.Token {
 	return lexer0.new_token(._comment, data.bytestr())
 }
 
-fn (mut lexer0 Lexer) parse_module_name() !token.Token {
+fn (mut lexer0 Lexer) parse_aliases() !token.Token {
 	data := lexer0.parse_alpha()
 	if data.len == 0 {
 		return error(lexer0.show_error_custom_error('not is valid module'))
 	}
 
-	return lexer0.new_token(._module, data.bytestr())
+	return lexer0.new_token(._aliases, data.bytestr())
 }
 
 fn (mut lexer0 Lexer) parse_atom() !token.Token {
@@ -152,7 +152,7 @@ fn (mut lexer0 Lexer) parse_atom() !token.Token {
 	if curr in [`'`, `\"`] {
 		_, data = lexer0.parse_bytes_from_delimiter()!
 	} else if is_capital(curr) {
-		return lexer0.parse_module_name()!
+		return lexer0.parse_aliases()!
 	} else if is_alpha(curr) {
 		data = lexer0.parse_alpha()
 	}
