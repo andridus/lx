@@ -4,6 +4,7 @@ import ast
 import lexer
 import token
 
+const ending_kinds = [token.Kind.eof, .newline, ._comma, ._rcbr, ._rpar, ._rsbr]
 struct Options {
 	build_path string = '_build'
 }
@@ -58,6 +59,16 @@ fn (mut p Parser) call_next_token() ! {
 		exit(1)
 	}
 }
+fn (mut p Parser) call_match_and_next_token(kind token.Kind) ! {
+	if p.current_token.kind == kind {
+		p.call_next_token()!
+	} else {
+		println(kind)
+		println(p.current_token.kind)
+		error(p.lexer.show_error_custom_error(p.gen_expect_error(kind)))
+	}
+}
+
 
 fn (mut p Parser) stmt() !ast.Node {
 	curr := p.current_token
@@ -92,6 +103,10 @@ fn (mut p Parser) expr() !ast.Node {
 		._charlist {
 			ast.new_node_2(curr.value(), ast.Charlist{})
 		}
+		._lsbr {
+			nodes, kind := p.parse_until(._rsbr)!
+			ast.new_node_3('[]', ast.List.new(kind), nodes)
+		}
 		._true {
 			ast.new_node(ast.Boolean.new(true))
 		}
@@ -99,7 +114,7 @@ fn (mut p Parser) expr() !ast.Node {
 			ast.new_node(ast.Boolean.new(false))
 		}
 		._atom {
-			ast.new_node_2(curr.value(), ast.Atom.new(curr.value()))
+			ast.new_atom_node(curr.value())
 		}
 		._comment {
 			ast.new_node_2(curr.value(), ast.Comment{})
@@ -138,7 +153,7 @@ fn (mut p Parser) maybe_apply_precendence(node ast.Node) !ast.Node {
 			}
 		}
 	} else {
-		p.check_end_expr()!
+		p.check_end_token()!
 		p.call_next_token()!
 		return node
 	}
@@ -159,10 +174,40 @@ fn (mut p Parser) insert_node_deep_left(name string, function ast.Function, left
 	return ast.new_node_3(name, function, [left, right])
 }
 
-fn (mut p Parser) check_end_expr() !bool {
-	if p.next_token.kind() in [.eof, .newline] {
-		return true
-	} else {
-		return error(p.lexer.show_error_custom_error(p.gen_syntax_error()))
+fn (mut p Parser) check_end_token() !bool {
+	if p.next_token.kind() in ending_kinds { return true }
+	return error(p.lexer.show_error_custom_error(p.gen_syntax_error()))
+}
+fn (mut p Parser) check_not_end_token() !bool {
+	if p.current_token.kind() !in ending_kinds { return true }
+	return error(p.lexer.show_error_custom_error(p.gen_syntax_error()))
+}
+
+fn (mut p Parser) parse_until(until token.Kind) !([]ast.Node, ast.NodeKind) {
+	p.call_next_token()!
+	mut nodes := []ast.Node{}
+	mut kind := ast.NodeKind(ast.Nil{})
+	for {
+		if p.current_token.kind == until {
+			p.call_next_token()!
+			break
+		}
+		node := p.expr()!
+		if nodes.len == 0 {
+			kind = node.kind
+		} else if node.kind != kind {
+			kind = ast.NodeKind(ast.Mixed.new([kind, node.kind]))
+		} else if mut kind is ast.Mixed {
+			kind.put_if_required(node.kind)
+		}
+		nodes << node
+
+		if p.current_token.kind == until {
+			p.call_next_token()!
+			break
+		}
+		p.call_match_and_next_token(._comma)!
+		p.check_not_end_token()!
 	}
+	return nodes, kind
 }

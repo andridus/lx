@@ -25,6 +25,14 @@ pub fn new_node(kind NodeKind) Node {
 	}
 }
 
+pub fn new_atom_node(value string) Node {
+	atom := Atom.new(value)
+	return Node{
+		left: NodeLeft(atom)
+		kind: atom
+	}
+}
+
 pub fn new_node_2(value string, kind NodeKind) Node {
 	value0 := str_to_node_left(value, kind)
 	return Node{

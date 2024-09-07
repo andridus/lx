@@ -10,18 +10,24 @@
 1_100.13
 1.1e10
 
-#Strings
-"minha string"
-"minha \"string\" com delimiter \""
-
-# Charlist
-'a'
-
 # Boolean
 true
 false
+
+#Strings
+"minha string"
+"minha \"string\" com delimiter \""
 
 # Atoms
 :a
 :"my atom utf8 with double quotes (\") delimiter"
 :'my atom utf8 with single quotes (\') delimiter'
+
+# Charlist
+'a'
+
+# Lists with integer
+[1,2,3]
+
+# Lists with mixed
+[1,:a,:b]

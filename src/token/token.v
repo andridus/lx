@@ -38,6 +38,9 @@ pub enum Kind {
 	_false
 	_atom
 	_comment
+	_lsbr // [
+	_rsbr // ]
+	_comma
 }
 
 pub enum Associative {

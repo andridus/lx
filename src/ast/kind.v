@@ -8,6 +8,7 @@ pub type NodeKind = Atom
 	| Charlist
 	| List
 	| Boolean
+	| Mixed
 	| Comment
 	| Nil
 
@@ -20,6 +21,21 @@ pub fn Atom.new(value string) Atom {
 	return Atom{
 		value: value
 		idx:   1 // it will use atom table to ensure value
+	}
+}
+
+pub struct Mixed {
+mut:
+	kinds []NodeKind
+}
+
+pub fn Mixed.new(kinds []NodeKind) Mixed {
+	return Mixed{kinds}
+}
+
+pub fn (mut m Mixed) put_if_required(kind NodeKind) {
+	if kind !in m.kinds {
+		m.kinds << kind
 	}
 }
 

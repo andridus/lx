@@ -17,7 +17,7 @@ pub fn (n Node) elixir() string {
 				}
 				'{:${n.left.value.str()}, [], [${mapped.join(',')}]}'
 			} else {
-				n.left.value
+				':${n.left.value}'
 			}
 		}
 		f64 {
@@ -28,10 +28,29 @@ pub fn (n Node) elixir() string {
 		}
 		string {
 			match n.kind {
-				String { "\"${n.left.str()}\"" }
-				Charlist { '\'${n.left.str()}\'' }
-				Boolean { n.kind.value.str() }
-				else { n.left.str() }
+				String {
+					"\"${n.left.str()}\""
+				}
+				Charlist {
+					'\'${n.left.str()}\''
+				}
+				Boolean {
+					n.kind.value.str()
+				}
+				List {
+					if n.nodes.len > 0 {
+						mut mapped := []string{}
+						for n0 in n.nodes {
+							mapped << n0.elixir()
+						}
+						'[${mapped.join(',')}]'
+					} else {
+						n.str()
+					}
+				}
+				else {
+					n.left.str()
+				}
 			}
 		}
 	}
