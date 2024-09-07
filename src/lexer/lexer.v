@@ -216,24 +216,44 @@ fn (mut lexer0 Lexer) parse_bytes_from_delimiter() !(rune, []u8) {
 }
 
 fn (mut lexer0 Lexer) parse_number() !token.Token {
+	mut opts := map[string]bool{}
 	mut term := [lexer0.source.current()]
 	term << lexer0.source.get_while_number()
-	return lexer0.continue_term(mut term, ._int)!
+	return lexer0.continue_term(mut term, ._int, mut opts)!
 }
 
-fn (mut lexer0 Lexer) continue_term(mut term []u8, kind token.Kind) !token.Token {
+fn (mut lexer0 Lexer) continue_term(mut term []u8, kind token.Kind, mut opts map[string]bool) !token.Token {
 	current := lexer0.source.current()
 	return match current {
 		`_` {
 			lexer0.source.ignore_bytes(1)!
 			term << lexer0.source.get_while_number()
-			lexer0.continue_term(mut term, kind)!
+			lexer0.continue_term(mut term, kind, mut opts)!
 		}
 		`e` {
 			if kind == ._float {
 				term << current
 				term << lexer0.source.get_while_number()
-				lexer0.continue_term(mut term, ._float_e)!
+				lexer0.continue_term(mut term, ._float_e, mut opts)!
+			} else {
+				error(lexer0.show_error_custom_error(lexer.invalid_token_message))
+			}
+		}
+		`x` {
+			if kind == ._int {
+				term << current
+				term << lexer0.source.get_while_number()
+				opts['hexadecimal'] = true
+				lexer0.continue_term(mut term, ._int, mut opts)!
+			} else {
+				error(lexer0.show_error_custom_error(lexer.invalid_token_message))
+			}
+		}
+		`A`...`F`, `a`...`f` {
+			if opts['hexadecimal'] == true && kind == ._int {
+				term << current
+				term << lexer0.source.get_while_number()
+				lexer0.continue_term(mut term, kind, mut opts)!
 			} else {
 				error(lexer0.show_error_custom_error(lexer.invalid_token_message))
 			}
@@ -242,11 +262,11 @@ fn (mut lexer0 Lexer) continue_term(mut term []u8, kind token.Kind) !token.Token
 			if kind == ._float {
 				term << current
 				term << lexer0.source.get_while_number()
-				lexer0.continue_term(mut term, ._string)!
+				lexer0.continue_term(mut term, ._string, mut opts)!
 			} else {
 				term << current
 				term << lexer0.source.get_while_number()
-				lexer0.continue_term(mut term, ._float)!
+				lexer0.continue_term(mut term, ._float, mut opts)!
 			}
 		}
 		`0`...`9` {
