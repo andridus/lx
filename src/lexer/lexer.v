@@ -208,7 +208,13 @@ fn (mut lexer0 Lexer) match_keyword() ?(string, bool) {
 				slice_keyword0.drop(1)
 				word << slice_keyword0
 				lexer0.source.ignore_bytes(slice_keyword0.len) or { break }
-				return word.bytestr(), false
+				a := lexer0.source.peek_next() or { 0 }
+				if a == `:` {
+					lexer0.source.ignore_bytes(1) or { break }
+					return word.bytestr(), true
+				} else {
+					return word.bytestr(), false
+				}
 			}
 		} else if keyword0.len == 0 {
 			mut is_atom := false

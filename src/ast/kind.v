@@ -27,16 +27,6 @@ pub fn Atom.new(value string) Atom {
 	}
 }
 
-pub struct Module {
-	name string
-}
-
-pub fn Module.new(name string) Module {
-	return Module{
-		name: name
-	}
-}
-
 pub struct Aliases {
 	values []string
 	idx    int

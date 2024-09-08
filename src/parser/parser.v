@@ -63,6 +63,15 @@ fn (mut p Parser) call_next_token() ! {
 	}
 }
 
+fn (mut p Parser) expect_keyword(keyword0 string) !token.Token {
+	keyword := p.expect(._keyword_atom)!
+	if keyword.value == keyword0 {
+		return keyword
+	} else {
+		return error(p.lexer.show_error_custom_error('expect keyword atom `${keyword0}` but received `${keyword.value}`'))
+	}
+}
+
 fn (mut p Parser) expect(kind token.Kind) !token.Token {
 	curr := p.current_token
 	if p.current_token.kind == kind {
@@ -189,7 +198,6 @@ fn (mut p Parser) parse_aliases() !ast.Node {
 fn (mut p Parser) ignore_next_newline() {
 	for {
 		if p.next_token.kind == .newline {
-			p.call_next_token() or { break }
 			p.call_next_token() or { break }
 		} else {
 			break
