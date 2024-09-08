@@ -4,7 +4,7 @@ import ast
 import lexer
 import token
 
-const ending_kinds = [token.Kind.eof, .newline, ._comma, ._rcbr, ._rpar, ._rsbr]
+const ending_kinds = [token.Kind.eof, .newline, ._comma]
 
 struct Options {
 	build_path string = '_build'
@@ -14,10 +14,12 @@ struct Parser {
 	filename string
 	options  &Options = unsafe { nil }
 mut:
-	lexer         &lexer.Lexer
-	stmts         []ast.Node
-	current_token token.Token
-	next_token    token.Token
+	lexer              &lexer.Lexer
+	stmts              []ast.Node
+	current_token      token.Token
+	next_token         token.Token
+	brackets_delimiter []token.Kind
+	in_keyword_list    bool
 }
 
 pub fn parse_stmts(data []u8) ![]ast.Node {
@@ -148,6 +150,9 @@ fn (mut p Parser) expr() !ast.Node {
 		._atom {
 			ast.new_atom_node(curr.value())
 		}
+		._keyword_atom {
+			p.parse_keyword_item()!
+		}
 		._comment {
 			ast.new_node_2(curr.value(), ast.Comment{})
 		}
@@ -156,6 +161,14 @@ fn (mut p Parser) expr() !ast.Node {
 		}
 	}
 	return p.maybe_apply_precendence(node)!
+}
+
+fn (mut p Parser) parse_keyword_item() !ast.Node {
+	p.in_keyword_list = true
+	key := p.expect(._keyword_atom)!
+	value := p.expr()!
+	p.in_keyword_list = false
+	return ast.new_keyword_node(key.value, value)
 }
 
 fn (mut p Parser) parse_aliases() !ast.Node {
@@ -212,7 +225,6 @@ fn (mut p Parser) maybe_apply_precendence(node ast.Node) !ast.Node {
 		}
 	} else {
 		p.check_end_token()!
-		p.call_next_token()!
 		return node
 	}
 }
@@ -233,8 +245,24 @@ fn (mut p Parser) insert_node_deep_left(name string, function ast.Function, left
 }
 
 fn (mut p Parser) check_end_token() !bool {
-	if p.next_token.kind() in parser.ending_kinds {
+	if p.current_token.kind() in parser.ending_kinds {
+		p.call_next_token()!
+		p.call_next_token()!
 		return true
+	}
+	if p.next_token.kind() in parser.ending_kinds {
+		if !p.in_keyword_list {
+			p.call_next_token()!
+		}
+		return true
+	}
+
+	if p.brackets_delimiter.len > 0 {
+		if p.brackets_delimiter.last() == p.next_token.kind {
+			// p.call_next_token()!
+
+			return true
+		}
 	}
 	return error(p.lexer.show_error_custom_error(p.gen_syntax_error()))
 }
@@ -248,6 +276,7 @@ fn (mut p Parser) check_not_end_token() !bool {
 
 fn (mut p Parser) parse_until(until token.Kind) !([]ast.Node, ast.NodeKind) {
 	p.call_next_token()!
+	p.brackets_delimiter << until
 	mut nodes := []ast.Node{}
 	mut kind := ast.NodeKind(ast.Nil{})
 	for {
@@ -264,13 +293,17 @@ fn (mut p Parser) parse_until(until token.Kind) !([]ast.Node, ast.NodeKind) {
 			kind.put_if_required(node.kind)
 		}
 		nodes << node
-
-		if p.current_token.kind == until {
-			p.call_next_token()!
+		if p.next_token.kind == until {
+			p.call_next_token() or { break }
 			break
 		}
-		p.call_match_and_next_token(._comma)!
+		// println(p)
+		// p.call_next_token() or { break}
+
+		p.ignore_next_newline()
+		p.expect(._comma)!
 		p.check_not_end_token()!
 	}
+	p.brackets_delimiter.delete_last()
 	return nodes, kind
 }

@@ -50,6 +50,7 @@ pub enum Kind {
 	_dot
 	_do
 	_end
+	_keyword_atom
 }
 
 pub enum Associative {
@@ -89,8 +90,8 @@ pub fn (token0 &Token) is_infix() bool {
 	return prec.is_infix()
 }
 
-pub fn (token0 &Token) precedence() !TokenPrecedence {
-	return token.precedences[token0.kind.str()] or { error('has no precedence') }
+pub fn (token0 &Token) precedence() ?TokenPrecedence {
+	return token.precedences[token0.kind.str()] or { return none }
 }
 
 pub fn generate_eof() Token {

@@ -38,6 +38,15 @@ false
 # Tuple with mixed
 {1,:a,:b}
 
+# Tuple inside list
+[{:a, 1}]
+[{:a, 1}, {:a, 2}]
+
+# keyword list
+[a: 1]
+[a: 1, b: 21,]
+[a: 1, b: 21, c: 3]
+
 # module name
 :A1
 A

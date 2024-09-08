@@ -33,6 +33,11 @@ pub fn new_atom_node(value string) Node {
 	}
 }
 
+pub fn new_keyword_node(key string, value_node Node) Node {
+	key_node := new_atom_node(key)
+	return new_node_3('[]', Tuple.new([key_node.kind, value_node.kind]), [key_node, value_node])
+}
+
 pub fn new_aliases_node(values []string) Node {
 	mut nodes := []Node{}
 	for value in values {

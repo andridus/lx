@@ -1,2 +1,8 @@
-defmodule A do
-end
+# Tuple inside list
+[{:a, 1}]
+[{:a, 1}, {:a, 2}]
+
+# keyword list
+[a: 1]
+[a: 1, b: 21,]
+[a: 1, b: 21, c: 3]

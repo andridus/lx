@@ -102,25 +102,29 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 			lexer0.parse_delimiter()!
 		}
 		else {
-			if keyword := lexer0.match_keyword() {
-				return match keyword {
-					'true' {
-						lexer0.new_token(._true, '')
-					}
-					'false' {
-						lexer0.new_token(._false, '')
-					}
-					'defmodule' {
-						lexer0.new_token(._defmodule, '')
-					}
-					'do' {
-						lexer0.new_token(._do, '')
-					}
-					'end' {
-						lexer0.new_token(._end, '')
-					}
-					else {
-						error(lexer0.show_error_custom_error('undefined matched keyword `${keyword}`'))
+			if keyword, is_atom := lexer0.match_keyword() {
+				if is_atom {
+					return lexer0.new_token(._keyword_atom, keyword)
+				} else {
+					return match keyword {
+						'true' {
+							lexer0.new_token(._true, '')
+						}
+						'false' {
+							lexer0.new_token(._false, '')
+						}
+						'defmodule' {
+							lexer0.new_token(._defmodule, '')
+						}
+						'do' {
+							lexer0.new_token(._do, '')
+						}
+						'end' {
+							lexer0.new_token(._end, '')
+						}
+						else {
+							error(lexer0.show_error_custom_error('undefined matched keyword `${keyword}`'))
+						}
 					}
 				}
 			}
@@ -138,7 +142,10 @@ fn (mut lexer0 Lexer) parse_inline_comment() !token.Token {
 	}
 	for next != 10 {
 		curr = lexer0.source.get_next_byte() or { break }
-		next = lexer0.source.peek_next() or { break }
+		next = lexer0.source.peek_next() or {
+			data << curr
+			break
+		}
 		data << curr
 	}
 	return lexer0.new_token(._comment, data.bytestr())
@@ -187,7 +194,7 @@ fn (mut lexer0 Lexer) parse_alpha() []u8 {
 	return byt
 }
 
-fn (mut lexer0 Lexer) match_keyword() ?string {
+fn (mut lexer0 Lexer) match_keyword() ?(string, bool) {
 	mut word := []u8{}
 	mut curr := lexer0.source.current()
 	mut tmp := lexer0.keywords.clone()
@@ -201,10 +208,29 @@ fn (mut lexer0 Lexer) match_keyword() ?string {
 				slice_keyword0.drop(1)
 				word << slice_keyword0
 				lexer0.source.ignore_bytes(slice_keyword0.len) or { break }
-				return word.bytestr()
+				return word.bytestr(), false
 			}
 		} else if keyword0.len == 0 {
-			return none
+			mut is_atom := false
+			for {
+				curr0 := lexer0.source.get_next_byte() or { break }
+				match curr0 {
+					`:` {
+						is_atom = true
+						// lexer0.source.ignore_bytes(1) or { break }
+						break
+					}
+					` ` {
+						break
+					}
+					else {
+						if is_alpha(curr0) {
+							word << curr0
+						}
+					}
+				}
+			}
+			return word.bytestr(), is_atom
 		} else {
 			curr = lexer0.source.get_next_byte() or { break }
 			if lexer.delimiters.index(curr) != -1 {
