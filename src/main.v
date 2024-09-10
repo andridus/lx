@@ -44,9 +44,12 @@ fn main() {
 		println('File \'${path}\' not found')
 		exit(1)
 	}
-	nodes := parser.parse_stmts(source) or { exit(1) }
+	nodes := parser.parse_stmts(source) or {
+		println(err.msg())
+		exit(1)
+	}
 	for node in nodes {
-		println(node.elixir())
+		println(node.elixir(true))
 	}
 	println(color.fg(.dark_green, .default, '->> compiled with success!'))
 }

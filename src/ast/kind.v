@@ -11,9 +11,15 @@ pub type NodeKind = Atom
 	| Boolean
 	| Module
 	| Aliases
+	| ModuleAttribute
+	| KeywordList
 	| Mixed
 	| Comment
 	| Nil
+
+pub struct ModuleAttribute {}
+
+pub struct KeywordList {}
 
 pub struct Atom {
 	value string
@@ -53,7 +59,14 @@ pub fn (m Mixed) kinds() []NodeKind {
 }
 
 pub fn (mut m Mixed) put_if_required(kind NodeKind) {
-	if kind !in m.kinds {
+	mut exists := false
+	for k in m.kinds {
+		if kind.str() == k.str() {
+			exists = true
+			return
+		}
+	}
+	if !exists {
 		m.kinds << kind
 	}
 }
@@ -110,4 +123,65 @@ pub enum FunctionPosition {
 	prefix
 	infix
 	postfix
+}
+
+pub fn (n NodeKind) str() string {
+	return match n {
+		Atom {
+			'atom'
+		}
+		Float {
+			'float'
+		}
+		Function {
+			'function'
+		}
+		Integer {
+			'integer'
+		}
+		String {
+			'string'
+		}
+		Charlist {
+			'charlist'
+		}
+		List {
+			'list(${n.kind})'
+		}
+		Tuple {
+			mut s := []string{}
+			for k in n.kinds {
+				s << k.str()
+			}
+			'tuple(${s.join(',')})'
+		}
+		Boolean {
+			'boolean'
+		}
+		Module {
+			'module'
+		}
+		Aliases {
+			'aliases'
+		}
+		ModuleAttribute {
+			'module_attribute'
+		}
+		KeywordList {
+			'keyword_list'
+		}
+		Mixed {
+			mut s := []string{}
+			for k in n.kinds {
+				s << k.str()
+			}
+			'mixed(${s.join(',')})'
+		}
+		Comment {
+			'comment'
+		}
+		Nil {
+			'nil'
+		}
+	}
 }

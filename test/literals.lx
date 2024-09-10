@@ -44,8 +44,9 @@ false
 
 # keyword list
 [a: 1]
-[a: 1, b: 21,]
+[a: 1, b: 21]
 [a: 1, b: 21, c: 3]
+a: 1, b: 21
 
 # module name
 :A1

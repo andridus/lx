@@ -51,6 +51,7 @@ pub enum Kind {
 	_do
 	_end
 	_keyword_atom
+	_mod_attr
 }
 
 pub enum Associative {

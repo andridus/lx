@@ -98,6 +98,9 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 		`:` {
 			lexer0.parse_atom()!
 		}
+		`@` {
+			lexer0.parse_attribute()!
+		}
 		`\"`, `'` {
 			lexer0.parse_delimiter()!
 		}
@@ -158,6 +161,23 @@ fn (mut lexer0 Lexer) parse_aliases() !token.Token {
 	}
 
 	return lexer0.new_token(._aliases, data.bytestr())
+}
+
+fn (mut lexer0 Lexer) parse_attribute() !token.Token {
+	mut curr := lexer0.source.current()
+
+	if curr != `@` {
+		return error(lexer0.show_error_custom_error('is not an attribute'))
+	}
+	curr = lexer0.source.get_next_byte()!
+	mut data := []u8{}
+	if is_alpha(curr) {
+		data = lexer0.parse_alpha()
+	}
+	if data.len == 0 {
+		return error(lexer0.show_error_custom_error('not is valid atom'))
+	}
+	return lexer0.new_token(._mod_attr, data.bytestr())
 }
 
 fn (mut lexer0 Lexer) parse_atom() !token.Token {

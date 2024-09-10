@@ -1,19 +1,23 @@
 module ast
 
-pub fn (n Node) elixir() string {
-	return match n.left {
+pub fn (n Node) elixir(typ bool) string {
+	sep := '::'
+	mut kind := ''
+	term := match n.left {
 		Node {
 			mut mapped := []string{}
 			for n0 in n.nodes {
-				mapped << n0.elixir()
+				mapped << n0.elixir(typ)
 			}
-			'{${n.left.elixir()}, [], [${mapped.join(',')}]}'
+			kind = n.kind.str()
+			'{${n.left.elixir(typ)}, [], [${mapped.join(',')}]}'
 		}
 		Atom {
+			kind = n.kind.str()
 			if n.nodes.len > 0 {
 				mut mapped := []string{}
 				for n0 in n.nodes {
-					mapped << n0.elixir()
+					mapped << n0.elixir(typ)
 				}
 				'{:${n.left.value.str()}, [], [${mapped.join(',')}]}'
 			} else {
@@ -21,15 +25,18 @@ pub fn (n Node) elixir() string {
 			}
 		}
 		f64 {
+			kind = n.kind.str()
 			n.left.str()
 		}
 		int {
+			kind = n.kind.str()
 			n.left.str()
 		}
 		string {
+			kind = n.kind.str()
 			match n.kind {
 				String {
-					"\"${n.left.str()}\""
+					"\"${n.left.str()}"
 				}
 				Charlist {
 					'\'${n.left.str()}\''
@@ -51,7 +58,20 @@ pub fn (n Node) elixir() string {
 					if n.nodes.len > 0 {
 						mut mapped := []string{}
 						for n0 in n.nodes {
-							mapped << n0.elixir()
+							mapped << n0.elixir(false)
+						}
+						'[${mapped.join(',')}]'
+					} else {
+						n.str()
+					}
+				}
+				KeywordList {
+					if n.nodes.len > 0 {
+						mut mapped := []string{}
+						for n0 in n.nodes {
+							k := n0.nodes[0].elixir(false)
+							v := n0.nodes[1].elixir(false)
+							mapped << '${k.substr(1, k.len)}: ${v}'
 						}
 						'[${mapped.join(',')}]'
 					} else {
@@ -62,7 +82,7 @@ pub fn (n Node) elixir() string {
 					if n.nodes.len > 0 {
 						mut mapped := []string{}
 						for n0 in n.nodes {
-							mapped << n0.elixir()
+							mapped << n0.elixir(false)
 						}
 						'{${mapped.join(',')}}'
 					} else {
@@ -74,5 +94,10 @@ pub fn (n Node) elixir() string {
 				}
 			}
 		}
+	}
+	if typ {
+		return '${term}${sep}${kind}'
+	} else {
+		return '${term}'
 	}
 }

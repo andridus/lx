@@ -4,7 +4,7 @@ import ast
 import lexer
 import token
 
-const ending_kinds = [token.Kind.eof, .newline, ._comma]
+const ending_kinds = [token.Kind.eof, .newline]
 
 struct Options {
 	build_path string = '_build'
@@ -30,18 +30,15 @@ pub fn parse_stmts(data []u8) ![]ast.Node {
 	p.call_next_token()!
 	p.call_next_token()!
 	for p.current_token.kind != .eof {
+		p.ignore_next_newline()
 		stmt := p.stmt()!
+
 		if !stmt.is_comment() { // ignore comment
 			p.stmts << stmt
 		}
-		for {
-			if p.current_token.kind == .newline {
-				p.call_next_token()!
-			} else {
-				break
-			}
-		}
+		p.ignore_next_newline()
 	}
+
 	return p.stmts
 }
 
@@ -57,10 +54,7 @@ pub fn parse_stmt(data []u8) !ast.Node {
 
 fn (mut p Parser) call_next_token() ! {
 	p.current_token = p.next_token
-	p.next_token = p.lexer.read_next_token() or {
-		println(p.gen_token_error())
-		exit(1)
-	}
+	p.next_token = p.lexer.read_next_token() or { token.Token{} }
 }
 
 fn (mut p Parser) expect_keyword(keyword0 string) !token.Token {
@@ -73,28 +67,27 @@ fn (mut p Parser) expect_keyword(keyword0 string) !token.Token {
 }
 
 fn (mut p Parser) expect(kind token.Kind) !token.Token {
+	p.ignore_next_newline()
 	curr := p.current_token
 	if p.current_token.kind == kind {
 		p.ignore_next_newline()
-		if p.next_token.kind != .eof {
-			p.call_next_token()!
-		}
+		p.call_next_token() or {}
 		return curr
 	} else {
 		return error(p.lexer.show_error_custom_error(p.gen_expect_error(kind)))
 	}
 }
 
-// fn (mut p Parser) expect_next(kind token.Kind) ! {
-// 	p.ignore_next_newline()
-// 	if p.next_token.kind == kind {
-// 		if p.next_token.kind != .eof {
-// 			p.call_next_token()!
-// 		}
-// 	} else {
-// 		error(p.lexer.show_error_custom_error(p.gen_expect_error(kind)))
-// 	}
-// }
+fn (mut p Parser) expect_one_of(kinds []token.Kind) !token.Token {
+	curr := p.current_token
+	if p.current_token.kind in kinds {
+		p.ignore_next_newline()
+		p.call_next_token() or {}
+		return curr
+	} else {
+		return error(p.lexer.show_error_custom_error(p.gen_expect_one_of_error(kinds)))
+	}
+}
 
 fn (mut p Parser) call_match_and_next_token(kind token.Kind) ! {
 	if p.current_token.kind == kind {
@@ -105,6 +98,7 @@ fn (mut p Parser) call_match_and_next_token(kind token.Kind) ! {
 }
 
 fn (mut p Parser) stmt() !ast.Node {
+	p.ignore_next_newline()
 	curr := p.current_token
 	match curr.kind() {
 		._defmodule {
@@ -120,49 +114,54 @@ fn (mut p Parser) stmt() !ast.Node {
 }
 
 fn (mut p Parser) expr() !ast.Node {
+	p.ignore_next_newline()
 	curr := p.current_token
 	node := match curr.kind() {
 		._int {
+			p.expect(._int)!
 			ast.new_node_2(curr.value(), ast.Integer{})
 		}
 		._float, ._float_e {
+			p.expect_one_of([._float, ._float_e])!
 			ast.new_node_2(curr.value(), ast.Float{})
 		}
 		._string {
+			p.expect(._string)!
 			ast.new_node_2(curr.value(), ast.String{})
 		}
 		._aliases {
 			p.parse_aliases()!
 		}
 		._charlist {
+			p.expect(._charlist)!
 			ast.new_node_2(curr.value(), ast.Charlist{})
 		}
 		._lsbr {
-			nodes, kind := p.parse_until(._rsbr)!
-			ast.new_node_3('[]', ast.List.new(kind), nodes)
+			p.parse_list()!
 		}
 		._lcbr {
-			nodes, kind := p.parse_until(._rcbr)!
-			if kind is ast.Mixed {
-				k := kind as ast.Mixed
-				ast.new_node_3('{}', ast.Tuple.new(k.kinds()), nodes)
-			} else {
-				ast.new_node_3('{}', ast.Tuple.new([kind]), nodes)
-			}
+			p.parse_tuple()!
 		}
 		._true {
+			p.expect(._true)!
 			ast.new_node(ast.Boolean.new(true))
 		}
 		._false {
+			p.expect(._false)!
 			ast.new_node(ast.Boolean.new(false))
 		}
 		._atom {
+			p.expect(._atom)!
 			ast.new_atom_node(curr.value())
 		}
 		._keyword_atom {
-			p.parse_keyword_item()!
+			p.parse_keyword_list()!
+		}
+		._mod_attr {
+			p.parse_attribute()!
 		}
 		._comment {
+			p.expect(._comment)!
 			ast.new_node_2(curr.value(), ast.Comment{})
 		}
 		else {
@@ -176,28 +175,38 @@ fn (mut p Parser) parse_keyword_item() !ast.Node {
 	p.in_keyword_list = true
 	key := p.expect(._keyword_atom)!
 	value := p.expr()!
-	p.in_keyword_list = false
 	return ast.new_keyword_node(key.value, value)
 }
 
+fn (mut p Parser) parse_keyword_list() !ast.Node {
+	mut nodes := [p.parse_keyword_item()!]
+	for p.current_token.kind == ._comma {
+		p.expect(._comma)!
+		nodes << p.parse_keyword_item() or { break }
+	}
+	return ast.new_keyword_list(nodes)
+}
+
+fn (mut p Parser) parse_attribute() !ast.Node {
+	key := p.expect(._mod_attr)!
+	value := p.expr()!
+	return ast.new_attribute_node(key.value, value)
+}
+
 fn (mut p Parser) parse_aliases() !ast.Node {
-	mut aliases := []string{}
-	for {
-		aliases << p.current_token.value()
-		if p.next_token.kind == ._dot {
-			p.ignore_next_newline()
-			p.call_next_token()!
-			p.call_next_token() or { break }
-		} else {
-			break
-		}
+	mut alias := p.expect(._aliases)!
+	mut aliases := [alias.value()]
+	for p.current_token.kind == ._dot {
+		p.expect(._dot)!
+		alias = p.expect(._aliases)!
+		aliases << alias.value()
 	}
 	return ast.new_aliases_node(aliases)
 }
 
 fn (mut p Parser) ignore_next_newline() {
 	for {
-		if p.next_token.kind == .newline {
+		if p.current_token.kind == .newline {
 			p.call_next_token() or { break }
 		} else {
 			break
@@ -210,14 +219,12 @@ fn (mut p Parser) find_keyword() ?ast.Node {
 }
 
 fn (mut p Parser) maybe_apply_precendence(node ast.Node) !ast.Node {
-	if prec := p.next_token.precedence() {
-		p.call_next_token()!
+	if prec := p.current_token.precedence() {
 		left := node
 		function_token := p.current_token
 		p.call_next_token()!
 		right := p.expr()!
 
-		// p.call_next_token()!
 		function_kind := ast.Function{
 			precedence: prec.get_precedence()
 			position:   .infix
@@ -253,24 +260,21 @@ fn (mut p Parser) insert_node_deep_left(name string, function ast.Function, left
 }
 
 fn (mut p Parser) check_end_token() !bool {
-	if p.current_token.kind() in parser.ending_kinds {
-		p.call_next_token()!
-		p.call_next_token()!
-		return true
-	}
-	if p.next_token.kind() in parser.ending_kinds {
-		if !p.in_keyword_list {
-			p.call_next_token()!
-		}
-		return true
-	}
-
 	if p.brackets_delimiter.len > 0 {
-		if p.brackets_delimiter.last() == p.next_token.kind {
-			// p.call_next_token()!
-
+		if p.current_token.kind == ._comma {
 			return true
 		}
+		if p.brackets_delimiter.last() == p.current_token.kind {
+			return true
+		}
+	}
+	if p.in_keyword_list {
+		if p.current_token.kind == ._comma {
+			return true
+		}
+	}
+	if p.current_token.kind() in parser.ending_kinds {
+		return true
 	}
 	return error(p.lexer.show_error_custom_error(p.gen_syntax_error()))
 }
@@ -282,36 +286,54 @@ fn (mut p Parser) check_not_end_token() !bool {
 	return error(p.lexer.show_error_custom_error(p.gen_syntax_error()))
 }
 
-fn (mut p Parser) parse_until(until token.Kind) !([]ast.Node, ast.NodeKind) {
-	p.call_next_token()!
-	p.brackets_delimiter << until
+fn (mut p Parser) parse_list() !ast.Node {
 	mut nodes := []ast.Node{}
 	mut kind := ast.NodeKind(ast.Nil{})
+	p.brackets_delimiter << ._rsbr
+	_ := p.expect(._lsbr)!
+	p.ignore_next_newline()
+	if p.current_token.kind == ._rsbr {
+		p.expect(._rsbr)!
+		return ast.new_node_3('[]', ast.List.new(kind), [])
+	}
 	for {
-		if p.current_token.kind == until {
-			p.call_next_token()!
-			break
-		}
 		node := p.expr()!
 		if nodes.len == 0 {
 			kind = node.kind
-		} else if node.kind != kind {
-			kind = ast.NodeKind(ast.Mixed.new([kind, node.kind]))
-		} else if mut kind is ast.Mixed {
-			kind.put_if_required(node.kind)
+		} else {
+			if mut kind is ast.Mixed {
+				kind.put_if_required(node.kind)
+			} else if node.kind != kind {
+				kind = ast.NodeKind(ast.Mixed.new([kind, node.kind]))
+			}
 		}
 		nodes << node
-		if p.next_token.kind == until {
-			p.call_next_token() or { break }
+		end_token := p.expect_one_of([._comma, ._rsbr])!
+		if end_token.kind == ._rsbr {
 			break
 		}
-		// println(p)
-		// p.call_next_token() or { break}
-
-		p.ignore_next_newline()
-		p.expect(._comma)!
-		p.check_not_end_token()!
 	}
 	p.brackets_delimiter.delete_last()
-	return nodes, kind
+	if nodes.len == 1 && nodes[0].kind is ast.KeywordList {
+		return nodes[0]
+	}
+	return ast.new_node_3('[]', ast.List.new(kind), nodes)
+}
+
+fn (mut p Parser) parse_tuple() !ast.Node {
+	mut nodes := []ast.Node{}
+	mut kinds := []ast.NodeKind{}
+	p.brackets_delimiter << ._rcbr
+	_ := p.expect(._lcbr)!
+	for {
+		node := p.expr()!
+		kinds << node.kind
+		nodes << node
+		end_token := p.expect_one_of([._comma, ._rcbr])!
+		if end_token.kind == ._rcbr {
+			break
+		}
+	}
+	p.brackets_delimiter.delete_last()
+	return ast.new_node_3('{}', ast.Tuple.new(kinds), nodes)
 }

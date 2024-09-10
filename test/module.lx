@@ -1,3 +1,6 @@
 defmodule A do
+  1
+
+
 end
 defmodule B, do: []
