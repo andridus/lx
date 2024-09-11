@@ -47,6 +47,17 @@ pub fn (n Node) elixir(typ bool) string {
 				Module {
 					'<<binary module ${n.kind.name.str()}>>'
 				}
+				ModuleAttribute {
+					if n.nodes.len > 0 {
+						mut mapped := []string{}
+						for n0 in n.nodes {
+							mapped << n0.elixir(false)
+						}
+						'{${mapped.join(',')}}'
+					} else {
+						n.str()
+					}
+				}
 				Aliases {
 					mut mapped := []string{}
 					for n0 in n.nodes {
