@@ -3,6 +3,7 @@ module parser
 import ast
 import lexer
 import token
+import table
 
 const ending_kinds = [token.Kind.eof, .newline]
 
@@ -16,6 +17,8 @@ struct Parser {
 mut:
 	lexer              &lexer.Lexer
 	stmts              []ast.Node
+	var_table          &table.VarTable
+	current_module     string = '__empty__'
 	current_token      token.Token
 	next_token         token.Token
 	brackets_delimiter []token.Kind
@@ -24,8 +27,10 @@ mut:
 
 pub fn parse_stmts(data []u8) ![]ast.Node {
 	mut l := lexer.Lexer.init(data)!
+	mut var_table := table.VarTable.init()!
 	mut p := Parser{
-		lexer: &l
+		lexer:     &l
+		var_table: var_table
 	}
 	p.call_next_token()!
 	p.call_next_token()!
@@ -44,8 +49,10 @@ pub fn parse_stmts(data []u8) ![]ast.Node {
 
 pub fn parse_stmt(data []u8) !ast.Node {
 	mut l := lexer.Lexer.init(data)!
+	mut var_table := table.VarTable.init()!
 	mut p := Parser{
-		lexer: &l
+		lexer:     &l
+		var_table: var_table
 	}
 	p.current_token = p.lexer.read_next_token()!
 	p.next_token = p.lexer.read_next_token()!
@@ -104,6 +111,9 @@ fn (mut p Parser) stmt() !ast.Node {
 		._defmodule {
 			return p.parse_module()
 		}
+		._def {
+			return p.parse_function()
+		}
 		.eof {
 			return error('eof')
 		}
@@ -117,6 +127,9 @@ fn (mut p Parser) expr() !ast.Node {
 	p.ignore_next_newline()
 	curr := p.current_token
 	node := match curr.kind() {
+		._ident {
+			p.parse_def_var()!
+		}
 		._int {
 			p.expect(._int)!
 			ast.new_node_2(curr.value(), ast.Integer{})
@@ -225,17 +238,20 @@ fn (mut p Parser) maybe_apply_precendence(node ast.Node) !ast.Node {
 		p.call_next_token()!
 		right := p.expr()!
 
-		function_kind := ast.Function{
+		caller_function_kind := ast.CallerFunction{
 			precedence: prec.get_precedence()
 			position:   .infix
 		}
 		match prec.get_assoc() {
 			.left {
-				return p.insert_node_deep_left(function_token.value(), function_kind,
+				return p.insert_node_deep_left(function_token.value(), caller_function_kind,
 					left, right)
 			}
 			else {
-				return ast.new_node_3(function_token.value(), function_kind, [left, right])
+				return ast.new_node_3(function_token.value(), caller_function_kind, [
+					left,
+					right,
+				])
 			}
 		}
 	} else {
@@ -244,19 +260,23 @@ fn (mut p Parser) maybe_apply_precendence(node ast.Node) !ast.Node {
 	}
 }
 
-fn (mut p Parser) insert_node_deep_left(name string, function ast.Function, left ast.Node, right ast.Node) !ast.Node {
-	if right.kind is ast.Function {
-		function0 := right.kind as ast.Function
-		if function0.precedence > 0 && function0.precedence <= function.precedence
-			&& right.nodes.len == 2 {
-			left0 := right.nodes[0]
-			right0 := right.nodes[1]
-			node_left := p.insert_node_deep_left(name, function, left, left0)!
-			name0 := right.left.to_str()
-			return ast.new_node_3(name0, function0, [node_left, right0])
+fn (mut p Parser) insert_node_deep_left(name string, caller_function ast.CallerFunction, left ast.Node, right ast.Node) !ast.Node {
+	if right.kind is ast.CallerFunction {
+		function0 := right.kind as ast.CallerFunction
+		if function0.precedence > 0 && function0.precedence <= caller_function.precedence {
+			if nodes := right.nodes {
+				if nodes.len == 2 {
+					left0 := nodes[0]
+					right0 := nodes[1]
+					node_left := p.insert_node_deep_left(name, caller_function, left,
+						left0)!
+					name0 := right.left.to_str()
+					return ast.new_node_3(name0, function0, [node_left, right0])
+				}
+			}
 		}
 	}
-	return ast.new_node_3(name, function, [left, right])
+	return ast.new_node_3(name, caller_function, [left, right])
 }
 
 fn (mut p Parser) check_end_token() !bool {

@@ -27,6 +27,7 @@ pub enum Kind {
 	eof
 	newline
 	_keyword
+	_attrb_op // =
 	_add_op   // +, -
 	_mult_op  // *, /
 	_int      // 1
@@ -49,6 +50,8 @@ pub enum Kind {
 	_aliases
 	_dot
 	_do
+	_def
+	_ident
 	_end
 	_keyword_atom
 	_mod_attr

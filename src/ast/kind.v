@@ -3,6 +3,7 @@ module ast
 pub type NodeKind = Atom
 	| Float
 	| Function
+	| CallerFunction
 	| Integer
 	| String
 	| Charlist
@@ -13,9 +14,31 @@ pub type NodeKind = Atom
 	| Aliases
 	| ModuleAttribute
 	| KeywordList
+	| DefVar
+	| Ident
 	| Mixed
 	| Comment
 	| Nil
+
+pub struct DefVar {
+	idx u32
+}
+
+pub fn DefVar.new(value u32) DefVar {
+	return DefVar{
+		idx: value
+	}
+}
+
+pub struct Ident {
+	idx u32
+}
+
+pub fn Ident.new(value u32) Ident {
+	return Ident{
+		idx: value
+	}
+}
 
 pub struct ModuleAttribute {}
 
@@ -113,7 +136,7 @@ pub fn Tuple.new(kinds []NodeKind) Tuple {
 	}
 }
 
-pub struct Function {
+pub struct CallerFunction {
 pub:
 	precedence int
 	position   FunctionPosition = .prefix
@@ -123,6 +146,12 @@ pub enum FunctionPosition {
 	prefix
 	infix
 	postfix
+}
+
+pub struct Function {
+pub:
+	precedence int
+	position   FunctionPosition = .prefix
 }
 
 pub fn (n NodeKind) str() string {
@@ -135,6 +164,9 @@ pub fn (n NodeKind) str() string {
 		}
 		Function {
 			'function'
+		}
+		CallerFunction {
+			'caller_function'
 		}
 		Integer {
 			'integer'
@@ -169,6 +201,12 @@ pub fn (n NodeKind) str() string {
 		}
 		KeywordList {
 			'keyword_list'
+		}
+		DefVar {
+			'variable_definition'
+		}
+		Ident {
+			'ident'
 		}
 		Mixed {
 			mut s := []string{}

@@ -6,22 +6,28 @@ pub fn (n Node) elixir(typ bool) string {
 	term := match n.left {
 		Node {
 			mut mapped := []string{}
-			for n0 in n.nodes {
-				mapped << n0.elixir(typ)
+			if nodes := n.nodes {
+				for n0 in nodes {
+					mapped << n0.elixir(typ)
+				}
 			}
 			kind = n.kind.str()
 			'{${n.left.elixir(typ)}, [], [${mapped.join(',')}]}'
 		}
 		Atom {
 			kind = n.kind.str()
-			if n.nodes.len > 0 {
-				mut mapped := []string{}
-				for n0 in n.nodes {
-					mapped << n0.elixir(typ)
+			if nodes := n.nodes {
+				if nodes.len > 0 {
+					mut mapped := []string{}
+					for n0 in nodes {
+						mapped << n0.elixir(typ)
+					}
+					'{:${n.left.value.str()}, [], [${mapped.join(',')}]}'
+				} else {
+					':${n.left.value}'
 				}
-				'{:${n.left.value.str()}, [], [${mapped.join(',')}]}'
 			} else {
-				':${n.left.value}'
+				'${n.left.value}'
 			}
 		}
 		f64 {
@@ -38,6 +44,9 @@ pub fn (n Node) elixir(typ bool) string {
 				String {
 					"\"${n.left.str()}"
 				}
+				Ident {
+					'{${n.left.str()}, [], nil}'
+				}
 				Charlist {
 					'\'${n.left.str()}\''
 				}
@@ -48,60 +57,80 @@ pub fn (n Node) elixir(typ bool) string {
 					'<<binary module ${n.kind.name.str()}>>'
 				}
 				ModuleAttribute {
-					if n.nodes.len > 0 {
-						mut mapped := []string{}
-						for n0 in n.nodes {
-							mapped << n0.elixir(false)
+					if nodes := n.nodes {
+						if nodes.len > 0 {
+							mut mapped := []string{}
+							for n0 in nodes {
+								mapped << n0.elixir(false)
+							}
+							'{${mapped.join(',')}}'
+						} else {
+							n.str()
 						}
-						'{${mapped.join(',')}}'
 					} else {
 						n.str()
 					}
 				}
 				Aliases {
 					mut mapped := []string{}
-					for n0 in n.nodes {
-						mapped << n0.left as string
+					if nodes := n.nodes {
+						for n0 in nodes {
+							mapped << n0.left as string
+						}
 					}
 					mapped.join('.')
 				}
 				List {
-					if n.nodes.len > 0 {
-						mut mapped := []string{}
-						for n0 in n.nodes {
-							mapped << n0.elixir(false)
+					if nodes := n.nodes {
+						if nodes.len > 0 {
+							mut mapped := []string{}
+							for n0 in nodes {
+								mapped << n0.elixir(false)
+							}
+							'[${mapped.join(',')}]'
+						} else {
+							n.str()
 						}
-						'[${mapped.join(',')}]'
 					} else {
 						n.str()
 					}
 				}
 				KeywordList {
-					if n.nodes.len > 0 {
-						mut mapped := []string{}
-						for n0 in n.nodes {
-							k := n0.nodes[0].elixir(false)
-							v := n0.nodes[1].elixir(false)
-							mapped << '${k.substr(1, k.len)}: ${v}'
+					if nodes := n.nodes {
+						if nodes.len > 0 {
+							mut mapped := []string{}
+							for n0 in nodes {
+								if nodes0 := n0.nodes {
+									k := nodes0[0].elixir(false)
+									v := nodes0[1].elixir(false)
+									mapped << '${k.substr(1, k.len)}: ${v}'
+								}
+							}
+							'[${mapped.join(',')}]'
+						} else {
+							n.str()
 						}
-						'[${mapped.join(',')}]'
 					} else {
 						n.str()
 					}
 				}
 				Tuple {
-					if n.nodes.len > 0 {
-						mut mapped := []string{}
-						for n0 in n.nodes {
-							mapped << n0.elixir(false)
+					if nodes := n.nodes {
+						if nodes.len > 0 {
+							mut mapped := []string{}
+							for n0 in nodes {
+								mapped << n0.elixir(false)
+							}
+							'{${mapped.join(',')}}'
+						} else {
+							n.str()
 						}
-						'{${mapped.join(',')}}'
 					} else {
-						n.str()
+						n.left.str()
 					}
 				}
 				else {
-					n.left.str()
+					'${n.kind}'
 				}
 			}
 		}

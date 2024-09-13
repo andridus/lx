@@ -4,7 +4,7 @@ import token
 import ast
 import utils
 
-const delimiters = [` `, `(`, `{`, `|`, `'`]
+const delimiters = [` `, `(`, `{`, `|`, `'`, `\n`]
 
 @[heap]
 pub struct Lexer {
@@ -58,6 +58,9 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 		}
 		`A`...`Z` {
 			lexer0.parse_aliases()!
+		}
+		`=` {
+			lexer0.new_token(._attrb_op, '=')
 		}
 		`+` {
 			lexer0.new_token(._add_op, '+')
@@ -122,11 +125,18 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 						'do' {
 							lexer0.new_token(._do, '')
 						}
+						'def' {
+							lexer0.new_token(._def, '')
+						}
 						'end' {
 							lexer0.new_token(._end, '')
 						}
 						else {
-							error(lexer0.show_error_custom_error('undefined matched keyword `${keyword}`'))
+							if is_atom {
+								lexer0.new_token(._atom, keyword)
+							} else {
+								lexer0.new_token(._ident, keyword)
+							}
 						}
 					}
 				}
@@ -217,54 +227,21 @@ fn (mut lexer0 Lexer) parse_alpha() []u8 {
 fn (mut lexer0 Lexer) match_keyword() ?(string, bool) {
 	mut word := []u8{}
 	mut curr := lexer0.source.current()
-	mut tmp := lexer0.keywords.clone()
-
 	for {
 		word << curr
-		keyword0 := tmp.filter(it.len >= word.len && it[word.len - 1] == curr)
-		if keyword0.len == 1 {
-			mut slice_keyword0 := keyword0[0][(word.len - 1)..]
-			if lexer0.source.peek_expect_match(slice_keyword0) {
-				slice_keyword0.drop(1)
-				word << slice_keyword0
-				lexer0.source.ignore_bytes(slice_keyword0.len) or { break }
-				a := lexer0.source.peek_next() or { 0 }
-				if a == `:` {
-					lexer0.source.ignore_bytes(1) or { break }
-					return word.bytestr(), true
-				} else {
-					return word.bytestr(), false
-				}
-			}
-		} else if keyword0.len == 0 {
-			mut is_atom := false
-			for {
-				curr0 := lexer0.source.get_next_byte() or { break }
-				match curr0 {
-					`:` {
-						is_atom = true
-						// lexer0.source.ignore_bytes(1) or { break }
-						break
-					}
-					` ` {
-						break
-					}
-					else {
-						if is_alpha(curr0) {
-							word << curr0
-						}
-					}
-				}
-			}
-			return word.bytestr(), is_atom
-		} else {
-			curr = lexer0.source.get_next_byte() or { break }
-			if lexer.delimiters.index(curr) != -1 {
-				break
-			}
+		pk := lexer0.source.peek_next() or { break }
+		if lexer.delimiters.index(pk) != -1 {
+			break
+		}
+		curr = lexer0.source.get_next_byte() or { break }
+	}
+	if word.len > 0 {
+		if word.last() == `:` {
+			_ := word.pop()
+			return word.bytestr(), true
 		}
 	}
-	return none
+	return word.bytestr(), false
 }
 
 fn (mut lexer0 Lexer) is_breaking_term() bool {

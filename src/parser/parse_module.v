@@ -17,7 +17,9 @@ fn (mut p Parser) parse_module() !ast.Node {
 
 			match node.kind {
 				ast.ModuleAttribute {
-					attributes[node.nodes[0].left.to_str()] = node.nodes[1]
+					if nodes := node.nodes {
+						attributes[nodes[0].left.to_str()] = nodes[1]
+					}
 				}
 				else {}
 			}
