@@ -26,6 +26,9 @@ false
 # Charlist
 'a'
 
+# nil
+nil
+
 # Lists with integer
 [1,2,3]
 

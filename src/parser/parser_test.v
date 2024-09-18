@@ -45,10 +45,10 @@ fn test_fail_parse_float_stmt() {
 fn test_parse_sum_tow_integer_stmt() {
 	source := '1 + 2'
 	expected := ast.Node{
-		left: ast.NodeLeft(ast.Atom{
+		left:  ast.NodeLeft(ast.Atom{
 			value: '+'
 		})
-		kind: ast.NodeKind(ast.Function{
+		kind:  ast.NodeKind(ast.Function{
 			precedence: 210
 			position:   .infix
 		})

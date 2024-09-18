@@ -26,6 +26,7 @@ pub fn (t Token) value() string {
 pub enum Kind {
 	eof
 	newline
+	_nil // 1
 	_keyword
 	_attrb_op // =
 	_add_op   // +, -
@@ -65,7 +66,7 @@ pub enum Associative {
 
 pub struct TokenPrecedence {
 	assoc      Associative
-	precedence int
+	precedence u32
 }
 
 pub fn (tp TokenPrecedence) get_assoc() Associative {
@@ -76,7 +77,7 @@ pub fn (tp TokenPrecedence) is_infix() bool {
 	return tp.assoc in [.right, .left]
 }
 
-pub fn (tp TokenPrecedence) get_precedence() int {
+pub fn (tp TokenPrecedence) get_precedence() u32 {
 	return tp.precedence
 }
 
@@ -95,7 +96,7 @@ pub fn (token0 &Token) is_infix() bool {
 }
 
 pub fn (token0 &Token) precedence() ?TokenPrecedence {
-	return token.precedences[token0.kind.str()] or { return none }
+	return precedences[token0.kind.str()] or { return none }
 }
 
 pub fn generate_eof() Token {

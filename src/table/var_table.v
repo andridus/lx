@@ -1,8 +1,11 @@
 module table
 
+import ast
+
 pub struct VarTable {
 mut:
 	idents []string
+	kinds  []ast.Literal
 	idxs   map[string]u32
 }
 
@@ -16,20 +19,21 @@ pub fn make_ident(aix u32) u32 {
 	return u32(val)
 }
 
-pub fn (mut vt VarTable) insert(name string) !u32 {
+pub fn (mut vt VarTable) insert(name string, lit ast.Literal) !u32 {
 	if idx := vt.idxs[name] {
 		return make_ident(idx)
 	} else {
 		vt.idents << name
+		vt.kinds << lit
 		idx := u32(vt.idents.len - 1)
 		vt.idxs[name] = idx
 		return make_ident(idx)
 	}
 }
 
-pub fn (mut vt VarTable) from(str string) !u32 {
-	return vt.insert(str)
-}
+// pub fn (mut vt VarTable) from(str string) !u32 {
+// 	return vt.insert(str)
+// }
 
 pub fn (vt VarTable) ref(s string) !u32 {
 	if idx := vt.idxs[s] {
@@ -38,16 +42,16 @@ pub fn (vt VarTable) ref(s string) !u32 {
 	return error('undefined ident ${s}')
 }
 
-pub fn (vt VarTable) lookup_by_name(s string) ?u32 {
+pub fn (vt VarTable) lookup_by_name(s string) ?(u32, ast.Literal) {
 	if idx := vt.idxs[s] {
-		return idx
+		return idx, vt.kinds[idx]
 	}
 	return none
 }
 
-pub fn (mut vt VarTable) lookup_by_idx(idx u32) ?string {
+pub fn (mut vt VarTable) lookup_by_idx(idx u32) ?(string, ast.Literal) {
 	if str := vt.idents[idx] {
-		return str
+		return str, vt.kinds[idx]
 	}
 	return none
 }

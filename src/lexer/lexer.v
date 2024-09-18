@@ -113,6 +113,9 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 					return lexer0.new_token(._keyword_atom, keyword)
 				} else {
 					return match keyword {
+						'nil' {
+							lexer0.new_token(._nil, '')
+						}
 						'true' {
 							lexer0.new_token(._true, '')
 						}
@@ -141,7 +144,7 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 					}
 				}
 			}
-			error(lexer0.show_error_custom_error(lexer.invalid_token_message))
+			error(lexer0.show_error_custom_error(invalid_token_message))
 		}
 	}
 }
@@ -230,7 +233,7 @@ fn (mut lexer0 Lexer) match_keyword() ?(string, bool) {
 	for {
 		word << curr
 		pk := lexer0.source.peek_next() or { break }
-		if lexer.delimiters.index(pk) != -1 {
+		if delimiters.index(pk) != -1 {
 			break
 		}
 		curr = lexer0.source.get_next_byte() or { break }
@@ -322,7 +325,7 @@ fn (mut lexer0 Lexer) continue_term(mut term []u8, kind token.Kind, mut opts map
 				term << lexer0.source.get_while_number()
 				lexer0.continue_term(mut term, ._float_e, mut opts)!
 			} else {
-				error(lexer0.show_error_custom_error(lexer.invalid_token_message))
+				error(lexer0.show_error_custom_error(invalid_token_message))
 			}
 		}
 		`x` {
@@ -332,7 +335,7 @@ fn (mut lexer0 Lexer) continue_term(mut term []u8, kind token.Kind, mut opts map
 				opts['hexadecimal'] = true
 				lexer0.continue_term(mut term, ._int, mut opts)!
 			} else {
-				error(lexer0.show_error_custom_error(lexer.invalid_token_message))
+				error(lexer0.show_error_custom_error(invalid_token_message))
 			}
 		}
 		`A`...`F`, `a`...`f` {
@@ -341,7 +344,7 @@ fn (mut lexer0 Lexer) continue_term(mut term []u8, kind token.Kind, mut opts map
 				term << lexer0.source.get_while_number()
 				lexer0.continue_term(mut term, kind, mut opts)!
 			} else {
-				error(lexer0.show_error_custom_error(lexer.invalid_token_message))
+				error(lexer0.show_error_custom_error(invalid_token_message))
 			}
 		}
 		`.` {
@@ -372,6 +375,6 @@ fn (lexer0 Lexer) new_token(kind token.Kind, value string) token.Token {
 	}
 }
 
-fn (lexer0 Lexer) to_meta() ast.Meta {
-	return ast.new_meta(0, 0, 0)
+pub fn (mut lexer0 Lexer) current_position() (int, int) {
+	return lexer0.source.current_pos(), lexer0.source.current_line()
 }

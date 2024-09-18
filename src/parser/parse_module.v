@@ -3,6 +3,7 @@ module parser
 import ast
 
 fn (mut p Parser) parse_module() !ast.Node {
+	mut meta := p.meta()
 	mut code := []ast.Node{}
 	mut attributes := map[string]ast.Node{}
 	p.expect(._defmodule)!
@@ -15,8 +16,8 @@ fn (mut p Parser) parse_module() !ast.Node {
 			node := p.stmt()!
 			code << node
 
-			match node.kind {
-				ast.ModuleAttribute {
+			match node.meta.kind {
+				.k_attribute {
 					if nodes := node.nodes {
 						attributes[nodes[0].left.to_str()] = nodes[1]
 					}
@@ -30,6 +31,8 @@ fn (mut p Parser) parse_module() !ast.Node {
 		p.expect_keyword('do')!
 		code << p.stmt()!
 	}
-	mod := ast.Module.new(module_name, attributes, code)
-	return ast.new_node(mod)
+
+	p.update_meta(mut meta)
+	meta.set_kind(.k_module_def)
+	return ast.new_node(module_name, meta, code)
 }

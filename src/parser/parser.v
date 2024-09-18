@@ -125,29 +125,55 @@ fn (mut p Parser) stmt() !ast.Node {
 
 fn (mut p Parser) expr() !ast.Node {
 	p.ignore_next_newline()
+
 	curr := p.current_token
 	node := match curr.kind() {
+		._nil {
+			mut meta := p.meta()
+			p.expect(._nil)!
+			p.update_meta(mut meta)
+			meta.set_literal(.l_nil)
+			meta.set_kind(.k_literal)
+			ast.new_node('nil', meta, none)
+		}
 		._ident {
 			p.parse_def_var()!
 		}
 		._int {
+			mut meta := p.meta()
 			p.expect(._int)!
-			ast.new_node_2(curr.value(), ast.Integer{})
+			p.update_meta(mut meta)
+			meta.set_literal(.l_integer)
+			meta.set_kind(.k_literal)
+			ast.new_node(curr.value(), meta, none)
 		}
 		._float, ._float_e {
+			mut meta := p.meta()
 			p.expect_one_of([._float, ._float_e])!
-			ast.new_node_2(curr.value(), ast.Float{})
+			p.update_meta(mut meta)
+			meta.set_literal(.l_float)
+			meta.set_kind(.k_literal)
+			ast.new_node(curr.value(), meta, none)
 		}
 		._string {
+			mut meta := p.meta()
 			p.expect(._string)!
-			ast.new_node_2(curr.value(), ast.String{})
+			p.update_meta(mut meta)
+			meta.set_literal(.l_string)
+			meta.set_kind(.k_literal)
+			ast.new_node(curr.value(), meta, none)
 		}
 		._aliases {
 			p.parse_aliases()!
 		}
 		._charlist {
+			mut meta := p.meta()
 			p.expect(._charlist)!
-			ast.new_node_2(curr.value(), ast.Charlist{})
+			p.update_meta(mut meta)
+			meta.set_literal(.l_list)
+			meta.set_literal_accepts([.l_char])
+			meta.set_kind(.k_literal)
+			ast.new_node(curr.value(), meta, none)
 		}
 		._lsbr {
 			p.parse_list()!
@@ -156,16 +182,28 @@ fn (mut p Parser) expr() !ast.Node {
 			p.parse_tuple()!
 		}
 		._true {
+			mut meta := p.meta()
 			p.expect(._true)!
-			ast.new_node(ast.Boolean.new(true))
+			p.update_meta(mut meta)
+			meta.set_literal(.l_boolean)
+			meta.set_kind(.k_literal)
+			ast.new_node('true', meta, none)
 		}
 		._false {
+			mut meta := p.meta()
 			p.expect(._false)!
-			ast.new_node(ast.Boolean.new(false))
+			p.update_meta(mut meta)
+			meta.set_literal(.l_boolean)
+			meta.set_kind(.k_literal)
+			ast.new_node('false', meta, none)
 		}
 		._atom {
+			mut meta := p.meta()
 			p.expect(._atom)!
-			ast.new_atom_node(curr.value())
+			p.update_meta(mut meta)
+			meta.set_literal(.l_atom)
+			meta.set_kind(.k_literal)
+			ast.new_node(curr.value(), meta, none)
 		}
 		._keyword_atom {
 			p.parse_keyword_list()!
@@ -174,8 +212,12 @@ fn (mut p Parser) expr() !ast.Node {
 			p.parse_attribute()!
 		}
 		._comment {
+			mut meta := p.meta()
 			p.expect(._comment)!
-			ast.new_node_2(curr.value(), ast.Comment{})
+			p.update_meta(mut meta)
+			meta.set_literal(.l_string)
+			meta.set_kind(.k_comment)
+			ast.new_node(curr.value(), meta, none)
 		}
 		else {
 			return error(p.lexer.show_error_custom_error('not parsed kind `${curr.kind()}`'))
@@ -185,36 +227,62 @@ fn (mut p Parser) expr() !ast.Node {
 }
 
 fn (mut p Parser) parse_keyword_item() !ast.Node {
+	mut meta := p.meta()
 	p.in_keyword_list = true
 	key := p.expect(._keyword_atom)!
+	p.update_meta(mut meta)
+	meta.set_literal(.l_atom)
+	meta.set_kind(.k_literal)
 	value := p.expr()!
-	return ast.new_keyword_node(key.value, value)
+	key_node := ast.new_node(key.value(), meta, none)
+	p.update_meta(mut meta)
+	meta.set_literal(.l_tuple)
+	meta.set_literal_accepts([.l_atom, value.meta.literal()])
+	meta.set_kind(.k_keyword_list)
+	return ast.new_node('{}', meta, [key_node, value])
 }
 
 fn (mut p Parser) parse_keyword_list() !ast.Node {
+	mut meta := p.meta()
 	mut nodes := [p.parse_keyword_item()!]
 	for p.current_token.kind == ._comma {
 		p.expect(._comma)!
 		nodes << p.parse_keyword_item() or { break }
 	}
-	return ast.new_keyword_list(nodes)
+	p.update_meta(mut meta)
+	meta.set_literal(.l_list)
+	meta.set_literal_accepts([.l_tuple])
+	meta.set_kind(.k_keyword_list)
+	return ast.new_node('[]', meta, nodes)
 }
 
 fn (mut p Parser) parse_attribute() !ast.Node {
+	mut meta := p.meta()
 	key := p.expect(._mod_attr)!
+	p.update_meta(mut meta)
+	meta.set_literal(.l_atom)
+	key_node := ast.new_node(key.value(), meta, none)
 	value := p.expr()!
-	return ast.new_attribute_node(key.value, value)
+	p.update_meta(mut meta)
+	meta.copy_literal_from_node(value)
+	meta.set_kind(.k_literal)
+	return ast.new_node('@', meta, [key_node, value])
 }
 
 fn (mut p Parser) parse_aliases() !ast.Node {
+	mut meta := p.meta()
 	mut alias := p.expect(._aliases)!
-	mut aliases := [alias.value()]
+	mut nodes := []ast.Node{}
 	for p.current_token.kind == ._dot {
 		p.expect(._dot)!
+		p.update_meta(mut meta)
 		alias = p.expect(._aliases)!
-		aliases << alias.value()
+		nodes << ast.new_node(alias.value(), meta, none)
 	}
-	return ast.new_aliases_node(aliases)
+	p.update_meta(mut meta)
+	meta.set_literal(.l_atom)
+	meta.set_kind(.k_alias)
+	return ast.new_node('__aliases__', meta, nodes)
 }
 
 fn (mut p Parser) ignore_next_newline() {
@@ -232,26 +300,25 @@ fn (mut p Parser) find_keyword() ?ast.Node {
 }
 
 fn (mut p Parser) maybe_apply_precendence(node ast.Node) !ast.Node {
+	mut meta := p.meta()
 	if prec := p.current_token.precedence() {
 		left := node
 		function_token := p.current_token
 		p.call_next_token()!
 		right := p.expr()!
 
-		caller_function_kind := ast.CallerFunction{
-			precedence: prec.get_precedence()
-			position:   .infix
-		}
+		function_caller := ast.FunctionCallerAttributes.new(prec.get_precedence(), .infix)
 		match prec.get_assoc() {
 			.left {
-				return p.insert_node_deep_left(function_token.value(), caller_function_kind,
-					left, right)
+				return p.insert_node_deep_left(function_token.value(), function_caller,
+					left, right, mut meta)
 			}
 			else {
-				return ast.new_node_3(function_token.value(), caller_function_kind, [
-					left,
-					right,
-				])
+				p.update_meta(mut meta)
+				meta.set_literal(p.promote_types(left, right))
+				meta.set_kind(.k_function_caller)
+				meta.set_function_caller_attributes(function_caller)
+				return ast.new_node(function_token.value(), meta, [left, right])
 			}
 		}
 	} else {
@@ -260,23 +327,44 @@ fn (mut p Parser) maybe_apply_precendence(node ast.Node) !ast.Node {
 	}
 }
 
-fn (mut p Parser) insert_node_deep_left(name string, caller_function ast.CallerFunction, left ast.Node, right ast.Node) !ast.Node {
-	if right.kind is ast.CallerFunction {
-		function0 := right.kind as ast.CallerFunction
-		if function0.precedence > 0 && function0.precedence <= caller_function.precedence {
-			if nodes := right.nodes {
-				if nodes.len == 2 {
-					left0 := nodes[0]
-					right0 := nodes[1]
-					node_left := p.insert_node_deep_left(name, caller_function, left,
-						left0)!
-					name0 := right.left.to_str()
-					return ast.new_node_3(name0, function0, [node_left, right0])
+fn (mut p Parser) insert_node_deep_left(name string, function_caller ast.FunctionCallerAttributes, left ast.Node, right ast.Node, mut meta ast.Meta) !ast.Node {
+	if right.meta.kind == .k_function_caller {
+		if function_caller_attributes := right.meta.function_caller_attributes {
+			if function_caller_attributes.precedence > 0
+				&& function_caller_attributes.precedence <= function_caller.precedence {
+				if nodes := right.nodes {
+					if nodes.len == 2 {
+						left0 := nodes[0]
+						right0 := nodes[1]
+						node_left := p.insert_node_deep_left(name, function_caller, left,
+							left0, mut meta)!
+						name0 := right.left.to_str()
+						mut meta0 := right.meta
+						meta0.set_literal(p.promote_types(left, right))
+						meta.set_kind(.k_literal)
+						return ast.new_node(name0, meta0, [node_left, right0])
+					}
 				}
 			}
 		}
 	}
-	return ast.new_node_3(name, caller_function, [left, right])
+	meta.set_literal(p.promote_types(left, right))
+	meta.set_kind(.k_literal)
+	meta.set_kind(.k_function_caller)
+	meta.set_function_caller_attributes(function_caller)
+	return ast.new_node(name, meta, [left, right])
+}
+
+fn (mut p Parser) promote_types(left ast.Node, right ast.Node) ast.Literal {
+	left_lit := left.meta.literal()
+	right_lit := right.meta.literal()
+	if left_lit == right_lit && left_lit in [.l_integer, .l_float] {
+		return left_lit
+	} else if left_lit != right_lit && left_lit in [.l_integer, .l_float]
+		&& right_lit in [.l_integer, .l_float] {
+		return .l_float
+	}
+	return left_lit
 }
 
 fn (mut p Parser) check_end_token() !bool {
@@ -293,39 +381,34 @@ fn (mut p Parser) check_end_token() !bool {
 			return true
 		}
 	}
-	if p.current_token.kind() in parser.ending_kinds {
+	if p.current_token.kind() in ending_kinds {
 		return true
 	}
 	return error(p.lexer.show_error_custom_error(p.gen_syntax_error()))
 }
 
 fn (mut p Parser) check_not_end_token() !bool {
-	if p.current_token.kind() !in parser.ending_kinds {
+	if p.current_token.kind() !in ending_kinds {
 		return true
 	}
 	return error(p.lexer.show_error_custom_error(p.gen_syntax_error()))
 }
 
 fn (mut p Parser) parse_list() !ast.Node {
+	mut meta := p.meta()
+	mut literals := []ast.Literal{}
 	mut nodes := []ast.Node{}
-	mut kind := ast.NodeKind(ast.Nil{})
 	p.brackets_delimiter << ._rsbr
 	_ := p.expect(._lsbr)!
 	p.ignore_next_newline()
 	if p.current_token.kind == ._rsbr {
 		p.expect(._rsbr)!
-		return ast.new_node_3('[]', ast.List.new(kind), [])
+		return ast.new_node('[]', meta, [])
 	}
 	for {
 		node := p.expr()!
-		if nodes.len == 0 {
-			kind = node.kind
-		} else {
-			if mut kind is ast.Mixed {
-				kind.put_if_required(node.kind)
-			} else if node.kind != kind {
-				kind = ast.NodeKind(ast.Mixed.new([kind, node.kind]))
-			}
+		if node.meta.literal() !in literals {
+			literals << node.meta.literal()
 		}
 		nodes << node
 		end_token := p.expect_one_of([._comma, ._rsbr])!
@@ -334,26 +417,45 @@ fn (mut p Parser) parse_list() !ast.Node {
 		}
 	}
 	p.brackets_delimiter.delete_last()
-	if nodes.len == 1 && nodes[0].kind is ast.KeywordList {
+	if nodes.len == 1 && nodes[0].get_kind() == .k_keyword_list {
 		return nodes[0]
 	}
-	return ast.new_node_3('[]', ast.List.new(kind), nodes)
+	p.update_meta(mut meta)
+	meta.set_literal(.l_list)
+	meta.set_literal_accepts(literals)
+	meta.set_kind(.k_literal)
+	return ast.new_node('[]', meta, nodes)
 }
 
 fn (mut p Parser) parse_tuple() !ast.Node {
+	mut meta := p.meta()
+	mut literals := []ast.Literal{}
 	mut nodes := []ast.Node{}
-	mut kinds := []ast.NodeKind{}
 	p.brackets_delimiter << ._rcbr
 	_ := p.expect(._lcbr)!
 	for {
 		node := p.expr()!
-		kinds << node.kind
+		literals << node.meta.literal()
 		nodes << node
 		end_token := p.expect_one_of([._comma, ._rcbr])!
 		if end_token.kind == ._rcbr {
 			break
 		}
 	}
+	p.update_meta(mut meta)
+	meta.set_literal(.l_tuple)
+	meta.set_literal_accepts(literals)
+	meta.set_kind(.k_literal)
 	p.brackets_delimiter.delete_last()
-	return ast.new_node_3('{}', ast.Tuple.new(kinds), nodes)
+	return ast.new_node('{}', meta, nodes)
+}
+
+fn (mut p Parser) meta() ast.Meta {
+	line, pos := p.lexer.current_position()
+	return ast.Meta.new(line, pos)
+}
+
+fn (mut p Parser) update_meta(mut meta ast.Meta) {
+	line, pos := p.lexer.current_position()
+	meta.update_pos(line, pos)
 }

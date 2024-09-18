@@ -4,7 +4,7 @@
 module color
 
 pub enum Color {
-	black = 30
+	black      = 30
 	dark_red
 	dark_green
 	dark_yellow
@@ -24,7 +24,7 @@ pub enum Color {
 }
 
 pub enum Decoration {
-	default = 0
+	default   = 0
 	bold
 	light
 	underline = 4
@@ -36,5 +36,5 @@ pub const suffix = 'm'
 pub const reset = '\033[0m'
 
 pub fn fg(c Color, decor Decoration, text string) string {
-	return '${color.prefix}${int(decor)}${color.suffix}${color.prefix}${int(c)}${color.suffix}${text}${color.reset}'
+	return '${prefix}${int(decor)}${suffix}${prefix}${int(c)}${suffix}${text}${reset}'
 }
