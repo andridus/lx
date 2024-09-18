@@ -5,4 +5,7 @@ defmodule A do
   def str do
     "string"
   end
+  # def str do
+  #   num()
+  # end
 end

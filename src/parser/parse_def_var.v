@@ -22,13 +22,20 @@ fn (mut p Parser) parse_def_var() !ast.Node {
 			nodes: [ident_node, node]
 			meta:  meta
 		}
-	}
-	if ident_val, lit := p.var_table.lookup_by_name(ident.value()) {
-		meta.set_literal(lit)
-		meta.set_kind(.k_ident)
-		meta.set_ident_attributes(ast.IdentAttributes{ident_val})
-		return ast.new_node(ident.value(), meta, none)
+	} else if p.current_token.kind == ._lpar {
+		println('should be a function call')
+		// verify if function was defined
+		// verify args
+		// create node
+		return error('not a function')
 	} else {
-		return error('undefined variable `${ident.value()}`')
+		if ident_val, lit := p.var_table.lookup_by_name(ident.value()) {
+			meta.set_literal(lit)
+			meta.set_kind(.k_ident)
+			meta.set_ident_attributes(ast.IdentAttributes{ident_val})
+			return ast.new_node(ident.value(), meta, none)
+		} else {
+			return error('undefined variable `${ident.value()}`')
+		}
 	}
 }

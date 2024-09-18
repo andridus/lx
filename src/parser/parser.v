@@ -18,6 +18,7 @@ mut:
 	lexer              &lexer.Lexer
 	stmts              []ast.Node
 	var_table          &table.VarTable
+	fun_table          &table.FunTable
 	current_module     string = '__empty__'
 	current_token      token.Token
 	next_token         token.Token
@@ -28,9 +29,11 @@ mut:
 pub fn parse_stmts(data []u8) ![]ast.Node {
 	mut l := lexer.Lexer.init(data)!
 	mut var_table := table.VarTable.init()!
+	mut fun_table := table.FunTable.init()!
 	mut p := Parser{
 		lexer:     &l
 		var_table: var_table
+		fun_table: fun_table
 	}
 	p.call_next_token()!
 	p.call_next_token()!
@@ -50,9 +53,11 @@ pub fn parse_stmts(data []u8) ![]ast.Node {
 pub fn parse_stmt(data []u8) !ast.Node {
 	mut l := lexer.Lexer.init(data)!
 	mut var_table := table.VarTable.init()!
+	mut fun_table := table.FunTable.init()!
 	mut p := Parser{
 		lexer:     &l
 		var_table: var_table
+		fun_table: fun_table
 	}
 	p.current_token = p.lexer.read_next_token()!
 	p.next_token = p.lexer.read_next_token()!

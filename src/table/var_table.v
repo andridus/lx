@@ -31,10 +31,6 @@ pub fn (mut vt VarTable) insert(name string, lit ast.Literal) !u32 {
 	}
 }
 
-// pub fn (mut vt VarTable) from(str string) !u32 {
-// 	return vt.insert(str)
-// }
-
 pub fn (vt VarTable) ref(s string) !u32 {
 	if idx := vt.idxs[s] {
 		return u32(idx)

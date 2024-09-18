@@ -4,9 +4,10 @@ import ast
 
 pub struct FunTable {
 mut:
-	idents []string
-	nodes  map[int]ast.Node
-	idxs   map[string]u32
+	idxs  map[string]u32
+	names []string
+	rets  []ast.Literal
+	args  [][]ast.Literal
 }
 
 pub fn FunTable.init() !&FunTable {
@@ -14,53 +15,38 @@ pub fn FunTable.init() !&FunTable {
 	return &ft
 }
 
-pub fn make_fun_ident(aix u32) u32 {
-	val := (aix << 6) + ((0x0 << 4) | ((0x2 << 2) | 0x3))
-	return u32(val)
-}
-
-pub fn (mut ft FunTable) insert(name string, node ast.Node) !u32 {
-	if idx := ft.idxs[name] {
-		return make_ident(idx)
+pub fn (mut ft FunTable) insert(name string, ret ast.Literal, args []ast.Literal) !u32 {
+	arity := args.len
+	fun_name := '${name}/${arity}'
+	if _idx := ft.idxs[name] {
+		return error('the function `${fun_name}` already defined')
 	} else {
-		ft.idents << name
-		idx := u32(ft.idents.len - 1)
+		ft.names << name
+		idx := u32(ft.names.len - 1)
 		ft.idxs[name] = idx
-		ft.nodes[idx] = node
-		return make_ident(idx)
+		ft.rets << ret
+		ft.args << args
+		return idx
 	}
-}
-
-pub fn (mut ft FunTable) from(str string, node ast.Node) !u32 {
-	return ft.insert(str, node)
 }
 
 pub fn (ft FunTable) ref(s string) !u32 {
 	if idx := ft.idxs[s] {
-		return u32(idx)
+		return idx
 	}
 	return error('undefined ident ${s}')
 }
 
-pub fn (ft FunTable) lookup_by_name(s string) ?ast.Node {
+pub fn (ft FunTable) lookup_by_name(s string) ?(ast.Literal, []ast.Literal) {
 	if idx := ft.idxs[s] {
-		return ft.nodes[idx]
+		return ft.rets[idx], ft.args[idx]
 	}
 	return none
 }
 
-pub fn (mut ft FunTable) string_by_idx(idx u32) ?ast.Node {
-	if node := ft.nodes[idx] {
-		return node
+pub fn (mut ft FunTable) string_by_idx(idx u32) ?(ast.Literal, []ast.Literal) {
+	if ret := ft.rets[idx] {
+		return ret, ft.args[idx]
 	}
 	return none
-}
-
-pub fn (ft FunTable) eq(idx u32, idx2 u32) bool {
-	if idx < ft.idents.len && idx2 < ft.idents.len {
-		ident1 := ft.idents[idx]
-		ident2 := ft.idents[idx2]
-		return ident1 == ident2
-	}
-	return false
 }

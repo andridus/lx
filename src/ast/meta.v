@@ -12,6 +12,7 @@ pub mut:
 	atom_attributes            ?AtomAttributes
 	ident_attributes           ?IdentAttributes
 	function_caller_attributes ?FunctionCallerAttributes
+	function_attributes        ?FunctionAttributes
 }
 
 pub struct AtomAttributes {
@@ -20,6 +21,11 @@ pub:
 }
 
 pub struct IdentAttributes {
+pub:
+	idx u32
+}
+
+pub struct FunctionAttributes {
 pub:
 	idx u32
 }
@@ -124,6 +130,11 @@ pub fn (mut m Meta) set_ident_attributes(idnt IdentAttributes) {
 pub fn (mut m Meta) set_function_caller_attributes(fc FunctionCallerAttributes) {
 	m.clear_attributes()
 	m.function_caller_attributes = fc
+}
+
+pub fn (mut m Meta) set_function_attributes(fc FunctionAttributes) {
+	m.clear_attributes()
+	m.function_attributes = fc
 }
 
 pub fn (mut m Meta) update_pos(end_line int, end_pos int) {
