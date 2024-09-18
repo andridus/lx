@@ -5,7 +5,7 @@ import ast
 fn (mut p Parser) parse_module() !ast.Node {
 	mut meta := p.meta()
 	mut code := []ast.Node{}
-	mut attributes := map[string]ast.Node{}
+	// mut attributes := map[string]ast.Node{}
 	p.expect(._defmodule)!
 	aliases := p.expect(._aliases)!
 	module_name := aliases.value
@@ -16,14 +16,14 @@ fn (mut p Parser) parse_module() !ast.Node {
 			node := p.stmt()!
 			code << node
 
-			match node.meta.kind {
-				.k_attribute {
-					if nodes := node.nodes {
-						attributes[nodes[0].left.to_str()] = nodes[1]
-					}
-				}
-				else {}
-			}
+			// match node.meta.kind {
+			// 	.k_attribute {
+			// 		if nodes := node.nodes {
+			// 			attributes[nodes[0].left.to_str()] = nodes[1]
+			// 		}
+			// 	}
+			// 	else {}
+			// }
 			p.ignore_next_newline()
 		}
 		p.expect(._end)!

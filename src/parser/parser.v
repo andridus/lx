@@ -452,11 +452,11 @@ fn (mut p Parser) parse_tuple() !ast.Node {
 }
 
 fn (mut p Parser) meta() ast.Meta {
-	line, pos := p.lexer.current_position()
+	pos, line := p.lexer.current_position()
 	return ast.Meta.new(line, pos)
 }
 
 fn (mut p Parser) update_meta(mut meta ast.Meta) {
-	line, pos := p.lexer.current_position()
+	pos, line := p.lexer.current_position()
 	meta.update_pos(line, pos)
 }

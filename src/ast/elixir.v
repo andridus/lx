@@ -116,7 +116,16 @@ pub fn (n Node) elixir(typ bool) string {
 				term = '{:@, [], [${key}, ${value}]}'
 			}
 		}
-		.k_function_def {}
+		.k_function_def {
+			kind = 'function(${n.get_meta_literal()})'
+			mut nodes_ex := []string{}
+			if nodes := n.nodes {
+				for n0 in nodes {
+					nodes_ex << n0.elixir(typ)
+				}
+			}
+			term = '{:${n.left.to_str()}, [], [${nodes_ex.join(',')}]}'
+		}
 		.k_function_caller {
 			kind = 'function_caller'
 			if nodes := n.nodes {

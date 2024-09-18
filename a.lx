@@ -1,4 +1,8 @@
 defmodule A do
-  @attr "some"
-  @attr 2
+  def num do
+    1
+  end
+  def str do
+    "string"
+  end
 end

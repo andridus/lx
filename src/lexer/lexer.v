@@ -1,7 +1,6 @@
 module lexer
 
 import token
-import ast
 import utils
 
 const delimiters = [` `, `(`, `{`, `|`, `'`, `\n`]

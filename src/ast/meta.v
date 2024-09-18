@@ -66,6 +66,22 @@ pub enum Literal {
 	l_any
 }
 
+pub fn (l Literal) str() string {
+	return match l {
+		.l_nil { 'nil' }
+		.l_integer { 'integer' }
+		.l_float { 'float' }
+		.l_boolean { 'boolean' }
+		.l_atom { 'atom' }
+		.l_string { 'string' }
+		.l_list { 'list' }
+		.l_tuple { 'tuple' }
+		.l_char { 'char' }
+		.l_function { 'function' }
+		.l_any { 'any' }
+	}
+}
+
 pub fn Meta.new(line int, start_pos int) Meta {
 	return Meta{
 		start_line: line
