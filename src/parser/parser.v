@@ -261,11 +261,12 @@ fn (mut p Parser) parse_attribute() !ast.Node {
 	key := p.expect(._mod_attr)!
 	p.update_meta(mut meta)
 	meta.set_literal(.l_atom)
+	meta.set_kind(.k_literal)
 	key_node := ast.new_node(key.value(), meta, none)
 	value := p.expr()!
 	p.update_meta(mut meta)
 	meta.copy_literal_from_node(value)
-	meta.set_kind(.k_literal)
+	meta.set_kind(.k_attribute)
 	return ast.new_node('@', meta, [key_node, value])
 }
 

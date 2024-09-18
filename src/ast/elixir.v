@@ -108,7 +108,14 @@ pub fn (n Node) elixir(typ bool) string {
 			}
 			term = mapped.join('.')
 		}
-		.k_attribute {}
+		.k_attribute {
+			kind = 'attribute'
+			if nodes := n.nodes {
+				key := nodes[0].left.to_str()
+				value := nodes[1].elixir(typ)
+				term = '{:@, [], [${key}, ${value}]}'
+			}
+		}
 		.k_function_def {}
 		.k_function_caller {
 			kind = 'function_caller'
@@ -124,7 +131,13 @@ pub fn (n Node) elixir(typ bool) string {
 		}
 		.k_module_def {
 			kind = 'module'
-			term = '{:module, ${n.left.to_str()}, <<binary>>}'
+			mut nodes_ex := []string{}
+			if nodes := n.nodes {
+				for n0 in nodes {
+					nodes_ex << n0.elixir(typ)
+				}
+			}
+			term = '{:module, ${n.left.to_str()}, [${nodes_ex.join(',')}]}'
 		}
 	}
 	if typ {
