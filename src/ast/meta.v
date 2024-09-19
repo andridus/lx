@@ -27,7 +27,8 @@ pub:
 
 pub struct FunctionAttributes {
 pub:
-	idx u32
+	idx       u32
+	fun_table &FunTable
 }
 
 pub struct FunctionCallerAttributes {

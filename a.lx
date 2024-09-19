@@ -1,11 +1,14 @@
 defmodule A do
-  def num do
+  def str(a :: string, b :: integer, c::float) do
     1
   end
-  def str do
-    "string"
+  def str(a :: float, b :: integer, c::float) do
+    1
   end
-  # def str do
-  #   num()
+  # def str(a :: string, b :: integer, c::float) do
+  #   1
   # end
+  def str do
+    1
+  end
 end

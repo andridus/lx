@@ -117,14 +117,21 @@ pub fn (n Node) elixir(typ bool) string {
 			}
 		}
 		.k_function_def {
-			kind = 'function(${n.get_meta_literal()})'
-			mut nodes_ex := []string{}
-			if nodes := n.nodes {
-				for n0 in nodes {
-					nodes_ex << n0.elixir(typ)
+			if attrs := n.meta.function_attributes {
+				if returns, args := attrs.fun_table.by_idx(attrs.idx) {
+					mut args0 := args.map('(${it.map(it.str()).join(',')})').join('|')
+					mut returns0 := returns.map(it.str()).join(',')
+
+					kind = 'function${args0}->${returns0}'
+					mut nodes_ex := []string{}
+					if nodes := n.nodes {
+						for n0 in nodes {
+							nodes_ex << n0.elixir(typ)
+						}
+					}
+					term = '{:${n.left.to_str()}, [], [${nodes_ex.join(',')}]}'
 				}
 			}
-			term = '{:${n.left.to_str()}, [], [${nodes_ex.join(',')}]}'
 		}
 		.k_function_caller {
 			kind = 'function_caller'

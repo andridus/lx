@@ -5,7 +5,22 @@ import ast
 fn (mut p Parser) parse_def_var() !ast.Node {
 	mut meta := p.meta()
 	ident := p.expect(._ident)!
-	if p.current_token.kind == ._attrb_op {
+	if p.in_args {
+		meta.set_kind(.k_ident)
+		if p.current_token.kind == ._type {
+			p.expect(._type)!
+			if _lit, typ := p.type_table.lookup_by_name(p.current_token.value()) {
+				p.call_next_token() or {}
+				meta.set_literal(typ)
+			} else {
+				node := p.expr()!
+				if node.get_kind() != .k_ident {
+					// define custom type here
+				}
+			}
+		}
+		return ast.new_node(ident.value(), meta, none)
+	} else if p.current_token.kind == ._attrb_op {
 		p.expect(._attrb_op)!
 		node := p.expr()!
 		p.update_meta(mut meta)

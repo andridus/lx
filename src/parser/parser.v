@@ -18,22 +18,26 @@ mut:
 	lexer              &lexer.Lexer
 	stmts              []ast.Node
 	var_table          &table.VarTable
-	fun_table          &table.FunTable
+	fun_table          &ast.FunTable
+	type_table         &table.TypeTable
 	current_module     string = '__empty__'
 	current_token      token.Token
 	next_token         token.Token
 	brackets_delimiter []token.Kind
 	in_keyword_list    bool
+	in_args            bool
 }
 
 pub fn parse_stmts(data []u8) ![]ast.Node {
 	mut l := lexer.Lexer.init(data)!
 	mut var_table := table.VarTable.init()!
-	mut fun_table := table.FunTable.init()!
+	mut fun_table := ast.FunTable.init()!
+	mut type_table := table.TypeTable.init()!
 	mut p := Parser{
-		lexer:     &l
-		var_table: var_table
-		fun_table: fun_table
+		lexer:      &l
+		var_table:  var_table
+		fun_table:  fun_table
+		type_table: type_table
 	}
 	p.call_next_token()!
 	p.call_next_token()!
@@ -53,11 +57,13 @@ pub fn parse_stmts(data []u8) ![]ast.Node {
 pub fn parse_stmt(data []u8) !ast.Node {
 	mut l := lexer.Lexer.init(data)!
 	mut var_table := table.VarTable.init()!
-	mut fun_table := table.FunTable.init()!
+	mut fun_table := ast.FunTable.init()!
+	mut type_table := table.TypeTable.init()!
 	mut p := Parser{
-		lexer:     &l
-		var_table: var_table
-		fun_table: fun_table
+		lexer:      &l
+		var_table:  var_table
+		fun_table:  fun_table
+		type_table: type_table
 	}
 	p.current_token = p.lexer.read_next_token()!
 	p.next_token = p.lexer.read_next_token()!
@@ -83,6 +89,7 @@ fn (mut p Parser) expect(kind token.Kind) !token.Token {
 	curr := p.current_token
 	if p.current_token.kind == kind {
 		p.ignore_next_newline()
+
 		p.call_next_token() or {}
 		return curr
 	} else {
@@ -374,6 +381,9 @@ fn (mut p Parser) promote_types(left ast.Node, right ast.Node) ast.Literal {
 }
 
 fn (mut p Parser) check_end_token() !bool {
+	if p.in_args {
+		return true
+	}
 	if p.brackets_delimiter.len > 0 {
 		if p.current_token.kind == ._comma {
 			return true

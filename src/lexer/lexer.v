@@ -3,7 +3,7 @@ module lexer
 import token
 import utils
 
-const delimiters = [` `, `(`, `{`, `|`, `'`, `\n`]
+const delimiters = [` `, `(`, `)`, `{`, `|`, `'`, `,`, `:`, `\n`]
 
 @[heap]
 pub struct Lexer {
@@ -98,7 +98,12 @@ fn (mut lexer0 Lexer) parse_token() !token.Token {
 			lexer0.new_token(._dot, '.')
 		}
 		`:` {
-			lexer0.parse_atom()!
+			if lexer0.source.peek_next()! == `:` {
+				lexer0.source.ignore_bytes(1)!
+				lexer0.new_token(._type, '::')
+			} else {
+				lexer0.parse_atom()!
+			}
 		}
 		`@` {
 			lexer0.parse_attribute()!
