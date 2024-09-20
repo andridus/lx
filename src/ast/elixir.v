@@ -147,13 +147,7 @@ pub fn (n Node) elixir(typ bool) string {
 		}
 		.k_module_def {
 			kind = 'module'
-			mut nodes_ex := []string{}
-			if nodes := n.nodes {
-				for n0 in nodes {
-					nodes_ex << n0.elixir(typ)
-				}
-			}
-			term = '{:module, ${n.left.to_str()}, [${nodes_ex.join(',')}]}'
+			term = '{:module, ${n.left.to_str()}, <<binary>>}'
 		}
 	}
 	if typ {

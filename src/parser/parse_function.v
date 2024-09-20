@@ -6,7 +6,10 @@ fn (mut p Parser) parse_function() !ast.Node {
 	mut meta := p.meta()
 	mut code := []ast.Node{}
 	mut args := []ast.Literal{}
+	mut ret_defined := false
+	mut returns := ast.Literal.l_nil
 	p.expect(._def)!
+	p.scope_context++
 	function_name := p.expect(._ident)!
 	if p.current_token.kind == ._lpar {
 		p.expect(._lpar)!
@@ -21,6 +24,10 @@ fn (mut p Parser) parse_function() !ast.Node {
 					continue
 				}
 				._rpar {
+					if p.current_token.kind == ._type {
+						ret_defined = true
+						returns = p.parse_type()!
+					}
 					break
 				}
 				else {}
@@ -28,6 +35,7 @@ fn (mut p Parser) parse_function() !ast.Node {
 		}
 		p.in_args = false
 	}
+
 	ex := p.expect_one_of([._do, ._comma])!
 	match ex.kind {
 		._do {
@@ -45,11 +53,16 @@ fn (mut p Parser) parse_function() !ast.Node {
 		}
 		else {}
 	}
-	mut returns := ast.Literal.l_nil
+	mut getted_return := ast.Literal.l_nil
 	if code.len > 0 {
 		last := code.last()
 		meta.copy_literal_from_node(last)
-		returns = last.get_meta_literal()
+		getted_return = last.get_meta_literal()
+	}
+	if ret_defined && returns != getted_return {
+		return error('expected the returned value to be `${returns.str()}`, but returned `${getted_return.str()}`')
+	} else {
+		returns = getted_return
 	}
 	fun_val := p.fun_table.insert(function_name.value(), returns, args)!
 	meta.set_kind(.k_function_def)

@@ -3,7 +3,7 @@ module lexer
 import token
 import utils
 
-const delimiters = [` `, `(`, `)`, `{`, `|`, `'`, `,`, `:`, `\n`]
+const delimiters = [` `, `(`, `)`, `{`, `|`, `'`, `,`, `\n`]
 
 @[heap]
 pub struct Lexer {
@@ -199,11 +199,6 @@ fn (mut lexer0 Lexer) parse_attribute() !token.Token {
 
 fn (mut lexer0 Lexer) parse_atom() !token.Token {
 	mut curr := lexer0.source.current()
-
-	if curr != `:` {
-		return error(lexer0.show_error_custom_error('is not an atom'))
-	}
-	curr = lexer0.source.get_next_byte()!
 	mut data := []u8{}
 	if curr in [`'`, `\"`] {
 		_, data = lexer0.parse_bytes_from_delimiter()!
@@ -237,6 +232,11 @@ fn (mut lexer0 Lexer) match_keyword() ?(string, bool) {
 	for {
 		word << curr
 		pk := lexer0.source.peek_next() or { break }
+		if pk == `:` {
+			if lexer0.source.peek_next_length(2)! == [u8(58), 58] {
+				break
+			}
+		}
 		if delimiters.index(pk) != -1 {
 			break
 		}
@@ -245,6 +245,7 @@ fn (mut lexer0 Lexer) match_keyword() ?(string, bool) {
 	if word.len > 0 {
 		if word.last() == `:` {
 			_ := word.pop()
+
 			return word.bytestr(), true
 		}
 	}

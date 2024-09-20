@@ -138,10 +138,14 @@ pub fn (mut b DataBytes) current() u8 {
 }
 
 pub fn (mut b DataBytes) peek_next() !u8 {
-	if b.eof() {
+	return b.peek_next_length(1)![0]
+}
+
+pub fn (mut b DataBytes) peek_next_length(num u32) ![]u8 {
+	if (b.current_pos + num) >= b.data.len {
 		return error('EOF')
 	}
-	return b.data[b.current_pos]
+	return b.data[b.current_pos..(b.current_pos + num)]
 }
 
 pub fn (mut b DataBytes) get_next_byte() !u8 {

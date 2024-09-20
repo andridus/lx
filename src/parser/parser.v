@@ -26,6 +26,7 @@ mut:
 	brackets_delimiter []token.Kind
 	in_keyword_list    bool
 	in_args            bool
+	scope_context      u32
 }
 
 pub fn parse_stmts(data []u8) ![]ast.Node {

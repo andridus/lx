@@ -2,11 +2,17 @@ module table
 
 import ast
 
-pub struct VarTable {
+@[heap]
+pub struct ContextVarTable {
 mut:
 	idents []string
 	kinds  []ast.Literal
 	idxs   map[string]u32
+}
+
+pub struct VarTable {
+mut:
+	contexts map[u32]&ContextVarTable
 }
 
 pub fn VarTable.init() !&VarTable {
@@ -19,44 +25,54 @@ pub fn make_ident(aix u32) u32 {
 	return u32(val)
 }
 
-pub fn (mut vt VarTable) insert(name string, lit ast.Literal) !u32 {
-	if idx := vt.idxs[name] {
+fn (mut vt VarTable) get_or_create_context(context u32) &ContextVarTable {
+	return vt.get_context(context) or {
+		ctx := &ContextVarTable{}
+		vt.contexts[context] = ctx
+		ctx
+	}
+}
+
+fn (vt VarTable) get_context(context u32) !&ContextVarTable {
+	if ctx := vt.contexts[context] {
+		return ctx
+	}
+	return error('context not found')
+}
+
+pub fn (mut vt VarTable) insert(context u32, name string, lit ast.Literal) !u32 {
+	mut ctx := vt.get_or_create_context(context)
+	if idx := ctx.idxs[name] {
 		return make_ident(idx)
 	} else {
-		vt.idents << name
-		vt.kinds << lit
-		idx := u32(vt.idents.len - 1)
-		vt.idxs[name] = idx
+		ctx.idents << name
+		ctx.kinds << lit
+		idx := u32(ctx.idents.len - 1)
+		ctx.idxs[name] = idx
 		return make_ident(idx)
 	}
 }
 
-pub fn (vt VarTable) ref(s string) !u32 {
-	if idx := vt.idxs[s] {
+pub fn (vt VarTable) ref(context u32, s string) !u32 {
+	ctx := vt.get_context(context)!
+	if idx := ctx.idxs[s] {
 		return u32(idx)
 	}
 	return error('undefined ident ${s}')
 }
 
-pub fn (vt VarTable) lookup_by_name(s string) ?(u32, ast.Literal) {
-	if idx := vt.idxs[s] {
-		return idx, vt.kinds[idx]
+pub fn (vt VarTable) lookup_by_name(context u32, s string) ?(u32, ast.Literal) {
+	ctx := vt.get_context(context) or { return none }
+	if idx := ctx.idxs[s] {
+		return idx, ctx.kinds[idx]
 	}
 	return none
 }
 
-pub fn (mut vt VarTable) lookup_by_idx(idx u32) ?(string, ast.Literal) {
-	if str := vt.idents[idx] {
-		return str, vt.kinds[idx]
+pub fn (mut vt VarTable) lookup_by_idx(context u32, idx u32) ?(string, ast.Literal) {
+	ctx := vt.get_context(context) or { return none }
+	if str := ctx.idents[idx] {
+		return str, ctx.kinds[idx]
 	}
 	return none
-}
-
-pub fn (vt VarTable) eq(idx u32, idx2 u32) bool {
-	if idx < vt.idents.len && idx2 < vt.idents.len {
-		ident1 := vt.idents[idx]
-		ident2 := vt.idents[idx2]
-		return ident1 == ident2
-	}
-	return false
 }

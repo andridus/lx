@@ -29,7 +29,7 @@ pub fn (mut ft FunTable) insert(name string, ret Literal, args []Literal) !u32 {
 				}
 			}
 			if err {
-				return error('the function `${fun_name}` already defined')
+				return error('the function `${fun_name}` with same signature already defined')
 			}
 		}
 		idx0 = idx
