@@ -1,8 +1,12 @@
 defmodule A do
-  def a(i::integer)::integer do
-    i
+  def c(j) do
+    j
   end
-  def a(i::float)::integer do
-    i
+  def a(j) do
+    c(j)
   end
+  def b() :: integer do
+    a(1)
+  end
+
 end

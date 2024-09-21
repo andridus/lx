@@ -3,7 +3,7 @@ module lexer
 import token
 import utils
 
-const delimiters = [` `, `(`, `)`, `{`, `|`, `'`, `,`, `\n`]
+const delimiters = [` `, `(`, `)`, `{`, `|`, `'`, `,`, `+`, `\n`]
 
 @[heap]
 pub struct Lexer {
@@ -381,5 +381,5 @@ fn (lexer0 Lexer) new_token(kind token.Kind, value string) token.Token {
 }
 
 pub fn (mut lexer0 Lexer) current_position() (int, int) {
-	return lexer0.source.current_pos(), lexer0.source.current_line()
+	return lexer0.source.current_pos_inline(), lexer0.source.current_line()
 }

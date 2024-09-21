@@ -15,7 +15,7 @@ pub fn run_suite() bool {
 	for path in paths {
 		println(color.fg(.white, .default, 'Compiling ${root_path}/${path}'))
 		source := os.read_bytes('${root_path}/${path}') or { return false }
-		_ := parser.parse_stmts(source) or { exit(1) }
+		_ := parser.parse_stmts(source, '${root_path}/${path}') or { exit(1) }
 		println(color.fg(.dark_green, .default, '->> ${root_path}/${path} compiled with success!'))
 	}
 	exit(1)

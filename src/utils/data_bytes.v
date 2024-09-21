@@ -7,6 +7,7 @@ pub struct DataBytes {
 mut:
 	data            []u8
 	current_pos     int
+	current_pos_inline     int
 	total_lines     int
 	lines_start_pos []int
 	current_line    int
@@ -124,6 +125,9 @@ pub fn (mut b DataBytes) current_line() int {
 pub fn (mut b DataBytes) current_pos() int {
 	return b.current_pos
 }
+pub fn (mut b DataBytes) current_pos_inline() int {
+	return b.current_pos_inline
+}
 
 pub fn (mut b DataBytes) eof() bool {
 	return b.current_pos == b.data.len
@@ -173,8 +177,12 @@ pub fn (mut b DataBytes) get_next_bytes(bytes u32) ![]u8 {
 	if to <= b.data.len {
 		b.current_pos = to
 		r := b.data[from..to]
-		if 10 in r {
-			b.current_line += 1
+		for p in r {
+			b.current_pos_inline++
+			if 10 == p {
+				b.current_line += 1
+				b.current_pos_inline = 0
+			}
 		}
 		return r
 	} else {

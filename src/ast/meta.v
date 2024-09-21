@@ -28,17 +28,16 @@ pub:
 pub struct FunctionAttributes {
 pub:
 	idx       u32
+	args_idx u32
 	fun_table &FunTable
 }
 
 pub struct FunctionCallerAttributes {
 pub:
+	args_idx u32
+	idx u32
 	precedence u32
 	position   MetaCallerFunctionPosition
-}
-
-pub fn FunctionCallerAttributes.new(prec u32, pos MetaCallerFunctionPosition) FunctionCallerAttributes {
-	return FunctionCallerAttributes{prec, pos}
 }
 
 pub enum MetaCallerFunctionPosition {

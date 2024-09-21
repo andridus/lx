@@ -1,0 +1,20 @@
+defmodule A do
+  def a() do
+    1
+  end
+  def b do
+    1
+  end
+  def c(i) do
+    i
+  end
+  def d(i) :: any do
+    i
+  end
+  def e(i :: integer) :: integer do
+    i
+  end
+  def f(i :: integer, j) :: integer do
+    i
+  end
+end

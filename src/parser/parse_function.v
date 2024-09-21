@@ -16,6 +16,10 @@ fn (mut p Parser) parse_function() !ast.Node {
 		p.in_args = true
 		p.ignore_next_newline()
 		for {
+			if p.current_token.kind == ._rpar {
+				p.expect(._rpar)!
+				break
+			}
 			arg := p.expr()!
 			args << arg.get_meta_literal()
 			ex0 := p.expect_one_of([._rpar, ._comma])!
@@ -24,10 +28,6 @@ fn (mut p Parser) parse_function() !ast.Node {
 					continue
 				}
 				._rpar {
-					if p.current_token.kind == ._type {
-						ret_defined = true
-						returns = p.parse_type()!
-					}
 					break
 				}
 				else {}
@@ -35,7 +35,10 @@ fn (mut p Parser) parse_function() !ast.Node {
 		}
 		p.in_args = false
 	}
-
+	if p.current_token.kind == ._type {
+		ret_defined = true
+		returns = p.parse_type()!
+	}
 	ex := p.expect_one_of([._do, ._comma])!
 	match ex.kind {
 		._do {
@@ -64,8 +67,8 @@ fn (mut p Parser) parse_function() !ast.Node {
 	} else {
 		returns = getted_return
 	}
-	fun_val := p.fun_table.insert(function_name.value(), returns, args)!
+	fun_val , args_idx := p.fun_table.insert(function_name.value(), returns, args, [[-1]])!
 	meta.set_kind(.k_function_def)
-	meta.set_function_attributes(ast.FunctionAttributes{ idx: fun_val, fun_table: p.fun_table })
+	meta.set_function_attributes(ast.FunctionAttributes{ idx: fun_val, args_idx: args_idx, fun_table: p.fun_table })
 	return ast.new_node(function_name.value(), meta, code)
 }
