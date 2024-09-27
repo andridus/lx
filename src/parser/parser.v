@@ -20,7 +20,7 @@ mut:
 	var_table          &table.VarTable
 	fun_table          &ast.FunTable
 	type_table         &table.TypeTable
-	current_module    []string
+	current_module     []string
 	current_token      token.Token
 	next_token         token.Token
 	brackets_delimiter []token.Kind
@@ -36,22 +36,23 @@ pub fn parse_stmts(data []u8, filepath string) ![]ast.Node {
 	mut type_table := table.TypeTable.init()!
 	mut p := Parser{
 		lexer:      &l
-		filepath: filepath
+		filepath:   filepath
 		var_table:  var_table
 		fun_table:  fun_table
 		type_table: type_table
 	}
-	p.call_next_token()!
-	p.call_next_token()!
-	for p.current_token.kind != .eof {
-		p.ignore_next_newline()
-		stmt := p.stmt()!
+	p.prelabel_functions()!
+	// p.call_next_token()!
+	// p.call_next_token()!
+	// for p.current_token.kind != .eof {
+	// 	p.ignore_next_newline()
+	// 	stmt := p.stmt()!
 
-		if !stmt.is_comment() { // ignore comment
-			p.stmts << stmt
-		}
-		p.ignore_next_newline()
-	}
+	// 	if !stmt.is_comment() { // ignore comment
+	// 		p.stmts << stmt
+	// 	}
+	// 	p.ignore_next_newline()
+	// }
 
 	return p.stmts
 }
@@ -322,7 +323,10 @@ fn (mut p Parser) maybe_apply_precendence(node ast.Node) !ast.Node {
 		p.call_next_token()!
 		right := p.expr()!
 
-		function_caller := ast.FunctionCallerAttributes{precedence: prec.get_precedence(), position: .infix}
+		function_caller := ast.FunctionCallerAttributes{
+			precedence: prec.get_precedence()
+			position:   .infix
+		}
 		match prec.get_assoc() {
 			.left {
 				return p.insert_node_deep_left(function_token.value(), function_caller,

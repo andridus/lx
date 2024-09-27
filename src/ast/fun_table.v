@@ -2,18 +2,42 @@ module ast
 
 pub struct FunCaller {
 	path string
-	mod string
+	mod  string
 	line u32
-	pos u32
+	pos  u32
 }
+
+pub struct FunctionLabel {
+pub:
+	name      string
+	mod       string
+	pos_start u32
+	pos_end   u32
+	filepath  string
+	args      []string
+	returns   string
+}
+
+pub struct FunctionCallerLabel {
+pub:
+	name       string
+	mod        string
+	inside_fun string
+	pos_start  u32
+	pos_end    u32
+	filepath   string
+	args       []string
+}
+
 pub struct FunTable {
 mut:
-	idxs  map[string]u32
-	names []string
-	rets  [][]Literal
-	args  [][][]Literal
-	type_reevaluate_instructions  map[u32]map[u32][][]int
-	callers  map[u32]map[u32]FunCaller
+	labels                       []FunctionLabel
+	idxs                         map[string]u32
+	names                        []string
+	rets                         [][]Literal
+	args                         [][][]Literal
+	type_reevaluate_instructions map[u32]map[u32][][]int
+	callers                      map[u32]map[u32]FunCaller
 }
 
 pub fn FunTable.init() !&FunTable {
@@ -24,6 +48,7 @@ pub fn FunTable.init() !&FunTable {
 pub fn (mut ft FunTable) add_type_reevaluate_instructions(idx u32, args_idx u32, instructions [][]int) {
 	ft.type_reevaluate_instructions[idx][args_idx] = instructions
 }
+
 pub fn find_args_idx(args0 []Literal, args1 [][]Literal, match_any bool) ?u32 {
 	mut idx := -1
 	if args1.len == 1 {
@@ -54,12 +79,13 @@ pub fn find_args_idx(args0 []Literal, args1 [][]Literal, match_any bool) ?u32 {
 	}
 	return none
 }
-pub fn (mut ft FunTable) reevaluate_with_args(fun_idx u32, args_idx u32, args []Literal, new_args []Literal) Literal{
+
+pub fn (mut ft FunTable) reevaluate_with_args(fun_idx u32, args_idx u32, args []Literal, new_args []Literal) Literal {
 	if instructions := ft.type_reevaluate_instructions[fun_idx][args_idx] {
 		mut ret := Literal.l_any
 		mut i := -1
 		mut args0 := map[int]Literal{}
-		for i0, n in args{
+		for i0, n in args {
 			if n == .l_any {
 				args0[i] = new_args[i0]
 			}
@@ -75,14 +101,16 @@ pub fn (mut ft FunTable) reevaluate_with_args(fun_idx u32, args_idx u32, args []
 	}
 	return .l_any
 }
+
 pub fn (mut ft FunTable) insert_caller(fun_idx u32, args_idx u32, mod string, path string, line u32, pos u32) {
 	ft.callers[fun_idx][args_idx] = FunCaller{
-		path: path,
-		mod: mod,
-		pos: pos,
+		path: path
+		mod:  mod
+		pos:  pos
 		line: line
 	}
 }
+
 pub fn (mut ft FunTable) insert(name string, ret Literal, args []Literal, reevaluate [][]int) !(u32, u32) {
 	arity := args.len
 	fun_name := '${name}/${arity}'

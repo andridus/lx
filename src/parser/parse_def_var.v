@@ -59,21 +59,23 @@ fn (mut p Parser) parse_def_var() !ast.Node {
 		}
 		p.in_args = false
 		fun_name := '${ident.value()}/${args_types.len}'
-		if idx, ret , args:= p.fun_table.lookup_by_name(fun_name) {
+		if idx, ret, args := p.fun_table.lookup_by_name(fun_name) {
 			if args_idx := ast.find_args_idx(args_types, args, true) {
 				mut returns := ret[args_idx]
 				p.update_meta(mut meta)
 				if returns == .l_any && ast.Literal.l_any in args[args_idx] {
-					returns = p.fun_table.reevaluate_with_args(idx, args_idx, args[args_idx], args_types)
+					returns = p.fun_table.reevaluate_with_args(idx, args_idx, args[args_idx],
+						args_types)
 				}
 				meta.set_literal(returns)
 				meta.set_kind(.k_function_caller)
 				meta.set_function_caller_attributes(ast.FunctionCallerAttributes{
 					args_idx: args_idx
-					idx: idx
+					idx:      idx
 				})
 				line, pos := p.lexer.current_position()
-				p.fun_table.insert_caller(idx, args_idx, p.current_module.join('.'), p.filepath, u32(pos), u32(line))
+				p.fun_table.insert_caller(idx, args_idx, p.current_module.join('.'), p.filepath,
+					u32(pos), u32(line))
 				return ast.new_node(ident.value(), meta, args_nodes)
 			}
 		}

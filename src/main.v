@@ -44,7 +44,7 @@ fn main() {
 		println('File \'${path}\' not found')
 		exit(1)
 	}
-	nodes := parser.parse_stmts(source, path ) or {
+	nodes := parser.parse_stmts(source, path) or {
 		println(err.msg())
 		exit(1)
 	}

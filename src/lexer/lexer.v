@@ -383,3 +383,7 @@ fn (lexer0 Lexer) new_token(kind token.Kind, value string) token.Token {
 pub fn (mut lexer0 Lexer) current_position() (int, int) {
 	return lexer0.source.current_pos_inline(), lexer0.source.current_line()
 }
+
+pub fn (mut lexer0 Lexer) source() []u8 {
+	return lexer0.source.data()
+}

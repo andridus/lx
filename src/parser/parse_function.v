@@ -67,8 +67,14 @@ fn (mut p Parser) parse_function() !ast.Node {
 	} else {
 		returns = getted_return
 	}
-	fun_val , args_idx := p.fun_table.insert(function_name.value(), returns, args, [[-1]])!
+	fun_val, args_idx := p.fun_table.insert(function_name.value(), returns, args, [
+		[-1],
+	])!
 	meta.set_kind(.k_function_def)
-	meta.set_function_attributes(ast.FunctionAttributes{ idx: fun_val, args_idx: args_idx, fun_table: p.fun_table })
+	meta.set_function_attributes(ast.FunctionAttributes{
+		idx:       fun_val
+		args_idx:  args_idx
+		fun_table: p.fun_table
+	})
 	return ast.new_node(function_name.value(), meta, code)
 }

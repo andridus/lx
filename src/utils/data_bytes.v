@@ -5,12 +5,12 @@ import color
 
 pub struct DataBytes {
 mut:
-	data            []u8
-	current_pos     int
-	current_pos_inline     int
-	total_lines     int
-	lines_start_pos []int
-	current_line    int
+	data               []u8
+	current_pos        int
+	current_pos_inline int
+	total_lines        int
+	lines_start_pos    []int
+	current_line       int
 }
 
 pub fn DataBytes.init(source []u8) DataBytes {
@@ -114,6 +114,10 @@ pub fn (mut b DataBytes) backwards_bytes(num int) {
 	}
 }
 
+pub fn (mut b DataBytes) data() []u8 {
+	return b.data
+}
+
 pub fn (mut b DataBytes) length() int {
 	return b.data.len
 }
@@ -125,6 +129,7 @@ pub fn (mut b DataBytes) current_line() int {
 pub fn (mut b DataBytes) current_pos() int {
 	return b.current_pos
 }
+
 pub fn (mut b DataBytes) current_pos_inline() int {
 	return b.current_pos_inline
 }
