@@ -1,19 +1,8 @@
-defmodule A do
-  def a(j::integer, k::float)::integer do
-    B.y(1,2)
+defmodule AModule do
+  def a :: integer do
+    1
   end
-  def b(j::string, k::bool)::string do
-    j
-  end
-  def c(j::string, k::bool) do
-    j
-  end
-  def d(j, k) do
-    m
-  end
-end
-defmodule B do
-  def y(j::integer, k::float)::integer do
-    A.a(1,2)
+  def b do
+    a()
   end
 end

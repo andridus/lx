@@ -16,13 +16,14 @@ pub:
 	filepath  string
 	args      []string
 	returns   string
+	is_private bool
 }
 
 pub struct FunctionCallerLabel {
 pub:
 	name       string
 	mod        string
-	inside_fun string
+	parent_fun string
 	pos_start  u32
 	pos_end    u32
 	filepath   string
@@ -32,6 +33,7 @@ pub:
 pub struct FunTable {
 mut:
 	labels                       []FunctionLabel
+	caller_labels								 []FunctionCallerLabel
 	idxs                         map[string]u32
 	names                        []string
 	rets                         [][]Literal
@@ -45,6 +47,12 @@ pub fn FunTable.init() !&FunTable {
 	return &ft
 }
 
+pub fn (mut ft FunTable) set_labels(functions []FunctionLabel) {
+	ft.labels = functions
+}
+pub fn (mut ft FunTable) set_caller_labels(functions_caller []FunctionCallerLabel) {
+	ft.caller_labels = functions_caller
+}
 pub fn (mut ft FunTable) add_type_reevaluate_instructions(idx u32, args_idx u32, instructions [][]int) {
 	ft.type_reevaluate_instructions[idx][args_idx] = instructions
 }
