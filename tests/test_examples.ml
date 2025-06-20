@@ -14,83 +14,94 @@ let string_contains_substring s sub =
 let test_simple_function_example () =
   let program = Compiler.parse_string "fun hello() { \"world\" }" in
   let result = Compiler.compile_to_string program in
-  let expected_parts = ["-module(generated)"; "hello() ->"; "\"world\"."] in
-  List.iter (fun part ->
-    let contains = string_contains_substring result part in
-    check bool ("contains: " ^ part) true contains
-  ) expected_parts
+  let expected_parts = [ "-module(generated)"; "hello() ->"; "\"world\"." ] in
+  List.iter
+    (fun part ->
+      let contains = string_contains_substring result part in
+      check bool ("contains: " ^ part) true contains)
+    expected_parts
 
 let test_function_with_parameters () =
   let program = Compiler.parse_string "fun add(x, y) { x }" in
   let result = Compiler.compile_to_string program in
-  let expected_parts = ["add(X, Y) ->"; "X."] in
-  List.iter (fun part ->
-    let contains = string_contains_substring result part in
-    check bool ("contains: " ^ part) true contains
-  ) expected_parts
+  let expected_parts = [ "add(X, Y) ->"; "X." ] in
+  List.iter
+    (fun part ->
+      let contains = string_contains_substring result part in
+      check bool ("contains: " ^ part) true contains)
+    expected_parts
 
 let test_multiple_functions () =
   let input = "fun first() { 1 } fun second() { 2 }" in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string program in
-  let expected_parts = ["first() ->"; "1."; "second() ->"; "2."] in
-  List.iter (fun part ->
-    let contains = string_contains_substring result part in
-    check bool ("contains: " ^ part) true contains
-  ) expected_parts
+  let expected_parts = [ "first() ->"; "1."; "second() ->"; "2." ] in
+  List.iter
+    (fun part ->
+      let contains = string_contains_substring result part in
+      check bool ("contains: " ^ part) true contains)
+    expected_parts
 
 let test_various_literals () =
-  let test_cases = [
-    ("fun test_int() { 42 }", ["42"]);
-    ("fun test_float() { 3.14 }", ["3.14"]);
-    ("fun test_bool() { true }", ["true"]);
-    ("fun test_atom() { :hello }", ["hello"]);
-    ("fun test_string() { \"world\" }", ["\"world\""]);
-  ] in
+  let test_cases =
+    [
+      ("fun test_int() { 42 }", [ "42" ]);
+      ("fun test_float() { 3.14 }", [ "3.14" ]);
+      ("fun test_bool() { true }", [ "true" ]);
+      ("fun test_atom() { :hello }", [ "hello" ]);
+      ("fun test_string() { \"world\" }", [ "\"world\"" ]);
+    ]
+  in
 
-  List.iter (fun (input, expected_parts) ->
-    let program = Compiler.parse_string input in
-    let result = Compiler.compile_to_string program in
-    List.iter (fun part ->
-      let contains = string_contains_substring result part in
-      check bool ("expression: " ^ input ^ " contains: " ^ part) true contains
-    ) expected_parts
-  ) test_cases
+  List.iter
+    (fun (input, expected_parts) ->
+      let program = Compiler.parse_string input in
+      let result = Compiler.compile_to_string program in
+      List.iter
+        (fun part ->
+          let contains = string_contains_substring result part in
+          check bool
+            ("expression: " ^ input ^ " contains: " ^ part)
+            true contains)
+        expected_parts)
+    test_cases
 
 let test_let_expressions () =
   (* Note: Let expressions now require both value and body *)
   let input = "fun expr() { let x = 42 in x }" in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string program in
-  let expected_parts = ["expr() ->"; "(X = 42, X)"] in
-  List.iter (fun part ->
-    let contains = string_contains_substring result part in
-    check bool ("let expression contains: " ^ part) true contains
-  ) expected_parts
+  let expected_parts = [ "expr() ->"; "(X = 42, X)" ] in
+  List.iter
+    (fun part ->
+      let contains = string_contains_substring result part in
+      check bool ("let expression contains: " ^ part) true contains)
+    expected_parts
 
 let test_empty_program () =
   let program = Compiler.parse_string "" in
   let result = Compiler.compile_to_string program in
-  let expected_parts = ["-module(generated)"; "-compile(export_all)"] in
-  List.iter (fun part ->
-    let contains = string_contains_substring result part in
-    check bool ("empty program contains: " ^ part) true contains
-  ) expected_parts
+  let expected_parts = [ "-module(generated)"; "-compile(export_all)" ] in
+  List.iter
+    (fun part ->
+      let contains = string_contains_substring result part in
+      check bool ("empty program contains: " ^ part) true contains)
+    expected_parts
 
 let test_error_handling () =
   (* Test that parsing invalid syntax raises appropriate errors *)
   try
     let _ = Compiler.parse_string "invalid syntax here" in
     Alcotest.fail "Should have raised parsing error"
-  with
-  | _ -> () (* Expected to fail *)
+  with _ -> () (* Expected to fail *)
 
-let tests = [
-  ("simple function example", `Quick, test_simple_function_example);
-  ("function with parameters", `Quick, test_function_with_parameters);
-  ("multiple functions", `Quick, test_multiple_functions);
-  ("various literal types", `Quick, test_various_literals);
-  ("let expressions", `Quick, test_let_expressions);
-  ("empty program", `Quick, test_empty_program);
-  ("error handling for invalid syntax", `Quick, test_error_handling);
-]
+let tests =
+  [
+    ("simple function example", `Quick, test_simple_function_example);
+    ("function with parameters", `Quick, test_function_with_parameters);
+    ("multiple functions", `Quick, test_multiple_functions);
+    ("various literal types", `Quick, test_various_literals);
+    ("let expressions", `Quick, test_let_expressions);
+    ("empty program", `Quick, test_empty_program);
+    ("error handling for invalid syntax", `Quick, test_error_handling);
+  ]

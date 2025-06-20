@@ -19,18 +19,10 @@ type pattern =
   | PCons of pattern * pattern
 
 (* OTP strategies for supervisors *)
-type otp_strategy =
-  | OneForOne
-  | OneForAll
-  | RestForOne
+type otp_strategy = OneForOne | OneForAll | RestForOne
 
 (* OTP handler types *)
-type otp_handler =
-  | Init
-  | Call
-  | Cast
-  | Info
-  | Terminate
+type otp_handler = Init | Call | Cast | Info | Terminate
 
 (* Expressions *)
 type expr =
@@ -46,42 +38,27 @@ type expr =
   | For of ident * expr * expr
 
 (* Function definitions *)
-type function_def = {
-  name: ident;
-  params: ident list;
-  body: expr;
-}
+type function_def = { name : ident; params : ident list; body : expr }
 
 (* Formal specifications *)
-type spec = {
-  name: ident;
-  requires: expr list;
-  ensures: expr list;
-}
+type spec = { name : ident; requires : expr list; ensures : expr list }
 
 (* Test definitions *)
-type test_def = {
-  name: string;
-  body: expr;
-}
-
-type describe_block = {
-  name: string;
-  tests: test_def list;
-}
+type test_def = { name : string; body : expr }
+type describe_block = { name : string; tests : test_def list }
 
 (* OTP components *)
 type otp_component =
   | Worker of {
-      name: ident;
-      handlers: (otp_handler * function_def) list;
-      functions: function_def list;
-      specs: spec list;
+      name : ident;
+      handlers : (otp_handler * function_def) list;
+      functions : function_def list;
+      specs : spec list;
     }
   | Supervisor of {
-      name: ident;
-      strategy: otp_strategy;
-      children: ident list;
+      name : ident;
+      strategy : otp_strategy;
+      children : ident list;
     }
 
 (* Module items *)
@@ -92,6 +69,4 @@ type module_item =
   | Test of describe_block
 
 (* Complete program *)
-type program = {
-  items: module_item list;
-}
+type program = { items : module_item list }

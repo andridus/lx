@@ -35,7 +35,7 @@ watch:
 	dune build --watch
 
 # Format OCaml code
-format:
+fmt:
 	dune fmt
 
 # Lint and check code quality

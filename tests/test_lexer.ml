@@ -33,10 +33,11 @@ let test_tokenize_in () =
   | Compiler.Parser.IN -> ()
   | _ -> Alcotest.fail "Expected IN token"
 
-let tests = [
-  ("tokenize integer", `Quick, test_tokenize_int);
-  ("tokenize identifier", `Quick, test_tokenize_ident);
-  ("tokenize let keyword", `Quick, test_tokenize_let);
-  ("tokenize equals", `Quick, test_tokenize_eq);
-  ("tokenize in keyword", `Quick, test_tokenize_in);
-]
+let tests =
+  [
+    ("tokenize integer", `Quick, test_tokenize_int);
+    ("tokenize identifier", `Quick, test_tokenize_ident);
+    ("tokenize let keyword", `Quick, test_tokenize_let);
+    ("tokenize equals", `Quick, test_tokenize_eq);
+    ("tokenize in keyword", `Quick, test_tokenize_in);
+  ]
