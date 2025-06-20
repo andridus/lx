@@ -12,7 +12,8 @@
   test_typechecker
   test_otp_validator
   test_module_generation
-  test_error_handling))
+  test_error_handling
+  test_function_calls))
 
 (rule
  (alias runtest)

@@ -94,6 +94,9 @@ let rec emit_expr (e : expr) : string =
   | App (func, args) ->
       (* For complex function expressions *)
       emit_expr func ^ "(" ^ String.concat ", " (List.map emit_expr args) ^ ")"
+  | ExternalCall (module_name, func_name, args) ->
+      (* Generate Erlang external call: module:function(args) *)
+      module_name ^ ":" ^ func_name ^ "(" ^ String.concat ", " (List.map emit_expr args) ^ ")"
   | Tuple exprs -> "{" ^ String.concat ", " (List.map emit_expr exprs) ^ "}"
   | List exprs -> "[" ^ String.concat ", " (List.map emit_expr exprs) ^ "]"
   | If (cond, then_expr, else_expr) ->
@@ -108,12 +111,19 @@ let rec emit_expr (e : expr) : string =
           (List.map (fun (p, e) -> emit_pattern p ^ " -> " ^ emit_expr e) cases)
       ^ " end"
   | For (_, _, _) -> "% For expressions not yet implemented"
+  | Sequence exprs ->
+      (* In Erlang, sequence of expressions is separated by commas *)
+      String.concat ",\n    " (List.map emit_expr exprs)
+
+let emit_function_clause (func_name : string) (clause : function_clause) : string =
+  func_name ^ "("
+  ^ String.concat ", " (List.map capitalize_var clause.params)
+  ^ ") ->\n    " ^ emit_expr clause.body
 
 let emit_function_def (func : function_def) : string =
   check_function_name func.name;
-  func.name ^ "("
-  ^ String.concat ", " (List.map capitalize_var func.params)
-  ^ ") ->\n    " ^ emit_expr func.body ^ "."
+  let clauses_code = List.map (emit_function_clause func.name) func.clauses in
+  String.concat ";\n" clauses_code ^ "."
 
 let emit_spec (spec : spec) : string =
   let emit_spec_expr expr =
@@ -170,9 +180,16 @@ let emit_otp_component (base_module_name : string) (component : otp_component) :
               | Info -> "handle_info"
               | Terminate -> "terminate"
             in
-            handler_name ^ "("
-            ^ String.concat ", " (List.map capitalize_var func.params)
-            ^ ") ->\n    " ^ emit_expr func.body ^ ".")
+            (* For handlers, we need to handle the new function_def structure *)
+            match func.clauses with
+            | [clause] ->
+                handler_name ^ "("
+                ^ String.concat ", " (List.map capitalize_var clause.params)
+                ^ ") ->\n    " ^ emit_expr clause.body ^ "."
+            | _ ->
+                (* Multiple clauses for handlers - generate separate clauses *)
+                let clauses_code = List.map (emit_function_clause handler_name) func.clauses in
+                String.concat ";\n" clauses_code ^ ".")
           handlers
       in
 

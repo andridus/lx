@@ -28,6 +28,7 @@ rule read = parse
   | ","             { COMMA }
   | ";"             { SEMICOLON }
   | "::"            { CONS }
+  | "."             { DOT }
 
   (* Literals *)
   | ['a'-'z']['a'-'z''A'-'Z''0'-'9''_']* as id {

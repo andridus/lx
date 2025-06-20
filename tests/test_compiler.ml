@@ -13,7 +13,7 @@ let string_contains_substring s sub =
   search 0
 
 let test_compile_function () =
-  let func = { name = "num"; params = []; body = Literal (LInt 42) } in
+  let func = make_single_clause_function "num" [] (Literal (LInt 42)) in
   let program = { items = [ Function func ] } in
   let result = Compiler.compile_to_string program in
   let expected_parts = [ "-module(generated)"; "num() ->"; "42." ] in
@@ -24,7 +24,7 @@ let test_compile_function () =
     expected_parts
 
 let test_compile_function_with_params () =
-  let func = { name = "add"; params = [ "x"; "y" ]; body = Var "x" } in
+  let func = make_single_clause_function "add" [ "x"; "y" ] (Var "x") in
   let program = { items = [ Function func ] } in
   let result = Compiler.compile_to_string program in
   let expected_parts = [ "add(X, Y) ->"; "X." ] in
@@ -36,7 +36,7 @@ let test_compile_function_with_params () =
 
 let test_compile_let_expression () =
   let let_expr = Let ("x", Literal (LInt 42), Var "x") in
-  let func = { name = "num"; params = []; body = let_expr } in
+  let func = make_single_clause_function "num" [] let_expr in
   let program = { items = [ Function func ] } in
   let result = Compiler.compile_to_string program in
   let expected_parts = [ "num() ->"; "(X = 42, X)." ] in
@@ -65,7 +65,7 @@ let test_empty_program () =
 
 (* Test for nil compilation *)
 let test_compile_nil () =
-  let func = { name = "test_nil"; params = []; body = Literal LNil } in
+  let func = make_single_clause_function "test_nil" [] (Literal LNil) in
   let program = { items = [ Function func ] } in
   let result = Compiler.compile_to_string program in
   let expected_parts = [ "test_nil() ->"; "nil." ] in
@@ -77,7 +77,7 @@ let test_compile_nil () =
 
 (* Test for empty function body compilation *)
 let test_compile_empty_function () =
-  let func = { name = "empty"; params = []; body = Literal LNil } in
+  let func = make_single_clause_function "empty" [] (Literal LNil) in
   let program = { items = [ Function func ] } in
   let result = Compiler.compile_to_string program in
   let expected_parts = [ "empty() ->"; "nil." ] in
@@ -95,9 +95,9 @@ let test_compile_tuples () =
   in
   let empty_tuple = Tuple [] in
 
-  let func1 = { name = "pair"; params = []; body = pair_tuple } in
-  let func2 = { name = "triple"; params = []; body = triple_tuple } in
-  let func3 = { name = "empty_tuple"; params = []; body = empty_tuple } in
+  let func1 = make_single_clause_function "pair" [] pair_tuple in
+  let func2 = make_single_clause_function "triple" [] triple_tuple in
+  let func3 = make_single_clause_function "empty_tuple" [] empty_tuple in
 
   let program =
     { items = [ Function func1; Function func2; Function func3 ] }
@@ -123,7 +123,7 @@ let test_compile_tuples () =
 (* Test for if-then without else compilation *)
 let test_compile_if_then () =
   let if_expr = If (Literal (LBool true), Literal (LInt 42), None) in
-  let func = { name = "test_if"; params = []; body = if_expr } in
+  let func = make_single_clause_function "test_if" [] if_expr in
   let program = { items = [ Function func ] } in
   let result = Compiler.compile_to_string program in
   let expected_parts =
@@ -140,7 +140,7 @@ let test_compile_if_then_else () =
   let if_expr =
     If (Literal (LBool true), Literal (LInt 42), Some (Literal (LInt 0)))
   in
-  let func = { name = "test_if_else"; params = []; body = if_expr } in
+  let func = make_single_clause_function "test_if_else" [] if_expr in
   let program = { items = [ Function func ] } in
   let result = Compiler.compile_to_string program in
   let expected_parts =

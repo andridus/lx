@@ -220,13 +220,14 @@ let rec infer_pattern (env : type_env) (pattern : pattern) :
 (* Type inference for expressions *)
 let rec infer_expr (env : type_env) (expr : expr) : lx_type * substitution =
   match expr with
-  | Literal lit -> (infer_literal lit, [])
-  | Var var -> (
-      try (List.assoc var env, [])
-      with Not_found -> raise (TypeError (UnboundVariable var)))
-  | Let (var, value, body) ->
+  | Literal l -> (infer_literal l, [])
+  | Var id -> (
+      try (List.assoc id env, [])
+      with Not_found ->
+        raise (TypeError (UnboundVariable id)))
+  | Let (id, value, body) ->
       let value_type, subst1 = infer_expr env value in
-      let new_env = (var, value_type) :: apply_subst_env subst1 env in
+      let new_env = (id, value_type) :: apply_subst_env subst1 env in
       let body_type, subst2 = infer_expr new_env body in
       (body_type, compose_subst subst1 subst2)
   | Fun (params, body) ->
@@ -263,6 +264,21 @@ let rec infer_expr (env : type_env) (expr : expr) : lx_type * substitution =
       in
       let final_subst = compose_subst subst2 unify_subst in
       (apply_subst final_subst result_type, final_subst)
+  | ExternalCall (_module_name, _func_name, args) ->
+      (* Type check external function calls *)
+      let _arg_types, subst =
+        List.fold_left
+          (fun (types, subst_acc) arg ->
+            let arg_type, subst =
+              infer_expr (apply_subst_env subst_acc env) arg
+            in
+            (arg_type :: types, compose_subst subst_acc subst))
+          ([], []) args
+      in
+      (* For external calls, we assume they return a generic type *)
+      (* In a real implementation, we would look up the module's type signature *)
+      let result_type = fresh_type_var () in
+      (result_type, subst)
   | Tuple exprs ->
       let types, subst =
         List.fold_left
@@ -338,20 +354,60 @@ let rec infer_expr (env : type_env) (expr : expr) : lx_type * substitution =
   | For (_, _, _) ->
       (* For expressions need more complex handling - simplified for now *)
       (TNil, [])
+  | Sequence exprs ->
+      (* Type of sequence is the type of the last expression *)
+      match List.rev exprs with
+      | [] -> (TNil, [])
+      | last_expr :: rest_exprs ->
+          let rest_exprs = List.rev rest_exprs in
+          (* Type check all expressions but return type of last one *)
+          let final_subst =
+            List.fold_left
+              (fun subst_acc expr ->
+                let _, subst = infer_expr (apply_subst_env subst_acc env) expr in
+                compose_subst subst_acc subst)
+              [] rest_exprs
+          in
+          let last_type, last_subst =
+            infer_expr (apply_subst_env final_subst env) last_expr
+          in
+          (last_type, compose_subst final_subst last_subst)
 
-(* Type inference for function definitions *)
-let infer_function_def (env : type_env) (func : function_def) :
-    lx_type * substitution =
-  let param_types = List.map (fun _ -> fresh_type_var ()) func.params in
-  let param_env = List.combine func.params param_types in
+(* Type inference for function clauses *)
+let infer_function_clause (env : type_env) (clause : function_clause) : lx_type * substitution =
+  let param_types = List.map (fun _ -> fresh_type_var ()) clause.params in
+  let param_env = List.combine clause.params param_types in
   let new_env = param_env @ env in
-  let body_type, subst = infer_expr new_env func.body in
+  let body_type, subst = infer_expr new_env clause.body in
   let fun_type =
     List.fold_right
       (fun param_type acc -> TFun (param_type, acc))
       param_types body_type
   in
   (fun_type, subst)
+
+(* Type inference for function definitions with multiple arities *)
+let infer_function_def (env : type_env) (func : function_def) : lx_type * substitution =
+  match func.clauses with
+  | [] -> failwith ("Function " ^ func.name ^ " has no clauses")
+  | [clause] ->
+      (* Single clause - backward compatibility *)
+      infer_function_clause env clause
+  | clauses ->
+      (* Multiple clauses - ensure they have compatible types *)
+      let clause_types_and_substs = List.map (infer_function_clause env) clauses in
+      let first_type, first_subst = List.hd clause_types_and_substs in
+
+            (* Check that all clauses have compatible types *)
+      let final_subst =
+        List.fold_left (fun acc_subst (_clause_type, clause_subst) ->
+          (* For now, we don't unify different arities - they're separate functions in Erlang *)
+          compose_subst acc_subst clause_subst
+        ) first_subst (List.tl clause_types_and_substs)
+      in
+
+      (* Return the type of the first clause as representative *)
+      (apply_subst final_subst first_type, final_subst)
 
 (* Built-in environment with OTP types *)
 let builtin_env : type_env =
@@ -361,6 +417,7 @@ let builtin_env : type_env =
         (TAtom, TFun (TAtom, TFun (TList TAtom, TFun (TList TAtom, TOtpState))))
     );
     ("logger", TFun (TString, TNil));
+    ("io.format", TFun (TString, TNil));
     ("ok", TAtom);
     ("error", TFun (TAtom, TTuple [ TAtom; TAtom ]));
     ("reply", TFun (TAtom, TFun (TOtpState, TOtpReply TAtom)));
@@ -374,6 +431,12 @@ let type_check_program (program : program) : type_env =
   reset_type_vars ();
   let env = builtin_env in
 
+  (* Add io.format with different arities *)
+  let tv = TVar 1000 in  (* Use a high number to avoid conflicts *)
+  let env_with_io =
+    ("io.format", TFun (TString, TFun (TList tv, TNil))) :: env
+  in
+
   (* First pass: collect function signatures *)
   let env_with_functions =
     List.fold_left
@@ -383,7 +446,7 @@ let type_check_program (program : program) : type_env =
             let func_type, _ = infer_function_def env_acc func in
             (func.name, func_type) :: env_acc
         | _ -> env_acc)
-      env program.items
+      env_with_io program.items
   in
 
   (* Second pass: type check all items *)

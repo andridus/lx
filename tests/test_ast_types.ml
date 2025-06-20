@@ -122,7 +122,7 @@ let test_pattern_types () =
       \  }"
   in
   match program.items with
-  | [ Function { body = Match (_, cases); _ } ] -> (
+  | [ Function { clauses = [{ body = Match (_, cases); _ }]; _ } ] -> (
       let patterns = List.map fst cases in
       match patterns with
       | [ PWildcard; PVar "y"; PAtom "atom" ] -> ()
@@ -202,7 +202,7 @@ let test_all_literal_types () =
     (fun (input, expected_literal) ->
       let program = Compiler.parse_string input in
       match program.items with
-      | [ Function { body = Literal l; _ } ] ->
+      | [ Function { clauses = [{ body = Literal l; _ }]; _ } ] ->
           check bool ("literal type: " ^ input) true (l = expected_literal)
       | _ -> Alcotest.fail ("Expected function with literal: " ^ input))
     test_cases

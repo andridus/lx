@@ -14,7 +14,7 @@ let string_contains_substring s sub =
 
 (* Test module name extraction from filename *)
 let test_module_name_generation () =
-  let func = { name = "example"; params = []; body = Literal (LInt 42) } in
+  let func = make_single_clause_function "example" [] (Literal (LInt 42)) in
   let program = { items = [ Function func ] } in
   let modules = Compiler.compile_to_string_with_module_name program "my_app" in
 
@@ -31,8 +31,8 @@ let test_module_name_generation () =
 let test_multiple_modules_generation () =
   (* This test would require OTP components to be properly implemented *)
   (* For now, we test that regular functions generate a single module *)
-  let func1 = { name = "start"; params = []; body = Literal (LAtom "ok") } in
-  let func2 = { name = "stop"; params = []; body = Literal (LAtom "ok") } in
+  let func1 = make_single_clause_function "start" [] (Literal (LAtom "ok")) in
+  let func2 = make_single_clause_function "stop" [] (Literal (LAtom "ok")) in
   let program = { items = [ Function func1; Function func2 ] } in
   let modules =
     Compiler.compile_to_string_with_module_name program "test_app"
@@ -73,7 +73,7 @@ let test_empty_module_generation () =
 
 (* Test module content structure *)
 let test_module_content_structure () =
-  let func = { name = "hello"; params = [ "name" ]; body = Var "name" } in
+  let func = make_single_clause_function "hello" [ "name" ] (Var "name") in
   let program = { items = [ Function func ] } in
   let modules =
     Compiler.compile_to_string_with_module_name program "greeting"

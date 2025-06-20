@@ -8,15 +8,9 @@ let test_basic_types () =
     {
       items =
         [
-          Function { name = "test_int"; params = []; body = Literal (LInt 42) };
-          Function
-            {
-              name = "test_string";
-              params = [];
-              body = Literal (LString "hello");
-            };
-          Function
-            { name = "test_bool"; params = []; body = Literal (LBool true) };
+          Function (make_single_clause_function "test_int" [] (Literal (LInt 42)));
+                      Function (make_single_clause_function "test_string" [] (Literal (LString "hello")));
+                      Function (make_single_clause_function "test_bool" [] (Literal (LBool true)));
         ];
     }
   in
@@ -32,13 +26,7 @@ let test_function_types () =
     {
       items =
         [
-          Function
-            {
-              name = "add";
-              params = [ "x"; "y" ];
-              body = Var "x";
-              (* Simplified to avoid undefined function *)
-            };
+          Function (make_single_clause_function "add" [ "x"; "y" ] (Var "x"));
         ];
     }
   in
@@ -56,12 +44,8 @@ let test_let_expressions () =
     {
       items =
         [
-          Function
-            {
-              name = "test_let";
-              params = [];
-              body = Let ("x", Literal (LInt 10), Var "x");
-            };
+          Function (make_single_clause_function "test_let" []
+            (Let ("x", Literal (LInt 10), Var "x")));
         ];
     }
   in
@@ -77,8 +61,7 @@ let test_type_error () =
     {
       items =
         [
-          Function
-            { name = "type_error"; params = []; body = Var "nonexistent_var" };
+          Function (make_single_clause_function "type_error" [] (Var "nonexistent_var"));
         ];
     }
   in
@@ -98,7 +81,7 @@ let test_nil_type () =
   let program =
     {
       items =
-        [ Function { name = "test_nil"; params = []; body = Literal LNil } ];
+        [ Function (make_single_clause_function "test_nil" [] (Literal LNil)) ];
     }
   in
 
@@ -118,8 +101,7 @@ let test_integer_type () =
     {
       items =
         [
-          Function
-            { name = "test_integer"; params = []; body = Literal (LInt 42) };
+          Function (make_single_clause_function "test_integer" [] (Literal (LInt 42)));
         ];
     }
   in
@@ -142,12 +124,8 @@ let test_optional_types () =
     {
       items =
         [
-          Function
-            {
-              name = "test_optional";
-              params = [];
-              body = If (Literal (LBool true), Literal (LInt 42), None);
-            };
+          Function (make_single_clause_function "test_optional" []
+            (If (Literal (LBool true), Literal (LInt 42), None)));
         ];
     }
   in
@@ -170,16 +148,11 @@ let test_if_then_else_consistent () =
     {
       items =
         [
-          Function
-            {
-              name = "test_if_else";
-              params = [];
-              body =
-                If
-                  ( Literal (LBool true),
-                    Literal (LInt 10),
-                    Some (Literal (LInt 20)) );
-            };
+          Function (make_single_clause_function "test_if_else" []
+            (If
+              ( Literal (LBool true),
+                Literal (LInt 10),
+                Some (Literal (LInt 20)) )));
         ];
     }
   in
@@ -202,13 +175,7 @@ let test_empty_function_body () =
     {
       items =
         [
-          Function
-            {
-              name = "test_empty";
-              params = [];
-              body = Literal LNil;
-              (* Empty body should be parsed as nil *)
-            };
+          Function (make_single_clause_function "test_empty" [] (Literal LNil));
         ];
     }
   in
@@ -230,12 +197,8 @@ let test_tuple_types () =
     {
       items =
         [
-          Function
-            {
-              name = "test_tuple";
-              params = [];
-              body = Tuple [ Literal (LAtom "ok"); Literal (LInt 42) ];
-            };
+          Function (make_single_clause_function "test_tuple" []
+            (Tuple [ Literal (LAtom "ok"); Literal (LInt 42) ]));
         ];
     }
   in

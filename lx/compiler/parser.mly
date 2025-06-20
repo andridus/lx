@@ -28,7 +28,7 @@ open Ast
 (* Operators and Punctuation *)
 %token EQ ARROW PIPE WILDCARD
 %token LPAREN RPAREN LBRACE RBRACE LBRACKET RBRACKET
-%token COMMA SEMICOLON CONS
+%token COMMA SEMICOLON CONS DOT
 
 %token EOF
 
@@ -57,16 +57,26 @@ module_item:
   | standalone_test = standalone_test_def { Test { name = "Standalone Tests"; tests = [standalone_test] } }
 
 function_def:
-  | FUN name = IDENT LPAREN params = separated_list(COMMA, IDENT) RPAREN LBRACE body = expr RBRACE
-    { { name; params; body } }
+  (* New syntax for multiple arities *)
+  | FUN name = IDENT LBRACE clauses = function_clause+ RBRACE
+    { { name; clauses } }
+  (* Backward compatibility: single clause *)
+  | FUN name = IDENT LPAREN params = separated_list(COMMA, IDENT) RPAREN LBRACE body = function_body RBRACE
+    { make_single_clause_function name params body }
   | FUN name = IDENT LPAREN params = separated_list(COMMA, IDENT) RPAREN LBRACE RBRACE
-    { { name; params; body = Literal LNil } }
+    { make_single_clause_function name params (Literal LNil) }
   | FUN _name = IDENT LPAREN _params = separated_list(COMMA, IDENT) RPAREN error
     { failwith "Missing function body - expected '{' after parameter list" }
   | FUN _name = IDENT error
-    { failwith "Missing parameter list - expected '(' after function name" }
+    { failwith "Missing parameter list or clause block - expected '(' or '{' after function name" }
   | FUN error
     { failwith "Missing function name after 'fun' keyword" }
+
+function_clause:
+  | LPAREN params = separated_list(COMMA, IDENT) RPAREN LBRACE body = function_body RBRACE
+    { { params; body } }
+  | LPAREN params = separated_list(COMMA, IDENT) RPAREN LBRACE RBRACE
+    { { params; body = Literal LNil } }
 
 otp_component:
   | w = worker_def { w }
@@ -151,6 +161,11 @@ expr:
 simple_expr:
   | l = literal { Literal l }
   | name = IDENT { Var name }
+  (* External function call: module.function(args) *)
+  | module_name = IDENT DOT func_name = IDENT LPAREN args = separated_list(COMMA, expr) RPAREN
+    { ExternalCall (module_name, func_name, args) }
+  (* Module reference without call (backward compatibility) *)
+  | module_name = IDENT DOT func_name = IDENT { Var (module_name ^ "." ^ func_name) }
   | LPAREN e = expr RPAREN { e }
   | LPAREN elements = separated_list(COMMA, expr) RPAREN
     { match elements with
@@ -192,3 +207,10 @@ literal:
 standalone_test_def:
   | TEST name = STRING LBRACE body = expr RBRACE
     { { name; body } }
+
+function_body:
+  | e = expr { e }
+  | e = expr SEMICOLON rest = function_body
+    { match rest with
+      | Sequence exprs -> Sequence (e :: exprs)
+      | single_expr -> Sequence [e; single_expr] }

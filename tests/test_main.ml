@@ -12,4 +12,5 @@ let () =
       ("Typechecker Tests", Test_typechecker.tests);
       ("Module Generation Tests", Test_module_generation.tests);
       ("Error Handling & Function Calls Tests", Test_error_handling.tests);
+      ("Function Calls Tests", Test_function_calls.tests);
     ]

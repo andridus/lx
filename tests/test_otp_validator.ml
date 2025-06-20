@@ -5,21 +5,11 @@ open Compiler.Typechecker
 open Compiler.Otp_validator
 
 let test_valid_worker () =
-  let init_handler =
-    {
-      name = "init";
-      params = [ "args" ];
-      body = App (Var "reply", [ Tuple [ Var "ok"; Literal (LAtom "state") ] ]);
-    }
-  in
+  let init_handler = make_single_clause_function "init" [ "args" ]
+    (App (Var "reply", [ Tuple [ Var "ok"; Literal (LAtom "state") ] ])) in
 
-  let call_handler =
-    {
-      name = "handle_call";
-      params = [ "msg"; "from"; "state" ];
-      body = App (Var "reply", [ Var "msg"; Var "state" ]);
-    }
-  in
+  let call_handler = make_single_clause_function "handle_call" [ "msg"; "from"; "state" ]
+    (App (Var "reply", [ Var "msg"; Var "state" ])) in
 
   let worker =
     Worker
@@ -45,13 +35,8 @@ let test_valid_worker () =
         ("Valid worker test failed (type error): " ^ string_of_type_error error)
 
 let test_missing_handler () =
-  let init_handler =
-    {
-      name = "init";
-      params = [ "args" ];
-      body = App (Var "reply", [ Tuple [ Var "ok"; Literal (LAtom "state") ] ]);
-    }
-  in
+  let init_handler = make_single_clause_function "init" [ "args" ]
+    (App (Var "reply", [ Tuple [ Var "ok"; Literal (LAtom "state") ] ])) in
 
   let worker =
     Worker
@@ -79,21 +64,11 @@ let test_missing_handler () =
   | TypeError _ -> fail "Missing handler test failed: type error occurred"
 
 let test_invalid_worker_name () =
-  let init_handler =
-    {
-      name = "init";
-      params = [ "args" ];
-      body = App (Var "reply", [ Tuple [ Var "ok"; Literal (LAtom "state") ] ]);
-    }
-  in
+  let init_handler = make_single_clause_function "init" [ "args" ]
+    (App (Var "reply", [ Tuple [ Var "ok"; Literal (LAtom "state") ] ])) in
 
-  let call_handler =
-    {
-      name = "handle_call";
-      params = [ "msg"; "from"; "state" ];
-      body = App (Var "reply", [ Var "msg"; Var "state" ]);
-    }
-  in
+  let call_handler = make_single_clause_function "handle_call" [ "msg"; "from"; "state" ]
+    (App (Var "reply", [ Var "msg"; Var "state" ])) in
 
   let worker =
     Worker
@@ -130,21 +105,11 @@ let test_valid_supervisor () =
       }
   in
 
-  let init_handler =
-    {
-      name = "init";
-      params = [ "args" ];
-      body = App (Var "reply", [ Tuple [ Var "ok"; Literal (LAtom "state") ] ]);
-    }
-  in
+  let init_handler = make_single_clause_function "init" [ "args" ]
+    (App (Var "reply", [ Tuple [ Var "ok"; Literal (LAtom "state") ] ])) in
 
-  let call_handler =
-    {
-      name = "handle_call";
-      params = [ "msg"; "from"; "state" ];
-      body = App (Var "reply", [ Var "msg"; Var "state" ]);
-    }
-  in
+  let call_handler = make_single_clause_function "handle_call" [ "msg"; "from"; "state" ]
+    (App (Var "reply", [ Var "msg"; Var "state" ])) in
 
   let worker =
     Worker
