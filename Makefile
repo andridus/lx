@@ -25,7 +25,7 @@ test: build
 
 # Run the compiler with example file
 run: build
-	dune exec lxc tests/example.lx
+	dune exec lx my/test1.lx
 
 # Development mode - build and run with example
 dev: build run

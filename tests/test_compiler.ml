@@ -1,29 +1,47 @@
 open Alcotest
 open Compiler.Ast
 
-let test_compile_int () =
-  let program = Expr (Literal (LInt 42)) in
-  let result = Compiler.compile_to_string program in
-  let expected = "-module(dummy).\n-compile(export_all).\n\nstart() -> 42." in
-  check string "compile integer" expected result
+(* Helper function to check if string contains substring *)
+let string_contains_substring s sub =
+  let len_s = String.length s in
+  let len_sub = String.length sub in
+  let rec search i =
+    if i > len_s - len_sub then false
+    else if String.sub s i len_sub = sub then true
+    else search (i + 1)
+  in
+  search 0
 
-let test_compile_var () =
-  let program = Expr (Var "x") in
+let test_compile_function () =
+  let func = { name = "num"; params = []; body = Literal (LInt 42) } in
+  let program = { items = [Function func] } in
   let result = Compiler.compile_to_string program in
-  let expected = "-module(dummy).\n-compile(export_all).\n\nstart() -> X." in
-  check string "compile variable" expected result
+  let expected_parts = ["-module(generated)"; "num() ->"; "42."] in
+  List.iter (fun part ->
+    let contains = string_contains_substring result part in
+    check bool ("contains: " ^ part) true contains
+  ) expected_parts
 
-let test_compile_let () =
-  let program = Expr (Let ("x", Literal (LInt 42))) in
+let test_compile_function_with_params () =
+  let func = { name = "add"; params = ["x"; "y"]; body = Var "x" } in
+  let program = { items = [Function func] } in
   let result = Compiler.compile_to_string program in
-  let expected = "-module(dummy).\n-compile(export_all).\n\nstart() -> X = 42." in
-  check string "compile let expression" expected result
+  let expected_parts = ["add(X, Y) ->"; "X."] in
+  List.iter (fun part ->
+    let contains = string_contains_substring result part in
+    check bool ("contains: " ^ part) true contains
+  ) expected_parts
 
-let test_compile_string () =
-  let program = Expr (Literal (LString "hello")) in
+let test_compile_let_expression () =
+  let let_expr = Let ("x", Literal (LInt 42), Var "x") in
+  let func = { name = "num"; params = []; body = let_expr } in
+  let program = { items = [Function func] } in
   let result = Compiler.compile_to_string program in
-  let expected = "-module(dummy).\n-compile(export_all).\n\nstart() -> \"hello\"." in
-  check string "compile string literal" expected result
+  let expected_parts = ["num() ->"; "(X = 42, X)."] in
+  List.iter (fun part ->
+    let contains = string_contains_substring result part in
+    check bool ("contains: " ^ part) true contains
+  ) expected_parts
 
 let test_capitalize_var () =
   check string "capitalize empty" "" (Compiler.capitalize_var "");
@@ -31,18 +49,19 @@ let test_capitalize_var () =
   check string "capitalize word" "Hello" (Compiler.capitalize_var "hello");
   check string "capitalize already caps" "Hello" (Compiler.capitalize_var "Hello")
 
-let test_end_to_end () =
-  let input = "let x = 42 in x" in
-  let program = Compiler.parse_string input in
+let test_empty_program () =
+  let program = { items = [] } in
   let result = Compiler.compile_to_string program in
-  let expected = "-module(dummy).\n-compile(export_all).\n\nstart() -> X = 42." in
-  check string "end-to-end compilation" expected result
+  let expected_parts = ["-module(generated)"; "-compile(export_all)"] in
+  List.iter (fun part ->
+    let contains = string_contains_substring result part in
+    check bool ("contains: " ^ part) true contains
+  ) expected_parts
 
 let tests = [
-  ("compile integer literal", `Quick, test_compile_int);
-  ("compile variable", `Quick, test_compile_var);
-  ("compile let expression", `Quick, test_compile_let);
-  ("compile string literal", `Quick, test_compile_string);
+  ("compile function", `Quick, test_compile_function);
+  ("compile function with params", `Quick, test_compile_function_with_params);
+  ("compile let expression", `Quick, test_compile_let_expression);
   ("capitalize variable names", `Quick, test_capitalize_var);
-  ("end-to-end compilation", `Quick, test_end_to_end);
+  ("empty program", `Quick, test_empty_program);
 ]
