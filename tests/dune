@@ -2,7 +2,8 @@
  (public_name test_lxc)
  (name test_main)
  (libraries compiler alcotest)
- (modules test_main test_lexer test_parser test_compiler test_examples test_ast_types))
+ (modules test_main test_lexer test_parser test_compiler test_examples test_ast_types test_typechecker test_otp_validator)
+ )
 
 (rule
  (alias runtest)

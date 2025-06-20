@@ -49,8 +49,8 @@ let test_list_expressions () =
 (* Test If expressions *)
 let test_if_expressions () =
   let test_cases = [
-    ("fun boolean() { if true then 42 else 0 }", ["case true of true ->"; "42"; "_ -> 0"]);
-    ("fun boolean() { if false then \"yes\" }", ["case false of true ->"; "\"yes\""; "_ -> ok"]);
+    ("fun boolean() { if true then 42 else 0 }", ["case true of true -> 42; _ -> 0"]);
+    ("fun boolean() { if false then \"no\" else \"yes\" }", ["case false of true -> \"no\"; _ -> \"yes\""]);
   ] in
 
   List.iter (fun (input, expected_parts) ->
@@ -58,6 +58,7 @@ let test_if_expressions () =
     let result = Compiler.compile_to_string program in
     List.iter (fun part ->
       let contains = string_contains_substring result part in
+      Printf.printf "if expression: %s contains: %s\n" input part;
       check bool ("if expression: " ^ input ^ " contains: " ^ part) true contains
     ) expected_parts
   ) test_cases
@@ -66,8 +67,8 @@ let test_if_expressions () =
 let test_case_expressions () =
   let test_cases = [
     ("fun num() { case 42 { 42 -> \"found\" } }", ["case 42 of 42 -> \"found\""]);
-    ("fun str() { case x { _ -> \"default\" } }", ["case X of _ -> \"default\""]);
-    ("fun atom() { case atom { :hello -> \"hi\" } }", ["case Atom of hello -> \"hi\""]);
+    ("fun str(x) { case x { _ -> \"default\" } }", ["case X of _ -> \"default\""]);
+    ("fun atom(a) { case a { :hello -> \"hi\" } }", ["case A of hello -> \"hi\""]);
   ] in
 
   List.iter (fun (input, expected_parts) ->

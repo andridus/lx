@@ -1,7 +1,7 @@
 (library
  (name compiler)
  (public_name lxc.compiler)
- (modules ast lexer parser compiler))
+ (modules ast lexer parser compiler typechecker otp_validator))
 
 (menhir
  (modules parser))

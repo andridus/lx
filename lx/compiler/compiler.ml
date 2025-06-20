@@ -2,6 +2,8 @@
 module Ast = Ast
 module Lexer = Lexer
 module Parser = Parser
+module Typechecker = Typechecker
+module Otp_validator = Otp_validator
 
 open Ast
 
@@ -117,10 +119,52 @@ let parse_file (filename : string) : program =
   result
 
 let compile_to_string (program : program) : string =
+  (* Type checking phase *)
+  (try
+    let type_env = Typechecker.type_check_program program in
+    (* OTP validation phase *)
+    (try
+      Otp_validator.validate_program program type_env;
+    with
+    | Otp_validator.OtpValidationError error ->
+        Printf.eprintf "OTP Validation Error: %s\n" (Otp_validator.string_of_otp_error error);
+        failwith "OTP validation failed")
+  with
+  | Typechecker.TypeError error ->
+      Printf.eprintf "Type Error: %s\n" (Typechecker.string_of_type_error error);
+      failwith "Type checking failed");
+
+  (* Code generation phase *)
   let module_name = "generated" in
   let header = "-module(" ^ module_name ^ ").\n-compile(export_all).\n\n" in
   let items = List.map emit_module_item program.items in
   header ^ String.concat "\n\n" items
+
+(* Type check a program without compilation *)
+let type_check_program (program : program) : Typechecker.type_env =
+  try
+    let type_env = Typechecker.type_check_program program in
+    Printf.printf "Type checking completed successfully.\n";
+
+    (* Also run OTP validation *)
+    (try
+      Otp_validator.validate_program program type_env;
+      Printf.printf "OTP validation completed successfully.\n"
+    with
+    | Otp_validator.OtpValidationError error ->
+        Printf.eprintf "OTP Validation Error: %s\n" (Otp_validator.string_of_otp_error error);
+        failwith "OTP validation failed");
+
+    type_env
+  with
+  | Typechecker.TypeError error ->
+      Printf.eprintf "Type Error: %s\n" (Typechecker.string_of_type_error error);
+      failwith "Type checking failed"
+
+(* Type check a file *)
+let type_check_file (filename : string) : Typechecker.type_env =
+  let program = parse_file filename in
+  type_check_program program
 
 let compile_file (filename : string) : unit =
   let program = parse_file filename in
