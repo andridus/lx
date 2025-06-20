@@ -7,6 +7,7 @@ open Ast
 %token <int> INT
 %token <float> FLOAT
 %token <bool> BOOL
+%token NIL
 
 (* Keywords *)
 %token LET IN FUN CASE IF THEN ELSE FOR WHEN
@@ -38,6 +39,11 @@ open Ast
 %left COMMA
 
 %start <program> main
+
+%on_error_reduce expr
+%on_error_reduce simple_expr
+%on_error_reduce function_def
+
 %%
 
 main:
@@ -48,10 +54,19 @@ module_item:
   | c = otp_component { OtpComponent c }
   | s = spec_def { Spec s }
   | t = test_block { Test t }
+  | standalone_test = standalone_test_def { Test { name = "Standalone Tests"; tests = [standalone_test] } }
 
 function_def:
   | FUN name = IDENT LPAREN params = separated_list(COMMA, IDENT) RPAREN LBRACE body = expr RBRACE
     { { name; params; body } }
+  | FUN name = IDENT LPAREN params = separated_list(COMMA, IDENT) RPAREN LBRACE RBRACE
+    { { name; params; body = Literal LNil } }
+  | FUN _name = IDENT LPAREN _params = separated_list(COMMA, IDENT) RPAREN error
+    { failwith "Missing function body - expected '{' after parameter list" }
+  | FUN _name = IDENT error
+    { failwith "Missing parameter list - expected '(' after function name" }
+  | FUN error
+    { failwith "Missing function name after 'fun' keyword" }
 
 otp_component:
   | w = worker_def { w }
@@ -122,6 +137,12 @@ expr:
     { If (cond, then_expr, Some else_expr) }
   | IF cond = expr THEN then_expr = expr
     { If (cond, then_expr, None) }
+  | IF _cond = expr THEN error
+    { failwith "Missing expression after 'then' in if statement" }
+  | IF _cond = expr error
+    { failwith "Missing 'then' keyword in if statement" }
+  | IF error
+    { failwith "Missing condition after 'if' keyword" }
   | CASE value = expr LBRACE cases = case_branch* RBRACE
     { Match (value, cases) }
   | FOR var = IDENT IN iterable = expr LBRACE body = expr RBRACE
@@ -134,7 +155,7 @@ simple_expr:
   | LPAREN elements = separated_list(COMMA, expr) RPAREN
     { match elements with
       | [] -> Tuple []
-      | [e] -> e
+      | [e] -> e  (* Single element in parentheses is just grouping *)
       | es -> Tuple es }
   | LBRACKET elements = separated_list(COMMA, expr) RBRACKET
     { List elements }
@@ -166,3 +187,8 @@ literal:
   | f = FLOAT { LFloat f }
   | b = BOOL { LBool b }
   | a = ATOM { LAtom a }
+  | NIL { LNil }
+
+standalone_test_def:
+  | TEST name = STRING LBRACE body = expr RBRACE
+    { { name; body } }

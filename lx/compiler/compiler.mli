@@ -13,9 +13,17 @@ module Typechecker = Typechecker
 (* Expose the OTP Validator module *)
 module Otp_validator = Otp_validator
 
+(* Expose the Error module *)
+module Error = Error
+
 (* Main compilation functions *)
-val parse_string : string -> Ast.program
+val parse_string : ?filename:string option -> string -> Ast.program
+val parse_file : string -> Ast.program
 val compile_to_string : Ast.program -> string
+
+val compile_to_string_with_module_name :
+  Ast.program -> string -> (string * string) list
+
 val compile_file : string -> unit
 
 (* Type checking functions *)

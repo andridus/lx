@@ -8,12 +8,13 @@ type type_var = int
 
 type lx_type =
   | TVar of type_var
-  | TInt
+  | TInteger
   | TFloat
   | TString
   | TBool
   | TAtom
-  | TUnit
+  | TNil
+  | TOption of lx_type
   | TFun of lx_type * lx_type
   | TTuple of lx_type list
   | TList of lx_type
@@ -52,12 +53,13 @@ let reset_type_vars () = type_var_counter := 0
 (* Pretty printing for types *)
 let rec string_of_type = function
   | TVar n -> "t" ^ string_of_int n
-  | TInt -> "int"
+  | TInteger -> "integer"
   | TFloat -> "float"
   | TString -> "string"
   | TBool -> "bool"
   | TAtom -> "atom"
-  | TUnit -> "unit"
+  | TNil -> "nil"
+  | TOption t -> "?" ^ string_of_type t
   | TFun (t1, t2) -> "(" ^ string_of_type t1 ^ " -> " ^ string_of_type t2 ^ ")"
   | TTuple ts -> "{" ^ String.concat ", " (List.map string_of_type ts) ^ "}"
   | TList t -> "[" ^ string_of_type t ^ "]"
@@ -106,6 +108,7 @@ let rec apply_subst (subst : substitution) (typ : lx_type) : lx_type =
   | TFun (t1, t2) -> TFun (apply_subst subst t1, apply_subst subst t2)
   | TTuple ts -> TTuple (List.map (apply_subst subst) ts)
   | TList t -> TList (apply_subst subst t)
+  | TOption t -> TOption (apply_subst subst t)
   | TRecord fields ->
       TRecord (List.map (fun (k, v) -> (k, apply_subst subst v)) fields)
   | TOtpReply t -> TOtpReply (apply_subst subst t)
@@ -125,6 +128,7 @@ let rec occurs_check (var : type_var) (typ : lx_type) : bool =
   | TFun (t1, t2) -> occurs_check var t1 || occurs_check var t2
   | TTuple ts -> List.exists (occurs_check var) ts
   | TList t -> occurs_check var t
+  | TOption t -> occurs_check var t
   | TRecord fields -> List.exists (fun (_, t) -> occurs_check var t) fields
   | TOtpReply t -> occurs_check var t
   | _ -> false
@@ -137,12 +141,12 @@ let rec unify (t1 : lx_type) (t2 : lx_type) : substitution =
       else if occurs_check var typ then
         raise (TypeError (OccursCheck (var, typ)))
       else [ (var, typ) ]
-  | TInt, TInt
+  | TInteger, TInteger
   | TFloat, TFloat
   | TString, TString
   | TBool, TBool
   | TAtom, TAtom
-  | TUnit, TUnit
+  | TNil, TNil
   | TOtpState, TOtpState
   | TOtpCast, TOtpCast
   | TOtpInfo, TOtpInfo ->
@@ -158,16 +162,18 @@ let rec unify (t1 : lx_type) (t2 : lx_type) : substitution =
           compose_subst acc s)
         [] ts1 ts2
   | TList t1, TList t2 -> unify t1 t2
+  | TOption t1, TOption t2 -> unify t1 t2
   | TOtpReply t1, TOtpReply t2 -> unify t1 t2
   | _ -> raise (TypeError (UnificationError (t1, t2)))
 
 (* Type inference for literals *)
 let infer_literal = function
-  | LInt _ -> TInt
+  | LInt _ -> TInteger
   | LFloat _ -> TFloat
   | LString _ -> TString
   | LBool _ -> TBool
   | LAtom _ -> TAtom
+  | LNil -> TNil
 
 (* Type inference for patterns *)
 let rec infer_pattern (env : type_env) (pattern : pattern) :
@@ -327,12 +333,11 @@ let rec infer_expr (env : type_env) (expr : expr) : lx_type * substitution =
           in
           (apply_subst final_subst then_type, final_subst)
       | None ->
-          let unit_unify = unify then_type TUnit in
-          let final_subst = compose_subst combined_subst2 unit_unify in
-          (TUnit, final_subst))
+          (* If without else returns optional type: T | nil *)
+          (TOption (apply_subst combined_subst2 then_type), combined_subst2))
   | For (_, _, _) ->
       (* For expressions need more complex handling - simplified for now *)
-      (TUnit, [])
+      (TNil, [])
 
 (* Type inference for function definitions *)
 let infer_function_def (env : type_env) (func : function_def) :
@@ -355,12 +360,13 @@ let builtin_env : type_env =
       TFun
         (TAtom, TFun (TAtom, TFun (TList TAtom, TFun (TList TAtom, TOtpState))))
     );
-    ("logger", TFun (TString, TUnit));
+    ("logger", TFun (TString, TNil));
     ("ok", TAtom);
     ("error", TFun (TAtom, TTuple [ TAtom; TAtom ]));
     ("reply", TFun (TAtom, TFun (TOtpState, TOtpReply TAtom)));
-    ("noreply", TFun (TOtpState, TOtpReply TUnit));
-    ("stop", TFun (TAtom, TFun (TOtpState, TOtpReply TUnit)));
+    ("noreply", TFun (TOtpState, TOtpReply TNil));
+    ("stop", TFun (TAtom, TFun (TOtpState, TOtpReply TNil)));
+    ("nil", TNil);
   ]
 
 (* Main type checking function *)

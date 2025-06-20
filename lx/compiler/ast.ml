@@ -7,6 +7,7 @@ type literal =
   | LFloat of float
   | LBool of bool
   | LAtom of string
+  | LNil
 
 (* Pattern matching *)
 type pattern =

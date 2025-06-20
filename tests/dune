@@ -1,7 +1,7 @@
 (executable
  (public_name test_lxc)
  (name test_main)
- (libraries compiler alcotest)
+ (libraries compiler alcotest str)
  (modules
   test_main
   test_lexer
@@ -10,7 +10,9 @@
   test_examples
   test_ast_types
   test_typechecker
-  test_otp_validator))
+  test_otp_validator
+  test_module_generation
+  test_error_handling))
 
 (rule
  (alias runtest)

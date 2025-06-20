@@ -10,4 +10,6 @@ let () =
       ("Example-based Tests", Test_examples.tests);
       ("OTP Validator Tests", Test_otp_validator.tests);
       ("Typechecker Tests", Test_typechecker.tests);
+      ("Module Generation Tests", Test_module_generation.tests);
+      ("Error Handling & Function Calls Tests", Test_error_handling.tests);
     ]

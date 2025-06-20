@@ -59,6 +59,93 @@ let test_parse_literals () =
       if not (check_fn program.items) then fail ("Failed to parse: " ^ input))
     test_cases
 
+(* Test for nil literal *)
+let test_parse_nil () =
+  let program = Compiler.parse_string "fun test_nil() { nil }" in
+  match program.items with
+  | [ Function { body = Literal LNil; _ } ] -> ()
+  | _ -> fail "Expected nil literal"
+
+(* Test for empty function body *)
+let test_parse_empty_function () =
+  let program = Compiler.parse_string "fun empty() { }" in
+  match program.items with
+  | [ Function { body = Literal LNil; _ } ] -> ()
+  | _ -> fail "Expected empty function to parse as nil"
+
+(* Test for tuple parsing *)
+let test_parse_tuples () =
+  let test_cases =
+    [
+      ( "fun pair() { (:ok, 42) }",
+        fun items ->
+          match items with
+          | [
+           Function
+             { body = Tuple [ Literal (LAtom "ok"); Literal (LInt 42) ]; _ };
+          ] ->
+              true
+          | _ -> false );
+      ( "fun triple() { (:ok, 42, \"test\") }",
+        fun items ->
+          match items with
+          | [
+           Function
+             {
+               body =
+                 Tuple
+                   [
+                     Literal (LAtom "ok");
+                     Literal (LInt 42);
+                     Literal (LString "test");
+                   ];
+               _;
+             };
+          ] ->
+              true
+          | _ -> false );
+      ( "fun empty_tuple() { () }",
+        fun items ->
+          match items with
+          | [ Function { body = Tuple []; _ } ] -> true
+          | _ -> false );
+    ]
+  in
+
+  List.iter
+    (fun (input, check_fn) ->
+      let program = Compiler.parse_string input in
+      if not (check_fn program.items) then
+        fail ("Failed to parse tuple: " ^ input))
+    test_cases
+
+(* Test for if-then without else *)
+let test_parse_if_then () =
+  let program = Compiler.parse_string "fun check() { if true then 42 }" in
+  match program.items with
+  | [
+   Function { body = If (Literal (LBool true), Literal (LInt 42), None); _ };
+  ] ->
+      ()
+  | _ -> fail "Expected if-then without else"
+
+(* Test for if-then-else *)
+let test_parse_if_then_else () =
+  let program =
+    Compiler.parse_string "fun check() { if true then 42 else 0 }"
+  in
+  match program.items with
+  | [
+   Function
+     {
+       body =
+         If (Literal (LBool true), Literal (LInt 42), Some (Literal (LInt 0)));
+       _;
+     };
+  ] ->
+      ()
+  | _ -> fail "Expected if-then-else"
+
 let tests =
   [
     ("parse simple function", `Quick, test_parse_simple_function);
@@ -66,4 +153,9 @@ let tests =
     ("parse multiple functions", `Quick, test_parse_multiple_functions);
     ("parse empty program", `Quick, test_parse_empty_program);
     ("parse various literals", `Quick, test_parse_literals);
+    ("parse nil literal", `Quick, test_parse_nil);
+    ("parse empty function", `Quick, test_parse_empty_function);
+    ("parse tuples", `Quick, test_parse_tuples);
+    ("parse if-then", `Quick, test_parse_if_then);
+    ("parse if-then-else", `Quick, test_parse_if_then_else);
   ]
