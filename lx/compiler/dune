@@ -1,0 +1,9 @@
+(library
+ (name compiler)
+ (public_name lxc.compiler)
+ (modules ast lexer parser compiler))
+
+(menhir
+ (modules parser))
+
+(ocamllex lexer)

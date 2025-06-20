@@ -1,0 +1,10 @@
+(executable
+ (public_name test_lxc)
+ (name test_main)
+ (libraries compiler alcotest)
+ (modules test_main test_lexer test_parser test_compiler test_examples))
+
+(rule
+ (alias runtest)
+ (deps example.lx example.erl example_string.lx example_var.lx)
+ (action (run ./test_main.exe)))
