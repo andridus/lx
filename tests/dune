@@ -16,6 +16,7 @@
   test_function_calls
   test_error_messages
   test_assignment
+  test_blocks
   ))
 
 (rule

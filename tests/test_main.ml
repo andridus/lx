@@ -15,4 +15,5 @@ let () =
       ("Function Calls Tests", Test_function_calls.tests);
       ("Enhanced Error Messages Tests", Test_error_messages.tests);
       ("Assignment Tests", Test_assignment.tests);
+      ("Test Blocks Tests", Test_blocks.tests);
     ]

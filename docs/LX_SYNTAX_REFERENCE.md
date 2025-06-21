@@ -172,7 +172,7 @@ x = 43  # Error: Variable 'x' is already defined and cannot be reassigned
 
 
 ### Block Expressions
-Block expressions allow grouping multiple statements and return the value of the last expression:
+Block expressions allow grouping multiple statements and return the value of the last expression. When compiled to Erlang, blocks are expanded inline for better performance:
 
 ```lx
 # Simple block
@@ -191,6 +191,17 @@ complex_result = {
   b = 15
   a + b
 }
+```
+
+**Compilation Behavior**: Block expressions are compiled as inline statements rather than anonymous functions, resulting in more efficient Erlang code:
+
+```erlang
+% Compiled output example:
+% start block Result_abc
+X_abc = 10,
+Y_abc = 20,
+% end block Result_abc
+Result_def = X_abc + Y_abc
 ```
 
 ### Sequence Expressions
@@ -690,6 +701,41 @@ worker bad_worker {
 }
 ```
 
+## Compilation Optimizations
+
+### Block Expression Optimization
+
+LX compiles block expressions as inline statements rather than anonymous functions for better performance. This optimization:
+
+- **Eliminates function call overhead** - No anonymous function creation or invocation
+- **Improves readability** - Generated Erlang code is more straightforward
+- **Maintains proper scoping** - Variables are renamed with unique suffixes to prevent conflicts
+- **Preserves semantics** - Block behavior remains identical to the original design
+
+**Example Transformation:**
+
+```lx
+fun calculate() {
+  result = {
+    x = 10
+    y = 20
+    x + y
+  }
+  result * 2
+}
+```
+
+**Generates optimized Erlang:**
+
+```erlang
+calculate() ->
+    % start block Result_abc
+    X_abc = 10,
+    Y_abc = 20,
+    % end block Result_abc
+    Result_def = X_abc + Y_abc,
+    Result_def * 2.
+```
 ## Best Practices
 
 1. **Use descriptive names** for functions and variables
@@ -703,6 +749,7 @@ worker bad_worker {
 9. **Follow consistent indentation** (2 or 4 spaces)
 10. **Use atoms** for status values (`:ok`, `:error`, etc.)
 11. **Use `#` for comments**, not `//`
+12. **Leverage block expressions** for better code organization and performance
 
 ## Examples
 

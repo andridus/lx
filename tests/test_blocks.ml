@@ -1,4 +1,5 @@
 open Alcotest
+open Compiler.Ast
 
 let string_contains_substring s sub =
   let len_s = String.length s in
@@ -12,10 +13,12 @@ let string_contains_substring s sub =
 
 (* Test simple block assignment *)
 let test_simple_block () =
-  let input = "fun test() { x = { y = 42; y } }" in
-  let program = parse_string input in
-  let result = compile_to_string program in
-  let expected_parts = [ "fun()"; "end)()" ] in
+  let block_expr = Block [ Assign ("y", Literal (LInt 42)); Var "y" ] in
+  let assign_expr = Assign ("x", block_expr) in
+  let func = make_single_clause_function "test" [] assign_expr in
+  let program = { items = [ Function func ] } in
+  let result = Compiler.compile_to_string program in
+  let expected_parts = [ "% start block"; "% end block" ] in
   List.iter
     (fun part ->
       let contains = string_contains_substring result part in
@@ -24,10 +27,13 @@ let test_simple_block () =
 
 (* Test nested blocks *)
 let test_nested_blocks () =
-  let input = "fun test() { x = { y = { z = 1; z }; y } }" in
-  let program = parse_string input in
-  let result = compile_to_string program in
-  let expected_parts = [ "fun()"; "end)()" ] in
+  let inner_block = Block [ Assign ("z", Literal (LInt 1)); Var "z" ] in
+  let outer_block = Block [ Assign ("y", inner_block); Var "y" ] in
+  let assign_expr = Assign ("x", outer_block) in
+  let func = make_single_clause_function "test" [] assign_expr in
+  let program = { items = [ Function func ] } in
+  let result = Compiler.compile_to_string program in
+  let expected_parts = [ "% start block"; "% end block" ] in
   List.iter
     (fun part ->
       let contains = string_contains_substring result part in
@@ -36,10 +42,17 @@ let test_nested_blocks () =
 
 (* Test block with multiple statements *)
 let test_multiple_statements_block () =
-  let input = "fun test() { x = { a = 1; b = 2; c = 3; c } }" in
-  let program = parse_string input in
-  let result = compile_to_string program in
-  let expected_parts = [ "fun()"; "end)()" ] in
+  let block_expr = Block [
+    Assign ("a", Literal (LInt 1));
+    Assign ("b", Literal (LInt 2));
+    Assign ("c", Literal (LInt 3));
+    Var "c"
+  ] in
+  let assign_expr = Assign ("x", block_expr) in
+  let func = make_single_clause_function "test" [] assign_expr in
+  let program = { items = [ Function func ] } in
+  let result = Compiler.compile_to_string program in
+  let expected_parts = [ "% start block"; "% end block" ] in
   List.iter
     (fun part ->
       let contains = string_contains_substring result part in
@@ -48,12 +61,19 @@ let test_multiple_statements_block () =
 
 (* Test that variables don't leak from blocks *)
 let test_variable_scoping () =
-  let input = "fun test() { x = { local = 42; local }; y = 1 }" in
-  let program = parse_string input in
-  let result = compile_to_string program in
-  (* Should contain anonymous function structure *)
-  let contains_anon_fun = string_contains_substring result "fun()" in
-  check bool "contains anonymous function" true contains_anon_fun
+  let block_expr = Block [ Assign ("local", Literal (LInt 42)); Var "local" ] in
+  let sequence_expr = Sequence [
+    Assign ("x", block_expr);
+    Assign ("y", Literal (LInt 1))
+  ] in
+  let func = make_single_clause_function "test" [] sequence_expr in
+  let program = { items = [ Function func ] } in
+  let result = Compiler.compile_to_string program in
+  (* Should contain block structure with proper scoping *)
+  let contains_block_start = string_contains_substring result "% start block" in
+  let contains_block_end = string_contains_substring result "% end block" in
+  check bool "contains block start comment" true contains_block_start;
+  check bool "contains block end comment" true contains_block_end
 
 let tests =
   [

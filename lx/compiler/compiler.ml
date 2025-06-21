@@ -133,7 +133,38 @@ let rec emit_pattern ctx (p : pattern) : string =
   | PCons (head, tail) ->
       "[" ^ emit_pattern ctx head ^ " | " ^ emit_pattern ctx tail ^ "]"
 
-let rec emit_expr ctx (e : expr) : string =
+(* Emit block expressions inline with proper variable scoping *)
+and emit_block_inline ctx var_name renamed_var exprs =
+  let block_ctx = create_scope (Some ctx) in
+
+  (* Process all expressions in the block *)
+  let rec process_exprs acc = function
+    | [] -> acc, "nil"
+    | [last_expr] ->
+        (* Last expression determines the block result *)
+        let last_code = emit_expr block_ctx last_expr in
+        (acc, last_code)
+    | expr :: rest ->
+        let expr_code = emit_expr block_ctx expr in
+        process_exprs (acc @ [expr_code]) rest
+  in
+
+  let statements, result_expr = process_exprs [] exprs in
+
+  (* Generate the inline block code *)
+  let block_name = String.capitalize_ascii var_name ^ "_" ^ block_ctx.scope_hash in
+  let block_comment = "% start block " ^ block_name in
+  let end_comment = "% end block " ^ block_name in
+
+  match statements with
+  | [] -> renamed_var ^ " = " ^ result_expr
+  | _ ->
+      (* Create the block with comments and inline statements, then assign result *)
+      block_comment ^ "\n    " ^
+      String.concat ",\n    " statements ^ ",\n    " ^
+      end_comment ^ "\n    " ^ renamed_var ^ " = " ^ result_expr
+
+and emit_expr ctx (e : expr) : string =
   match e with
   | Literal l -> emit_literal l
   | Var id -> get_renamed_var ctx id
@@ -141,6 +172,9 @@ let rec emit_expr ctx (e : expr) : string =
       (* Check if this is a simple assignment that can be optimized *)
       let renamed = add_var_to_scope ctx id in
       match value with
+      (* Special handling for block assignments *)
+      | Block exprs ->
+          emit_block_inline ctx id renamed exprs
       (* If assigning another assignment, we can optimize by using the value directly *)
       | Assign (_, inner_value) ->
           (* For single assignment in block, use the inner value directly *)
@@ -188,12 +222,9 @@ let rec emit_expr ctx (e : expr) : string =
       let block_ctx = create_scope (Some ctx) in
       String.concat ",\n    " (List.map (emit_expr block_ctx) exprs)
   | Block exprs ->
-      (* Generate anonymous function for block scope *)
+      (* This should not be called directly - blocks are handled in assignments *)
       let block_ctx = create_scope (Some ctx) in
-      let block_body =
-        String.concat ",\n        " (List.map (emit_expr block_ctx) exprs)
-      in
-      "(fun() ->\n        " ^ block_body ^ "\n    end)()"
+      String.concat ",\n    " (List.map (emit_expr block_ctx) exprs)
   | BinOp (left, op, right) ->
       emit_expr ctx left ^ " " ^ op ^ " " ^ emit_expr ctx right
 
