@@ -1,5 +1,9 @@
 %{
 open Ast
+
+(* Helper function to convert menhir position to our position type *)
+let make_position pos =
+  { line = pos.Lexing.pos_lnum; column = pos.Lexing.pos_cnum - pos.Lexing.pos_bol + 1; filename = None }
 %}
 
 (* Tokens *)
@@ -141,7 +145,7 @@ test_def:
 expr:
   | e = simple_expr { e }
   | name = IDENT EQ value = expr
-    { Assign (name, value) }
+    { let pos = make_position $startpos in Assign (name, value, Some pos) }
   | func = expr LPAREN args = separated_list(COMMA, expr) RPAREN
     { App (func, args) }
   | left = expr PLUS right = expr

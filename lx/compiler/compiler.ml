@@ -139,20 +139,22 @@ and emit_block_inline ctx var_name renamed_var exprs =
 
   (* Process all expressions in the block *)
   let rec process_exprs acc = function
-    | [] -> acc, "nil"
-    | [last_expr] ->
+    | [] -> (acc, "nil")
+    | [ last_expr ] ->
         (* Last expression determines the block result *)
         let last_code = emit_expr block_ctx last_expr in
         (acc, last_code)
     | expr :: rest ->
         let expr_code = emit_expr block_ctx expr in
-        process_exprs (acc @ [expr_code]) rest
+        process_exprs (acc @ [ expr_code ]) rest
   in
 
   let statements, result_expr = process_exprs [] exprs in
 
   (* Generate the inline block code *)
-  let block_name = String.capitalize_ascii var_name ^ "_" ^ block_ctx.scope_hash in
+  let block_name =
+    String.capitalize_ascii var_name ^ "_" ^ block_ctx.scope_hash
+  in
   let block_comment = "% start block " ^ block_name in
   let end_comment = "% end block " ^ block_name in
 
@@ -160,23 +162,22 @@ and emit_block_inline ctx var_name renamed_var exprs =
   | [] -> renamed_var ^ " = " ^ result_expr
   | _ ->
       (* Create the block with comments and inline statements, then assign result *)
-      block_comment ^ "\n    " ^
-      String.concat ",\n    " statements ^ ",\n    " ^
-      end_comment ^ "\n    " ^ renamed_var ^ " = " ^ result_expr
+      block_comment ^ "\n    "
+      ^ String.concat ",\n    " statements
+      ^ ",\n    " ^ end_comment ^ "\n    " ^ renamed_var ^ " = " ^ result_expr
 
 and emit_expr ctx (e : expr) : string =
   match e with
   | Literal l -> emit_literal l
   | Var id -> get_renamed_var ctx id
-  | Assign (id, value) -> (
+  | Assign (id, value, _pos) -> (
       (* Check if this is a simple assignment that can be optimized *)
       let renamed = add_var_to_scope ctx id in
       match value with
       (* Special handling for block assignments *)
-      | Block exprs ->
-          emit_block_inline ctx id renamed exprs
+      | Block exprs -> emit_block_inline ctx id renamed exprs
       (* If assigning another assignment, we can optimize by using the value directly *)
-      | Assign (_, inner_value) ->
+      | Assign (_, inner_value, _) ->
           (* For single assignment in block, use the inner value directly *)
           renamed ^ " = " ^ emit_expr ctx inner_value
       | _ -> renamed ^ " = " ^ emit_expr ctx value)
@@ -232,10 +233,9 @@ let emit_function_clause (func_name : string) (clause : function_clause) :
     string =
   let ctx = create_scope None in
   (* Add pattern variables to scope *)
-  List.iter (function
-    | PVar name -> ignore (add_var_to_scope ctx name)
-    | _ -> ()
-  ) clause.params;
+  List.iter
+    (function PVar name -> ignore (add_var_to_scope ctx name) | _ -> ())
+    clause.params;
   let pattern_strings = List.map (emit_pattern ctx) clause.params in
   func_name ^ "("
   ^ String.concat ", " pattern_strings
@@ -473,9 +473,11 @@ let compile_to_string_with_module_name (program : program)
        Printf.eprintf "OTP Validation Error: %s\n"
          (Otp_validator.string_of_otp_error error);
        failwith "OTP validation failed"
-   with Typechecker.TypeError error ->
-     Printf.eprintf "Type Error: %s\n" (Typechecker.string_of_type_error error);
-     failwith "Type checking failed");
+   with
+  | Error.CompilationError _ as e -> raise e
+  | Typechecker.TypeError error ->
+      Printf.eprintf "Type Error: %s\n" (Typechecker.string_of_type_error error);
+      failwith "Type checking failed");
 
   (* Separate OTP components from regular items *)
   let otp_components, regular_items =
@@ -541,9 +543,11 @@ let type_check_program (program : program) : Typechecker.type_env =
        failwith "OTP validation failed");
 
     type_env
-  with Typechecker.TypeError error ->
-    Printf.eprintf "Type Error: %s\n" (Typechecker.string_of_type_error error);
-    failwith "Type checking failed"
+  with
+  | Error.CompilationError _ as e -> raise e
+  | Typechecker.TypeError error ->
+      Printf.eprintf "Type Error: %s\n" (Typechecker.string_of_type_error error);
+      failwith "Type checking failed"
 
 (* Type check a file *)
 let type_check_file (filename : string) : Typechecker.type_env =

@@ -16,7 +16,10 @@ let test_parse_function_with_params () =
   match program.items with
   | [
    Function
-     { name = "add"; clauses = [ { params = [ PVar "x"; PVar "y" ]; body = Var "x" } ] };
+     {
+       name = "add";
+       clauses = [ { params = [ PVar "x"; PVar "y" ]; body = Var "x" } ];
+     };
   ] ->
       ()
   | _ -> fail "Expected function with parameters"

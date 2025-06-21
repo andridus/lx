@@ -82,14 +82,12 @@ let test_function_call_not_capitalized () =
 
 let test_variables_still_capitalized () =
   (* Test that variables are still properly capitalized *)
-  let code =
-    {|
+  let code = {|
     fun test_vars(param) {
       x = param
       x
     }
-  |}
-  in
+  |} in
   let program = Compiler.parse_string code in
   let erlang_code = Compiler.compile_to_string program in
   check bool "Parameters should be capitalized" true

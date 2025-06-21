@@ -16,6 +16,10 @@ type error_kind =
   | ArityMismatch of string * int * int (* function_name, expected, found *)
   | MissingField of
       string * string * string list (* field, record_type, required_fields *)
+  | VariableRedefinition of
+      string * position option (* variable name, first definition position *)
+  | VariableShadowing of
+      string * position option (* variable name, parent definition position *)
 
 type compilation_error = {
   kind : error_kind;
@@ -27,13 +31,21 @@ type compilation_error = {
 
 exception CompilationError of compilation_error
 
+(* ANSI color codes *)
+let yellow = "\027[33m"
+let red = "\027[31m"
+let blue = "\027[34m"
+let green = "\027[32m"
+let bold = "\027[1m"
+let reset = "\027[0m"
+
 let position_of_lexbuf ?(filename = None) lexbuf =
   let pos = Lexing.lexeme_start_p lexbuf in
   { line = pos.pos_lnum; column = pos.pos_cnum - pos.pos_bol + 1; filename }
 
 let string_of_position pos =
   let file_part = match pos.filename with Some f -> f ^ ":" | None -> "" in
-  Printf.sprintf "%s%d:%d" file_part pos.line pos.column
+  Printf.sprintf "%s%s%d:%d%s" yellow file_part pos.line pos.column reset
 
 (* Helper function to find similar names using Levenshtein distance *)
 let levenshtein_distance s1 s2 =
@@ -107,6 +119,28 @@ let string_of_error_kind = function
   | MissingField (field, record_type, _required) ->
       Printf.sprintf "Missing required field '%s' in record of type '%s'" field
         record_type
+  | VariableRedefinition (var, first_pos) ->
+      let first_pos_str =
+        match first_pos with
+        | Some pos ->
+            Printf.sprintf " (first defined at line %d, column %d)" pos.line
+              pos.column
+        | None -> ""
+      in
+      let scope_context = " within the same scope" in
+      Printf.sprintf
+        "Variable %s%s%s%s is already defined%s and cannot be reassigned%s"
+        yellow bold var reset scope_context first_pos_str
+  | VariableShadowing (var, parent_pos) ->
+      let parent_pos_str =
+        match parent_pos with
+        | Some pos ->
+            Printf.sprintf " (defined in parent scope at line %d, column %d)"
+              pos.line pos.column
+        | None -> " (defined in parent scope)"
+      in
+      Printf.sprintf "Variable %s%s%s%s cannot shadow parent scope variable%s"
+        yellow bold var reset parent_pos_str
 
 let make_suggestion = function
   | RecordFieldError (field, record_type, available) -> (
@@ -154,6 +188,18 @@ let make_suggestion = function
         (Printf.sprintf
            "Try using a different name like '%s_func', 'my_%s', or '%s_val'"
            word word word)
+  | VariableRedefinition (var, _) ->
+      Some
+        (Printf.sprintf
+           "Use a different variable name like '%s_new', '%s_2', or \
+            'updated_%s'"
+           var var var)
+  | VariableShadowing (var, _) ->
+      Some
+        (Printf.sprintf
+           "Use a different variable name like '%s_local', 'inner_%s', or \
+            '%s_block'"
+           var var var)
   | _ -> None
 
 let make_context = function
@@ -278,6 +324,35 @@ let arity_mismatch_error ?(filename = None) lexbuf func_name expected found =
   let err =
     make_error ~filename
       (ArityMismatch (func_name, expected, found))
+      lexbuf message
+  in
+  raise (CompilationError err)
+
+(* New error functions for variable scoping *)
+let variable_redefinition_error ?(filename = None) ?(first_pos = None) lexbuf
+    var_name =
+  let message =
+    Printf.sprintf
+      "Variable '%s' is already defined in this scope and cannot be reassigned"
+      var_name
+  in
+  let err =
+    make_error ~filename
+      (VariableRedefinition (var_name, first_pos))
+      lexbuf message
+  in
+  raise (CompilationError err)
+
+let variable_shadowing_error ?(filename = None) ?(parent_pos = None) lexbuf
+    var_name =
+  let message =
+    Printf.sprintf
+      "Variable '%s' is already defined in parent scope and cannot be shadowed"
+      var_name
+  in
+  let err =
+    make_error ~filename
+      (VariableShadowing (var_name, parent_pos))
       lexbuf message
   in
   raise (CompilationError err)

@@ -78,6 +78,11 @@ fun test() {
     in
     Alcotest.fail "Expected reassignment error but compilation succeeded"
   with
+  | Compiler.Error.CompilationError err
+    when string_contains_substring
+           (Compiler.Error.string_of_error err)
+           "already defined" ->
+      ()
   | Failure msg when string_contains_substring msg "already defined" -> ()
   | e -> Alcotest.fail ("Unexpected error: " ^ Printexc.to_string e)
 

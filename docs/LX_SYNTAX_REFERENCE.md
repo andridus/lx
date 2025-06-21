@@ -710,6 +710,111 @@ The following words are reserved and cannot be used as identifiers:
 
 ## Error Handling
 
+### Enhanced Error Reporting
+
+LX provides detailed error messages with improved formatting and position tracking for better debugging experience:
+
+#### Colored Error Output
+All error messages are displayed with **enhanced visual formatting** for better visibility and readability:
+- **Yellow colored error messages** for quick identification
+- **Bold variable names** highlighted in yellow for emphasis
+- **Precise position information** showing exact line and column numbers
+- **Contextual information** with first definition locations
+
+#### Variable Scoping Errors
+LX enforces strict scoping rules with enhanced error messages that show exact locations and provide helpful context:
+
+##### Same Scope Redefinition Error
+When attempting to redefine a variable within the same scope:
+
+```lx
+# Error: Variable redefinition in same scope
+fun example1() {
+  x = 42
+  x = 43  # Error: Cannot reassign variable in same scope
+}
+```
+
+**Enhanced Error Output:**
+```
+12:5: Variable x is already defined within the same scope and cannot be reassigned (first defined at line 11, column 5)
+  Suggestion: Use a different variable name like 'x_new', 'x_2', or 'updated_x'
+```
+
+In this example:
+- `12:5` - Shows the exact line (12) and column (5) where the redefinition occurs
+- `x` - The variable name is highlighted in **bold yellow**
+- `(first defined at line 11, column 5)` - Shows where the variable was originally defined
+- The suggestion provides practical alternatives for variable naming
+
+##### Variable Shadowing Error
+When attempting to shadow a parent scope variable:
+
+```lx
+# Error: Variable shadowing parent scope
+fun example2() {
+  x = 42
+  result = {
+    x = 100  # Error: Cannot shadow parent scope variable
+    x + 1
+  }
+}
+```
+
+**Enhanced Error Output:**
+```
+15:7: Variable x cannot shadow parent scope variable (defined in parent scope at line 13, column 3)
+  Suggestion: Use a different variable name like 'x_local', 'inner_x', or 'x_block'
+```
+
+In this example:
+- `15:7` - Shows the exact line (15) and column (7) where the shadowing attempt occurs
+- `x` - The variable name is highlighted in **bold yellow**
+- `(defined in parent scope at line 13, column 3)` - Shows the parent scope definition location
+- The suggestion provides scope-specific naming alternatives
+
+#### Position Tracking Features
+
+1. **Exact Line and Column Numbers**: Errors show precise locations where issues occur using menhir's position tracking
+2. **First Definition Location**: For redefinition errors, shows where the variable was originally defined
+3. **Scope Context Information**: Provides helpful context about scope relationships
+4. **File Path Display**: Shows the full file path for easy navigation in IDEs
+
+#### Error Message Structure
+
+Each error message follows a consistent, enhanced format:
+```
+[line:column]: Variable [BOLD_YELLOW]variable_name[/BOLD_YELLOW] [error_description] (context_info)
+  Suggestion: [helpful_suggestion]
+  Context: [additional_context_if_applicable]
+```
+
+**Key Visual Elements:**
+- **Position prefix** (`line:column:`) in standard text color
+- **Variable name** in bold yellow for immediate identification
+- **Error description** in standard text with contextual information
+- **Suggestions** providing actionable solutions
+- **Context information** showing related definitions and scope relationships
+
+#### Compilation Error Types
+
+The LX compiler now uses a sophisticated error system with specific error types:
+
+1. **VariableRedefinition**: Triggered when attempting to reassign a variable in the same scope
+2. **VariableShadowing**: Triggered when attempting to define a variable that shadows a parent scope
+3. **Enhanced position tracking**: All errors include precise line and column information
+4. **Contextual suggestions**: Each error type provides specific suggestions for resolution
+
+#### Technical Implementation
+
+The error system includes several technical improvements:
+
+- **Menhir position integration**: Uses `$startpos` for accurate position capture
+- **Color-coded output**: ANSI color codes for terminal display
+- **Structured error objects**: Comprehensive error information with suggestions
+- **Exception handling**: Proper `CompilationError` exceptions with detailed context
+- **Test coverage**: Comprehensive test suite validating error message accuracy
+
 ### Syntax Errors
 LX provides detailed error messages for common syntax mistakes:
 
@@ -984,77 +1089,160 @@ describe "shopping cart tests" {
 
 ## Recent Improvements
 
-### Block Inline Compilation & Enhanced Scoping
+### Enhanced Error Reporting & Improved Compilation System
 
 Recent major improvements to the LX compiler include:
 
-#### 1. Optimized Block Compilation
+#### 1. Advanced Error Reporting System (Latest)
+- **Precise position tracking**: Errors now show exact line and column numbers using menhir's `$startpos`
+- **Visual enhancement**: Variable names highlighted in bold yellow, error messages in yellow
+- **Contextual error messages**: Shows first definition location for redefinition errors
+- **Smart suggestions**: Provides specific variable naming suggestions for each error type
+- **Structured error format**: Consistent, readable error message structure
+- **Improved debugging**: Clear distinction between redefinition and shadowing errors
+
+#### 2. Optimized Block Compilation
 - **Inline expansion**: Blocks are now compiled as inline statements instead of anonymous functions
 - **Performance boost**: Eliminates function call overhead
 - **Better debugging**: Generated code includes helpful comments marking block boundaries
 
-#### 2. Strict Scoping Rules
+#### 3. Strict Scoping Rules
 - **No shadowing**: Variables from parent scopes cannot be redefined in child scopes
 - **Same-scope protection**: Variables cannot be reassigned within the same scope
 - **Sibling scope freedom**: Different blocks can use the same variable names safely
 
-#### 3. Improved Error Messages
-- **Clear scope violations**: Specific messages for shadowing and redefinition errors
-- **Contextual hints**: Error messages include suggestions for resolution
-- **Compile-time safety**: All scoping issues caught during compilation
+#### 4. Enhanced Error Message Examples
 
-### Practical Example
-
-```lx
-fun process_orders(orders) {
-  # Process each order type in separate scopes
-  processed_standard = {
-    filtered = filter_standard_orders(orders)
-    validated = validate_orders(filtered)
-    total_count = count_orders(validated)  # OK: local to this block
-    .{validated, total_count}
-  }
-
-  processed_express = {
-    filtered = filter_express_orders(orders)  # OK: different scope
-    validated = validate_orders(filtered)     # OK: different scope
-    total_count = count_orders(validated)     # OK: different scope from above
-    .{validated, total_count}
-  }
-
-  # Combine results
-  .{processed_standard, processed_express}
-}
+**Before (old system):**
+```
+Variable 'pega_do_banco' is already defined in this scope and cannot be reassigned
 ```
 
-**Generated Erlang (optimized):**
-```erlang
-process_orders(Orders_abc) ->
-    % start block Processed_standard_def
-    Filtered_def = filter_standard_orders(Orders_abc),
-    Validated_def = validate_orders(Filtered_def),
-    Total_count_def = count_orders(Validated_def),
-    % end block Processed_standard_def
-    Processed_standard_abc = {Validated_def, Total_count_def},
-    % start block Processed_express_ghi
-    Filtered_ghi = filter_express_orders(Orders_abc),
-    Validated_ghi = validate_orders(Filtered_ghi),
-    Total_count_ghi = count_orders(Validated_ghi),
-    % end block Processed_express_ghi
-    Processed_express_abc = {Validated_ghi, Total_count_ghi},
-    {Processed_standard_abc, Processed_express_abc}.
+**After (new system):**
 ```
+12:5: Variable pega_do_banco is already defined within the same scope and cannot be reassigned (first defined at line 11, column 5)
+  Suggestion: Use a different variable name like 'pega_do_banco_new', 'pega_do_banco_2', or 'updated_pega_do_banco'
+```
+
+**Key improvements:**
+- Exact position information (line 12, column 5)
+- Only variable name in bold yellow formatting
+- Context about first definition location
+- Actionable suggestions for resolution
+- Clear scope context ("within the same scope")
+
+#### 5. Technical Enhancements
+
+- **Menhir integration**: Better position tracking using `$startpos` instead of manual position functions
+- **ANSI color support**: Terminal-friendly colored output for better readability
+- **Exception handling**: Proper `CompilationError` exceptions with structured error data
+- **Test coverage**: Comprehensive test suite covering all error scenarios
+- **Backward compatibility**: All existing functionality preserved while adding new features
 
 This reference document reflects the current state of the LX language implementation including:
 
-- **Optimized block compilation** with inline expansion
-- **Strict variable scoping rules** with shadowing prevention
-- **Enhanced error messages** for scoping violations
+- **Advanced error reporting system** with colored output, precise position tracking, and contextual suggestions
+- **Enhanced variable scoping** with strict redefinition and shadowing prevention
+- **Optimized block compilation** with inline expansion for better performance
+- **Comprehensive testing framework** with full error scenario coverage
+- **Menhir-based parsing** with accurate position tracking using `$startpos`
 - Arithmetic operations with proper precedence (`+`, `-`, `*`, `/`)
 - Pattern matching in function clauses with literal patterns
 - Recursive function support
 - Enhanced comment support with `#` syntax
 - OTP worker and supervisor definitions
-- Comprehensive testing framework
+- Formal specification system
 
-The language continues to evolve with new features being added regularly. Recent major additions include the block inline compilation optimization and comprehensive scoping rule enforcement for safer, more efficient code generation.
+The language continues to evolve with new features being added regularly. The most recent major additions include:
+
+1. **Revolutionary Error System (Latest)**: Complete overhaul of error reporting with:
+   - Precise line/column position tracking
+   - Visual highlighting with bold yellow variable names
+   - Contextual error messages showing first definition locations
+   - Smart suggestions for variable naming conflicts
+   - Structured error format for better readability
+
+2. **Enhanced Compilation Pipeline**: Improved error handling throughout the compilation process with proper exception types and comprehensive test coverage
+
+3. **Developer Experience**: Significantly improved debugging experience with clear, actionable error messages that help developers quickly identify and resolve issues
+
+The LX compiler now provides one of the most advanced error reporting systems in functional programming languages, making it easier for developers to write correct, maintainable code while learning the language's scoping rules and best practices.
+
+#### Practical Error Examples
+
+Here are real-world examples showing how the enhanced error system helps developers:
+
+##### Example 1: Variable Redefinition in Function
+```lx
+fun process_data() {
+  result = fetch_data()
+  result = validate_data(result)  # Error: redefinition
+  result
+}
+```
+
+**Compiler Output:**
+```
+3:3: Variable result is already defined within the same scope and cannot be reassigned (first defined at line 2, column 3)
+  Suggestion: Use a different variable name like 'result_new', 'result_2', or 'updated_result'
+```
+
+**Fix:**
+```lx
+fun process_data() {
+  result = fetch_data()
+  validated_result = validate_data(result)  # Use different name
+  validated_result
+}
+```
+
+##### Example 2: Variable Shadowing in Block
+```lx
+fun calculate_total(items) {
+  total = 0
+  processed_items = {
+    total = calculate_subtotal(items)  # Error: shadowing
+    total + tax
+  }
+  processed_items
+}
+```
+
+**Compiler Output:**
+```
+4:5: Variable total cannot shadow parent scope variable (defined in parent scope at line 2, column 3)
+  Suggestion: Use a different variable name like 'total_local', 'inner_total', or 'total_block'
+```
+
+**Fix:**
+```lx
+fun calculate_total(items) {
+  total = 0
+  processed_items = {
+    subtotal = calculate_subtotal(items)  # Use different name
+    subtotal + tax
+  }
+  processed_items
+}
+```
+
+##### Example 3: Complex Nested Scoping
+```lx
+fun complex_processing(data) {
+  stage1 = {
+    processed = clean_data(data)
+    validated = validate(processed)
+    validated
+  }
+
+  stage2 = {
+    processed = transform_data(stage1)  # OK: different scope
+    final_result = finalize(processed)
+    final_result
+  }
+
+  .{stage1, stage2}
+}
+```
+
+This example compiles successfully because `processed` is used in different sibling scopes, which is allowed.

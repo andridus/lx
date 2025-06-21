@@ -29,7 +29,8 @@ type type_env = (ident * lx_type) list
 
 (* Symbol table context for managing variable scopes *)
 type symbol_context = {
-  variables : (ident * lx_type) list;
+  variables : (ident * lx_type * Error.position option) list;
+      (* name, type, definition position *)
   parent : symbol_context option;
 }
 
@@ -38,19 +39,55 @@ let create_context parent = { variables = []; parent }
 
 (* Lookup variable in context hierarchy *)
 let rec lookup_variable_in_context name context =
-  try Some (List.assoc name context.variables)
+  try
+    let _, var_type, _ =
+      List.find (fun (n, _, _) -> n = name) context.variables
+    in
+    Some var_type
   with Not_found -> (
     match context.parent with
     | Some parent_ctx -> lookup_variable_in_context name parent_ctx
     | None -> None)
 
+(* Get variable position from context *)
+let rec get_variable_position name context =
+  try
+    let _, _, pos = List.find (fun (n, _, _) -> n = name) context.variables in
+    pos
+  with Not_found -> (
+    match context.parent with
+    | Some parent_ctx -> get_variable_position name parent_ctx
+    | None -> None)
+
+(* Global scope tracking for better error reporting *)
+let scope_depth = ref 0
+
+(* Helper function to determine scope context *)
+let get_scope_context () =
+  if !scope_depth > 1 then " (within nested block scope)"
+  else if !scope_depth > 0 then " (within block scope)"
+  else ""
+
 (* Add variable to current context, checking for reassignment and shadowing *)
-let add_variable_to_context name var_type context =
+let add_variable_to_context ?(filename = None) ?(lexbuf = None) name var_type
+    ?pos context =
   (* Check if variable already exists in current scope *)
-  if List.mem_assoc name context.variables then
-    failwith
-      ("Variable '" ^ name
-     ^ "' is already defined in this scope and cannot be reassigned")
+  if List.exists (fun (n, _, _) -> n = name) context.variables then
+    let first_pos = get_variable_position name context in
+    match lexbuf with
+    | Some lb -> Error.variable_redefinition_error ~filename ~first_pos lb name
+    | None ->
+        (* Use the actual position passed in, not an estimate *)
+        let current_pos = pos in
+        let error =
+          Error.make_error_with_position
+            (Error.VariableRedefinition (name, first_pos))
+            (match current_pos with
+            | Some p -> p
+            | None -> Error.make_position 1 1)
+            ""
+        in
+        raise (Error.CompilationError error)
   else
     (* Check if variable exists in parent scope - shadowing not allowed *)
     let parent_has_var =
@@ -59,16 +96,35 @@ let add_variable_to_context name var_type context =
       | None -> false
     in
     if parent_has_var then
-      failwith
-        ("Variable '" ^ name
-       ^ "' is already defined in parent scope and cannot be shadowed")
+      let parent_pos =
+        match context.parent with
+        | Some parent_ctx -> get_variable_position name parent_ctx
+        | None -> None
+      in
+      match lexbuf with
+      | Some lb -> Error.variable_shadowing_error ~filename ~parent_pos lb name
+      | None ->
+          (* Use the actual position passed in, not an estimate *)
+          let current_pos = pos in
+          let error =
+            Error.make_error_with_position
+              (Error.VariableShadowing (name, parent_pos))
+              (match current_pos with
+              | Some p -> p
+              | None -> Error.make_position 1 1)
+              ""
+          in
+          raise (Error.CompilationError error)
     else
-      { context with variables = (name, var_type) :: context.variables }
+      (* Store the actual position information *)
+      { context with variables = (name, var_type, pos) :: context.variables }
 
 (* Convert context to type_env for compatibility *)
 let context_to_env context =
   let rec collect_vars ctx acc =
-    let vars = ctx.variables @ acc in
+    let vars =
+      List.map (fun (name, typ, _) -> (name, typ)) ctx.variables @ acc
+    in
     match ctx.parent with
     | Some parent -> collect_vars parent vars
     | None -> vars
@@ -292,11 +348,25 @@ let rec infer_expr_with_context (context : symbol_context) (expr : expr) :
       | None ->
           let similar_vars = List.map fst (context_to_env context) in
           raise (TypeError (UnboundVariable (id, similar_vars))))
-  | Assign (id, value) ->
+  | Assign (id, value, pos) ->
       let value_type, subst, new_context =
         infer_expr_with_context context value
       in
-      let updated_context = add_variable_to_context id value_type new_context in
+      (* Use the position information from the AST if available *)
+      let error_position =
+        match pos with
+        | Some p ->
+            Some
+              {
+                Error.line = p.line;
+                Error.column = p.column;
+                Error.filename = p.filename;
+              }
+        | None -> Some (Error.make_position 1 1)
+      in
+      let updated_context =
+        add_variable_to_context id value_type ?pos:error_position new_context
+      in
       (value_type, subst, updated_context)
   | Sequence exprs -> (
       (* Type of sequence is the type of the last expression *)
@@ -316,26 +386,35 @@ let rec infer_expr_with_context (context : symbol_context) (expr : expr) :
             infer_expr_with_context accumulated_context last_expr
           in
           (last_type, compose_subst final_subst last_subst, final_context))
-  | Block exprs -> (
+  | Block exprs ->
       (* Block expressions create a new scope *)
+      incr scope_depth;
+      (* Enter nested scope *)
       let block_context = create_context (Some context) in
-      match List.rev exprs with
-      | [] -> (TNil, [], context)
-      | last_expr :: rest_exprs ->
-          let rest_exprs = List.rev rest_exprs in
-          (* Type check all expressions in the block scope *)
-          let final_subst, accumulated_context =
-            List.fold_left
-              (fun (subst_acc, ctx_acc) expr ->
-                let _, subst, new_ctx = infer_expr_with_context ctx_acc expr in
-                (compose_subst subst_acc subst, new_ctx))
-              ([], block_context) rest_exprs
-          in
-          let last_type, last_subst, _ =
-            infer_expr_with_context accumulated_context last_expr
-          in
-          (* Return the original context (block variables don't leak out) *)
-          (last_type, compose_subst final_subst last_subst, context))
+      let result =
+        match List.rev exprs with
+        | [] -> (TNil, [], context)
+        | last_expr :: rest_exprs ->
+            let rest_exprs = List.rev rest_exprs in
+            (* Type check all expressions in the block scope *)
+            let final_subst, accumulated_context =
+              List.fold_left
+                (fun (subst_acc, ctx_acc) expr ->
+                  let _, subst, new_ctx =
+                    infer_expr_with_context ctx_acc expr
+                  in
+                  (compose_subst subst_acc subst, new_ctx))
+                ([], block_context) rest_exprs
+            in
+            let last_type, last_subst, _ =
+              infer_expr_with_context accumulated_context last_expr
+            in
+            (* Return the original context (block variables don't leak out) *)
+            (last_type, compose_subst final_subst last_subst, context)
+      in
+      decr scope_depth;
+      (* Exit nested scope *)
+      result
   | _ ->
       (* For other expressions, convert context to env and use original function *)
       let env = context_to_env context in
@@ -344,7 +423,12 @@ let rec infer_expr_with_context (context : symbol_context) (expr : expr) :
 
 (* Wrapper function that maintains original interface *)
 and infer_expr (env : type_env) (expr : expr) : lx_type * substitution =
-  let base_context = { variables = env; parent = None } in
+  let base_context =
+    {
+      variables = List.map (fun (name, typ) -> (name, typ, None)) env;
+      parent = None;
+    }
+  in
   let result_type, subst, _ = infer_expr_with_context base_context expr in
   (result_type, subst)
 
@@ -358,7 +442,7 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
       with Not_found ->
         let similar_vars = get_env_var_names env in
         raise (TypeError (UnboundVariable (id, similar_vars))))
-  | Assign (_id, value) ->
+  | Assign (_id, value, _pos) ->
       let value_type, subst = infer_expr_original env value in
       (* Assignment returns the assigned value type *)
       (value_type, subst)
@@ -526,18 +610,24 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
             infer_expr (apply_subst_env final_subst env) last_expr
           in
           (last_type, compose_subst final_subst last_subst))
-  | BinOp (left, op, right) ->
+  | BinOp (left, op, right) -> (
       let left_type, subst1 = infer_expr env left in
       let right_type, subst2 = infer_expr (apply_subst_env subst1 env) right in
       let combined_subst = compose_subst subst1 subst2 in
       (* For arithmetic operations, both operands should be numbers *)
-             (match op with
-         | "+" | "-" | "*" | "/" ->
-             let int_unify1 = unify (apply_subst combined_subst left_type) TInteger in
-             let int_unify2 = unify (apply_subst combined_subst right_type) TInteger in
-             let final_subst = compose_subst (compose_subst combined_subst int_unify1) int_unify2 in
-             (TInteger, final_subst)
-        | _ -> failwith ("Unknown binary operator: " ^ op))
+      match op with
+      | "+" | "-" | "*" | "/" ->
+          let int_unify1 =
+            unify (apply_subst combined_subst left_type) TInteger
+          in
+          let int_unify2 =
+            unify (apply_subst combined_subst right_type) TInteger
+          in
+          let final_subst =
+            compose_subst (compose_subst combined_subst int_unify1) int_unify2
+          in
+          (TInteger, final_subst)
+      | _ -> failwith ("Unknown binary operator: " ^ op))
 
 (* Type inference for function clauses *)
 let infer_function_clause (env : type_env) (clause : function_clause) :
@@ -545,11 +635,13 @@ let infer_function_clause (env : type_env) (clause : function_clause) :
   let param_types = List.map (fun _ -> fresh_type_var ()) clause.params in
   (* Extract variable bindings from patterns and create environment *)
   let param_env =
-    List.fold_left2 (fun acc pattern param_type ->
-      match pattern with
-      | PVar name -> (name, param_type) :: acc
-      | _ -> acc  (* Literals and other patterns don't add to environment *)
-    ) [] clause.params param_types in
+    List.fold_left2
+      (fun acc pattern param_type ->
+        match pattern with
+        | PVar name -> (name, param_type) :: acc
+        | _ -> acc (* Literals and other patterns don't add to environment *))
+      [] clause.params param_types
+  in
   let new_env = param_env @ env in
   let body_type, subst = infer_expr new_env clause.body in
   let fun_type =
@@ -593,7 +685,11 @@ let infer_function_def (env : type_env) (func : function_def) :
       in
 
       (* Unify the function type variable with the inferred type *)
-      let unify_subst = unify (apply_subst final_subst func_type_var) (apply_subst final_subst first_type) in
+      let unify_subst =
+        unify
+          (apply_subst final_subst func_type_var)
+          (apply_subst final_subst first_type)
+      in
       let complete_subst = compose_subst final_subst unify_subst in
 
       (* Return the type of the first clause as representative *)

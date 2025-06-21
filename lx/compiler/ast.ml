@@ -1,5 +1,8 @@
 type ident = string
 
+(* Position information for better error reporting *)
+type position = { line : int; column : int; filename : string option }
+
 (* Basic literals *)
 type literal =
   | LString of string
@@ -36,7 +39,7 @@ type otp_callback =
 type expr =
   | Literal of literal
   | Var of ident
-  | Assign of ident * expr
+  | Assign of ident * expr * position option (* variable, value, position *)
   | Fun of ident list * expr
   | App of expr * expr list
   | ExternalCall of string * string * expr list (* module, function, args *)
