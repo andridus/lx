@@ -611,12 +611,23 @@ worker my_worker {
   - **Return**: Can return any type (not restricted to tuples)
 
 ### Supervisor Definition
+
+Supervisors must use bracket syntax for defining children lists to maintain consistency with list notation throughout the language:
+
 ```lx
 supervisor my_supervisor {
   strategy one_for_one
   children [worker1, worker2, worker3]
 }
+
+# Empty children list
+supervisor empty_supervisor {
+  strategy one_for_one
+  children []
+}
 ```
+
+**Important**: The `children` field must always use bracket notation `[...]` even for empty lists. This ensures consistency with list syntax used elsewhere in LX.
 
 #### Supervisor Strategies
 - `one_for_one` - Restart only the failed child
@@ -756,6 +767,28 @@ simple_pattern ::= '_'                                    # Wildcard
                  | '[' pattern_list ']'                   # List pattern
 ```
 
+### OTP Component Grammar
+```
+otp_component ::= worker_def
+                | supervisor_def
+
+worker_def ::= 'worker' IDENT '{' worker_body '}'
+
+worker_body ::= function_def*
+              | spec_def*
+
+supervisor_def ::= 'supervisor' IDENT '{' supervisor_body '}'
+
+supervisor_body ::= 'strategy' otp_strategy 'children' children_list
+
+otp_strategy ::= 'one_for_one'
+               | 'one_for_all'
+               | 'rest_for_one'
+
+children_list ::= '[' separated_list(COMMA, IDENT) ']'     # List with children
+                | '[' ']'                                   # Empty list
+```
+
 ## Reserved Words
 
 The following words are reserved and cannot be used as identifiers:
@@ -889,6 +922,14 @@ fun spec() { }  # 'spec' is reserved for specifications
 
 # Error: Missing description in test
 test { }  # Should be: test "description" { }
+
+# Error: Invalid supervisor syntax (missing brackets)
+supervisor my_sup {
+  strategy one_for_one
+  children worker1, worker2  # Error: brackets required
+}
+# Compiler output: "Invalid supervisor children field - brackets are required around the children list"
+# Should be: children [worker1, worker2]
 ```
 
 ### Variable Scoping Errors
@@ -1259,7 +1300,54 @@ describe "shopping cart tests" {
 
 ## Recent Improvements
 
-### Special Syntax Features (Latest)
+### Enhanced Supervisor Error Testing (Latest)
+
+The LX compiler now includes comprehensive test coverage for supervisor error messages, ensuring developers receive clear, actionable feedback when syntax errors occur:
+
+#### Test Suite Expansion
+- **7 new supervisor-specific tests** added to the test suite
+- **Total test count increased to 115+** comprehensive tests
+- **Error message validation** ensures consistency and helpfulness
+- **Position tracking verification** confirms accurate line/column reporting
+
+#### Error Message Testing Categories
+
+1. **Syntax Error Detection**: Tests verify that missing brackets are properly detected
+2. **Suggestion Validation**: Tests ensure helpful suggestions are provided in error messages
+3. **Context Information**: Tests verify educational context about why brackets are required
+4. **Position Accuracy**: Tests confirm errors are reported at correct line and column numbers
+5. **Positive Validation**: Tests ensure correct syntax parses successfully
+6. **Edge Cases**: Tests validate empty children lists and various syntax variations
+
+#### Example Test Coverage
+
+```lx
+# Test case: Missing brackets with multiple children
+supervisor cart_sup {
+  strategy one_for_one
+  children cart, inventory, payment  # Error: brackets required
+}
+# Expected: Clear error message with suggestion to use [cart, inventory, payment]
+
+# Test case: Correct syntax validation
+supervisor cart_sup {
+  strategy one_for_one
+  children [cart, inventory, payment]  # Success: parses correctly
+}
+# Expected: Successful parsing with proper AST generation
+```
+
+#### Error Message Structure Validation
+
+The tests verify that error messages include:
+- **Primary message**: Clear description of the syntax error
+- **Suggestion field**: Specific guidance on how to fix the error
+- **Context field**: Educational information about why the syntax is required
+- **Position information**: Accurate line and column numbers
+
+This comprehensive testing ensures that developers receive consistent, helpful error messages that accelerate the learning process and reduce debugging time.
+
+### Special Syntax Features (Previous)
 
 The LX compiler now supports several special syntax features for improved Erlang/OTP integration:
 
@@ -1305,11 +1393,43 @@ io.format("Hello ~p~n", [__MODULE__])
 # gen_server:call(__MODULE__, :get)  # Error: use '.' instead of ':'
 ```
 
-#### 4. Comprehensive Test Coverage
-- **108 tests**: Including 7 new tests for special syntax features
-- **Parser validation**: Tests ensure correct AST generation
+#### 4. Consistent Supervisor Syntax Enforcement
+- **Bracket-only syntax**: Supervisors now require bracket syntax for children lists for consistency
+- **List notation consistency**: Aligns with list syntax used throughout the language
+- **Required brackets**: Both `children [worker1, worker2]` and `children []` require brackets
+- **Grammar simplification**: Parser rules simplified to only accept `[separated_list(COMMA, IDENT)]`
+- **Clear error messages**: Invalid syntax without brackets provides clear parse errors
+
+```lx
+# Correct syntax (required):
+supervisor my_sup {
+  strategy one_for_one
+  children [worker1, worker2]    # Brackets required
+}
+
+supervisor empty_sup {
+  strategy one_for_one
+  children []                    # Brackets required even for empty lists
+}
+```
+
+#### 5. Enhanced Test Coverage with Supervisor Error Validation
+- **115+ tests**: Including comprehensive supervisor error message tests
+- **Supervisor error testing**: 7 new tests specifically for supervisor syntax validation
+- **Error message validation**: Tests verify precise error messages, suggestions, and context
+- **Position tracking**: Tests ensure accurate line and column reporting
+- **Parser validation**: Tests ensure correct AST generation for supervisor syntax
 - **Compilation verification**: Tests verify correct Erlang output
-- **Error detection**: Tests verify proper error reporting
+- **Error detection**: Tests verify proper error reporting for invalid syntax
+
+**New Supervisor Error Tests:**
+- `supervisor_missing_brackets_multiple_children`: Tests error when multiple children lack brackets
+- `supervisor_missing_brackets_single_child`: Tests error when single child lacks brackets
+- `supervisor_invalid_children_syntax`: Tests error for completely invalid children syntax
+- `supervisor_correct_syntax_with_brackets`: Validates correct bracket syntax parsing
+- `supervisor_empty_children_with_brackets`: Validates empty bracket syntax parsing
+- `supervisor_error_message_contains_suggestion`: Validates suggestion field presence
+- `supervisor_error_message_educational`: Validates educational context messages
 
 ### Enhanced Error Reporting & Improved Compilation System
 
@@ -1630,3 +1750,102 @@ fun complex_processing(data) {
 ```
 
 This example compiles successfully because `processed` is used in different sibling scopes, which is allowed.
+
+### Complete OTP Application Example
+
+Here's a comprehensive example showing both worker and supervisor definitions with both syntax variations:
+
+```lx
+# Define workers first
+worker cart_worker {
+  fun init(user_id) {
+    initial_state = .{user_id, [], 0.0}
+    .{:ok, initial_state}
+  }
+
+  fun handle_call(:get_cart, _from, state) {
+    .{:reply, state, state}
+  }
+
+  fun handle_cast(.{:add_item, item}, .{user_id, items, total}) {
+    new_items = [item | items]
+    new_total = total + item.price
+    new_state = .{user_id, new_items, new_total}
+    .{:noreply, new_state}
+  }
+}
+
+worker inventory_worker {
+  fun init(_) {
+    .{:ok, .{}}
+  }
+
+  fun handle_call(.{:check_stock, item_id}, _from, state) {
+    stock_level = check_inventory(item_id)
+    .{:reply, stock_level, state}
+  }
+}
+
+# Supervisor with bracket syntax (recommended)
+supervisor shop_supervisor {
+  strategy one_for_one
+  children [cart_worker, inventory_worker]
+}
+
+# Another supervisor with different strategy
+supervisor alt_shop_supervisor {
+  strategy one_for_all
+  children [cart_worker, inventory_worker]
+}
+
+# Supervisor with empty children list
+supervisor empty_supervisor {
+  strategy rest_for_one
+  children []
+}
+```
+
+**Generated Erlang Modules:**
+
+For the main supervisor (`shop_supervisor`):
+```erlang
+-module(shop_supervisor).
+-behaviour(supervisor).
+-compile(export_all).
+
+init([]) ->
+    Children = [
+        {cart_worker, {cart_worker, start_link, []}, permanent, 5000, worker, [cart_worker]},
+        {inventory_worker, {inventory_worker, start_link, []}, permanent, 5000, worker, [inventory_worker]}
+    ],
+    {ok, {#{strategy => one_for_one, intensity => 10, period => 60}, Children}}.
+```
+
+For the cart worker:
+```erlang
+-module(cart_worker).
+-behaviour(gen_server).
+-compile(export_all).
+
+init(User_id_abc) ->
+    Initial_state_def = {User_id_abc, [], 0.0},
+    {ok, Initial_state_def}.
+
+handle_call(get_cart, _, State_ghi) ->
+    {reply, State_ghi, State_ghi}.
+
+handle_cast({add_item, Item_jkl}, {User_id_mno, Items_pqr, Total_stu}) ->
+    New_items_vwx = [Item_jkl | Items_pqr],
+    New_total_yza = Total_stu + element(2, Item_jkl),  % Assuming item.price is second element
+    New_state_bcd = {User_id_mno, New_items_vwx, New_total_yza},
+    {noreply, New_state_bcd}.
+```
+
+This comprehensive example demonstrates:
+- **Multiple workers** with different callback functions
+- **Consistent bracket syntax** for supervisor children lists
+- **Different supervisor strategies** (`one_for_one`, `one_for_all`, `rest_for_one`)
+- **Empty children lists** using bracket notation
+- **Proper OTP structure** with init, handle_call, and handle_cast callbacks
+- **Pattern matching** in function parameters and case expressions
+- **External references** between workers in the supervisor children list

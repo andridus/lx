@@ -18,7 +18,8 @@
   test_assignment
   test_blocks
   test_scoping
-  test_special_syntax))
+  test_special_syntax
+  test_supervisor_errors))
 
 (rule
  (alias runtest)

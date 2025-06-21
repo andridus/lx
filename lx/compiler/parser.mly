@@ -105,9 +105,17 @@ worker_def:
 supervisor_def:
   | SUPERVISOR name = IDENT LBRACE
       STRATEGY strategy = otp_strategy
-      CHILDREN children = separated_list(COMMA, IDENT)
+      CHILDREN LBRACKET children = separated_list(COMMA, IDENT) RBRACKET
     RBRACE
     { Supervisor { name; strategy; children } }
+  | SUPERVISOR name = IDENT LBRACE
+      STRATEGY strategy = otp_strategy
+      CHILDREN _first_child = IDENT error
+    { failwith ("Enhanced:Invalid supervisor children field - brackets are required around the children list|Suggestion:Change 'children " ^ _first_child ^ ", ...' to 'children [" ^ _first_child ^ ", ...]'|Context:Supervisor children must always be enclosed in brackets for consistency with list syntax|Example:supervisor " ^ name ^ " {\n  strategy " ^ (match strategy with OneForOne -> "one_for_one" | OneForAll -> "one_for_all" | RestForOne -> "rest_for_one") ^ "\n  children [" ^ _first_child ^ "]\n}") }
+  | SUPERVISOR name = IDENT LBRACE
+      STRATEGY _strategy = otp_strategy
+      CHILDREN error
+    { failwith ("Enhanced:Invalid supervisor children field - expected '[' after 'children' keyword|Suggestion:Use 'children [worker1, worker2]' or 'children []' for empty list|Context:Supervisor children must be enclosed in brackets|Example:supervisor " ^ name ^ " {\n  strategy one_for_one\n  children [worker1, worker2]\n}") }
 
 otp_strategy:
   | ONE_FOR_ONE { OneForOne }

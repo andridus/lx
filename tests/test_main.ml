@@ -18,4 +18,5 @@ let () =
       ("Test Blocks Tests", Test_blocks.tests);
       ("Test Scoping Tests", Test_scoping.tests);
       ("Special Syntax Tests", Test_special_syntax.tests);
+      ("Supervisor Error Tests", Test_supervisor_errors.tests);
     ]
