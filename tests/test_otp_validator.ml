@@ -1,56 +1,37 @@
 (* Tests for the OTP Validator *)
 open Alcotest
 open Compiler.Ast
-open Compiler.Typechecker
 open Compiler.Otp_validator
 
-let test_valid_worker () =
-  let init_handler =
+let test_valid_worker_with_init () =
+  let init_func =
     make_single_clause_function "init" [ "args" ]
-      (App (Var "reply", [ Tuple [ Var "ok"; Literal (LAtom "state") ] ]))
-  in
-
-  let call_handler =
-    make_single_clause_function "handle_call" [ "msg"; "from"; "state" ]
-      (App (Var "reply", [ Var "msg"; Var "state" ]))
+      (Tuple [ Literal (LAtom "ok"); Literal (LAtom "state") ])
   in
 
   let worker =
-    Worker
-      {
-        name = "test_worker";
-        handlers = [ (Init, init_handler); (Call, call_handler) ];
-        functions = [];
-        specs = [];
-      }
+    Worker { name = "test_worker"; functions = [ init_func ]; specs = [] }
   in
 
   let program = { items = [ OtpComponent worker ] } in
 
   try
-    let env = type_check_program program in
-    validate_program program env;
+    validate_program program;
     ()
-  with
-  | OtpValidationError error ->
-      fail ("Valid worker test failed: " ^ string_of_otp_error error)
-  | TypeError error ->
-      fail
-        ("Valid worker test failed (type error): " ^ string_of_type_error error)
+  with OtpValidationError error ->
+    fail ("Valid worker test failed: " ^ string_of_otp_error error)
 
-let test_missing_handler () =
-  let init_handler =
-    make_single_clause_function "init" [ "args" ]
-      (App (Var "reply", [ Tuple [ Var "ok"; Literal (LAtom "state") ] ]))
+let test_worker_missing_init () =
+  let some_func =
+    make_single_clause_function "other_function" [ "x" ] (Var "x")
   in
 
   let worker =
     Worker
       {
         name = "incomplete_worker";
-        handlers = [ (Init, init_handler) ];
-        (* Missing Call handler *)
-        functions = [];
+        functions = [ some_func ];
+        (* Missing init function *)
         specs = [];
       }
   in
@@ -58,26 +39,175 @@ let test_missing_handler () =
   let program = { items = [ OtpComponent worker ] } in
 
   try
-    let env = type_check_program program in
-    validate_program program env;
-    fail "Missing handler test failed: should have thrown error"
+    validate_program program;
+    fail "Missing init test failed: should have thrown error"
   with
-  | OtpValidationError (MissingRequiredHandler (Call, _)) -> ()
+  | OtpValidationError (MissingRequiredCallback ("init", _)) -> ()
   | OtpValidationError error ->
       fail
-        ("Missing handler test failed: wrong error: "
-       ^ string_of_otp_error error)
-  | TypeError _ -> fail "Missing handler test failed: type error occurred"
+        ("Missing init test failed: wrong error: " ^ string_of_otp_error error)
 
-let test_invalid_worker_name () =
-  let init_handler =
+let test_handle_call_invalid_arity () =
+  let init_func =
     make_single_clause_function "init" [ "args" ]
-      (App (Var "reply", [ Tuple [ Var "ok"; Literal (LAtom "state") ] ]))
+      (Tuple [ Literal (LAtom "ok"); Literal (LAtom "state") ])
   in
 
-  let call_handler =
-    make_single_clause_function "handle_call" [ "msg"; "from"; "state" ]
-      (App (Var "reply", [ Var "msg"; Var "state" ]))
+  let handle_call_func =
+    make_single_clause_function "handle_call"
+      [ "request"; "from" ] (* Wrong arity: should be 3 *)
+      (Tuple
+         [
+           Literal (LAtom "reply");
+           Literal (LAtom "ok");
+           Literal (LAtom "state");
+         ])
+  in
+
+  let worker =
+    Worker
+      {
+        name = "test_worker";
+        functions = [ init_func; handle_call_func ];
+        specs = [];
+      }
+  in
+
+  let program = { items = [ OtpComponent worker ] } in
+
+  try
+    validate_program program;
+    fail "Invalid handle_call arity test failed: should have thrown error"
+  with
+  | OtpValidationError (InvalidCallbackArity ("handle_call", _, 3, 2)) -> ()
+  | OtpValidationError error ->
+      fail
+        ("Invalid handle_call arity test failed: wrong error: "
+       ^ string_of_otp_error error)
+
+let test_handle_call_valid_arity () =
+  let init_func =
+    make_single_clause_function "init" [ "args" ]
+      (Tuple [ Literal (LAtom "ok"); Literal (LAtom "state") ])
+  in
+
+  let handle_call_func =
+    make_single_clause_function "handle_call"
+      [ "request"; "from"; "state" ] (* Correct arity: 3 *)
+      (Tuple
+         [
+           Literal (LAtom "reply");
+           Literal (LAtom "ok");
+           Literal (LAtom "state");
+         ])
+  in
+
+  let worker =
+    Worker
+      {
+        name = "test_worker";
+        functions = [ init_func; handle_call_func ];
+        specs = [];
+      }
+  in
+
+  let program = { items = [ OtpComponent worker ] } in
+
+  try
+    validate_program program;
+    ()
+  with OtpValidationError error ->
+    fail ("Valid handle_call test failed: " ^ string_of_otp_error error)
+
+let test_handle_cast_invalid_arity () =
+  let init_func =
+    make_single_clause_function "init" [ "args" ]
+      (Tuple [ Literal (LAtom "ok"); Literal (LAtom "state") ])
+  in
+
+  let handle_cast_func =
+    make_single_clause_function "handle_cast"
+      [ "request" ] (* Wrong arity: should be 2 *)
+      (Tuple [ Literal (LAtom "noreply"); Literal (LAtom "state") ])
+  in
+
+  let worker =
+    Worker
+      {
+        name = "test_worker";
+        functions = [ init_func; handle_cast_func ];
+        specs = [];
+      }
+  in
+
+  let program = { items = [ OtpComponent worker ] } in
+
+  try
+    validate_program program;
+    fail "Invalid handle_cast arity test failed: should have thrown error"
+  with
+  | OtpValidationError (InvalidCallbackArity ("handle_cast", _, 2, 1)) -> ()
+  | OtpValidationError error ->
+      fail
+        ("Invalid handle_cast arity test failed: wrong error: "
+       ^ string_of_otp_error error)
+
+let test_callback_non_tuple_return () =
+  let init_func =
+    make_single_clause_function "init" [ "args" ]
+      (Literal (LAtom "not_a_tuple"))
+    (* Should return a tuple *)
+  in
+
+  let worker =
+    Worker { name = "test_worker"; functions = [ init_func ]; specs = [] }
+  in
+
+  let program = { items = [ OtpComponent worker ] } in
+
+  try
+    validate_program program;
+    fail "Non-tuple return test failed: should have thrown error"
+  with
+  | OtpValidationError (InvalidCallbackReturn ("init", _)) -> ()
+  | OtpValidationError error ->
+      fail
+        ("Non-tuple return test failed: wrong error: "
+       ^ string_of_otp_error error)
+
+let test_format_status_any_return () =
+  let init_func =
+    make_single_clause_function "init" [ "args" ]
+      (Tuple [ Literal (LAtom "ok"); Literal (LAtom "state") ])
+  in
+
+  let format_status_func =
+    make_single_clause_function "format_status" [ "status" ]
+      (Literal (LAtom "any_return_allowed"))
+    (* format_status can return anything *)
+  in
+
+  let worker =
+    Worker
+      {
+        name = "test_worker";
+        functions = [ init_func; format_status_func ];
+        specs = [];
+      }
+  in
+
+  let program = { items = [ OtpComponent worker ] } in
+
+  try
+    validate_program program;
+    ()
+  with OtpValidationError error ->
+    fail ("Format status test failed: " ^ string_of_otp_error error)
+
+let test_invalid_worker_name () =
+  let init_func =
+    make_single_clause_function "init" [ "args" ]
+      (Tuple [ Literal (LAtom "ok"); Literal (LAtom "state") ])
   in
 
   let worker =
@@ -85,8 +215,7 @@ let test_invalid_worker_name () =
       {
         name = "Invalid-Worker-Name";
         (* Invalid atom name *)
-        handlers = [ (Init, init_handler); (Call, call_handler) ];
-        functions = [];
+        functions = [ init_func ];
         specs = [];
       }
   in
@@ -94,8 +223,7 @@ let test_invalid_worker_name () =
   let program = { items = [ OtpComponent worker ] } in
 
   try
-    let env = type_check_program program in
-    validate_program program env;
+    validate_program program;
     fail "Invalid worker name test failed: should have thrown error"
   with
   | OtpValidationError (InvalidWorkerName _) -> ()
@@ -103,7 +231,6 @@ let test_invalid_worker_name () =
       fail
         ("Invalid worker name test failed: wrong error: "
        ^ string_of_otp_error error)
-  | TypeError _ -> fail "Invalid worker name test failed: type error occurred"
 
 let test_valid_supervisor () =
   let supervisor =
@@ -115,39 +242,22 @@ let test_valid_supervisor () =
       }
   in
 
-  let init_handler =
+  let init_func =
     make_single_clause_function "init" [ "args" ]
-      (App (Var "reply", [ Tuple [ Var "ok"; Literal (LAtom "state") ] ]))
-  in
-
-  let call_handler =
-    make_single_clause_function "handle_call" [ "msg"; "from"; "state" ]
-      (App (Var "reply", [ Var "msg"; Var "state" ]))
+      (Tuple [ Literal (LAtom "ok"); Literal (LAtom "state") ])
   in
 
   let worker =
-    Worker
-      {
-        name = "test_worker";
-        handlers = [ (Init, init_handler); (Call, call_handler) ];
-        functions = [];
-        specs = [];
-      }
+    Worker { name = "test_worker"; functions = [ init_func ]; specs = [] }
   in
 
   let program = { items = [ OtpComponent supervisor; OtpComponent worker ] } in
 
   try
-    let env = type_check_program program in
-    validate_program program env;
+    validate_program program;
     ()
-  with
-  | OtpValidationError error ->
-      fail ("Valid supervisor test failed: " ^ string_of_otp_error error)
-  | TypeError error ->
-      fail
-        ("Valid supervisor test failed (type error): "
-       ^ string_of_type_error error)
+  with OtpValidationError error ->
+    fail ("Valid supervisor test failed: " ^ string_of_otp_error error)
 
 let test_unknown_child () =
   let supervisor =
@@ -163,20 +273,23 @@ let test_unknown_child () =
   let program = { items = [ OtpComponent supervisor ] } in
 
   try
-    let env = type_check_program program in
-    validate_program program env;
+    validate_program program;
     fail "Unknown child test failed: should have thrown error"
   with
   | OtpValidationError (UnknownChild (_, _)) -> ()
   | OtpValidationError error ->
       fail
         ("Unknown child test failed: wrong error: " ^ string_of_otp_error error)
-  | TypeError _ -> fail "Unknown child test failed: type error occurred"
 
 let tests =
   [
-    ("valid worker", `Quick, test_valid_worker);
-    ("missing handler", `Quick, test_missing_handler);
+    ("valid worker with init", `Quick, test_valid_worker_with_init);
+    ("worker missing init", `Quick, test_worker_missing_init);
+    ("handle_call invalid arity", `Quick, test_handle_call_invalid_arity);
+    ("handle_call valid arity", `Quick, test_handle_call_valid_arity);
+    ("handle_cast invalid arity", `Quick, test_handle_cast_invalid_arity);
+    ("callback non-tuple return", `Quick, test_callback_non_tuple_return);
+    ("format_status any return", `Quick, test_format_status_any_return);
     ("invalid worker name", `Quick, test_invalid_worker_name);
     ("valid supervisor", `Quick, test_valid_supervisor);
     ("unknown child", `Quick, test_unknown_child);

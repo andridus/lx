@@ -1,0 +1,5 @@
+worker test_worker {
+  fun init(args) {
+    {:ok, 0}
+  }
+}

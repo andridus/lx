@@ -14,7 +14,9 @@
   test_module_generation
   test_error_handling
   test_function_calls
-  test_error_messages))
+  test_error_messages
+  test_assignment
+  ))
 
 (rule
  (alias runtest)

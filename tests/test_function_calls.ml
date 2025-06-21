@@ -12,6 +12,13 @@ let string_contains_substring s sub =
   in
   search 0
 
+(* Helper function to check if string matches regex pattern *)
+let string_matches_pattern s pattern =
+  try
+    let _ = Str.search_forward (Str.regexp pattern) s 0 in
+    true
+  with Not_found -> false
+
 let test_function_call_parsing () =
   let program =
     Compiler.parse_string "fun validation() { io.format(\"hello\") }"
@@ -171,11 +178,21 @@ let test_multiple_arities_compilation () =
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string program in
   let expected_parts =
-    [ "a() ->"; "nil;"; "a(X) ->"; "X;"; "a(X, Y) ->"; "X." ]
+    [
+      "a() ->";
+      "nil;";
+      "a(X_[a-z0-9]+) ->";
+      "X_[a-z0-9]+;";
+      "a(X_[a-z0-9]+, Y_[a-z0-9]+) ->";
+      "X_[a-z0-9]+\\.";
+    ]
   in
   List.iter
     (fun part ->
-      let contains = string_contains_substring result part in
+      let contains =
+        if String.contains part '[' then string_matches_pattern result part
+        else string_contains_substring result part
+      in
       check bool ("contains: " ^ part) true contains)
     expected_parts
 
@@ -211,10 +228,15 @@ let test_function_with_args () =
     Compiler.parse_string "fun validation(x) { io.format(\"hello\", [x]) }"
   in
   let result = Compiler.compile_to_string program in
-  let expected_parts = [ "validation(X) ->"; "io:format(\"hello\", [X])" ] in
+  let expected_parts =
+    [ "validation(X_[a-z0-9]+) ->"; "io:format(\"hello\", \\[X_[a-z0-9]+\\])" ]
+  in
   List.iter
     (fun part ->
-      let contains = string_contains_substring result part in
+      let contains =
+        if String.contains part '[' then string_matches_pattern result part
+        else string_contains_substring result part
+      in
       check bool ("contains: " ^ part) true contains)
     expected_parts
 
@@ -231,14 +253,17 @@ let test_multiple_expressions_example () =
   let result = Compiler.compile_to_string program in
   let expected_parts =
     [
-      "b(X) ->";
+      "b(X_[a-z0-9]+) ->";
       "io:format(\"olá mundo\"),";
-      "io:format(\"olá mundo com args\", [X])";
+      "io:format(\"olá mundo com args\", \\[X_[a-z0-9]+\\])";
     ]
   in
   List.iter
     (fun part ->
-      let contains = string_contains_substring result part in
+      let contains =
+        if String.contains part '[' then string_matches_pattern result part
+        else string_contains_substring result part
+      in
       check bool ("contains: " ^ part) true contains)
     expected_parts
 
@@ -246,10 +271,12 @@ let test_backward_compatibility () =
   (* Test that old syntax still works *)
   let program = Compiler.parse_string "fun old_style(x, y) { x }" in
   let result = Compiler.compile_to_string program in
-  let expected_parts = [ "old_style(X, Y) ->"; "X." ] in
+  let expected_parts =
+    [ "old_style(X_[a-z0-9]+, Y_[a-z0-9]+) ->"; "X_[a-z0-9]+\\." ]
+  in
   List.iter
     (fun part ->
-      let contains = string_contains_substring result part in
+      let contains = string_matches_pattern result part in
       check bool ("contains: " ^ part) true contains)
     expected_parts
 

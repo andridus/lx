@@ -11,6 +11,13 @@ let string_contains_substring s sub =
   in
   search 0
 
+(* Helper function to check if string matches regex pattern *)
+let string_matches_pattern s pattern =
+  try
+    let _ = Str.search_forward (Str.regexp pattern) s 0 in
+    true
+  with Not_found -> false
+
 let test_simple_function_example () =
   let program = Compiler.parse_string "fun hello() { \"world\" }" in
   let result = Compiler.compile_to_string program in
@@ -24,10 +31,12 @@ let test_simple_function_example () =
 let test_function_with_parameters () =
   let program = Compiler.parse_string "fun add(x, y) { x }" in
   let result = Compiler.compile_to_string program in
-  let expected_parts = [ "add(X, Y) ->"; "X." ] in
+  let expected_parts =
+    [ "add(X_[a-z0-9]+, Y_[a-z0-9]+) ->"; "X_[a-z0-9]+\\." ]
+  in
   List.iter
     (fun part ->
-      let contains = string_contains_substring result part in
+      let contains = string_matches_pattern result part in
       check bool ("contains: " ^ part) true contains)
     expected_parts
 
@@ -71,10 +80,13 @@ let test_let_expressions () =
   let input = "fun expr() { let x = 42 in x }" in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string program in
-  let expected_parts = [ "expr() ->"; "(X = 42, X)" ] in
+  let expected_parts = [ "expr() ->"; "\\(X_[a-z0-9]+ = 42, X_[a-z0-9]+\\)" ] in
   List.iter
     (fun part ->
-      let contains = string_contains_substring result part in
+      let contains =
+        if String.contains part '[' then string_matches_pattern result part
+        else string_contains_substring result part
+      in
       check bool ("let expression contains: " ^ part) true contains)
     expected_parts
 

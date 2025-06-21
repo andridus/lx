@@ -27,6 +27,41 @@ type lx_type =
 (* Type environment *)
 type type_env = (ident * lx_type) list
 
+(* Symbol table context for managing variable scopes *)
+type symbol_context = {
+  variables : (ident * lx_type) list;
+  parent : symbol_context option;
+}
+
+(* Create new context *)
+let create_context parent = { variables = []; parent }
+
+(* Add variable to current context, checking for reassignment *)
+let add_variable_to_context name var_type context =
+  if List.mem_assoc name context.variables then
+    failwith
+      ("Variable '" ^ name
+     ^ "' is already defined in this scope and cannot be reassigned")
+  else { context with variables = (name, var_type) :: context.variables }
+
+(* Lookup variable in context hierarchy *)
+let rec lookup_variable_in_context name context =
+  try Some (List.assoc name context.variables)
+  with Not_found -> (
+    match context.parent with
+    | Some parent_ctx -> lookup_variable_in_context name parent_ctx
+    | None -> None)
+
+(* Convert context to type_env for compatibility *)
+let context_to_env context =
+  let rec collect_vars ctx acc =
+    let vars = ctx.variables @ acc in
+    match ctx.parent with
+    | Some parent -> collect_vars parent vars
+    | None -> vars
+  in
+  collect_vars context []
+
 (* Type substitution *)
 type substitution = (type_var * lx_type) list
 
@@ -35,8 +70,6 @@ type type_error =
   | UnificationError of lx_type * lx_type * string option
   | UnboundVariable of ident * string list
   | OccursCheck of type_var * lx_type
-  | HandlerTypeMismatch of otp_handler * lx_type * lx_type
-  | MissingHandler of otp_handler
   | InvalidOtpComponent of string
   | RecordFieldMismatch of string * string * string list
   | ArityMismatch of string * int * int
@@ -96,25 +129,6 @@ let string_of_type_error = function
   | OccursCheck (var, typ) ->
       "Occurs check failed: " ^ string_of_type (TVar var) ^ " occurs in "
       ^ string_of_type typ
-  | HandlerTypeMismatch (handler, expected, actual) ->
-      "Handler "
-      ^ (match handler with
-        | Init -> "init"
-        | Call -> "call"
-        | Cast -> "cast"
-        | Info -> "info"
-        | Terminate -> "terminate")
-      ^ " has wrong type. Expected: " ^ string_of_type expected ^ ", but got: "
-      ^ string_of_type actual
-  | MissingHandler handler -> (
-      "Missing required handler: "
-      ^
-      match handler with
-      | Init -> "init"
-      | Call -> "call"
-      | Cast -> "cast"
-      | Info -> "info"
-      | Terminate -> "terminate")
   | InvalidOtpComponent msg -> "Invalid OTP component: " ^ msg
   | RecordFieldMismatch (field, record_type, available) ->
       let available_str = String.concat ", " available in
@@ -254,8 +268,74 @@ let rec infer_pattern (env : type_env) (pattern : pattern) :
       in
       (list_type, env2, final_subst)
 
-(* Type inference for expressions *)
-let rec infer_expr (env : type_env) (expr : expr) : lx_type * substitution =
+(* Type inference for expressions with symbol context *)
+let rec infer_expr_with_context (context : symbol_context) (expr : expr) :
+    lx_type * substitution * symbol_context =
+  match expr with
+  | Literal l -> (infer_literal l, [], context)
+  | Var id -> (
+      match lookup_variable_in_context id context with
+      | Some var_type -> (var_type, [], context)
+      | None ->
+          let similar_vars = List.map fst (context_to_env context) in
+          raise (TypeError (UnboundVariable (id, similar_vars))))
+  | Assign (id, value) ->
+      let value_type, subst, new_context =
+        infer_expr_with_context context value
+      in
+      let updated_context = add_variable_to_context id value_type new_context in
+      (value_type, subst, updated_context)
+  | Sequence exprs -> (
+      (* Type of sequence is the type of the last expression *)
+      match List.rev exprs with
+      | [] -> (TNil, [], context)
+      | last_expr :: rest_exprs ->
+          let rest_exprs = List.rev rest_exprs in
+          (* Type check all expressions and accumulate context changes *)
+          let final_subst, accumulated_context =
+            List.fold_left
+              (fun (subst_acc, ctx_acc) expr ->
+                let _, subst, new_ctx = infer_expr_with_context ctx_acc expr in
+                (compose_subst subst_acc subst, new_ctx))
+              ([], context) rest_exprs
+          in
+          let last_type, last_subst, final_context =
+            infer_expr_with_context accumulated_context last_expr
+          in
+          (last_type, compose_subst final_subst last_subst, final_context))
+  | Block exprs -> (
+      (* Block expressions have the same type behavior as sequences *)
+      match List.rev exprs with
+      | [] -> (TNil, [], context)
+      | last_expr :: rest_exprs ->
+          let rest_exprs = List.rev rest_exprs in
+          (* Type check all expressions and accumulate context changes *)
+          let final_subst, accumulated_context =
+            List.fold_left
+              (fun (subst_acc, ctx_acc) expr ->
+                let _, subst, new_ctx = infer_expr_with_context ctx_acc expr in
+                (compose_subst subst_acc subst, new_ctx))
+              ([], context) rest_exprs
+          in
+          let last_type, last_subst, final_context =
+            infer_expr_with_context accumulated_context last_expr
+          in
+          (last_type, compose_subst final_subst last_subst, final_context))
+  | _ ->
+      (* For other expressions, convert context to env and use original function *)
+      let env = context_to_env context in
+      let result_type, subst = infer_expr_original env expr in
+      (result_type, subst, context)
+
+(* Wrapper function that maintains original interface *)
+and infer_expr (env : type_env) (expr : expr) : lx_type * substitution =
+  let base_context = { variables = env; parent = None } in
+  let result_type, subst, _ = infer_expr_with_context base_context expr in
+  (result_type, subst)
+
+(* Original type inference function for compatibility *)
+and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
+    =
   match expr with
   | Literal l -> (infer_literal l, [])
   | Var id -> (
@@ -263,10 +343,14 @@ let rec infer_expr (env : type_env) (expr : expr) : lx_type * substitution =
       with Not_found ->
         let similar_vars = get_env_var_names env in
         raise (TypeError (UnboundVariable (id, similar_vars))))
+  | Assign (_id, value) ->
+      let value_type, subst = infer_expr_original env value in
+      (* Assignment returns the assigned value type *)
+      (value_type, subst)
   | Let (id, value, body) ->
-      let value_type, subst1 = infer_expr env value in
+      let value_type, subst1 = infer_expr_original env value in
       let new_env = (id, value_type) :: apply_subst_env subst1 env in
-      let body_type, subst2 = infer_expr new_env body in
+      let body_type, subst2 = infer_expr_original new_env body in
       (body_type, compose_subst subst1 subst2)
   | Fun (params, body) ->
       let param_types = List.map (fun _ -> fresh_type_var ()) params in
@@ -393,7 +477,27 @@ let rec infer_expr (env : type_env) (expr : expr) : lx_type * substitution =
       (* For expressions need more complex handling - simplified for now *)
       (TNil, [])
   | Sequence exprs -> (
-      (* Type of sequence is the type of the last expression *)
+      (* Sequence expressions have the same type behavior as blocks *)
+      match List.rev exprs with
+      | [] -> (TNil, [])
+      | last_expr :: rest_exprs ->
+          let rest_exprs = List.rev rest_exprs in
+          (* Type check all expressions but return type of last one *)
+          let final_subst =
+            List.fold_left
+              (fun subst_acc expr ->
+                let _, subst =
+                  infer_expr (apply_subst_env subst_acc env) expr
+                in
+                compose_subst subst_acc subst)
+              [] rest_exprs
+          in
+          let last_type, last_subst =
+            infer_expr (apply_subst_env final_subst env) last_expr
+          in
+          (last_type, compose_subst final_subst last_subst))
+  | Block exprs -> (
+      (* Block expressions have the same type behavior as sequences *)
       match List.rev exprs with
       | [] -> (TNil, [])
       | last_expr :: rest_exprs ->

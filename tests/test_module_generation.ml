@@ -12,6 +12,13 @@ let string_contains_substring s sub =
   in
   search 0
 
+(* Helper function to check if string matches regex pattern *)
+let string_matches_pattern s pattern =
+  try
+    let _ = Str.search_forward (Str.regexp pattern) s 0 in
+    true
+  with Not_found -> false
+
 (* Test module name extraction from filename *)
 let test_module_name_generation () =
   let func = make_single_clause_function "example" [] (Literal (LInt 42)) in
@@ -83,12 +90,19 @@ let test_module_content_structure () =
   | [ (_, module_content) ] ->
       let expected_parts =
         [
-          "-module(greeting)"; "-compile(export_all)"; "hello(Name) ->"; "Name.";
+          "-module(greeting)";
+          "-compile(export_all)";
+          "hello(Name_[a-z0-9]+) ->";
+          "Name_[a-z0-9]+\\.";
         ]
       in
       List.iter
         (fun part ->
-          let contains = string_contains_substring module_content part in
+          let contains =
+            if String.contains part '[' then
+              string_matches_pattern module_content part
+            else string_contains_substring module_content part
+          in
           check bool ("contains: " ^ part) true contains)
         expected_parts
   | _ -> fail "Expected exactly one module"

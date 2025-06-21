@@ -7,21 +7,78 @@ module Otp_validator = Otp_validator
 module Error = Error
 open Ast
 
+(* Initialize random number generator *)
+let () = Random.self_init ()
+
+let capitalize_var id =
+  if String.length id > 0 then
+    String.uppercase_ascii (String.sub id 0 1)
+    ^ String.sub id 1 (String.length id - 1)
+  else id
+
+(* Variable renaming context for scope simulation *)
+type rename_context = {
+  scope_hash : string;
+  var_map : (string, string) Hashtbl.t;
+  parent : rename_context option;
+  used_hashes : (string, bool) Hashtbl.t;
+}
+
+let generate_random_hash () =
+  let chars = "abcdefghijklmnopqrstuvwxyz0123456789" in
+  let len = String.length chars in
+  let hash_len = 3 in
+  let result = Bytes.create hash_len in
+  for i = 0 to hash_len - 1 do
+    let idx = Random.int len in
+    Bytes.set result i chars.[idx]
+  done;
+  Bytes.to_string result
+
+let rec generate_unique_hash used_hashes =
+  let hash = generate_random_hash () in
+  if Hashtbl.mem used_hashes hash then generate_unique_hash used_hashes
+  else (
+    Hashtbl.replace used_hashes hash true;
+    hash)
+
+let create_scope parent =
+  let parent_used_hashes =
+    match parent with Some p -> p.used_hashes | None -> Hashtbl.create 16
+  in
+  let scope_hash = generate_unique_hash parent_used_hashes in
+  {
+    scope_hash;
+    var_map = Hashtbl.create 16;
+    parent;
+    used_hashes =
+      (match parent with Some p -> p.used_hashes | None -> Hashtbl.create 16);
+  }
+
+let get_renamed_var ctx var_name =
+  let rec lookup ctx =
+    match Hashtbl.find_opt ctx.var_map var_name with
+    | Some renamed -> renamed
+    | None -> (
+        match ctx.parent with
+        | Some parent_ctx -> lookup parent_ctx
+        | None -> capitalize_var var_name (* fallback to original name *))
+  in
+  lookup ctx
+
+let add_var_to_scope ctx var_name =
+  let renamed = capitalize_var var_name ^ "_" ^ ctx.scope_hash in
+  Hashtbl.replace ctx.var_map var_name renamed;
+  renamed
+
 (* Check for reserved words in function names *)
 let reserved_words =
   [
-    "test";
     "spec";
-    "describe";
     "worker";
     "supervisor";
     "strategy";
     "children";
-    "init";
-    "call";
-    "cast";
-    "info";
-    "terminate";
     "requires";
     "ensures";
     "assert";
@@ -45,17 +102,11 @@ let check_function_name name =
       Printf.sprintf
         "Enhanced:'%s' is a reserved word and cannot be used as a function \
          name|Suggestion:Try using a different name like '%s_func' or \
-         'my_%s'|Context:Reserved words include: test, spec, describe, worker, \
-         supervisor, etc."
+         'my_%s'|Context:Reserved words include: spec, worker, supervisor, \
+         etc."
         name name name
     in
     failwith message
-
-let capitalize_var id =
-  if String.length id > 0 then
-    String.uppercase_ascii (String.sub id 0 1)
-    ^ String.sub id 1 (String.length id - 1)
-  else id
 
 let emit_literal (l : literal) : string =
   match l with
@@ -67,62 +118,90 @@ let emit_literal (l : literal) : string =
   | LAtom a -> a
   | LNil -> "nil"
 
-let rec emit_pattern (p : pattern) : string =
+let rec emit_pattern ctx (p : pattern) : string =
   match p with
   | PWildcard -> "_"
-  | PVar id -> capitalize_var id
+  | PVar id -> get_renamed_var ctx id
   | PAtom a -> a
   | PLiteral l -> emit_literal l
-  | PTuple ps -> "{" ^ String.concat ", " (List.map emit_pattern ps) ^ "}"
-  | PList ps -> "[" ^ String.concat ", " (List.map emit_pattern ps) ^ "]"
+  | PTuple ps -> "{" ^ String.concat ", " (List.map (emit_pattern ctx) ps) ^ "}"
+  | PList ps -> "[" ^ String.concat ", " (List.map (emit_pattern ctx) ps) ^ "]"
   | PCons (head, tail) ->
-      "[" ^ emit_pattern head ^ " | " ^ emit_pattern tail ^ "]"
+      "[" ^ emit_pattern ctx head ^ " | " ^ emit_pattern ctx tail ^ "]"
 
-let rec emit_expr (e : expr) : string =
+let rec emit_expr ctx (e : expr) : string =
   match e with
   | Literal l -> emit_literal l
-  | Var id -> capitalize_var id
+  | Var id -> get_renamed_var ctx id
+  | Assign (id, value) -> (
+      (* Check if this is a simple assignment that can be optimized *)
+      let renamed = add_var_to_scope ctx id in
+      match value with
+      (* If assigning another assignment, we can optimize by using the value directly *)
+      | Assign (_, inner_value) ->
+          (* For single assignment in block, use the inner value directly *)
+          renamed ^ " = " ^ emit_expr ctx inner_value
+      | _ -> renamed ^ " = " ^ emit_expr ctx value)
   | Let (id, value, body) ->
-      "(" ^ capitalize_var id ^ " = " ^ emit_expr value ^ ", " ^ emit_expr body
+      let renamed = add_var_to_scope ctx id in
+      "(" ^ renamed ^ " = " ^ emit_expr ctx value ^ ", " ^ emit_expr ctx body
       ^ ")"
   | Fun (params, body) ->
+      let fun_ctx = create_scope (Some ctx) in
+      let renamed_params = List.map (add_var_to_scope fun_ctx) params in
       "fun("
-      ^ String.concat ", " (List.map capitalize_var params)
-      ^ ") -> " ^ emit_expr body ^ " end"
+      ^ String.concat ", " renamed_params
+      ^ ") -> " ^ emit_expr fun_ctx body ^ " end"
   | App (Var func_name, args) ->
       (* Function calls should not capitalize the function name *)
-      func_name ^ "(" ^ String.concat ", " (List.map emit_expr args) ^ ")"
+      func_name ^ "(" ^ String.concat ", " (List.map (emit_expr ctx) args) ^ ")"
   | App (func, args) ->
       (* For complex function expressions *)
-      emit_expr func ^ "(" ^ String.concat ", " (List.map emit_expr args) ^ ")"
+      emit_expr ctx func ^ "("
+      ^ String.concat ", " (List.map (emit_expr ctx) args)
+      ^ ")"
   | ExternalCall (module_name, func_name, args) ->
       (* Generate Erlang external call: module:function(args) *)
       module_name ^ ":" ^ func_name ^ "("
-      ^ String.concat ", " (List.map emit_expr args)
+      ^ String.concat ", " (List.map (emit_expr ctx) args)
       ^ ")"
-  | Tuple exprs -> "{" ^ String.concat ", " (List.map emit_expr exprs) ^ "}"
-  | List exprs -> "[" ^ String.concat ", " (List.map emit_expr exprs) ^ "]"
+  | Tuple exprs ->
+      "{" ^ String.concat ", " (List.map (emit_expr ctx) exprs) ^ "}"
+  | List exprs ->
+      "[" ^ String.concat ", " (List.map (emit_expr ctx) exprs) ^ "]"
   | If (cond, then_expr, else_expr) ->
-      "case " ^ emit_expr cond ^ " of true -> " ^ emit_expr then_expr
+      "case " ^ emit_expr ctx cond ^ " of true -> " ^ emit_expr ctx then_expr
       ^ (match else_expr with
-        | Some e -> "; _ -> " ^ emit_expr e
+        | Some e -> "; _ -> " ^ emit_expr ctx e
         | None -> "; _ -> nil")
       ^ " end"
   | Match (value, cases) ->
-      "case " ^ emit_expr value ^ " of "
+      "case " ^ emit_expr ctx value ^ " of "
       ^ String.concat "; "
-          (List.map (fun (p, e) -> emit_pattern p ^ " -> " ^ emit_expr e) cases)
+          (List.map
+             (fun (p, e) -> emit_pattern ctx p ^ " -> " ^ emit_expr ctx e)
+             cases)
       ^ " end"
   | For (_, _, _) -> "% For expressions not yet implemented"
   | Sequence exprs ->
-      (* In Erlang, sequence of expressions is separated by commas *)
-      String.concat ",\n    " (List.map emit_expr exprs)
+      (* Function body sequences - no anonymous function wrapper *)
+      let block_ctx = create_scope (Some ctx) in
+      String.concat ",\n    " (List.map (emit_expr block_ctx) exprs)
+  | Block exprs ->
+      (* Generate anonymous function for block scope *)
+      let block_ctx = create_scope (Some ctx) in
+      let block_body =
+        String.concat ",\n        " (List.map (emit_expr block_ctx) exprs)
+      in
+      "(fun() ->\n        " ^ block_body ^ "\n    end)()"
 
 let emit_function_clause (func_name : string) (clause : function_clause) :
     string =
+  let ctx = create_scope None in
+  let renamed_params = List.map (add_var_to_scope ctx) clause.params in
   func_name ^ "("
-  ^ String.concat ", " (List.map capitalize_var clause.params)
-  ^ ") ->\n    " ^ emit_expr clause.body
+  ^ String.concat ", " renamed_params
+  ^ ") ->\n    " ^ emit_expr ctx clause.body
 
 let emit_function_def (func : function_def) : string =
   check_function_name func.name;
@@ -130,13 +209,14 @@ let emit_function_def (func : function_def) : string =
   String.concat ";\n" clauses_code ^ "."
 
 let emit_spec (spec : spec) : string =
+  let ctx = create_scope None in
   let emit_spec_expr expr =
     match expr with
     | App (Var "in", [ Var var; list_expr ]) ->
-        var ^ " in " ^ emit_expr list_expr
+        var ^ " in " ^ emit_expr ctx list_expr
     | App (Var "matches", [ Var result; pattern_expr ]) ->
-        result ^ " matches " ^ emit_expr pattern_expr
-    | _ -> emit_expr expr
+        result ^ " matches " ^ emit_expr ctx pattern_expr
+    | _ -> emit_expr ctx expr
   in
   let requires_str =
     if List.length spec.requires > 0 then
@@ -153,9 +233,10 @@ let emit_spec (spec : spec) : string =
   "%% Spec for " ^ spec.name ^ requires_str ^ ensures_str
 
 let emit_test_def (test : test_def) : string =
+  let ctx = create_scope None in
   "test_"
   ^ String.map (function ' ' -> '_' | c -> c) test.name
-  ^ "() ->\n    " ^ emit_expr test.body ^ "."
+  ^ "() ->\n    " ^ emit_expr ctx test.body ^ "."
 
 let emit_describe_block (desc : describe_block) : string =
   let test_functions = List.map emit_test_def desc.tests in
@@ -165,47 +246,20 @@ let emit_describe_block (desc : describe_block) : string =
 let emit_otp_component (base_module_name : string) (component : otp_component) :
     string * string =
   match component with
-  | Worker { name; handlers; functions; specs } ->
+  | Worker { name; functions; specs } ->
       let module_name = base_module_name ^ "_" ^ name in
       let header =
         "-module(" ^ module_name
         ^ ").\n-behaviour(gen_server).\n-compile(export_all).\n\n"
       in
 
-      (* Generate handler functions *)
-      let handler_code =
-        List.map
-          (fun (handler, func) ->
-            let handler_name =
-              match handler with
-              | Init -> "init"
-              | Call -> "handle_call"
-              | Cast -> "handle_cast"
-              | Info -> "handle_info"
-              | Terminate -> "terminate"
-            in
-            (* For handlers, we need to handle the new function_def structure *)
-            match func.clauses with
-            | [ clause ] ->
-                handler_name ^ "("
-                ^ String.concat ", " (List.map capitalize_var clause.params)
-                ^ ") ->\n    " ^ emit_expr clause.body ^ "."
-            | _ ->
-                (* Multiple clauses for handlers - generate separate clauses *)
-                let clauses_code =
-                  List.map (emit_function_clause handler_name) func.clauses
-                in
-                String.concat ";\n" clauses_code ^ ".")
-          handlers
-      in
-
-      (* Generate regular functions *)
+      (* Generate all functions, including OTP callbacks *)
       let function_code = List.map emit_function_def functions in
 
       (* Generate specs *)
       let spec_code = List.map emit_spec specs in
 
-      let all_code = spec_code @ handler_code @ function_code in
+      let all_code = spec_code @ function_code in
       (module_name, header ^ String.concat "\n\n" all_code)
   | Supervisor { name; strategy; children } ->
       let module_name = base_module_name ^ "_" ^ name in
@@ -374,9 +428,9 @@ let compile_to_string_with_module_name (program : program)
     (base_module_name : string) : (string * string) list =
   (* Type checking phase *)
   (try
-     let type_env = Typechecker.type_check_program program in
+     let _ = Typechecker.type_check_program program in
      (* OTP validation phase *)
-     try Otp_validator.validate_program program type_env
+     try Otp_validator.validate_program program
      with Otp_validator.OtpValidationError error ->
        Printf.eprintf "OTP Validation Error: %s\n"
          (Otp_validator.string_of_otp_error error);
@@ -441,7 +495,7 @@ let type_check_program (program : program) : Typechecker.type_env =
 
     (* Also run OTP validation *)
     (try
-       Otp_validator.validate_program program type_env;
+       Otp_validator.validate_program program;
        Printf.printf "\nOTP validation completed successfully.\n"
      with Otp_validator.OtpValidationError error ->
        Printf.eprintf "OTP Validation Error: %s\n"

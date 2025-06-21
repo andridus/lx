@@ -12,6 +12,13 @@ let string_contains_substring s sub =
   in
   search 0
 
+(* Helper function to check if string matches regex pattern *)
+let string_matches_pattern s pattern =
+  try
+    let _ = Str.search_forward (Str.regexp pattern) s 0 in
+    true
+  with Not_found -> false
+
 let test_compile_function () =
   let func = make_single_clause_function "num" [] (Literal (LInt 42)) in
   let program = { items = [ Function func ] } in
@@ -27,10 +34,12 @@ let test_compile_function_with_params () =
   let func = make_single_clause_function "add" [ "x"; "y" ] (Var "x") in
   let program = { items = [ Function func ] } in
   let result = Compiler.compile_to_string program in
-  let expected_parts = [ "add(X, Y) ->"; "X." ] in
+  let expected_parts =
+    [ "add(X_[a-z0-9]+, Y_[a-z0-9]+) ->"; "X_[a-z0-9]+\\." ]
+  in
   List.iter
     (fun part ->
-      let contains = string_contains_substring result part in
+      let contains = string_matches_pattern result part in
       check bool ("contains: " ^ part) true contains)
     expected_parts
 
@@ -39,10 +48,10 @@ let test_compile_let_expression () =
   let func = make_single_clause_function "num" [] let_expr in
   let program = { items = [ Function func ] } in
   let result = Compiler.compile_to_string program in
-  let expected_parts = [ "num() ->"; "(X = 42, X)." ] in
+  let expected_parts = [ "num() ->"; "(X_[a-z0-9]+ = 42, X_[a-z0-9]+)" ] in
   List.iter
     (fun part ->
-      let contains = string_contains_substring result part in
+      let contains = string_matches_pattern result part in
       check bool ("contains: " ^ part) true contains)
     expected_parts
 

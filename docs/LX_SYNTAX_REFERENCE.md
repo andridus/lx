@@ -1,0 +1,829 @@
+# LX Language Syntax Reference
+
+This document provides a comprehensive reference for the LX programming language syntax. LX is a functional language designed for building OTP (Open Telecom Platform) applications with Erlang/BEAM interoperability.
+
+## Table of Contents
+
+1. [Lexical Elements](#lexical-elements)
+2. [Keywords](#keywords)
+3. [Operators and Punctuation](#operators-and-punctuation)
+4. [Literals](#literals)
+5. [Identifiers](#identifiers)
+6. [Comments](#comments)
+7. [Expressions](#expressions)
+8. [Function Definitions](#function-definitions)
+9. [Pattern Matching](#pattern-matching)
+10. [OTP Components](#otp-components)
+11. [Specifications](#specifications)
+12. [Testing](#testing)
+13. [Examples](#examples)
+
+## Lexical Elements
+
+### Keywords
+
+LX has several categories of keywords:
+
+#### Core Language Keywords
+- `fun` - Function definition
+- `case` - Pattern matching
+- `if` - Conditional expression
+- `then` - Used with `if` expressions
+- `else` - Used with `if` expressions
+- `for` - Loop iteration
+- `when` - Guard expressions
+- `true` - Boolean literal
+- `false` - Boolean literal
+- `nil` - Null/empty value
+- `let` - Variable binding with scope (legacy)
+- `in` - Used with `let` expressions (legacy)
+
+#### OTP Keywords
+- `worker` - Defines an OTP worker (gen_server)
+- `supervisor` - Defines an OTP supervisor
+- `strategy` - Supervisor restart strategy
+- `children` - Supervisor child processes
+- `one_for_one` - Supervisor strategy
+- `one_for_all` - Supervisor strategy
+- `rest_for_one` - Supervisor strategy
+
+#### Specification Keywords
+- `spec` - Formal specification
+- `requires` - Preconditions
+- `ensures` - Postconditions
+- `matches` - Pattern matching constraints
+
+#### Testing Keywords
+- `describe` - Test suite description
+- `test` - Individual test case
+- `assert` - Test assertion
+
+## Operators and Punctuation
+
+### Operators
+- `=` - Assignment/binding
+- `->` - Function arrow, case branch
+- `|` - Pipe operator
+- `_` - Wildcard pattern
+- `::` - List cons operator
+- `.` - Module access
+
+### Punctuation
+- `(` `)` - Parentheses (grouping, function calls, tuples)
+- `{` `}` - Braces (blocks, records, function bodies)
+- `[` `]` - Brackets (lists)
+- `,` - Comma (separators)
+- `;` - Semicolon (expression sequences)
+
+## Literals
+
+### String Literals
+```lx
+"hello world"
+"escaped \"quotes\""
+"multiline\nstring"
+```
+
+Supported escape sequences:
+- `\"` - Double quote
+- `\\` - Backslash
+- `\n` - Newline
+- `\t` - Tab
+- `\r` - Carriage return
+
+### Integer Literals
+```lx
+42
+0
+-17
+```
+
+### Float Literals
+```lx
+3.14
+0.0
+-2.5
+```
+
+### Boolean Literals
+```lx
+true
+false
+```
+
+### Atom Literals
+```lx
+:ok
+:error
+:timeout
+:my_atom
+```
+
+### Nil Literal
+```lx
+nil
+```
+
+## Identifiers
+
+### Variable Identifiers
+- Start with lowercase letter
+- Can contain letters, digits, and underscores
+- Examples: `x`, `my_var`, `count_1`
+
+### Module/Constructor Identifiers
+- Start with lowercase letter
+- Can contain letters, digits, and underscores
+- Examples: `my_module`, `result`, `http_client`
+
+## Comments
+
+Single-line comments start with `#`:
+```lx
+# This is a comment
+x = 42  # End-of-line comment
+
+# Comments can be at the end of file without newline
+```
+
+**Note**: Comments use `#` (hash/pound) symbol, not `//` like in C-style languages.
+
+## Expressions
+
+### Variable Assignment
+LX supports direct variable assignment without explicit scoping keywords:
+
+```lx
+x = 42
+y = "hello"
+z = true
+```
+
+**Important**: Variables cannot be reassigned within the same scope. This will cause a compile-time error:
+```lx
+x = 42
+x = 43  # Error: Variable 'x' is already defined and cannot be reassigned
+```
+
+### Legacy Let Expressions
+For backward compatibility, `let` expressions are still supported:
+```lx
+let x = 42 in
+  x + 1
+```
+
+### Block Expressions
+Block expressions allow grouping multiple statements and return the value of the last expression:
+
+```lx
+# Simple block
+result = {
+  x = 10
+  y = 20
+  x + y  # This value is returned
+}
+
+# Nested blocks
+complex_result = {
+  a = {
+    inner = 5
+    inner * 2
+  }
+  b = 15
+  a + b
+}
+```
+
+### Sequence Expressions
+Function bodies can contain multiple expressions separated by newlines or semicolons:
+
+```lx
+fun process_data(input) {
+  cleaned = clean_input(input)
+  validated = validate_data(cleaned)
+  transformed = transform_data(validated)
+  transformed
+}
+
+# With semicolons (optional)
+fun process_data_compact(input) {
+  cleaned = clean_input(input);
+  validated = validate_data(cleaned);
+  transformed = transform_data(validated);
+  transformed
+}
+```
+
+### Function Application
+```lx
+func(arg1, arg2, arg3)
+```
+
+### External Function Calls
+```lx
+# Call function from another module
+my_module.function_name(arg1, arg2)
+```
+
+### Conditional Expressions
+```lx
+if condition {
+  true_branch
+} else {
+  false_branch
+}
+
+# Without else clause
+if condition {
+  expression
+}
+```
+
+### Case Expressions (Pattern Matching)
+```lx
+case value {
+  pattern1 -> expression1
+  pattern2 -> expression2
+  _ -> default_expression
+}
+```
+
+### For Loops
+```lx
+for item in list {
+  process(item)
+}
+```
+
+### Tuples
+```lx
+{}              # Empty tuple
+{x}             # Single element (just grouping)
+{x, y}          # Two elements
+{x, y, z}       # Three elements
+```
+
+### Lists
+```lx
+[]              # Empty list
+[1, 2, 3]       # List with elements
+[head | tail]   # Cons pattern
+```
+
+## Function Definitions
+
+### Single Clause Functions
+```lx
+fun add(x, y) {
+  x + y
+}
+
+# With multiple statements
+fun complex_calculation(a, b) {
+  temp1 = a * 2
+  temp2 = b + 5
+  result = temp1 + temp2
+  result
+}
+```
+
+### Multiple Clause Functions (Pattern Matching)
+```lx
+fun factorial {
+  (0) { 1 }
+  (n) { n * factorial(n - 1) }
+}
+
+fun process_result {
+  ({:ok, value}) { value }
+  ({:error, reason}) {
+    log_error(reason)
+    nil
+  }
+}
+```
+
+### Empty Function Body
+```lx
+fun empty_func() {}
+```
+
+### Functions with Block Bodies
+```lx
+fun complex_function(input) {
+  # Validate input
+  if input == nil {
+    {:error, "Input cannot be nil"}
+  } else {
+    # Process the input
+    processed = process_input(input)
+    validated = validate_processed(processed)
+
+    # Return result
+    case validated {
+      {:ok, result} -> {:ok, result}
+      {:error, reason} -> {:error, reason}
+    }
+  }
+}
+```
+
+## Pattern Matching
+
+### Basic Patterns
+```lx
+case value {
+  42 -> "forty-two"           # Literal pattern
+  x -> "variable binding"     # Variable pattern
+  _ -> "wildcard"             # Wildcard pattern
+}
+```
+
+### Atom Patterns
+```lx
+case result {
+  :ok -> "success"
+  :error -> "failure"
+  :timeout -> "timeout"
+}
+```
+
+### Tuple Patterns
+```lx
+case tuple {
+  {x, y} -> x + y
+  {x, y, z} -> x + y + z
+  {} -> 0
+}
+```
+
+### List Patterns
+```lx
+case list {
+  [] -> "empty"
+  [x] -> "single element"
+  [x, y] -> "two elements"
+  [head | tail] -> "cons pattern"
+}
+```
+
+## OTP Components
+
+### Worker Definition
+```lx
+worker my_worker {
+  # Required init function
+  fun init(args) {
+    initial_state = setup_state(args)
+    {:ok, initial_state}
+  }
+
+  # Optional callback functions
+  fun handle_call(request, from, state) {
+    response = process_request(request, state)
+    new_state = update_state(state, request)
+    {:reply, response, new_state}
+  }
+
+  fun handle_cast(request, state) {
+    new_state = handle_async_request(request, state)
+    {:noreply, new_state}
+  }
+
+  fun handle_info(info, state) {
+    {:noreply, state}
+  }
+
+  fun terminate(reason, state) {
+    cleanup_resources(state)
+    {:ok}
+  }
+
+  fun code_change(old_vsn, state, extra) {
+    migrated_state = migrate_state(old_vsn, state, extra)
+    {:ok, migrated_state}
+  }
+
+  fun format_status(status) {
+    formatted = format_for_debugging(status)
+    formatted
+  }
+
+  # Regular helper functions
+  fun helper_function(x, y) {
+    result = x + y
+    result
+  }
+
+  # Specifications
+  spec helper_function {
+    requires x > 0, y > 0
+    ensures result > 0
+  }
+}
+```
+
+### OTP Callback Functions
+
+#### Required Callbacks
+- `init(Args)` - Initialize worker state
+  - **Parameters**: 1 (initialization arguments)
+  - **Return**: Must return a tuple
+
+#### Optional Callbacks
+- `handle_call(Request, From, State)` - Handle synchronous calls
+  - **Parameters**: 3 (request, caller, current state)
+  - **Return**: Must return a tuple (typically `{:reply, Response, NewState}`)
+
+- `handle_cast(Request, State)` - Handle asynchronous casts
+  - **Parameters**: 2 (request, current state)
+  - **Return**: Must return a tuple (typically `{:noreply, NewState}`)
+
+- `handle_info(Info, State)` - Handle system messages
+  - **Parameters**: 2 (info message, current state)
+  - **Return**: Must return a tuple
+
+- `terminate(Reason, State)` - Cleanup on termination
+  - **Parameters**: 2 (termination reason, current state)
+  - **Return**: Must return a tuple
+
+- `code_change(OldVsn, State, Extra)` - Handle code upgrades
+  - **Parameters**: 3 (old version, current state, extra data)
+  - **Return**: Must return a tuple
+
+- `format_status(Status)` - Format status for debugging
+  - **Parameters**: 1 (status information)
+  - **Return**: Can return any type (not restricted to tuples)
+
+### Supervisor Definition
+```lx
+supervisor my_supervisor {
+  strategy one_for_one
+  children [worker1, worker2, worker3]
+}
+```
+
+#### Supervisor Strategies
+- `one_for_one` - Restart only the failed child
+- `one_for_all` - Restart all children when one fails
+- `rest_for_one` - Restart the failed child and all children started after it
+
+## Specifications
+
+### Basic Specification
+```lx
+spec function_name {
+  requires condition1, condition2
+  ensures result_condition1, result_condition2
+}
+```
+
+### Empty Specification
+```lx
+spec function_name {
+}
+```
+
+## Testing
+
+### Test Suites
+```lx
+describe "test suite description" {
+  test "individual test description" {
+    result = some_function(input)
+    assert result == expected
+  }
+
+  test "another test" {
+    # Multiple statements in test
+    x = 10
+    y = 20
+    sum = x + y
+    assert sum == 30
+  }
+}
+```
+
+### Standalone Tests
+```lx
+test "standalone test" {
+  assert 1 + 1 == 2
+}
+```
+
+### Test Expressions
+Tests can contain any valid LX expression including assignments and blocks:
+```lx
+test "complex test with assignments" {
+  input = "test_data"
+  processed = {
+    cleaned = clean_data(input)
+    validated = validate_data(cleaned)
+    validated
+  }
+
+  result = case processed {
+    {:ok, data} -> :success
+    {:error, _} -> :failure
+  }
+
+  assert result == :success
+}
+```
+
+## Grammar Rules
+
+### Program Structure
+```
+program ::= module_item* EOF
+
+module_item ::= function_def
+              | otp_component
+              | spec_def
+              | test_block
+              | standalone_test
+
+function_def ::= 'fun' IDENT '{' function_clause+ '}'           # Multiple clauses
+               | 'fun' IDENT '(' params ')' '{' function_body '}'  # Single clause
+
+function_clause ::= '(' params ')' '{' function_body '}'
+
+function_body ::= expr
+                | expr ';' function_body
+                | statement_list
+
+statement_list ::= statement
+                 | statement statement_list
+
+statement ::= expr
+```
+
+### Expression Grammar
+```
+expr ::= simple_expr
+       | IDENT '=' expr                                    # Assignment
+       | 'let' IDENT '=' expr 'in' expr                   # Let binding (legacy)
+       | expr '(' expr_list ')'                           # Function call
+       | 'if' expr 'then' expr ('else' expr)?             # Conditional
+       | 'case' expr '{' case_branch* '}'                 # Pattern matching
+       | 'for' IDENT 'in' expr '{' expr '}'               # For loop
+
+simple_expr ::= literal
+              | IDENT                                      # Variable
+              | IDENT '.' IDENT '(' expr_list ')'         # External call
+              | IDENT '.' IDENT                           # Module reference
+              | '(' expr ')'                              # Grouping
+              | '(' expr_list ')'                         # Tuple
+              | '[' expr_list ']'                         # List
+              | '{' statement_list '}'                    # Block expression
+              | '{' '}'                                   # Empty block
+
+case_branch ::= pattern '->' expr
+
+pattern ::= simple_pattern
+          | pattern '::' pattern                          # Cons pattern
+
+simple_pattern ::= '_'                                    # Wildcard
+                 | IDENT                                  # Variable
+                 | ATOM                                   # Atom
+                 | literal                                # Literal
+                 | '(' pattern_list ')'                   # Tuple pattern
+                 | '[' pattern_list ']'                   # List pattern
+```
+
+## Reserved Words
+
+The following words are reserved and cannot be used as identifiers:
+
+**Core**: `fun`, `case`, `if`, `then`, `else`, `for`, `when`, `true`, `false`, `nil`, `let`, `in`
+
+**OTP**: `worker`, `supervisor`, `strategy`, `children`, `one_for_one`, `one_for_all`, `rest_for_one`
+
+**Specs**: `spec`, `requires`, `ensures`, `matches`
+
+**Testing**: `describe`, `test`, `assert`
+
+**Note**: The words `test` and `describe` can be used as function names when not in testing contexts, but they are reserved within test block definitions.
+
+## Error Handling
+
+### Syntax Errors
+LX provides detailed error messages for common syntax mistakes:
+
+```lx
+# Error: Missing function body
+fun my_func(x, y)  # Missing { }
+
+# Error: Reserved word usage in wrong context
+fun spec() { }  # 'spec' is reserved for specifications
+
+# Error: Missing description in test
+test { }  # Should be: test "description" { }
+```
+
+### Variable Assignment Errors
+```lx
+# Error: Variable reassignment
+x = 42
+x = 43  # Error: Variable 'x' is already defined in this scope and cannot be reassigned
+
+# Valid: Different scopes
+fun test_scoping() {
+  x = 42  # This is fine
+  result = {
+    x = 100  # This is also fine - different scope
+    x + 1
+  }
+  x + result  # Uses outer x (42) and result (101)
+}
+```
+
+### OTP Validation Errors
+The compiler validates OTP callback functions:
+
+```lx
+worker bad_worker {
+  # Error: init must have exactly 1 parameter
+  fun init(x, y) { {:ok, 0} }
+
+  # Error: handle_call must have exactly 3 parameters
+  fun handle_call(request) { {:reply, :ok, 0} }
+
+  # Error: handle_call must return a tuple
+  fun handle_call(req, from, state) { :ok }
+}
+```
+
+## Best Practices
+
+1. **Use descriptive names** for functions and variables
+2. **Avoid variable reassignment** - use different names or scopes
+3. **Use block expressions** for complex calculations
+4. **Always provide init function** in workers
+5. **Return tuples from OTP callbacks** (except format_status)
+6. **Use pattern matching** instead of nested if-else
+7. **Write tests** for your functions with descriptive names
+8. **Use specifications** to document function contracts
+9. **Follow consistent indentation** (2 or 4 spaces)
+10. **Use atoms** for status values (`:ok`, `:error`, etc.)
+11. **Use `#` for comments**, not `//`
+
+## Examples
+
+### Variable Assignment and Blocks
+```lx
+fun calculate_total(items) {
+  # Calculate subtotal
+  subtotal = {
+    sum = 0
+    # In a real implementation, this would be a fold/reduce
+    for item in items {
+      sum = sum + item.price
+    }
+    sum
+  }
+
+  # Calculate tax
+  tax_rate = 0.08
+  tax = subtotal * tax_rate
+
+  # Calculate total
+  total = subtotal + tax
+
+  # Return structured result
+  {
+    :subtotal, subtotal,
+    :tax, tax,
+    :total, total
+  }
+}
+```
+
+### Complex Worker with Assignments
+```lx
+worker shopping_cart {
+  fun init(user_id) {
+    initial_state = {
+      :user_id, user_id,
+      :items, [],
+      :total, 0.0
+    }
+    {:ok, initial_state}
+  }
+
+  fun handle_call({:add_item, item}, _from, state) {
+    # Extract current items and total
+    current_items = get_items(state)
+    current_total = get_total(state)
+
+    # Calculate new values
+    new_items = [item | current_items]
+    new_total = current_total + item.price
+
+    # Create new state
+    new_state = {
+      :user_id, state.user_id,
+      :items, new_items,
+      :total, new_total
+    }
+
+    {:reply, {:ok, new_total}, new_state}
+  }
+
+  fun handle_call({:remove_item, item_id}, _from, state) {
+    # Process removal
+    result = {
+      filtered_items = filter_items(state.items, item_id)
+      new_total = calculate_total(filtered_items)
+
+      new_state = {
+        :user_id, state.user_id,
+        :items, filtered_items,
+        :total, new_total
+      }
+
+      {:ok, new_state}
+    }
+
+    case result {
+      {:ok, new_state} -> {:reply, {:ok, new_state.total}, new_state}
+      {:error, reason} -> {:reply, {:error, reason}, state}
+    }
+  }
+
+  fun handle_cast(:clear_cart, state) {
+    cleared_state = {
+      :user_id, state.user_id,
+      :items, [],
+      :total, 0.0
+    }
+    {:noreply, cleared_state}
+  }
+}
+```
+
+### Pattern Matching with Assignments
+```lx
+fun process_api_response(response) {
+  parsed_response = case response {
+    {:ok, data} -> {
+      # Process successful response
+      processed_data = transform_data(data)
+      validated_data = validate_data(processed_data)
+      {:success, validated_data}
+    }
+    {:error, reason} -> {
+      # Handle error response
+      error_message = format_error(reason)
+      log_error(error_message)
+      {:failure, error_message}
+    }
+    _ -> {
+      # Handle unexpected response
+      error_msg = "Unexpected response format"
+      log_warning(error_msg)
+      {:failure, error_msg}
+    }
+  }
+
+  # Return final result
+  parsed_response
+}
+```
+
+### Testing with Multiple Statements
+```lx
+describe "shopping cart tests" {
+  test "should add items correctly" {
+    # Setup
+    cart_state = {:user_id, 123, :items, [], :total, 0.0}
+    item = {:id, 1, :name, "Widget", :price, 10.50}
+
+    # Execute
+    result = shopping_cart.handle_call({:add_item, item}, nil, cart_state)
+
+    # Verify
+    expected_total = 10.50
+    case result {
+      {:reply, {:ok, total}, new_state} -> {
+        assert total == expected_total
+        assert length(new_state.items) == 1
+      }
+      _ -> assert false  # Should not reach here
+    }
+  }
+
+  test "should prevent variable reassignment" {
+    # This should compile fine
+    x = 10
+    y = 20
+    result = x + y
+    assert result == 30
+
+    # Note: This would cause a compile error if uncommented:
+    # x = 15  # Error: cannot reassign x
+  }
+}
+```
+
+This reference document reflects the current state of the LX language implementation including variable assignment, block expressions, enhanced comment support, and improved error handling. The language continues to evolve with new features being added regularly.

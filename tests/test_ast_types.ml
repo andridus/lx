@@ -90,9 +90,9 @@ let test_case_expressions () =
       ( "fun num() { case 42 { 42 -> \"found\" } }",
         [ "case 42 of 42 -> \"found\"" ] );
       ( "fun str(x) { case x { _ -> \"default\" } }",
-        [ "case X of _ -> \"default\"" ] );
+        [ "case X_[a-z0-9]+ of _ -> \"default\"" ] );
       ( "fun atom(a) { case a { :hello -> \"hi\" } }",
-        [ "case A of hello -> \"hi\"" ] );
+        [ "case A_[a-z0-9]+ of hello -> \"hi\"" ] );
     ]
   in
 
@@ -102,7 +102,15 @@ let test_case_expressions () =
       let result = Compiler.compile_to_string program in
       List.iter
         (fun part ->
-          let contains = string_contains_substring result part in
+          let contains =
+            if String.contains part '[' then
+              (* Use regex matching for patterns with hash *)
+              try
+                let _ = Str.search_forward (Str.regexp part) result 0 in
+                true
+              with Not_found -> false
+            else string_contains_substring result part
+          in
           check bool
             ("case expression: " ^ input ^ " contains: " ^ part)
             true contains)
@@ -178,10 +186,20 @@ let test_complex_expressions () =
   in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string program in
-  let expected_parts = [ "complex() ->"; "{1, 2}"; "[X, X]"; "case true" ] in
+  let expected_parts =
+    [ "complex() ->"; "{1, 2}"; "\\[X_[a-z0-9]+, X_[a-z0-9]+\\]"; "case true" ]
+  in
   List.iter
     (fun part ->
-      let contains = string_contains_substring result part in
+      let contains =
+        if String.contains part '[' && String.contains part ']' then
+          (* Use regex matching for patterns with hash *)
+          try
+            let _ = Str.search_forward (Str.regexp part) result 0 in
+            true
+          with Not_found -> false
+        else string_contains_substring result part
+      in
       check bool ("complex expression contains: " ^ part) true contains)
     expected_parts
 

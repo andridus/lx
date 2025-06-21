@@ -16,9 +16,6 @@ open Ast
 %token WORKER SUPERVISOR STRATEGY CHILDREN
 %token ONE_FOR_ONE ONE_FOR_ALL REST_FOR_ONE
 
-(* Handler Keywords *)
-%token INIT CALL CAST INFO TERMINATE
-
 (* Spec Keywords *)
 %token SPEC REQUIRES ENSURES MATCHES
 
@@ -69,8 +66,6 @@ function_def:
     { failwith "Enhanced:Missing function body - expected '{' after parameter list|Suggestion:Add '{' and '}' to define the function body|Context:function definition" }
   | FUN _name = IDENT error
     { failwith "Enhanced:Missing parameter list or clause block - expected '(' or '{' after function name|Suggestion:Add '()' for parameters or '{}' for multiple clauses|Context:function definition" }
-  | FUN TEST error
-    { failwith "Enhanced:'test' is a reserved word and cannot be used as a function name|Suggestion:Try using a different name like 'test_func' or 'my_test'|Context:Reserved words include: test, spec, describe, worker, supervisor, etc." }
   | FUN error
     { failwith "Enhanced:Missing function name after 'fun' keyword|Suggestion:Provide a valid identifier name for the function|Context:function definition" }
 
@@ -86,11 +81,10 @@ otp_component:
 
 worker_def:
   | WORKER name = IDENT LBRACE
-      handlers = handler_def*
       functions = function_def*
       specs = spec_def*
     RBRACE
-    { Worker { name; handlers; functions; specs } }
+    { Worker { name; functions; specs } }
 
 supervisor_def:
   | SUPERVISOR name = IDENT LBRACE
@@ -99,21 +93,10 @@ supervisor_def:
     RBRACE
     { Supervisor { name; strategy; children } }
 
-handler_def:
-  | handler = otp_handler LBRACE body = function_def RBRACE
-    { (handler, body) }
-
 otp_strategy:
   | ONE_FOR_ONE { OneForOne }
   | ONE_FOR_ALL { OneForAll }
   | REST_FOR_ONE { RestForOne }
-
-otp_handler:
-  | INIT { Init }
-  | CALL { Call }
-  | CAST { Cast }
-  | INFO { Info }
-  | TERMINATE { Terminate }
 
 spec_def:
   | SPEC name = IDENT LBRACE RBRACE
@@ -132,15 +115,27 @@ spec_expr:
   | e = expr { e }
 
 test_block:
-  | DESCRIBE name = STRING LBRACE tests = test_def* RBRACE
-    { { name; tests } }
+  | IDENT LBRACE tests = test_def* RBRACE
+    { if $1 = "describe" then { name = ""; tests } else failwith "Expected 'describe' keyword" }
+  | IDENT name = STRING LBRACE tests = test_def* RBRACE
+    { if $1 = "describe" then { name; tests } else failwith "Expected 'describe' keyword" }
+  | IDENT error
+    { if $1 = "describe" then
+        failwith "Enhanced:The describe block must be followed by a description string|Suggestion:Use 'describe \"description\" { ... }'|Context:test block definition"
+      else failwith "Expected 'describe' keyword" }
 
 test_def:
-  | TEST name = STRING LBRACE body = expr RBRACE
-    { { name; body } }
+  | IDENT name = STRING LBRACE body = expr RBRACE
+    { if $1 = "test" then { name; body } else failwith "Expected 'test' keyword" }
+  | IDENT error
+    { if $1 = "test" then
+        failwith "Enhanced:The test block must be followed by a description string|Suggestion:Use 'test \"description\" { ... }'|Context:test definition"
+      else failwith "Expected 'test' keyword" }
 
 expr:
   | e = simple_expr { e }
+  | name = IDENT EQ value = expr
+    { Assign (name, value) }
   | LET name = IDENT EQ value = expr IN body = expr
     { Let (name, value, body) }
   | func = expr LPAREN args = separated_list(COMMA, expr) RPAREN
@@ -176,6 +171,13 @@ simple_expr:
       | es -> Tuple es }
   | LBRACKET elements = separated_list(COMMA, expr) RBRACKET
     { List elements }
+  (* Block expressions *)
+  | LBRACE statements = statement_list RBRACE
+    { match statements with
+      | [e] -> e
+      | es -> Block es }
+  | LBRACE RBRACE
+    { Literal LNil }
 
 case_branch:
   | pattern = pattern ARROW body = expr
@@ -207,8 +209,8 @@ literal:
   | NIL { LNil }
 
 standalone_test_def:
-  | TEST name = STRING LBRACE body = expr RBRACE
-    { { name; body } }
+  | IDENT name = STRING LBRACE body = expr RBRACE
+    { if $1 = "test" then { name; body } else failwith "Expected 'test' keyword" }
 
 function_body:
   | e = expr { e }
@@ -216,3 +218,14 @@ function_body:
     { match rest with
       | Sequence exprs -> Sequence (e :: exprs)
       | single_expr -> Sequence [e; single_expr] }
+  | statements = statement_list
+    { match statements with
+      | [e] -> e
+      | es -> Sequence es }
+
+statement_list:
+  | s = statement { [s] }
+  | s = statement rest = statement_list { s :: rest }
+
+statement:
+  | e = expr { e }

@@ -22,13 +22,21 @@ type pattern =
 (* OTP strategies for supervisors *)
 type otp_strategy = OneForOne | OneForAll | RestForOne
 
-(* OTP handler types *)
-type otp_handler = Init | Call | Cast | Info | Terminate
+(* Special OTP callback function names *)
+type otp_callback =
+  | Init
+  | HandleCall
+  | HandleCast
+  | HandleInfo
+  | Terminate
+  | CodeChange
+  | FormatStatus
 
 (* Expressions *)
 type expr =
   | Literal of literal
   | Var of ident
+  | Assign of ident * expr
   | Let of ident * expr * expr
   | Fun of ident list * expr
   | App of expr * expr list
@@ -38,7 +46,8 @@ type expr =
   | Match of expr * (pattern * expr) list
   | If of expr * expr * expr option
   | For of ident * expr * expr
-  | Sequence of expr list
+  | Sequence of expr list (* Function body sequences *)
+  | Block of expr list (* Explicit block expressions {} *)
 
 (* Function clause for multiple arities *)
 type function_clause = { params : ident list; body : expr }
@@ -59,12 +68,7 @@ type describe_block = { name : string; tests : test_def list }
 
 (* OTP components *)
 type otp_component =
-  | Worker of {
-      name : ident;
-      handlers : (otp_handler * function_def) list;
-      functions : function_def list;
-      specs : spec list;
-    }
+  | Worker of { name : ident; functions : function_def list; specs : spec list }
   | Supervisor of {
       name : ident;
       strategy : otp_strategy;
@@ -80,3 +84,39 @@ type module_item =
 
 (* Complete program *)
 type program = { items : module_item list }
+
+(* Helper functions for OTP callback validation *)
+let string_of_otp_callback = function
+  | Init -> "init"
+  | HandleCall -> "handle_call"
+  | HandleCast -> "handle_cast"
+  | HandleInfo -> "handle_info"
+  | Terminate -> "terminate"
+  | CodeChange -> "code_change"
+  | FormatStatus -> "format_status"
+
+let is_otp_callback_name name =
+  match name with
+  | "init" | "handle_call" | "handle_cast" | "handle_info" | "terminate"
+  | "code_change" | "format_status" ->
+      true
+  | _ -> false
+
+let otp_callback_of_string = function
+  | "init" -> Some Init
+  | "handle_call" -> Some HandleCall
+  | "handle_cast" -> Some HandleCast
+  | "handle_info" -> Some HandleInfo
+  | "terminate" -> Some Terminate
+  | "code_change" -> Some CodeChange
+  | "format_status" -> Some FormatStatus
+  | _ -> None
+
+let expected_arity_for_callback = function
+  | Init -> 1
+  | HandleCall -> 3
+  | HandleCast -> 2
+  | HandleInfo -> 2
+  | Terminate -> 2
+  | CodeChange -> 3
+  | FormatStatus -> 1

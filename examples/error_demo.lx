@@ -1,0 +1,20 @@
+// This file contains intentional errors to demonstrate improved error messages
+
+fun test_function() {
+    // This should cause a record field error similar to the one mentioned
+    let func = { name = "test_if"; params = []; body = nil };
+    func
+}
+
+fun another_test() {
+    // This should cause an unbound variable error
+    let result = nonexistent_variable;
+    result
+}
+
+fun type_mismatch_test() {
+    // This should cause a type mismatch error
+    let number = 42;
+    let string_result = number + "hello";
+    string_result
+}

@@ -2,13 +2,13 @@ open Alcotest
 open Compiler.Error
 
 let test_reserved_word_error () =
-  (* Test that 'test' is now correctly tokenized as TEST token *)
+  (* Test that 'test' is now correctly tokenized as IDENT token (not reserved) *)
   let lexbuf = Lexing.from_string "test" in
   Compiler.Lexer.set_filename (Some "test.lx");
   let token = Compiler.Lexer.read lexbuf in
-  (* Should return TEST token, not raise an error *)
-  check bool "Should tokenize 'test' as TEST token" true
-    (token = Compiler.Parser.TEST)
+  (* Should return IDENT token, not TEST *)
+  check bool "Should tokenize 'test' as IDENT token" true
+    (token = Compiler.Parser.IDENT "test")
 
 let test_unterminated_string_error () =
   (* Test unterminated string detection *)

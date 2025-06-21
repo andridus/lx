@@ -12,7 +12,8 @@ rule read = parse
   | '\n' { Lexing.new_line lexbuf; read lexbuf }
 
   (* Comments *)
-  | "//" [^ '\n']* '\n' { Lexing.new_line lexbuf; read lexbuf }
+  | "#" [^ '\n']* '\n' { Lexing.new_line lexbuf; read lexbuf }
+  | "#" [^ '\n']* eof { EOF }
 
   (* Operators and Punctuation *)
   | "="             { EQ }
@@ -39,10 +40,9 @@ rule read = parse
       | "true" -> BOOL true | "false" -> BOOL false | "nil" -> NIL
       | "worker" -> WORKER | "supervisor" -> SUPERVISOR | "strategy" -> STRATEGY | "children" -> CHILDREN
       | "one_for_one" -> ONE_FOR_ONE | "one_for_all" -> ONE_FOR_ALL | "rest_for_one" -> REST_FOR_ONE
-      | "init" -> INIT | "call" -> CALL | "cast" -> CAST | "info" -> INFO | "terminate" -> TERMINATE
       | "spec" -> SPEC | "requires" -> REQUIRES | "ensures" -> ENSURES | "matches" -> MATCHES
-      | "describe" -> DESCRIBE | "test" -> TEST | "assert" -> ASSERT
-      | word when List.mem word ["spec"; "describe"; "worker"; "supervisor"] ->
+      | "assert" -> ASSERT
+      | word when List.mem word ["spec"; "worker"; "supervisor"] ->
           (* Other commonly misused reserved words *)
           Error.reserved_word_error ~filename:(!filename_ref) lexbuf word
       | _ -> IDENT id
