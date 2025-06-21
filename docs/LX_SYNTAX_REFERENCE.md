@@ -66,6 +66,10 @@ LX has several categories of keywords:
 - `_` - Wildcard pattern
 - `::` - List cons operator
 - `.` - Module access
+- `+` - Addition
+- `-` - Subtraction
+- `*` - Multiplication
+- `/` - Division
 
 ### Punctuation
 - `(` `)` - Parentheses (grouping, function calls)
@@ -243,6 +247,19 @@ case value {
 }
 ```
 
+### Arithmetic Expressions
+```lx
+# Basic arithmetic operations
+x = 10 + 5    # Addition: 15
+y = 20 - 8    # Subtraction: 12
+z = 6 * 7     # Multiplication: 42
+w = 15 / 3    # Division: 5
+
+# Complex expressions with precedence
+result = 2 + 3 * 4    # Result: 14 (multiplication has higher precedence)
+total = (10 + 5) * 2  # Result: 30 (parentheses override precedence)
+```
+
 ### For Loops
 ```lx
 for item in list {
@@ -295,6 +312,20 @@ fun process_result {
     log_error(reason)
     nil
   }
+}
+
+# Pattern matching with literals
+fun describe_number {
+  (0) { "zero" }
+  (1) { "one" }
+  (n) { "other number: " + string_of_int(n) }
+}
+
+# Pattern matching with multiple parameters
+fun compare {
+  (x, y) when x > y { "first is greater" }
+  (x, y) when x < y { "second is greater" }
+  (_, _) { "equal" }
 }
 ```
 
@@ -555,12 +586,23 @@ statement ::= expr
 
 ### Expression Grammar
 ```
-expr ::= simple_expr
+expr ::= arithmetic_expr
        | IDENT '=' expr                                    # Assignment
        | expr '(' expr_list ')'                           # Function call
        | 'if' expr 'then' expr ('else' expr)?             # Conditional
        | 'case' expr '{' case_branch* '}'                 # Pattern matching
        | 'for' IDENT 'in' expr '{' expr '}'               # For loop
+
+arithmetic_expr ::= term
+                  | arithmetic_expr '+' term               # Addition
+                  | arithmetic_expr '-' term               # Subtraction
+
+term ::= factor
+       | term '*' factor                                   # Multiplication
+       | term '/' factor                                   # Division
+
+factor ::= simple_expr
+         | '(' arithmetic_expr ')'                         # Grouping
 
 simple_expr ::= literal
               | IDENT                                      # Variable
@@ -720,6 +762,16 @@ worker shopping_cart {
   fun code_change(old_vsn, state, extra) {
     .{:ok, state}
   }
+
+  # Helper function with arithmetic
+  fun calculate_total(items) {
+    # Calculate sum using arithmetic operations
+    total = 0
+    for item in items {
+      total = total + item.price * item.quantity
+    }
+    total
+  }
 }
 ```
 
@@ -773,17 +825,50 @@ describe "shopping cart tests" {
     }
   }
 
-  test "should prevent variable reassignment" {
-    # This should compile fine
+  test "should handle arithmetic operations" {
+    # Test basic arithmetic
     x = 10
-    y = 20
-    result = x + y
-    assert result == 30
+    y = 5
 
-    # Note: This would cause a compile error if uncommented:
-    # x = 15  # Error: cannot reassign x
+    # Test all operators
+    addition = x + y      # 15
+    subtraction = x - y   # 5
+    multiplication = x * y # 50
+    division = x / y      # 2
+
+    # Test precedence
+    complex = x + y * 2   # 20 (not 30)
+    grouped = (x + y) * 2 # 30
+
+    assert addition == 15
+    assert subtraction == 5
+    assert multiplication == 50
+    assert division == 2
+    assert complex == 20
+    assert grouped == 30
+  }
+
+  test "should support recursive functions" {
+    # Test factorial function
+    result = factorial(5)
+    assert result == 120
+
+    # Test with base case
+    base_case = factorial(0)
+    assert base_case == 1
   }
 }
 ```
 
-This reference document reflects the current state of the LX language implementation including variable assignment, block expressions, enhanced comment support, and improved error handling. The language continues to evolve with new features being added regularly.
+This reference document reflects the current state of the LX language implementation including:
+
+- Variable assignment and block expressions
+- Arithmetic operations with proper precedence (`+`, `-`, `*`, `/`)
+- Pattern matching in function clauses with literal patterns
+- Recursive function support
+- Enhanced comment support with `#` syntax
+- Improved error handling with contextual messages
+- OTP worker and supervisor definitions
+- Comprehensive testing framework
+
+The language continues to evolve with new features being added regularly. Recent additions include full arithmetic expression support with proper operator precedence and enhanced pattern matching capabilities for function definitions.

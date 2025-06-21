@@ -31,6 +31,10 @@ rule read = parse
   | ";"             { SEMICOLON }
   | "::"            { CONS }
   | "."             { DOT }
+  | "+"             { PLUS }
+  | "-"             { MINUS }
+  | "*"             { MULT }
+  | "/"             { DIV }
 
   (* Literals *)
   | ['a'-'z']['a'-'z''A'-'Z''0'-'9''_']* as id {

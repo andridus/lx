@@ -27,6 +27,7 @@ open Ast
 %token LPAREN RPAREN LBRACE RBRACE LBRACKET RBRACKET
 %token DOT_LBRACE
 %token COMMA SEMICOLON CONS DOT
+%token PLUS MINUS MULT DIV
 
 %token EOF
 
@@ -35,6 +36,8 @@ open Ast
 %left PIPE
 %left CONS
 %left COMMA
+%left PLUS MINUS
+%left MULT DIV
 
 %start <program> main
 
@@ -66,15 +69,17 @@ function_def:
   | FUN _name = IDENT LPAREN _params = separated_list(COMMA, IDENT) RPAREN error
     { failwith "Enhanced:Missing function body - expected '{' after parameter list|Suggestion:Add '{' and '}' to define the function body|Context:function definition" }
   | FUN _name = IDENT error
-    { failwith "Enhanced:Missing parameter list or clause block - expected '(' or '{' after function name|Suggestion:Add '()' for parameters or '{}' for multiple clauses|Context:function definition" }
+    { failwith "Enhanced:Missing parameter list or clause block - expected '(' or '{' after function name|Suggestion:Use 'fun name() { body }' for single clause functions or 'fun name { (params) { body } }' for multiple clause functions|Context:function definition" }
   | FUN error
     { failwith "Enhanced:Missing function name after 'fun' keyword|Suggestion:Provide a valid identifier name for the function|Context:function definition" }
 
 function_clause:
-  | LPAREN params = separated_list(COMMA, IDENT) RPAREN LBRACE body = function_body RBRACE
+  | LPAREN params = separated_list(COMMA, pattern) RPAREN LBRACE body = function_body RBRACE
     { { params; body } }
-  | LPAREN params = separated_list(COMMA, IDENT) RPAREN LBRACE RBRACE
+  | LPAREN params = separated_list(COMMA, pattern) RPAREN LBRACE RBRACE
     { { params; body = Literal LNil } }
+  | error
+    { failwith "Enhanced:Invalid function clause syntax - expected parameter list in parentheses|Suggestion:For single clause functions use 'fun name() { body }', for multiple clause functions use 'fun name { (params) { body } }'|Context:function clause definition" }
 
 otp_component:
   | w = worker_def { w }
@@ -139,6 +144,14 @@ expr:
     { Assign (name, value) }
   | func = expr LPAREN args = separated_list(COMMA, expr) RPAREN
     { App (func, args) }
+  | left = expr PLUS right = expr
+    { BinOp (left, "+", right) }
+  | left = expr MINUS right = expr
+    { BinOp (left, "-", right) }
+  | left = expr MULT right = expr
+    { BinOp (left, "*", right) }
+  | left = expr DIV right = expr
+    { BinOp (left, "/", right) }
   | IF cond = expr THEN then_expr = expr ELSE else_expr = expr
     { If (cond, then_expr, Some else_expr) }
   | IF cond = expr THEN then_expr = expr

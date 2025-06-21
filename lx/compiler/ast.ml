@@ -47,16 +47,17 @@ type expr =
   | For of ident * expr * expr
   | Sequence of expr list (* Function body sequences *)
   | Block of expr list (* Explicit block expressions {} *)
+  | BinOp of expr * string * expr (* Binary operations *)
 
 (* Function clause for multiple arities *)
-type function_clause = { params : ident list; body : expr }
+type function_clause = { params : pattern list; body : expr }
 
 (* Function definitions with multiple arities *)
 type function_def = { name : ident; clauses : function_clause list }
 
 (* Helper function to create single-clause function for backward compatibility *)
 let make_single_clause_function name params body =
-  { name; clauses = [ { params; body } ] }
+  { name; clauses = [ { params = List.map (fun p -> PVar p) params; body } ] }
 
 (* Formal specifications *)
 type spec = { name : ident; requires : expr list; ensures : expr list }

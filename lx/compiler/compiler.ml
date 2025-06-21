@@ -194,13 +194,20 @@ let rec emit_expr ctx (e : expr) : string =
         String.concat ",\n        " (List.map (emit_expr block_ctx) exprs)
       in
       "(fun() ->\n        " ^ block_body ^ "\n    end)()"
+  | BinOp (left, op, right) ->
+      emit_expr ctx left ^ " " ^ op ^ " " ^ emit_expr ctx right
 
 let emit_function_clause (func_name : string) (clause : function_clause) :
     string =
   let ctx = create_scope None in
-  let renamed_params = List.map (add_var_to_scope ctx) clause.params in
+  (* Add pattern variables to scope *)
+  List.iter (function
+    | PVar name -> ignore (add_var_to_scope ctx name)
+    | _ -> ()
+  ) clause.params;
+  let pattern_strings = List.map (emit_pattern ctx) clause.params in
   func_name ^ "("
-  ^ String.concat ", " renamed_params
+  ^ String.concat ", " pattern_strings
   ^ ") ->\n    " ^ emit_expr ctx clause.body
 
 let emit_function_def (func : function_def) : string =

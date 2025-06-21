@@ -511,12 +511,30 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
             infer_expr (apply_subst_env final_subst env) last_expr
           in
           (last_type, compose_subst final_subst last_subst))
+  | BinOp (left, op, right) ->
+      let left_type, subst1 = infer_expr env left in
+      let right_type, subst2 = infer_expr (apply_subst_env subst1 env) right in
+      let combined_subst = compose_subst subst1 subst2 in
+      (* For arithmetic operations, both operands should be numbers *)
+             (match op with
+         | "+" | "-" | "*" | "/" ->
+             let int_unify1 = unify (apply_subst combined_subst left_type) TInteger in
+             let int_unify2 = unify (apply_subst combined_subst right_type) TInteger in
+             let final_subst = compose_subst (compose_subst combined_subst int_unify1) int_unify2 in
+             (TInteger, final_subst)
+        | _ -> failwith ("Unknown binary operator: " ^ op))
 
 (* Type inference for function clauses *)
 let infer_function_clause (env : type_env) (clause : function_clause) :
     lx_type * substitution =
   let param_types = List.map (fun _ -> fresh_type_var ()) clause.params in
-  let param_env = List.combine clause.params param_types in
+  (* Extract variable bindings from patterns and create environment *)
+  let param_env =
+    List.fold_left2 (fun acc pattern param_type ->
+      match pattern with
+      | PVar name -> (name, param_type) :: acc
+      | _ -> acc  (* Literals and other patterns don't add to environment *)
+    ) [] clause.params param_types in
   let new_env = param_env @ env in
   let body_type, subst = infer_expr new_env clause.body in
   let fun_type =
@@ -532,12 +550,20 @@ let infer_function_def (env : type_env) (func : function_def) :
   match func.clauses with
   | [] -> failwith ("Function " ^ func.name ^ " has no clauses")
   | [ clause ] ->
-      (* Single clause - backward compatibility *)
-      infer_function_clause env clause
+      (* Single clause - add function to environment for recursion *)
+      let func_type_var = fresh_type_var () in
+      let env_with_func = (func.name, func_type_var) :: env in
+      let inferred_type, subst = infer_function_clause env_with_func clause in
+      let unify_subst = unify (apply_subst subst func_type_var) inferred_type in
+      let final_subst = compose_subst subst unify_subst in
+      (apply_subst final_subst inferred_type, final_subst)
   | clauses ->
+      (* Multiple clauses - add function to environment for recursion *)
+      let func_type_var = fresh_type_var () in
+      let env_with_func = (func.name, func_type_var) :: env in
       (* Multiple clauses - ensure they have compatible types *)
       let clause_types_and_substs =
-        List.map (infer_function_clause env) clauses
+        List.map (infer_function_clause env_with_func) clauses
       in
       let first_type, first_subst = List.hd clause_types_and_substs in
 
@@ -551,8 +577,12 @@ let infer_function_def (env : type_env) (func : function_def) :
           (List.tl clause_types_and_substs)
       in
 
+      (* Unify the function type variable with the inferred type *)
+      let unify_subst = unify (apply_subst final_subst func_type_var) (apply_subst final_subst first_type) in
+      let complete_subst = compose_subst final_subst unify_subst in
+
       (* Return the type of the first clause as representative *)
-      (apply_subst final_subst first_type, final_subst)
+      (apply_subst complete_subst first_type, complete_subst)
 
 (* Built-in environment with OTP types *)
 let builtin_env : type_env =

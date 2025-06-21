@@ -99,8 +99,8 @@ let test_multiple_arities_parsing () =
        clauses =
          [
            { params = []; body = Literal LNil };
-           { params = [ "x" ]; body = Var "x" };
-           { params = [ "x"; "y" ]; body = Var "x" };
+           { params = [ PVar "x" ]; body = Var "x" };
+           { params = [ PVar "x"; PVar "y" ]; body = Var "x" };
          ];
      };
   ] ->
