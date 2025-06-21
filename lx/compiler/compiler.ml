@@ -43,9 +43,10 @@ let check_function_name name =
   if is_reserved_word name then
     let message =
       Printf.sprintf
-        "'%s' is a reserved word and cannot be used as a function name.\n\
-         Reserved words include: test, spec, describe, worker, supervisor, etc.\n\
-         Try using a different name like '%s_func' or 'my_%s'."
+        "Enhanced:'%s' is a reserved word and cannot be used as a function \
+         name|Suggestion:Try using a different name like '%s_func' or \
+         'my_%s'|Context:Reserved words include: test, spec, describe, worker, \
+         supervisor, etc."
         name name name
     in
     failwith message
@@ -96,7 +97,9 @@ let rec emit_expr (e : expr) : string =
       emit_expr func ^ "(" ^ String.concat ", " (List.map emit_expr args) ^ ")"
   | ExternalCall (module_name, func_name, args) ->
       (* Generate Erlang external call: module:function(args) *)
-      module_name ^ ":" ^ func_name ^ "(" ^ String.concat ", " (List.map emit_expr args) ^ ")"
+      module_name ^ ":" ^ func_name ^ "("
+      ^ String.concat ", " (List.map emit_expr args)
+      ^ ")"
   | Tuple exprs -> "{" ^ String.concat ", " (List.map emit_expr exprs) ^ "}"
   | List exprs -> "[" ^ String.concat ", " (List.map emit_expr exprs) ^ "]"
   | If (cond, then_expr, else_expr) ->
@@ -115,7 +118,8 @@ let rec emit_expr (e : expr) : string =
       (* In Erlang, sequence of expressions is separated by commas *)
       String.concat ",\n    " (List.map emit_expr exprs)
 
-let emit_function_clause (func_name : string) (clause : function_clause) : string =
+let emit_function_clause (func_name : string) (clause : function_clause) :
+    string =
   func_name ^ "("
   ^ String.concat ", " (List.map capitalize_var clause.params)
   ^ ") ->\n    " ^ emit_expr clause.body
@@ -182,13 +186,15 @@ let emit_otp_component (base_module_name : string) (component : otp_component) :
             in
             (* For handlers, we need to handle the new function_def structure *)
             match func.clauses with
-            | [clause] ->
+            | [ clause ] ->
                 handler_name ^ "("
                 ^ String.concat ", " (List.map capitalize_var clause.params)
                 ^ ") ->\n    " ^ emit_expr clause.body ^ "."
             | _ ->
                 (* Multiple clauses for handlers - generate separate clauses *)
-                let clauses_code = List.map (emit_function_clause handler_name) func.clauses in
+                let clauses_code =
+                  List.map (emit_function_clause handler_name) func.clauses
+                in
                 String.concat ";\n" clauses_code ^ ".")
           handlers
       in
@@ -239,6 +245,17 @@ let emit_module_item (item : module_item) : string =
   | Spec spec -> emit_spec spec
   | Test desc -> emit_describe_block desc
 
+(* Helper function to check if string contains substring *)
+let string_contains_substring s sub =
+  let len_s = String.length s in
+  let len_sub = String.length sub in
+  let rec search i =
+    if i > len_s - len_sub then false
+    else if String.sub s i len_sub = sub then true
+    else search (i + 1)
+  in
+  search 0
+
 let parse_string ?(filename = None) (content : string) : program =
   let lexbuf = Lexing.from_string content in
   Lexer.set_filename filename;
@@ -254,6 +271,33 @@ let parse_string ?(filename = None) (content : string) : program =
           col
       in
       Error.parse_error ~filename lexbuf message
+  | Failure msg when string_contains_substring msg "Enhanced:" ->
+      let pos = Lexing.lexeme_start_p lexbuf in
+      let line = pos.pos_lnum in
+      let col = pos.pos_cnum - pos.pos_bol + 1 in
+      (* Parse enhanced error format directly *)
+      let parts = String.split_on_char '|' msg in
+      let parse_part part =
+        match String.split_on_char ':' part with
+        | key :: value_parts ->
+            (String.trim key, String.concat ":" value_parts |> String.trim)
+        | _ -> ("", part)
+      in
+      let parsed_parts = List.map parse_part parts in
+      let get_value key =
+        try Some (List.assoc key parsed_parts) with Not_found -> None
+      in
+      let message =
+        match get_value "Enhanced" with Some m -> m | None -> msg
+      in
+      let suggestion = get_value "Suggestion" in
+      let context = get_value "Context" in
+      let position = Error.make_position ~filename line col in
+      let error =
+        Error.make_error_with_position ~suggestion ~context
+          (Error.SyntaxError message) position message
+      in
+      raise (Error.CompilationError error)
   | exn ->
       let pos = Lexing.lexeme_start_p lexbuf in
       let line = pos.pos_lnum in
@@ -287,6 +331,34 @@ let parse_file (filename : string) : program =
           col
       in
       Error.parse_error ~filename:(Some filename) lexbuf message
+  | Failure msg when string_contains_substring msg "Enhanced:" ->
+      close_in ic;
+      let pos = Lexing.lexeme_start_p lexbuf in
+      let line = pos.pos_lnum in
+      let col = pos.pos_cnum - pos.pos_bol + 1 in
+      (* Parse enhanced error format directly *)
+      let parts = String.split_on_char '|' msg in
+      let parse_part part =
+        match String.split_on_char ':' part with
+        | key :: value_parts ->
+            (String.trim key, String.concat ":" value_parts |> String.trim)
+        | _ -> ("", part)
+      in
+      let parsed_parts = List.map parse_part parts in
+      let get_value key =
+        try Some (List.assoc key parsed_parts) with Not_found -> None
+      in
+      let message =
+        match get_value "Enhanced" with Some m -> m | None -> msg
+      in
+      let suggestion = get_value "Suggestion" in
+      let context = get_value "Context" in
+      let position = Error.make_position ~filename:(Some filename) line col in
+      let error =
+        Error.make_error_with_position ~suggestion ~context
+          (Error.SyntaxError message) position message
+      in
+      raise (Error.CompilationError error)
   | exn ->
       close_in ic;
       let pos = Lexing.lexeme_start_p lexbuf in

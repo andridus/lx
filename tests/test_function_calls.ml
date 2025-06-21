@@ -13,53 +13,143 @@ let string_contains_substring s sub =
   search 0
 
 let test_function_call_parsing () =
-  let program = Compiler.parse_string "fun validation() { io.format(\"hello\") }" in
+  let program =
+    Compiler.parse_string "fun validation() { io.format(\"hello\") }"
+  in
   match program.items with
-  | [ Function { clauses = [{ body = App (Var "io.format", [Literal (LString "hello")]); _ }]; _ } ] -> ()
-  | [ Function { clauses = [{ body = ExternalCall ("io", "format", [Literal (LString "hello")]); _ }]; _ } ] -> ()
+  | [
+   Function
+     {
+       clauses =
+         [ { body = App (Var "io.format", [ Literal (LString "hello") ]); _ } ];
+       _;
+     };
+  ] ->
+      ()
+  | [
+   Function
+     {
+       clauses =
+         [
+           {
+             body = ExternalCall ("io", "format", [ Literal (LString "hello") ]);
+             _;
+           };
+         ];
+       _;
+     };
+  ] ->
+      ()
   | _ -> fail "Expected function call parsing"
 
 let test_external_function_call_parsing () =
-  let program = Compiler.parse_string "fun validation() { io.format(\"hello\") }" in
+  let program =
+    Compiler.parse_string "fun validation() { io.format(\"hello\") }"
+  in
   match program.items with
-  | [ Function { clauses = [{ body = ExternalCall ("io", "format", [Literal (LString "hello")]); _ }]; _ } ] -> ()
-  | [ Function { clauses = [{ body = App (Var "io.format", [Literal (LString "hello")]); _ }]; _ } ] ->
+  | [
+   Function
+     {
+       clauses =
+         [
+           {
+             body = ExternalCall ("io", "format", [ Literal (LString "hello") ]);
+             _;
+           };
+         ];
+       _;
+     };
+  ] ->
+      ()
+  | [
+   Function
+     {
+       clauses =
+         [ { body = App (Var "io.format", [ Literal (LString "hello") ]); _ } ];
+       _;
+     };
+  ] ->
       (* Backward compatibility - this is also valid *)
       ()
   | _ -> fail "Expected external function call parsing"
 
 let test_multiple_arities_parsing () =
-  let input = {|
+  let input =
+    {|
     fun a {
       () { nil }
       (x) { x }
       (x, y) { x }
     }
-  |} in
+  |}
+  in
   let program = Compiler.parse_string input in
   match program.items with
-  | [ Function { name = "a"; clauses = [
-      { params = []; body = Literal LNil };
-      { params = ["x"]; body = Var "x" };
-      { params = ["x"; "y"]; body = Var "x" }
-    ] } ] -> ()
+  | [
+   Function
+     {
+       name = "a";
+       clauses =
+         [
+           { params = []; body = Literal LNil };
+           { params = [ "x" ]; body = Var "x" };
+           { params = [ "x"; "y" ]; body = Var "x" };
+         ];
+     };
+  ] ->
+      ()
   | _ -> fail "Expected function with multiple arities"
 
 let test_sequence_parsing () =
-  let program = Compiler.parse_string "fun validation() { io.format(\"hello\"); io.format(\"world\") }" in
+  let program =
+    Compiler.parse_string
+      "fun validation() { io.format(\"hello\"); io.format(\"world\") }"
+  in
   match program.items with
-  | [ Function { clauses = [{ body = Sequence [
-      App (Var "io.format", [Literal (LString "hello")]);
-      App (Var "io.format", [Literal (LString "world")])
-    ]; _ }]; _ } ] -> ()
-  | [ Function { clauses = [{ body = Sequence [
-      ExternalCall ("io", "format", [Literal (LString "hello")]);
-      ExternalCall ("io", "format", [Literal (LString "world")])
-    ]; _ }]; _ } ] -> ()
+  | [
+   Function
+     {
+       clauses =
+         [
+           {
+             body =
+               Sequence
+                 [
+                   App (Var "io.format", [ Literal (LString "hello") ]);
+                   App (Var "io.format", [ Literal (LString "world") ]);
+                 ];
+             _;
+           };
+         ];
+       _;
+     };
+  ] ->
+      ()
+  | [
+   Function
+     {
+       clauses =
+         [
+           {
+             body =
+               Sequence
+                 [
+                   ExternalCall ("io", "format", [ Literal (LString "hello") ]);
+                   ExternalCall ("io", "format", [ Literal (LString "world") ]);
+                 ];
+             _;
+           };
+         ];
+       _;
+     };
+  ] ->
+      ()
   | _ -> fail "Expected sequence parsing"
 
 let test_external_function_call_compilation () =
-  let program = Compiler.parse_string "fun validation() { io.format(\"hello\") }" in
+  let program =
+    Compiler.parse_string "fun validation() { io.format(\"hello\") }"
+  in
   let result = Compiler.compile_to_string program in
   let expected_parts = [ "validation() ->"; "io:format(\"hello\")" ] in
   List.iter
@@ -69,23 +159,20 @@ let test_external_function_call_compilation () =
     expected_parts
 
 let test_multiple_arities_compilation () =
-  let input = {|
+  let input =
+    {|
     fun a {
       () { nil }
       (x) { x }
       (x, y) { x }
     }
-  |} in
+  |}
+  in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string program in
-  let expected_parts = [
-    "a() ->";
-    "nil;";
-    "a(X) ->";
-    "X;";
-    "a(X, Y) ->";
-    "X."
-  ] in
+  let expected_parts =
+    [ "a() ->"; "nil;"; "a(X) ->"; "X;"; "a(X, Y) ->"; "X." ]
+  in
   List.iter
     (fun part ->
       let contains = string_contains_substring result part in
@@ -93,7 +180,9 @@ let test_multiple_arities_compilation () =
     expected_parts
 
 let test_function_call_compilation () =
-  let program = Compiler.parse_string "fun validation() { io.format(\"hello\") }" in
+  let program =
+    Compiler.parse_string "fun validation() { io.format(\"hello\") }"
+  in
   let result = Compiler.compile_to_string program in
   let expected_parts = [ "validation() ->"; "io:format(\"hello\")" ] in
   List.iter
@@ -103,13 +192,14 @@ let test_function_call_compilation () =
     expected_parts
 
 let test_sequence_compilation () =
-  let program = Compiler.parse_string "fun validation() { io.format(\"hello\"); io.format(\"world\") }" in
+  let program =
+    Compiler.parse_string
+      "fun validation() { io.format(\"hello\"); io.format(\"world\") }"
+  in
   let result = Compiler.compile_to_string program in
-  let expected_parts = [
-    "validation() ->";
-    "io:format(\"hello\"),";
-    "io:format(\"world\")"
-  ] in
+  let expected_parts =
+    [ "validation() ->"; "io:format(\"hello\"),"; "io:format(\"world\")" ]
+  in
   List.iter
     (fun part ->
       let contains = string_contains_substring result part in
@@ -117,12 +207,11 @@ let test_sequence_compilation () =
     expected_parts
 
 let test_function_with_args () =
-  let program = Compiler.parse_string "fun validation(x) { io.format(\"hello\", [x]) }" in
+  let program =
+    Compiler.parse_string "fun validation(x) { io.format(\"hello\", [x]) }"
+  in
   let result = Compiler.compile_to_string program in
-  let expected_parts = [
-    "validation(X) ->";
-    "io:format(\"hello\", [X])"
-  ] in
+  let expected_parts = [ "validation(X) ->"; "io:format(\"hello\", [X])" ] in
   List.iter
     (fun part ->
       let contains = string_contains_substring result part in
@@ -130,19 +219,23 @@ let test_function_with_args () =
     expected_parts
 
 let test_multiple_expressions_example () =
-  let input = {|
+  let input =
+    {|
     fun b(x) {
       io.format("olá mundo");
       io.format("olá mundo com args", [x])
     }
-  |} in
+  |}
+  in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string program in
-  let expected_parts = [
-    "b(X) ->";
-    "io:format(\"olá mundo\"),";
-    "io:format(\"olá mundo com args\", [X])"
-  ] in
+  let expected_parts =
+    [
+      "b(X) ->";
+      "io:format(\"olá mundo\"),";
+      "io:format(\"olá mundo com args\", [X])";
+    ]
+  in
   List.iter
     (fun part ->
       let contains = string_contains_substring result part in
@@ -153,10 +246,7 @@ let test_backward_compatibility () =
   (* Test that old syntax still works *)
   let program = Compiler.parse_string "fun old_style(x, y) { x }" in
   let result = Compiler.compile_to_string program in
-  let expected_parts = [
-    "old_style(X, Y) ->";
-    "X."
-  ] in
+  let expected_parts = [ "old_style(X, Y) ->"; "X." ] in
   List.iter
     (fun part ->
       let contains = string_contains_substring result part in
@@ -166,10 +256,14 @@ let test_backward_compatibility () =
 let tests =
   [
     ("function call parsing", `Quick, test_function_call_parsing);
-    ("external function call parsing", `Quick, test_external_function_call_parsing);
+    ( "external function call parsing",
+      `Quick,
+      test_external_function_call_parsing );
     ("multiple arities parsing", `Quick, test_multiple_arities_parsing);
     ("sequence parsing", `Quick, test_sequence_parsing);
-    ("external function call compilation", `Quick, test_external_function_call_compilation);
+    ( "external function call compilation",
+      `Quick,
+      test_external_function_call_compilation );
     ("multiple arities compilation", `Quick, test_multiple_arities_compilation);
     ("function call compilation", `Quick, test_function_call_compilation);
     ("sequence compilation", `Quick, test_sequence_compilation);

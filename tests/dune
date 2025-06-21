@@ -13,7 +13,8 @@
   test_otp_validator
   test_module_generation
   test_error_handling
-  test_function_calls))
+  test_function_calls
+  test_error_messages))
 
 (rule
  (alias runtest)

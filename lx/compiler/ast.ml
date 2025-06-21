@@ -32,7 +32,7 @@ type expr =
   | Let of ident * expr * expr
   | Fun of ident list * expr
   | App of expr * expr list
-  | ExternalCall of string * string * expr list  (* module, function, args *)
+  | ExternalCall of string * string * expr list (* module, function, args *)
   | Tuple of expr list
   | List of expr list
   | Match of expr * (pattern * expr) list
@@ -44,14 +44,11 @@ type expr =
 type function_clause = { params : ident list; body : expr }
 
 (* Function definitions with multiple arities *)
-type function_def = {
-  name : ident;
-  clauses : function_clause list
-}
+type function_def = { name : ident; clauses : function_clause list }
 
 (* Helper function to create single-clause function for backward compatibility *)
 let make_single_clause_function name params body =
-  { name; clauses = [{ params; body }] }
+  { name; clauses = [ { params; body } ] }
 
 (* Formal specifications *)
 type spec = { name : ident; requires : expr list; ensures : expr list }

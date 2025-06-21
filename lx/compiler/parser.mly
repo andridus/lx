@@ -66,11 +66,13 @@ function_def:
   | FUN name = IDENT LPAREN params = separated_list(COMMA, IDENT) RPAREN LBRACE RBRACE
     { make_single_clause_function name params (Literal LNil) }
   | FUN _name = IDENT LPAREN _params = separated_list(COMMA, IDENT) RPAREN error
-    { failwith "Missing function body - expected '{' after parameter list" }
+    { failwith "Enhanced:Missing function body - expected '{' after parameter list|Suggestion:Add '{' and '}' to define the function body|Context:function definition" }
   | FUN _name = IDENT error
-    { failwith "Missing parameter list or clause block - expected '(' or '{' after function name" }
+    { failwith "Enhanced:Missing parameter list or clause block - expected '(' or '{' after function name|Suggestion:Add '()' for parameters or '{}' for multiple clauses|Context:function definition" }
+  | FUN TEST error
+    { failwith "Enhanced:'test' is a reserved word and cannot be used as a function name|Suggestion:Try using a different name like 'test_func' or 'my_test'|Context:Reserved words include: test, spec, describe, worker, supervisor, etc." }
   | FUN error
-    { failwith "Missing function name after 'fun' keyword" }
+    { failwith "Enhanced:Missing function name after 'fun' keyword|Suggestion:Provide a valid identifier name for the function|Context:function definition" }
 
 function_clause:
   | LPAREN params = separated_list(COMMA, IDENT) RPAREN LBRACE body = function_body RBRACE
@@ -148,11 +150,11 @@ expr:
   | IF cond = expr THEN then_expr = expr
     { If (cond, then_expr, None) }
   | IF _cond = expr THEN error
-    { failwith "Missing expression after 'then' in if statement" }
+    { failwith "Enhanced:Missing expression after 'then' in if statement|Suggestion:Add an expression after 'then'|Context:if statement" }
   | IF _cond = expr error
-    { failwith "Missing 'then' keyword in if statement" }
+    { failwith "Enhanced:Missing 'then' keyword in if statement|Suggestion:Add 'then' after the condition|Context:if statement" }
   | IF error
-    { failwith "Missing condition after 'if' keyword" }
+    { failwith "Enhanced:Missing condition after 'if' keyword|Suggestion:Add a boolean expression after 'if'|Context:if statement" }
   | CASE value = expr LBRACE cases = case_branch* RBRACE
     { Match (value, cases) }
   | FOR var = IDENT IN iterable = expr LBRACE body = expr RBRACE

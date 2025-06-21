@@ -1,3 +1,7 @@
+let enhance_and_print_error error =
+  let enhanced = Compiler.Error.enhance_ocaml_error error in
+  Printf.eprintf "%s\n" enhanced
+
 let () =
   try
     if Array.length Sys.argv < 2 then (
@@ -27,11 +31,39 @@ let () =
         (Compiler.Otp_validator.string_of_otp_error error);
       exit 1
   | Failure msg ->
-      Printf.eprintf "Error: %s\n" msg;
+      let string_contains_substring s sub =
+        let len_s = String.length s in
+        let len_sub = String.length sub in
+        let rec search i =
+          if i > len_s - len_sub then false
+          else if String.sub s i len_sub = sub then true
+          else search (i + 1)
+        in
+        search 0
+      in
+      if string_contains_substring msg "Enhanced:" then
+        Printf.eprintf "%s\n" msg
+      else enhance_and_print_error msg;
       exit 1
   | Sys_error msg ->
       Printf.eprintf "System error: %s\n" msg;
       exit 1
   | exn ->
-      Printf.eprintf "Fatal error: %s\n" (Printexc.to_string exn);
+      let error_msg = Printexc.to_string exn in
+      let string_contains_substring s sub =
+        let len_s = String.length s in
+        let len_sub = String.length sub in
+        let rec search i =
+          if i > len_s - len_sub then false
+          else if String.sub s i len_sub = sub then true
+          else search (i + 1)
+        in
+        search 0
+      in
+      if
+        string_contains_substring error_msg "belongs to the type"
+        || string_contains_substring error_msg "record field"
+        || string_contains_substring error_msg "Unbound"
+      then enhance_and_print_error error_msg
+      else Printf.eprintf "Fatal error: %s\n" error_msg;
       exit 2

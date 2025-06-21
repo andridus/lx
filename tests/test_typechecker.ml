@@ -8,9 +8,13 @@ let test_basic_types () =
     {
       items =
         [
-          Function (make_single_clause_function "test_int" [] (Literal (LInt 42)));
-                      Function (make_single_clause_function "test_string" [] (Literal (LString "hello")));
-                      Function (make_single_clause_function "test_bool" [] (Literal (LBool true)));
+          Function
+            (make_single_clause_function "test_int" [] (Literal (LInt 42)));
+          Function
+            (make_single_clause_function "test_string" []
+               (Literal (LString "hello")));
+          Function
+            (make_single_clause_function "test_bool" [] (Literal (LBool true)));
         ];
     }
   in
@@ -25,9 +29,7 @@ let test_function_types () =
   let program =
     {
       items =
-        [
-          Function (make_single_clause_function "add" [ "x"; "y" ] (Var "x"));
-        ];
+        [ Function (make_single_clause_function "add" [ "x"; "y" ] (Var "x")) ];
     }
   in
 
@@ -44,8 +46,9 @@ let test_let_expressions () =
     {
       items =
         [
-          Function (make_single_clause_function "test_let" []
-            (Let ("x", Literal (LInt 10), Var "x")));
+          Function
+            (make_single_clause_function "test_let" []
+               (Let ("x", Literal (LInt 10), Var "x")));
         ];
     }
   in
@@ -61,7 +64,8 @@ let test_type_error () =
     {
       items =
         [
-          Function (make_single_clause_function "type_error" [] (Var "nonexistent_var"));
+          Function
+            (make_single_clause_function "type_error" [] (Var "nonexistent_var"));
         ];
     }
   in
@@ -101,7 +105,8 @@ let test_integer_type () =
     {
       items =
         [
-          Function (make_single_clause_function "test_integer" [] (Literal (LInt 42)));
+          Function
+            (make_single_clause_function "test_integer" [] (Literal (LInt 42)));
         ];
     }
   in
@@ -124,8 +129,9 @@ let test_optional_types () =
     {
       items =
         [
-          Function (make_single_clause_function "test_optional" []
-            (If (Literal (LBool true), Literal (LInt 42), None)));
+          Function
+            (make_single_clause_function "test_optional" []
+               (If (Literal (LBool true), Literal (LInt 42), None)));
         ];
     }
   in
@@ -148,11 +154,12 @@ let test_if_then_else_consistent () =
     {
       items =
         [
-          Function (make_single_clause_function "test_if_else" []
-            (If
-              ( Literal (LBool true),
-                Literal (LInt 10),
-                Some (Literal (LInt 20)) )));
+          Function
+            (make_single_clause_function "test_if_else" []
+               (If
+                  ( Literal (LBool true),
+                    Literal (LInt 10),
+                    Some (Literal (LInt 20)) )));
         ];
     }
   in
@@ -197,8 +204,9 @@ let test_tuple_types () =
     {
       items =
         [
-          Function (make_single_clause_function "test_tuple" []
-            (Tuple [ Literal (LAtom "ok"); Literal (LInt 42) ]));
+          Function
+            (make_single_clause_function "test_tuple" []
+               (Tuple [ Literal (LAtom "ok"); Literal (LInt 42) ]));
         ];
     }
   in

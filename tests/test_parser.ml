@@ -4,21 +4,31 @@ open Alcotest
 let test_parse_simple_function () =
   let program = Compiler.parse_string "fun num() { 42 }" in
   match program.items with
-  | [ Function { name = "num"; clauses = [{ params = []; body = Literal (LInt 42) }] } ] -> ()
+  | [
+   Function
+     { name = "num"; clauses = [ { params = []; body = Literal (LInt 42) } ] };
+  ] ->
+      ()
   | _ -> fail "Expected simple function definition"
 
 let test_parse_function_with_params () =
   let program = Compiler.parse_string "fun add(x, y) { x }" in
   match program.items with
-  | [ Function { name = "add"; clauses = [{ params = [ "x"; "y" ]; body = Var "x" }] } ] -> ()
+  | [
+   Function
+     { name = "add"; clauses = [ { params = [ "x"; "y" ]; body = Var "x" } ] };
+  ] ->
+      ()
   | _ -> fail "Expected function with parameters"
 
 let test_parse_multiple_functions () =
   let program = Compiler.parse_string "fun first() { 1 } fun second() { 2 }" in
   match program.items with
   | [
-       Function { name = "first"; clauses = [{ params = []; body = Literal (LInt 1) }] };
-        Function { name = "second"; clauses = [{ params = []; body = Literal (LInt 2) }] };
+   Function
+     { name = "first"; clauses = [ { params = []; body = Literal (LInt 1) } ] };
+   Function
+     { name = "second"; clauses = [ { params = []; body = Literal (LInt 2) } ] };
   ] ->
       ()
   | _ -> fail "Expected two function definitions"
@@ -33,22 +43,31 @@ let test_parse_literals () =
       ( "fun num() { 42 }",
         fun items ->
           match items with
-          | [ Function { clauses = [{ body = Literal (LInt 42); _ }]; _ } ] -> true
+          | [ Function { clauses = [ { body = Literal (LInt 42); _ } ]; _ } ] ->
+              true
           | _ -> false );
       ( "fun str() { \"hello\" }",
         fun items ->
           match items with
-          | [ Function { clauses = [{ body = Literal (LString "hello"); _ }]; _ } ] -> true
+          | [
+           Function { clauses = [ { body = Literal (LString "hello"); _ } ]; _ };
+          ] ->
+              true
           | _ -> false );
       ( "fun bool() { true }",
         fun items ->
           match items with
-          | [ Function { clauses = [{ body = Literal (LBool true); _ }]; _ } ] -> true
+          | [ Function { clauses = [ { body = Literal (LBool true); _ } ]; _ } ]
+            ->
+              true
           | _ -> false );
       ( "fun atom() { :atom }",
         fun items ->
           match items with
-          | [ Function { clauses = [{ body = Literal (LAtom "atom"); _ }]; _ } ] -> true
+          | [
+           Function { clauses = [ { body = Literal (LAtom "atom"); _ } ]; _ };
+          ] ->
+              true
           | _ -> false );
     ]
   in
@@ -63,14 +82,14 @@ let test_parse_literals () =
 let test_parse_nil () =
   let program = Compiler.parse_string "fun test_nil() { nil }" in
   match program.items with
-  | [ Function { clauses = [{ body = Literal LNil; _ }]; _ } ] -> ()
+  | [ Function { clauses = [ { body = Literal LNil; _ } ]; _ } ] -> ()
   | _ -> fail "Expected nil literal"
 
 (* Test for empty function body *)
 let test_parse_empty_function () =
   let program = Compiler.parse_string "fun empty() { }" in
   match program.items with
-  | [ Function { clauses = [{ body = Literal LNil; _ }]; _ } ] -> ()
+  | [ Function { clauses = [ { body = Literal LNil; _ } ]; _ } ] -> ()
   | _ -> fail "Expected empty function to parse as nil"
 
 (* Test for tuple parsing *)
@@ -82,7 +101,16 @@ let test_parse_tuples () =
           match items with
           | [
            Function
-             { clauses = [{ body = Tuple [ Literal (LAtom "ok"); Literal (LInt 42) ]; _ }]; _ };
+             {
+               clauses =
+                 [
+                   {
+                     body = Tuple [ Literal (LAtom "ok"); Literal (LInt 42) ];
+                     _;
+                   };
+                 ];
+               _;
+             };
           ] ->
               true
           | _ -> false );
@@ -92,16 +120,20 @@ let test_parse_tuples () =
           | [
            Function
              {
-               clauses = [{
-                 body =
-                   Tuple
-                     [
-                       Literal (LAtom "ok");
-                       Literal (LInt 42);
-                       Literal (LString "test");
-                     ];
-                 _;
-               }]; _;
+               clauses =
+                 [
+                   {
+                     body =
+                       Tuple
+                         [
+                           Literal (LAtom "ok");
+                           Literal (LInt 42);
+                           Literal (LString "test");
+                         ];
+                     _;
+                   };
+                 ];
+               _;
              };
           ] ->
               true
@@ -109,7 +141,7 @@ let test_parse_tuples () =
       ( "fun empty_tuple() { () }",
         fun items ->
           match items with
-          | [ Function { clauses = [{ body = Tuple []; _ }]; _ } ] -> true
+          | [ Function { clauses = [ { body = Tuple []; _ } ]; _ } ] -> true
           | _ -> false );
     ]
   in
@@ -126,7 +158,12 @@ let test_parse_if_then () =
   let program = Compiler.parse_string "fun check() { if true then 42 }" in
   match program.items with
   | [
-   Function { clauses = [{ body = If (Literal (LBool true), Literal (LInt 42), None); _ }]; _ };
+   Function
+     {
+       clauses =
+         [ { body = If (Literal (LBool true), Literal (LInt 42), None); _ } ];
+       _;
+     };
   ] ->
       ()
   | _ -> fail "Expected if-then without else"
@@ -140,11 +177,18 @@ let test_parse_if_then_else () =
   | [
    Function
      {
-       clauses = [{
-         body =
-           If (Literal (LBool true), Literal (LInt 42), Some (Literal (LInt 0)));
-         _;
-       }]; _;
+       clauses =
+         [
+           {
+             body =
+               If
+                 ( Literal (LBool true),
+                   Literal (LInt 42),
+                   Some (Literal (LInt 0)) );
+             _;
+           };
+         ];
+       _;
      };
   ] ->
       ()

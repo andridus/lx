@@ -30,14 +30,17 @@ type type_env = (ident * lx_type) list
 (* Type substitution *)
 type substitution = (type_var * lx_type) list
 
-(* Error types *)
+(* Enhanced error types with better context *)
 type type_error =
-  | UnificationError of lx_type * lx_type
-  | UnboundVariable of ident
+  | UnificationError of lx_type * lx_type * string option
+  | UnboundVariable of ident * string list
   | OccursCheck of type_var * lx_type
   | HandlerTypeMismatch of otp_handler * lx_type * lx_type
   | MissingHandler of otp_handler
   | InvalidOtpComponent of string
+  | RecordFieldMismatch of string * string * string list
+  | ArityMismatch of string * int * int
+  | ContextualTypeError of string * string * string option
 
 exception TypeError of type_error
 
@@ -74,9 +77,22 @@ let rec string_of_type = function
   | TOtpInfo -> "otp_info"
 
 let string_of_type_error = function
-  | UnificationError (t1, t2) ->
-      "Cannot unify types: " ^ string_of_type t1 ^ " and " ^ string_of_type t2
-  | UnboundVariable var -> "Unbound variable: " ^ var
+  | UnificationError (t1, t2, context) ->
+      let context_part =
+        match context with Some ctx -> " in " ^ ctx | None -> ""
+      in
+      Printf.sprintf "Cannot unify types%s: %s and %s" context_part
+        (string_of_type t1) (string_of_type t2)
+  | UnboundVariable (var, similar) ->
+      let suggestion =
+        match similar with
+        | [] -> ""
+        | [ s ] -> Printf.sprintf " (did you mean '%s'?)" s
+        | suggestions ->
+            Printf.sprintf " (did you mean one of: %s?)"
+              (String.concat ", " suggestions)
+      in
+      Printf.sprintf "Unbound variable: %s%s" var suggestion
   | OccursCheck (var, typ) ->
       "Occurs check failed: " ^ string_of_type (TVar var) ^ " occurs in "
       ^ string_of_type typ
@@ -100,6 +116,27 @@ let string_of_type_error = function
       | Info -> "info"
       | Terminate -> "terminate")
   | InvalidOtpComponent msg -> "Invalid OTP component: " ^ msg
+  | RecordFieldMismatch (field, record_type, available) ->
+      let available_str = String.concat ", " available in
+      Printf.sprintf
+        "Field '%s' does not exist in record type '%s'. Available fields: %s"
+        field record_type available_str
+  | ArityMismatch (func, expected, found) ->
+      Printf.sprintf "Function '%s' expects %d arguments, but %d were provided"
+        func expected found
+  | ContextualTypeError (msg, context, suggestion) ->
+      let suggestion_part =
+        match suggestion with Some s -> " Suggestion: " ^ s | None -> ""
+      in
+      Printf.sprintf "%s in %s.%s" msg context suggestion_part
+
+(* Helper function to get variable names from environment *)
+let get_env_var_names env = List.map fst env
+
+(* Helper function to get record field names *)
+let get_record_fields = function
+  | TRecord fields -> List.map fst fields
+  | _ -> []
 
 (* Substitution operations *)
 let rec apply_subst (subst : substitution) (typ : lx_type) : lx_type =
@@ -164,7 +201,7 @@ let rec unify (t1 : lx_type) (t2 : lx_type) : substitution =
   | TList t1, TList t2 -> unify t1 t2
   | TOption t1, TOption t2 -> unify t1 t2
   | TOtpReply t1, TOtpReply t2 -> unify t1 t2
-  | _ -> raise (TypeError (UnificationError (t1, t2)))
+  | _ -> raise (TypeError (UnificationError (t1, t2, None)))
 
 (* Type inference for literals *)
 let infer_literal = function
@@ -224,7 +261,8 @@ let rec infer_expr (env : type_env) (expr : expr) : lx_type * substitution =
   | Var id -> (
       try (List.assoc id env, [])
       with Not_found ->
-        raise (TypeError (UnboundVariable id)))
+        let similar_vars = get_env_var_names env in
+        raise (TypeError (UnboundVariable (id, similar_vars))))
   | Let (id, value, body) ->
       let value_type, subst1 = infer_expr env value in
       let new_env = (id, value_type) :: apply_subst_env subst1 env in
@@ -354,7 +392,7 @@ let rec infer_expr (env : type_env) (expr : expr) : lx_type * substitution =
   | For (_, _, _) ->
       (* For expressions need more complex handling - simplified for now *)
       (TNil, [])
-  | Sequence exprs ->
+  | Sequence exprs -> (
       (* Type of sequence is the type of the last expression *)
       match List.rev exprs with
       | [] -> (TNil, [])
@@ -364,17 +402,20 @@ let rec infer_expr (env : type_env) (expr : expr) : lx_type * substitution =
           let final_subst =
             List.fold_left
               (fun subst_acc expr ->
-                let _, subst = infer_expr (apply_subst_env subst_acc env) expr in
+                let _, subst =
+                  infer_expr (apply_subst_env subst_acc env) expr
+                in
                 compose_subst subst_acc subst)
               [] rest_exprs
           in
           let last_type, last_subst =
             infer_expr (apply_subst_env final_subst env) last_expr
           in
-          (last_type, compose_subst final_subst last_subst)
+          (last_type, compose_subst final_subst last_subst))
 
 (* Type inference for function clauses *)
-let infer_function_clause (env : type_env) (clause : function_clause) : lx_type * substitution =
+let infer_function_clause (env : type_env) (clause : function_clause) :
+    lx_type * substitution =
   let param_types = List.map (fun _ -> fresh_type_var ()) clause.params in
   let param_env = List.combine clause.params param_types in
   let new_env = param_env @ env in
@@ -387,23 +428,28 @@ let infer_function_clause (env : type_env) (clause : function_clause) : lx_type 
   (fun_type, subst)
 
 (* Type inference for function definitions with multiple arities *)
-let infer_function_def (env : type_env) (func : function_def) : lx_type * substitution =
+let infer_function_def (env : type_env) (func : function_def) :
+    lx_type * substitution =
   match func.clauses with
   | [] -> failwith ("Function " ^ func.name ^ " has no clauses")
-  | [clause] ->
+  | [ clause ] ->
       (* Single clause - backward compatibility *)
       infer_function_clause env clause
   | clauses ->
       (* Multiple clauses - ensure they have compatible types *)
-      let clause_types_and_substs = List.map (infer_function_clause env) clauses in
+      let clause_types_and_substs =
+        List.map (infer_function_clause env) clauses
+      in
       let first_type, first_subst = List.hd clause_types_and_substs in
 
-            (* Check that all clauses have compatible types *)
+      (* Check that all clauses have compatible types *)
       let final_subst =
-        List.fold_left (fun acc_subst (_clause_type, clause_subst) ->
-          (* For now, we don't unify different arities - they're separate functions in Erlang *)
-          compose_subst acc_subst clause_subst
-        ) first_subst (List.tl clause_types_and_substs)
+        List.fold_left
+          (fun acc_subst (_clause_type, clause_subst) ->
+            (* For now, we don't unify different arities - they're separate functions in Erlang *)
+            compose_subst acc_subst clause_subst)
+          first_subst
+          (List.tl clause_types_and_substs)
       in
 
       (* Return the type of the first clause as representative *)
@@ -432,7 +478,8 @@ let type_check_program (program : program) : type_env =
   let env = builtin_env in
 
   (* Add io.format with different arities *)
-  let tv = TVar 1000 in  (* Use a high number to avoid conflicts *)
+  let tv = TVar 1000 in
+  (* Use a high number to avoid conflicts *)
   let env_with_io =
     ("io.format", TFun (TString, TFun (TList tv, TNil))) :: env
   in
