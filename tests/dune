@@ -17,6 +17,7 @@
   test_error_messages
   test_assignment
   test_blocks
+  test_scoping
   ))
 
 (rule

@@ -16,4 +16,5 @@ let () =
       ("Enhanced Error Messages Tests", Test_error_messages.tests);
       ("Assignment Tests", Test_assignment.tests);
       ("Test Blocks Tests", Test_blocks.tests);
+      ("Test Scoping Tests", Test_scoping.tests);
     ]

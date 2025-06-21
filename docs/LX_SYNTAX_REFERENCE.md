@@ -169,6 +169,62 @@ x = 42
 x = 43  # Error: Variable 'x' is already defined and cannot be reassigned
 ```
 
+### Variable Scoping Rules
+
+LX has strict scoping rules to prevent common programming errors:
+
+#### 1. Same Scope Redefinition - NOT ALLOWED
+```lx
+fun example() {
+  x = 42
+  x = 100  # Error: Variable 'x' is already defined in this scope
+}
+```
+
+#### 2. Shadowing (Parent-to-Child) - NOT ALLOWED
+```lx
+fun example() {
+  x = 42           # Variable in parent scope
+  result = {
+    x = 100        # Error: Cannot shadow parent scope variable
+    x + 1
+  }
+}
+```
+
+#### 3. Same Name in Sibling Scopes - ALLOWED
+```lx
+fun example() {
+  result1 = {
+    x = 100        # OK: Variable in block 1
+    x + 10
+  }
+
+  result2 = {
+    x = 200        # OK: Different scope from block 1
+    x + 20
+  }
+
+  .{result1, result2}
+}
+```
+
+**Compilation Behavior**: Each scope gets unique variable names with suffixes to prevent conflicts:
+
+```erlang
+% Generated Erlang code:
+example() ->
+    % start block Result1_abc
+    X_abc = 100,
+    % end block Result1_abc
+    Result1_def = X_abc + 10,
+    % start block Result2_ghi
+    X_ghi = 200,
+    % end block Result2_ghi
+    Result2_def = X_ghi + 20,
+    {Result1_def, Result2_def}.
+```
+
 
 
 ### Block Expressions
@@ -668,20 +724,38 @@ fun spec() { }  # 'spec' is reserved for specifications
 test { }  # Should be: test "description" { }
 ```
 
-### Variable Assignment Errors
-```lx
-# Error: Variable reassignment
-x = 42
-x = 43  # Error: Variable 'x' is already defined in this scope and cannot be reassigned
+### Variable Scoping Errors
+LX enforces strict scoping rules with clear error messages:
 
-# Valid: Different scopes
-fun test_scoping() {
-  x = 42  # This is fine
+```lx
+# Error: Same scope redefinition
+fun example1() {
+  x = 42
+  x = 43  # Error: Variable 'x' is already defined in this scope and cannot be reassigned
+}
+
+# Error: Shadowing parent scope
+fun example2() {
+  x = 42
   result = {
-    x = 100  # This is also fine - different scope
+    x = 100  # Error: Variable 'x' is already defined in parent scope and cannot be shadowed
     x + 1
   }
-  x + result  # Uses outer x (42) and result (101)
+}
+
+# Valid: Different sibling scopes
+fun example3() {
+  result1 = {
+    x = 100  # OK: First block scope
+    x + 10
+  }
+
+  result2 = {
+    x = 200  # OK: Different block scope
+    x + 20
+  }
+
+  .{result1, result2}
 }
 ```
 
@@ -739,8 +813,8 @@ calculate() ->
 ## Best Practices
 
 1. **Use descriptive names** for functions and variables
-2. **Avoid variable reassignment** - use different names or scopes
-3. **Use block expressions** for complex calculations
+2. **Respect scoping rules** - avoid shadowing and use unique names in sibling scopes
+3. **Use block expressions** for complex calculations and better code organization
 4. **Always provide init function** in workers
 5. **Return tuples from OTP callbacks** (except format_status)
 6. **Use pattern matching** instead of nested if-else
@@ -749,7 +823,8 @@ calculate() ->
 9. **Follow consistent indentation** (2 or 4 spaces)
 10. **Use atoms** for status values (`:ok`, `:error`, etc.)
 11. **Use `#` for comments**, not `//`
-12. **Leverage block expressions** for better code organization and performance
+12. **Leverage inline block compilation** for better performance
+13. **Design clear variable scopes** - use different names for different purposes
 
 ## Examples
 
@@ -907,15 +982,79 @@ describe "shopping cart tests" {
 }
 ```
 
+## Recent Improvements
+
+### Block Inline Compilation & Enhanced Scoping
+
+Recent major improvements to the LX compiler include:
+
+#### 1. Optimized Block Compilation
+- **Inline expansion**: Blocks are now compiled as inline statements instead of anonymous functions
+- **Performance boost**: Eliminates function call overhead
+- **Better debugging**: Generated code includes helpful comments marking block boundaries
+
+#### 2. Strict Scoping Rules
+- **No shadowing**: Variables from parent scopes cannot be redefined in child scopes
+- **Same-scope protection**: Variables cannot be reassigned within the same scope
+- **Sibling scope freedom**: Different blocks can use the same variable names safely
+
+#### 3. Improved Error Messages
+- **Clear scope violations**: Specific messages for shadowing and redefinition errors
+- **Contextual hints**: Error messages include suggestions for resolution
+- **Compile-time safety**: All scoping issues caught during compilation
+
+### Practical Example
+
+```lx
+fun process_orders(orders) {
+  # Process each order type in separate scopes
+  processed_standard = {
+    filtered = filter_standard_orders(orders)
+    validated = validate_orders(filtered)
+    total_count = count_orders(validated)  # OK: local to this block
+    .{validated, total_count}
+  }
+
+  processed_express = {
+    filtered = filter_express_orders(orders)  # OK: different scope
+    validated = validate_orders(filtered)     # OK: different scope
+    total_count = count_orders(validated)     # OK: different scope from above
+    .{validated, total_count}
+  }
+
+  # Combine results
+  .{processed_standard, processed_express}
+}
+```
+
+**Generated Erlang (optimized):**
+```erlang
+process_orders(Orders_abc) ->
+    % start block Processed_standard_def
+    Filtered_def = filter_standard_orders(Orders_abc),
+    Validated_def = validate_orders(Filtered_def),
+    Total_count_def = count_orders(Validated_def),
+    % end block Processed_standard_def
+    Processed_standard_abc = {Validated_def, Total_count_def},
+    % start block Processed_express_ghi
+    Filtered_ghi = filter_express_orders(Orders_abc),
+    Validated_ghi = validate_orders(Filtered_ghi),
+    Total_count_ghi = count_orders(Validated_ghi),
+    % end block Processed_express_ghi
+    Processed_express_abc = {Validated_ghi, Total_count_ghi},
+    {Processed_standard_abc, Processed_express_abc}.
+```
+
 This reference document reflects the current state of the LX language implementation including:
 
-- Variable assignment and block expressions
+- **Optimized block compilation** with inline expansion
+- **Strict variable scoping rules** with shadowing prevention
+- **Enhanced error messages** for scoping violations
 - Arithmetic operations with proper precedence (`+`, `-`, `*`, `/`)
 - Pattern matching in function clauses with literal patterns
 - Recursive function support
 - Enhanced comment support with `#` syntax
-- Improved error handling with contextual messages
 - OTP worker and supervisor definitions
 - Comprehensive testing framework
 
-The language continues to evolve with new features being added regularly. Recent additions include full arithmetic expression support with proper operator precedence and enhanced pattern matching capabilities for function definitions.
+The language continues to evolve with new features being added regularly. Recent major additions include the block inline compilation optimization and comprehensive scoping rule enforcement for safer, more efficient code generation.

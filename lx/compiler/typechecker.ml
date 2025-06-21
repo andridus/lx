@@ -36,14 +36,6 @@ type symbol_context = {
 (* Create new context *)
 let create_context parent = { variables = []; parent }
 
-(* Add variable to current context, checking for reassignment *)
-let add_variable_to_context name var_type context =
-  if List.mem_assoc name context.variables then
-    failwith
-      ("Variable '" ^ name
-     ^ "' is already defined in this scope and cannot be reassigned")
-  else { context with variables = (name, var_type) :: context.variables }
-
 (* Lookup variable in context hierarchy *)
 let rec lookup_variable_in_context name context =
   try Some (List.assoc name context.variables)
@@ -51,6 +43,27 @@ let rec lookup_variable_in_context name context =
     match context.parent with
     | Some parent_ctx -> lookup_variable_in_context name parent_ctx
     | None -> None)
+
+(* Add variable to current context, checking for reassignment and shadowing *)
+let add_variable_to_context name var_type context =
+  (* Check if variable already exists in current scope *)
+  if List.mem_assoc name context.variables then
+    failwith
+      ("Variable '" ^ name
+     ^ "' is already defined in this scope and cannot be reassigned")
+  else
+    (* Check if variable exists in parent scope - shadowing not allowed *)
+    let parent_has_var =
+      match context.parent with
+      | Some parent_ctx -> lookup_variable_in_context name parent_ctx <> None
+      | None -> false
+    in
+    if parent_has_var then
+      failwith
+        ("Variable '" ^ name
+       ^ "' is already defined in parent scope and cannot be shadowed")
+    else
+      { context with variables = (name, var_type) :: context.variables }
 
 (* Convert context to type_env for compatibility *)
 let context_to_env context =
@@ -304,23 +317,25 @@ let rec infer_expr_with_context (context : symbol_context) (expr : expr) :
           in
           (last_type, compose_subst final_subst last_subst, final_context))
   | Block exprs -> (
-      (* Block expressions have the same type behavior as sequences *)
+      (* Block expressions create a new scope *)
+      let block_context = create_context (Some context) in
       match List.rev exprs with
       | [] -> (TNil, [], context)
       | last_expr :: rest_exprs ->
           let rest_exprs = List.rev rest_exprs in
-          (* Type check all expressions and accumulate context changes *)
+          (* Type check all expressions in the block scope *)
           let final_subst, accumulated_context =
             List.fold_left
               (fun (subst_acc, ctx_acc) expr ->
                 let _, subst, new_ctx = infer_expr_with_context ctx_acc expr in
                 (compose_subst subst_acc subst, new_ctx))
-              ([], context) rest_exprs
+              ([], block_context) rest_exprs
           in
-          let last_type, last_subst, final_context =
+          let last_type, last_subst, _ =
             infer_expr_with_context accumulated_context last_expr
           in
-          (last_type, compose_subst final_subst last_subst, final_context))
+          (* Return the original context (block variables don't leak out) *)
+          (last_type, compose_subst final_subst last_subst, context))
   | _ ->
       (* For other expressions, convert context to env and use original function *)
       let env = context_to_env context in
