@@ -131,9 +131,14 @@ nil
 ## Identifiers
 
 ### Variable Identifiers
-- Start with lowercase letter
+- Start with lowercase letter or underscore
 - Can contain letters, digits, and underscores
-- Examples: `x`, `my_var`, `count_1`
+- Examples: `x`, `my_var`, `count_1`, `_ignored`
+
+#### Special Variable Patterns
+- `_` (underscore) - Wildcard pattern, ignores the value
+- Variables starting with `_` - Ignored variables for assignments
+- `__MODULE__` - Special macro that compiles to `?MODULE` in Erlang
 
 ### Module/Constructor Identifiers
 - Start with lowercase letter
@@ -167,6 +172,26 @@ z = true
 ```lx
 x = 42
 x = 43  # Error: Variable 'x' is already defined and cannot be reassigned
+```
+
+#### Ignored Variable Assignments
+Variables starting with underscore are treated as ignored assignments - they evaluate the right-hand side for side effects but don't create variable bindings:
+
+```lx
+fun example() {
+  _result = expensive_computation()  # Evaluates but doesn't bind
+  _debug = log_message("debug info") # Side effect only
+  :ok
+}
+```
+
+**Compilation behavior**: Ignored variables are compiled as just the expression value without assignment:
+```erlang
+% Generated Erlang:
+example() ->
+    expensive_computation(),
+    log_message("debug info"),
+    ok.
 ```
 
 ### Variable Scoping Rules
@@ -289,6 +314,32 @@ func(arg1, arg2, arg3)
 ```lx
 # Call function from another module
 my_module.function_name(arg1, arg2)
+
+# Using __MODULE__ macro for self-references
+gen_server.call(__MODULE__, :get_state)
+```
+
+#### Module Reference Macro
+The `__MODULE__` macro is a special identifier that compiles to `?MODULE` in Erlang, providing a reference to the current module:
+
+```lx
+fun get_current_module() {
+  __MODULE__  # Compiles to ?MODULE in Erlang
+}
+
+fun call_self() {
+  gen_server.call(__MODULE__, :some_request)
+}
+```
+
+**Compilation behavior**:
+```erlang
+% Generated Erlang:
+get_current_module() ->
+    ?MODULE.
+
+call_self() ->
+    gen_server:call(?MODULE, some_request).
 ```
 
 ### Conditional Expressions
@@ -363,6 +414,17 @@ fun complex_calculation(a, b) {
   temp2 = b + 5
   result = temp1 + temp2
   result
+}
+
+# With underscore parameters (ignored parameters)
+fun init(_args) {
+  # Ignore initialization arguments
+  .{:ok, initial_state}
+}
+
+fun handle_call(:get, _from, state) {
+  # Ignore the 'from' parameter
+  .{:reply, state, state}
 }
 ```
 
@@ -1051,36 +1113,51 @@ fun calculate_total(items) {
 }
 ```
 
-### Complex Worker with Assignments
+### Complex Worker with Special Syntax Features
 ```lx
 worker shopping_cart {
-  fun init(user_id) {
-    initial_state = .{user_id, [], 0.0}
+  fun init(_args) {
+    # Underscore parameter ignores initialization arguments
+    initial_state = .{[], 0.0}
     .{:ok, initial_state}
   }
 
-  fun handle_call(request, from, state) {
-    # Simple example - in practice you'd pattern match on request
-    response = process_request(request, state)
-    .{:reply, response, state}
+  fun handle_call(request, _from, state) {
+    # Underscore parameter ignores the 'from' reference
+    case request {
+      :get_cart -> .{:reply, state, state}
+      :get_module -> .{:reply, __MODULE__, state}  # Use __MODULE__ macro
+      _ -> .{:reply, :unknown_request, state}
+    }
   }
 
   fun handle_cast(request, state) {
-    # Process async request
+    # Process async request with ignored variables
+    _log_result = log_request(request)  # Side effect only
     new_state = update_state(request, state)
     .{:noreply, new_state}
   }
 
-  fun handle_info(info, state) {
+  fun handle_info(_info, state) {
+    # Ignore info messages
     .{:noreply, state}
   }
 
-  fun terminate(reason, state) {
+  fun terminate(_reason, state) {
+    # Ignore termination reason, just cleanup
+    _cleanup_result = cleanup_resources(state)
     .{:ok}
   }
 
-  fun code_change(old_vsn, state, extra) {
+  fun code_change(_old_vsn, state, _extra) {
+    # Ignore version and extra data
     .{:ok, state}
+  }
+
+  # Helper function demonstrating external calls
+  fun notify_external_service(data) {
+    # Use dot notation for external module calls
+    http_client.post("http://api.example.com", data)
   }
 
   # Helper function with arithmetic
@@ -1182,9 +1259,61 @@ describe "shopping cart tests" {
 
 ## Recent Improvements
 
+### Special Syntax Features (Latest)
+
+The LX compiler now supports several special syntax features for improved Erlang/OTP integration:
+
+#### 1. Underscore Parameters and Ignored Variables
+- **Underscore parameters**: Use `_` or `_name` in function parameters to ignore values
+- **Ignored variable assignments**: Variables starting with `_` are evaluated for side effects but don't create bindings
+- **Wildcard patterns**: `_` can be used in pattern matching to ignore values
+
+```lx
+# Underscore parameters
+fun init(_) { .{:ok, []} }
+fun handle_call(:get, _from, state) { .{:reply, state, state} }
+
+# Ignored variables
+fun process() {
+  _debug = log_message("Processing started")  # Side effect only
+  result = do_work()
+  result
+}
+```
+
+#### 2. Module Reference Macro
+- **`__MODULE__` macro**: Compiles to `?MODULE` in Erlang for self-references
+- **Seamless integration**: Works in any expression context
+- **Type-safe**: Properly integrated with the type system
+
+```lx
+fun get_current_module() { __MODULE__ }
+fun call_self() { gen_server.call(__MODULE__, :request) }
+```
+
+#### 3. Enhanced External Call Syntax
+- **Dot notation**: Use `module.function(args)` for external calls
+- **Compile-time validation**: Ensures correct syntax usage
+- **Error detection**: Catches invalid colon syntax and suggests corrections
+
+```lx
+# Correct syntax
+gen_server.call(__MODULE__, :get)
+io.format("Hello ~p~n", [__MODULE__])
+
+# Invalid syntax (detected and reported)
+# gen_server:call(__MODULE__, :get)  # Error: use '.' instead of ':'
+```
+
+#### 4. Comprehensive Test Coverage
+- **108 tests**: Including 7 new tests for special syntax features
+- **Parser validation**: Tests ensure correct AST generation
+- **Compilation verification**: Tests verify correct Erlang output
+- **Error detection**: Tests verify proper error reporting
+
 ### Enhanced Error Reporting & Improved Compilation System
 
-Recent major improvements to the LX compiler include:
+Previous major improvements to the LX compiler include:
 
 #### 1. Advanced Error Reporting System (Latest)
 - **Precise position tracking**: Errors now show exact line and column numbers using menhir's `$startpos`
@@ -1298,6 +1427,130 @@ The language continues to evolve with new features being added regularly. The mo
 4. **Developer Experience**: Significantly improved debugging experience with clear, actionable error messages that help developers quickly identify and resolve issues in both language syntax and OTP patterns
 
 The LX compiler now provides one of the most advanced error reporting systems in functional programming languages, making it easier for developers to write correct, maintainable code while learning the language's scoping rules and best practices.
+
+## Complete Example: Worker with All Special Syntax Features
+
+Here's a comprehensive example demonstrating all the special syntax features implemented:
+
+```lx
+worker advanced_cart {
+  # Underscore parameter ignores initialization arguments
+  fun init(_) {
+    _startup_log = logger.info("Cart worker starting up")  # Ignored variable
+    initial_state = .{[], 0}
+    .{:ok, initial_state}
+  }
+
+  # Multiple underscore parameters and __MODULE__ usage
+  fun handle_call(request, _from, state) {
+    case request {
+      :get_cart ->
+        .{:reply, state, state}
+
+      :get_module ->
+        .{:reply, __MODULE__, state}  # __MODULE__ macro
+
+      .{:add_item, item} -> {
+        _validation_log = validator.check_item(item)  # Side effect only
+        new_state = add_to_cart(state, item)
+        .{:reply, :ok, new_state}
+      }
+
+      _ ->
+        .{:reply, :unknown_request, state}
+    }
+  }
+
+  # Ignored parameter and external module calls
+  fun handle_cast(.{:log_activity, activity}, state) {
+    _log_result = logger.info("Activity: ~p", [activity])  # Ignored assignment
+    metrics.increment("cart_activity")  # External call with dot notation
+    .{:noreply, state}
+  }
+
+  # Multiple ignored parameters
+  fun handle_info(_info, state) {
+    _debug = logger.debug("Received info message")  # Side effect only
+    .{:noreply, state}
+  }
+
+  # Pattern matching with wildcards and ignored variables
+  fun terminate(reason, state) {
+    case reason {
+      :normal -> {
+        _cleanup = logger.info("Normal shutdown")
+        cleanup_resources(state)
+      }
+      _ -> {
+        _error_log = logger.error("Abnormal shutdown: ~p", [reason])
+        emergency_cleanup(state)
+      }
+    }
+    .{:ok}
+  }
+
+  # Helper functions demonstrating all features
+  fun add_to_cart(.{items, count}, new_item) {
+    _validation = validate_item(new_item)  # Ignored validation result
+    updated_items = [new_item | items]
+    .{updated_items, count + 1}
+  }
+
+  fun validate_item(item) {
+    # Use external validation service
+    validation_service.validate(__MODULE__, item)
+  }
+
+  fun cleanup_resources(.{items, _count}) {
+    # Pattern matching with wildcard
+    _cleanup_result = storage.save_items(items)  # Side effect only
+    _shutdown_log = logger.info("Resources cleaned up")
+    :ok
+  }
+}
+```
+
+**Generated Erlang output:**
+```erlang
+-module(advanced_cart).
+-behaviour(gen_server).
+-compile(export_all).
+
+init(_) ->
+    logger:info("Cart worker starting up"),
+    Initial_state_abc = {[], 0},
+    {ok, Initial_state_abc}.
+
+handle_call(get_cart, _, State_def) ->
+    {reply, State_def, State_def};
+handle_call(get_module, _, State_def) ->
+    {reply, ?MODULE, State_def};
+handle_call({add_item, Item_ghi}, _, State_def) ->
+    validator:check_item(Item_ghi),
+    New_state_jkl = add_to_cart(State_def, Item_ghi),
+    {reply, ok, New_state_jkl};
+handle_call(_, _, State_def) ->
+    {reply, unknown_request, State_def}.
+
+handle_cast({log_activity, Activity_mno}, State_pqr) ->
+    logger:info("Activity: ~p", [Activity_mno]),
+    metrics:increment("cart_activity"),
+    {noreply, State_pqr}.
+
+handle_info(_, State_stu) ->
+    logger:debug("Received info message"),
+    {noreply, State_stu}.
+
+% ... additional functions with proper variable renaming and ignored variable handling
+```
+
+This example showcases:
+- **Underscore parameters** (`_`, `_from`, `_info`, `_count`)
+- **Ignored variable assignments** (`_startup_log`, `_validation_log`, etc.)
+- **`__MODULE__` macro** usage for self-reference
+- **External function calls** with dot notation (`logger.info`, `metrics.increment`)
+- **Pattern matching** with wildcards and ignored variables
+- **Proper Erlang compilation** with variable renaming and optimization
 
 #### Practical Error Examples
 

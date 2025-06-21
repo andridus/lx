@@ -17,7 +17,8 @@
   test_error_messages
   test_assignment
   test_blocks
-  test_scoping))
+  test_scoping
+  test_special_syntax))
 
 (rule
  (alias runtest)

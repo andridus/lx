@@ -12,6 +12,7 @@ let make_position pos =
 %token <float> FLOAT
 %token <bool> BOOL
 %token NIL
+%token MODULE_MACRO
 
 (* Keywords *)
 %token FUN CASE IF THEN ELSE FOR WHEN IN
@@ -30,7 +31,7 @@ let make_position pos =
 %token EQ ARROW PIPE WILDCARD
 %token LPAREN RPAREN LBRACE RBRACE LBRACKET RBRACKET
 %token DOT_LBRACE
-%token COMMA SEMICOLON CONS DOT
+%token COMMA SEMICOLON CONS COLON DOT
 %token PLUS MINUS MULT DIV
 
 %token EOF
@@ -42,6 +43,7 @@ let make_position pos =
 %left COMMA
 %left PLUS MINUS
 %left MULT DIV
+%left DOT COLON (* Highest precedence for module calls *)
 
 %start <program> main
 
@@ -65,16 +67,16 @@ function_def:
   (* New syntax for multiple arities *)
   | FUN name = IDENT LBRACE clauses = function_clause+ RBRACE
     { let pos = make_position $startpos in { name; clauses; position = Some pos } }
-  (* Backward compatibility: single clause *)
-  | FUN name = IDENT LPAREN params = separated_list(COMMA, IDENT) RPAREN LBRACE body = function_body RBRACE
+  (* Backward compatibility: single clause with pattern support *)
+  | FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN LBRACE body = function_body RBRACE
     { let pos = make_position $startpos in
-      let clause = { params = List.map (fun p -> PVar p) params; body; position = Some pos } in
+      let clause = { params; body; position = Some pos } in
       { name; clauses = [clause]; position = Some pos } }
-  | FUN name = IDENT LPAREN params = separated_list(COMMA, IDENT) RPAREN LBRACE RBRACE
+  | FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN LBRACE RBRACE
     { let pos = make_position $startpos in
-      let clause = { params = List.map (fun p -> PVar p) params; body = Literal LNil; position = Some pos } in
+      let clause = { params; body = Literal LNil; position = Some pos } in
       { name; clauses = [clause]; position = Some pos } }
-  | FUN _name = IDENT LPAREN _params = separated_list(COMMA, IDENT) RPAREN error
+  | FUN _name = IDENT LPAREN _params = separated_list(COMMA, pattern) RPAREN error
     { failwith "Enhanced:Missing function body - expected '{' after parameter list|Suggestion:Add '{' and '}' to define the function body|Context:function definition" }
   | FUN _name = IDENT error
     { failwith "Enhanced:Missing parameter list or clause block - expected '(' or '{' after function name|Suggestion:Use 'fun name() { body }' for single clause functions or 'fun name { (params) { body } }' for multiple clause functions|Context:function definition" }
@@ -152,6 +154,9 @@ expr:
     { let pos = make_position $startpos in Assign (name, value, Some pos) }
   | func = expr LPAREN args = separated_list(COMMA, expr) RPAREN
     { App (func, args) }
+  (* Error case: detect incorrect colon syntax and provide helpful error *)
+  | module_name = IDENT COLON func_name = IDENT LPAREN _args = separated_list(COMMA, expr) RPAREN %prec COLON
+    { failwith ("Enhanced:Invalid module call syntax - use '.' instead of ':' for module calls|Suggestion:Change '" ^ module_name ^ ":" ^ func_name ^ "()' to '" ^ module_name ^ "." ^ func_name ^ "()'|Context:Lx uses dot notation for module calls, not colon notation") }
   | left = expr PLUS right = expr
     { BinOp (left, "+", right) }
   | left = expr MINUS right = expr
@@ -178,11 +183,14 @@ expr:
 simple_expr:
   | l = literal { Literal l }
   | name = IDENT { Var name }
+  | MODULE_MACRO { Var "?MODULE" }
   (* External function call: module.function(args) *)
   | module_name = IDENT DOT func_name = IDENT LPAREN args = separated_list(COMMA, expr) RPAREN
     { ExternalCall (module_name, func_name, args) }
+
   (* Module reference without call (backward compatibility) *)
   | module_name = IDENT DOT func_name = IDENT { Var (module_name ^ "." ^ func_name) }
+
   | LPAREN e = expr RPAREN { e }
   | LPAREN elements = separated_list(COMMA, expr) RPAREN
     { match elements with

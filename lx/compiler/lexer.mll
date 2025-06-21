@@ -32,14 +32,18 @@ rule read = parse
   | ","             { COMMA }
   | ";"             { SEMICOLON }
   | "::"            { CONS }
+  | ":"             { COLON }
   | "."             { DOT }
   | "+"             { PLUS }
   | "-"             { MINUS }
   | "*"             { MULT }
   | "/"             { DIV }
 
+  (* Special tokens *)
+  | "__MODULE__"    { MODULE_MACRO }
+
   (* Literals *)
-  | ['a'-'z']['a'-'z''A'-'Z''0'-'9''_']* as id {
+  | ['a'-'z''_']['a'-'z''A'-'Z''0'-'9''_']* as id {
       (* Check if it's a reserved word first *)
       match id with
       | "fun" -> FUN | "case" -> CASE

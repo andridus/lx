@@ -55,21 +55,34 @@ let create_scope parent =
       (match parent with Some p -> p.used_hashes | None -> Hashtbl.create 16);
   }
 
+let is_ignored_var var_name =
+  String.length var_name > 0 && var_name.[0] = '_'
+
 let get_renamed_var ctx var_name =
-  let rec lookup ctx =
-    match Hashtbl.find_opt ctx.var_map var_name with
-    | Some renamed -> renamed
-    | None -> (
-        match ctx.parent with
-        | Some parent_ctx -> lookup parent_ctx
-        | None -> capitalize_var var_name (* fallback to original name *))
-  in
-  lookup ctx
+  if is_ignored_var var_name then
+    (* Always return underscore for ignored variables *)
+    "_"
+  else
+    let rec lookup ctx =
+      match Hashtbl.find_opt ctx.var_map var_name with
+      | Some renamed -> renamed
+      | None -> (
+          match ctx.parent with
+          | Some parent_ctx -> lookup parent_ctx
+          | None -> capitalize_var var_name (* fallback to original name *))
+    in
+    lookup ctx
 
 let add_var_to_scope ctx var_name =
-  let renamed = capitalize_var var_name ^ "_" ^ ctx.scope_hash in
-  Hashtbl.replace ctx.var_map var_name renamed;
-  renamed
+  if is_ignored_var var_name then
+    (* For ignored variables, use underscore in Erlang *)
+    let renamed = "_" in
+    Hashtbl.replace ctx.var_map var_name renamed;
+    renamed
+  else
+    let renamed = capitalize_var var_name ^ "_" ^ ctx.scope_hash in
+    Hashtbl.replace ctx.var_map var_name renamed;
+    renamed
 
 (* Check for reserved words in function names *)
 let reserved_words =
@@ -119,14 +132,16 @@ let emit_literal (l : literal) : string =
   | LString s -> "\"" ^ s ^ "\""
   | LBool true -> "true"
   | LBool false -> "false"
-  | LAtom a -> a
+  | LAtom a -> a (* Atoms in Erlang don't need colon prefix *)
   | LNil -> "nil"
 
 let rec emit_pattern ctx (p : pattern) : string =
   match p with
   | PWildcard -> "_"
-  | PVar id -> get_renamed_var ctx id
-  | PAtom a -> a
+  | PVar id ->
+      if is_ignored_var id then "_"
+      else get_renamed_var ctx id
+  | PAtom a -> a (* Atoms in Erlang don't need colon prefix *)
   | PLiteral l -> emit_literal l
   | PTuple ps -> "{" ^ String.concat ", " (List.map (emit_pattern ctx) ps) ^ "}"
   | PList ps -> "[" ^ String.concat ", " (List.map (emit_pattern ctx) ps) ^ "]"
@@ -167,20 +182,41 @@ and emit_block_inline ctx var_name renamed_var exprs =
       ^ ",\n    " ^ end_comment ^ "\n    " ^ renamed_var ^ " = " ^ result_expr
 
 and emit_expr ctx (e : expr) : string =
+
+  (* Check for invalid colon syntax patterns in any expression *)
+  (match e with
+  | Sequence exprs | Block exprs ->
+      (* Check for the invalid pattern: module_var followed by function call with atom *)
+      let rec check_pattern = function
+        | Var module_name :: App (Literal (LAtom func_name), _) :: _ ->
+            failwith ("Enhanced:Invalid module call syntax detected - use '.' instead of ':' for module calls|Suggestion:Change '" ^ module_name ^ ":" ^ func_name ^ "(...)' to '" ^ module_name ^ "." ^ func_name ^ "(...)'|Context:Lx uses dot notation for module calls, not colon notation")
+        | Var module_name :: Literal (LAtom func_name) :: _ :: _ ->
+            failwith ("Enhanced:Invalid module call syntax detected - use '.' instead of ':' for module calls|Suggestion:Change '" ^ module_name ^ ":" ^ func_name ^ "(...)' to '" ^ module_name ^ "." ^ func_name ^ "(...)'|Context:Lx uses dot notation for module calls, not colon notation")
+        | _ :: rest -> check_pattern rest
+        | [] -> ()
+      in
+      check_pattern exprs
+  | _ -> ());
+
   match e with
   | Literal l -> emit_literal l
   | Var id -> get_renamed_var ctx id
   | Assign (id, value, _pos) -> (
-      (* Check if this is a simple assignment that can be optimized *)
-      let renamed = add_var_to_scope ctx id in
-      match value with
-      (* Special handling for block assignments *)
-      | Block exprs -> emit_block_inline ctx id renamed exprs
-      (* If assigning another assignment, we can optimize by using the value directly *)
-      | Assign (_, inner_value, _) ->
-          (* For single assignment in block, use the inner value directly *)
-          renamed ^ " = " ^ emit_expr ctx inner_value
-      | _ -> renamed ^ " = " ^ emit_expr ctx value)
+      (* Check if this is an ignored variable assignment *)
+      if is_ignored_var id then
+        (* For ignored variables, just evaluate the right side for side effects *)
+        emit_expr ctx value
+      else
+        (* Normal assignment handling *)
+        let renamed = add_var_to_scope ctx id in
+        match value with
+        (* Special handling for block assignments *)
+        | Block exprs -> emit_block_inline ctx id renamed exprs
+        (* If assigning another assignment, we can optimize by using the value directly *)
+        | Assign (_, inner_value, _) ->
+            (* For single assignment in block, use the inner value directly *)
+            renamed ^ " = " ^ emit_expr ctx inner_value
+        | _ -> renamed ^ " = " ^ emit_expr ctx value)
   | Fun (params, body) ->
       let fun_ctx = create_scope (Some ctx) in
       let renamed_params = List.map (add_var_to_scope fun_ctx) params in
@@ -219,15 +255,33 @@ and emit_expr ctx (e : expr) : string =
       ^ " end"
   | For (_, _, _) -> "% For expressions not yet implemented"
   | Sequence exprs ->
-      (* Function body sequences - no anonymous function wrapper *)
+      (* Function body sequences - detect external calls pattern *)
       let block_ctx = create_scope (Some ctx) in
-      String.concat ",\n    " (List.map (emit_expr block_ctx) exprs)
+      let transformed_exprs = detect_and_transform_external_calls exprs in
+      String.concat ",\n    " (List.map (emit_expr block_ctx) transformed_exprs)
   | Block exprs ->
       (* This should not be called directly - blocks are handled in assignments *)
       let block_ctx = create_scope (Some ctx) in
-      String.concat ",\n    " (List.map (emit_expr block_ctx) exprs)
+      let transformed_exprs = detect_and_transform_external_calls exprs in
+      String.concat ",\n    " (List.map (emit_expr block_ctx) transformed_exprs)
   | BinOp (left, op, right) ->
       emit_expr ctx left ^ " " ^ op ^ " " ^ emit_expr ctx right
+
+(* Helper function to detect and transform external call patterns *)
+and detect_and_transform_external_calls exprs =
+  let rec transform acc = function
+    | [] -> List.rev acc
+    | [expr] -> List.rev (expr :: acc)
+    | Var module_name :: Literal (LAtom func_name) :: App (_, _) :: _rest ->
+        (* Pattern: module_var, :func_atom, function_call -> This is invalid syntax! *)
+        failwith ("Enhanced:Invalid module call syntax detected - use '.' instead of ':' for module calls|Suggestion:Change '" ^ module_name ^ ":" ^ func_name ^ "()' to '" ^ module_name ^ "." ^ func_name ^ "()'|Context:Lx uses dot notation for module calls, not colon notation")
+    | Var module_name :: Literal (LAtom func_name) :: _arg1 :: _arg2 :: _rest ->
+        (* Pattern: module_var, :func_atom, arg1, arg2, ... -> This is also invalid syntax! *)
+        failwith ("Enhanced:Invalid module call syntax detected - use '.' instead of ':' for module calls|Suggestion:Change '" ^ module_name ^ ":" ^ func_name ^ "(...)' to '" ^ module_name ^ "." ^ func_name ^ "(...)'|Context:Lx uses dot notation for module calls, not colon notation")
+    | expr :: rest ->
+        transform (expr :: acc) rest
+  in
+  transform [] exprs
 
 let emit_function_clause (func_name : string) (clause : function_clause) :
     string =
