@@ -25,6 +25,7 @@ open Ast
 (* Operators and Punctuation *)
 %token EQ ARROW PIPE WILDCARD
 %token LPAREN RPAREN LBRACE RBRACE LBRACKET RBRACKET
+%token DOT_LBRACE
 %token COMMA SEMICOLON CONS DOT
 
 %token EOF
@@ -167,6 +168,9 @@ simple_expr:
       | [] -> Tuple []
       | [e] -> e  (* Single element in parentheses is just grouping *)
       | es -> Tuple es }
+  (* Tuple syntax with .{} *)
+  | DOT_LBRACE elements = separated_list(COMMA, expr) RBRACE
+    { Tuple elements }
   | LBRACKET elements = separated_list(COMMA, expr) RBRACKET
     { List elements }
   (* Block expressions *)
@@ -195,6 +199,9 @@ simple_pattern:
       | [] -> PTuple []
       | [p] -> p
       | ps -> PTuple ps }
+  (* Tuple pattern syntax with .{} *)
+  | DOT_LBRACE patterns = separated_list(COMMA, pattern) RBRACE
+    { PTuple patterns }
   | LBRACKET patterns = separated_list(COMMA, pattern) RBRACKET
     { PList patterns }
 

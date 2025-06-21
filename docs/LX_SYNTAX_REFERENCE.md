@@ -68,8 +68,9 @@ LX has several categories of keywords:
 - `.` - Module access
 
 ### Punctuation
-- `(` `)` - Parentheses (grouping, function calls, tuples)
-- `{` `}` - Braces (blocks, records, function bodies)
+- `(` `)` - Parentheses (grouping, function calls)
+- `{` `}` - Braces (blocks, function bodies)
+- `.{` `}` - Dot-braces (tuples)
 - `[` `]` - Brackets (lists)
 - `,` - Comma (separators)
 - `;` - Semicolon (expression sequences)
@@ -251,10 +252,10 @@ for item in list {
 
 ### Tuples
 ```lx
-{}              # Empty tuple
-{x}             # Single element (just grouping)
-{x, y}          # Two elements
-{x, y, z}       # Three elements
+.{}             # Empty tuple
+.{x}            # Single element tuple
+.{x, y}         # Two elements
+.{x, y, z}      # Three elements
 ```
 
 ### Lists
@@ -289,8 +290,8 @@ fun factorial {
 }
 
 fun process_result {
-  ({:ok, value}) { value }
-  ({:error, reason}) {
+  (.{:ok, value}) { value }
+  (.{:error, reason}) {
     log_error(reason)
     nil
   }
@@ -307,7 +308,7 @@ fun empty_func() {}
 fun complex_function(input) {
   # Validate input
   if input == nil {
-    {:error, "Input cannot be nil"}
+    .{:error, "Input cannot be nil"}
   } else {
     # Process the input
     processed = process_input(input)
@@ -315,8 +316,8 @@ fun complex_function(input) {
 
     # Return result
     case validated {
-      {:ok, result} -> {:ok, result}
-      {:error, reason} -> {:error, reason}
+      .{:ok, result} -> .{:ok, result}
+      .{:error, reason} -> .{:error, reason}
     }
   }
 }
@@ -345,9 +346,9 @@ case result {
 ### Tuple Patterns
 ```lx
 case tuple {
-  {x, y} -> x + y
-  {x, y, z} -> x + y + z
-  {} -> 0
+  .{x, y} -> x + y
+  .{x, y, z} -> x + y + z
+  .{} -> 0
 }
 ```
 
@@ -369,33 +370,33 @@ worker my_worker {
   # Required init function
   fun init(args) {
     initial_state = setup_state(args)
-    {:ok, initial_state}
+    .{:ok, initial_state}
   }
 
   # Optional callback functions
   fun handle_call(request, from, state) {
     response = process_request(request, state)
     new_state = update_state(state, request)
-    {:reply, response, new_state}
+    .{:reply, response, new_state}
   }
 
   fun handle_cast(request, state) {
     new_state = handle_async_request(request, state)
-    {:noreply, new_state}
+    .{:noreply, new_state}
   }
 
   fun handle_info(info, state) {
-    {:noreply, state}
+    .{:noreply, state}
   }
 
   fun terminate(reason, state) {
     cleanup_resources(state)
-    {:ok}
+    .{:ok}
   }
 
   fun code_change(old_vsn, state, extra) {
     migrated_state = migrate_state(old_vsn, state, extra)
-    {:ok, migrated_state}
+    .{:ok, migrated_state}
   }
 
   fun format_status(status) {
@@ -427,11 +428,11 @@ worker my_worker {
 #### Optional Callbacks
 - `handle_call(Request, From, State)` - Handle synchronous calls
   - **Parameters**: 3 (request, caller, current state)
-  - **Return**: Must return a tuple (typically `{:reply, Response, NewState}`)
+  - **Return**: Must return a tuple (typically `.{:reply, Response, NewState}`)
 
 - `handle_cast(Request, State)` - Handle asynchronous casts
   - **Parameters**: 2 (request, current state)
-  - **Return**: Must return a tuple (typically `{:noreply, NewState}`)
+  - **Return**: Must return a tuple (typically `.{:noreply, NewState}`)
 
 - `handle_info(Info, State)` - Handle system messages
   - **Parameters**: 2 (info message, current state)
@@ -517,8 +518,8 @@ test "complex test with assignments" {
   }
 
   result = case processed {
-    {:ok, data} -> :success
-    {:error, _} -> :failure
+    .{:ok, data} -> :success
+    .{:error, _} -> :failure
   }
 
   assert result == :success
@@ -566,7 +567,7 @@ simple_expr ::= literal
               | IDENT '.' IDENT '(' expr_list ')'         # External call
               | IDENT '.' IDENT                           # Module reference
               | '(' expr ')'                              # Grouping
-              | '(' expr_list ')'                         # Tuple
+              | '.{' expr_list '}'                        # Tuple
               | '[' expr_list ']'                         # List
               | '{' statement_list '}'                    # Block expression
               | '{' '}'                                   # Empty block
@@ -580,7 +581,7 @@ simple_pattern ::= '_'                                    # Wildcard
                  | IDENT                                  # Variable
                  | ATOM                                   # Atom
                  | literal                                # Literal
-                 | '(' pattern_list ')'                   # Tuple pattern
+                 | '.{' pattern_list '}'                  # Tuple pattern
                  | '[' pattern_list ']'                   # List pattern
 ```
 
@@ -637,10 +638,10 @@ The compiler validates OTP callback functions:
 ```lx
 worker bad_worker {
   # Error: init must have exactly 1 parameter
-  fun init(x, y) { {:ok, 0} }
+  fun init(x, y) { .{:ok, 0} }
 
   # Error: handle_call must have exactly 3 parameters
-  fun handle_call(request) { {:reply, :ok, 0} }
+  fun handle_call(request) { .{:reply, :ok, 0} }
 
   # Error: handle_call must return a tuple
   fun handle_call(req, from, state) { :ok }
@@ -683,12 +684,8 @@ fun calculate_total(items) {
   # Calculate total
   total = subtotal + tax
 
-  # Return structured result
-  {
-    :subtotal, subtotal,
-    :tax, tax,
-    :total, total
-  }
+  # Return structured result as tuple
+  .{subtotal, tax, total}
 }
 ```
 
@@ -696,61 +693,32 @@ fun calculate_total(items) {
 ```lx
 worker shopping_cart {
   fun init(user_id) {
-    initial_state = {
-      :user_id, user_id,
-      :items, [],
-      :total, 0.0
-    }
-    {:ok, initial_state}
+    initial_state = .{user_id, [], 0.0}
+    .{:ok, initial_state}
   }
 
-  fun handle_call({:add_item, item}, _from, state) {
-    # Extract current items and total
-    current_items = get_items(state)
-    current_total = get_total(state)
-
-    # Calculate new values
-    new_items = [item | current_items]
-    new_total = current_total + item.price
-
-    # Create new state
-    new_state = {
-      :user_id, state.user_id,
-      :items, new_items,
-      :total, new_total
-    }
-
-    {:reply, {:ok, new_total}, new_state}
+  fun handle_call(request, from, state) {
+    # Simple example - in practice you'd pattern match on request
+    response = process_request(request, state)
+    .{:reply, response, state}
   }
 
-  fun handle_call({:remove_item, item_id}, _from, state) {
-    # Process removal
-    result = {
-      filtered_items = filter_items(state.items, item_id)
-      new_total = calculate_total(filtered_items)
-
-      new_state = {
-        :user_id, state.user_id,
-        :items, filtered_items,
-        :total, new_total
-      }
-
-      {:ok, new_state}
-    }
-
-    case result {
-      {:ok, new_state} -> {:reply, {:ok, new_state.total}, new_state}
-      {:error, reason} -> {:reply, {:error, reason}, state}
-    }
+  fun handle_cast(request, state) {
+    # Process async request
+    new_state = update_state(request, state)
+    .{:noreply, new_state}
   }
 
-  fun handle_cast(:clear_cart, state) {
-    cleared_state = {
-      :user_id, state.user_id,
-      :items, [],
-      :total, 0.0
-    }
-    {:noreply, cleared_state}
+  fun handle_info(info, state) {
+    .{:noreply, state}
+  }
+
+  fun terminate(reason, state) {
+    .{:ok}
+  }
+
+  fun code_change(old_vsn, state, extra) {
+    .{:ok, state}
   }
 }
 ```
@@ -759,23 +727,23 @@ worker shopping_cart {
 ```lx
 fun process_api_response(response) {
   parsed_response = case response {
-    {:ok, data} -> {
+    .{:ok, data} -> {
       # Process successful response
       processed_data = transform_data(data)
       validated_data = validate_data(processed_data)
-      {:success, validated_data}
+      .{:success, validated_data}
     }
-    {:error, reason} -> {
+    .{:error, reason} -> {
       # Handle error response
       error_message = format_error(reason)
       log_error(error_message)
-      {:failure, error_message}
+      .{:failure, error_message}
     }
     _ -> {
       # Handle unexpected response
       error_msg = "Unexpected response format"
       log_warning(error_msg)
-      {:failure, error_msg}
+      .{:failure, error_msg}
     }
   }
 
@@ -787,20 +755,19 @@ fun process_api_response(response) {
 ### Testing with Multiple Statements
 ```lx
 describe "shopping cart tests" {
-  test "should add items correctly" {
+  test "should handle basic operations" {
     # Setup
-    cart_state = {:user_id, 123, :items, [], :total, 0.0}
-    item = {:id, 1, :name, "Widget", :price, 10.50}
+    initial_state = .{123, [], 0.0}
 
     # Execute
-    result = shopping_cart.handle_call({:add_item, item}, nil, cart_state)
+    result = shopping_cart.init(123)
 
     # Verify
-    expected_total = 10.50
     case result {
-      {:reply, {:ok, total}, new_state} -> {
-        assert total == expected_total
-        assert length(new_state.items) == 1
+      .{:ok, state} -> {
+        assert state.0 == 123  # user_id
+        assert state.1 == []   # items
+        assert state.2 == 0.0  # total
       }
       _ -> assert false  # Should not reach here
     }

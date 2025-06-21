@@ -75,7 +75,7 @@ run-example:
 		echo "Usage: make run-example FILE=path/to/file.lx"; \
 		exit 1; \
 	fi
-	dune exec lxc $(FILE)
+	dune exec  --lx $(FILE)
 
 # Show project status
 status:

@@ -22,6 +22,7 @@ rule read = parse
   | "_"             { WILDCARD }
   | "("             { LPAREN }
   | ")"             { RPAREN }
+  | ".{"            { DOT_LBRACE }
   | "{"             { LBRACE }
   | "}"             { RBRACE }
   | "["             { LBRACKET }
