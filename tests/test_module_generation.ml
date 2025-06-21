@@ -23,7 +23,7 @@ let string_matches_pattern s pattern =
 let test_module_name_generation () =
   let func = make_single_clause_function "example" [] (Literal (LInt 42)) in
   let program = { items = [ Function func ] } in
-  let modules = Compiler.compile_to_string_with_module_name program "my_app" in
+  let modules = Compiler.compile_to_string_with_module_name program "my_app" () in
 
   match modules with
   | [ (module_name, module_content) ] ->
@@ -42,7 +42,7 @@ let test_multiple_modules_generation () =
   let func2 = make_single_clause_function "stop" [] (Literal (LAtom "ok")) in
   let program = { items = [ Function func1; Function func2 ] } in
   let modules =
-    Compiler.compile_to_string_with_module_name program "test_app"
+    Compiler.compile_to_string_with_module_name program "test_app" ()
   in
 
   match modules with
@@ -62,7 +62,7 @@ let test_multiple_modules_generation () =
 let test_empty_module_generation () =
   let program = { items = [] } in
   let modules =
-    Compiler.compile_to_string_with_module_name program "empty_app"
+    Compiler.compile_to_string_with_module_name program "empty_app" ()
   in
 
   match modules with
@@ -83,7 +83,7 @@ let test_module_content_structure () =
   let func = make_single_clause_function "hello" [ "name" ] (Var "name") in
   let program = { items = [ Function func ] } in
   let modules =
-    Compiler.compile_to_string_with_module_name program "greeting"
+    Compiler.compile_to_string_with_module_name program "greeting" ()
   in
 
   match modules with

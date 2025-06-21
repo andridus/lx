@@ -64,12 +64,16 @@ module_item:
 function_def:
   (* New syntax for multiple arities *)
   | FUN name = IDENT LBRACE clauses = function_clause+ RBRACE
-    { { name; clauses } }
+    { let pos = make_position $startpos in { name; clauses; position = Some pos } }
   (* Backward compatibility: single clause *)
   | FUN name = IDENT LPAREN params = separated_list(COMMA, IDENT) RPAREN LBRACE body = function_body RBRACE
-    { make_single_clause_function name params body }
+    { let pos = make_position $startpos in
+      let clause = { params = List.map (fun p -> PVar p) params; body; position = Some pos } in
+      { name; clauses = [clause]; position = Some pos } }
   | FUN name = IDENT LPAREN params = separated_list(COMMA, IDENT) RPAREN LBRACE RBRACE
-    { make_single_clause_function name params (Literal LNil) }
+    { let pos = make_position $startpos in
+      let clause = { params = List.map (fun p -> PVar p) params; body = Literal LNil; position = Some pos } in
+      { name; clauses = [clause]; position = Some pos } }
   | FUN _name = IDENT LPAREN _params = separated_list(COMMA, IDENT) RPAREN error
     { failwith "Enhanced:Missing function body - expected '{' after parameter list|Suggestion:Add '{' and '}' to define the function body|Context:function definition" }
   | FUN _name = IDENT error
@@ -79,9 +83,9 @@ function_def:
 
 function_clause:
   | LPAREN params = separated_list(COMMA, pattern) RPAREN LBRACE body = function_body RBRACE
-    { { params; body } }
+    { let pos = make_position $startpos in { params; body; position = Some pos } }
   | LPAREN params = separated_list(COMMA, pattern) RPAREN LBRACE RBRACE
-    { { params; body = Literal LNil } }
+    { let pos = make_position $startpos in { params; body = Literal LNil; position = Some pos } }
   | error
     { failwith "Enhanced:Invalid function clause syntax - expected parameter list in parentheses|Suggestion:For single clause functions use 'fun name() { body }', for multiple clause functions use 'fun name { (params) { body } }'|Context:function clause definition" }
 

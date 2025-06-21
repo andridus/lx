@@ -16,7 +16,7 @@ let test_valid_worker_with_init () =
   let program = { items = [ OtpComponent worker ] } in
 
   try
-    validate_program program;
+    validate_program program None;
     ()
   with OtpValidationError error ->
     fail ("Valid worker test failed: " ^ string_of_otp_error error)
@@ -39,10 +39,10 @@ let test_worker_missing_init () =
   let program = { items = [ OtpComponent worker ] } in
 
   try
-    validate_program program;
+    validate_program program None;
     fail "Missing init test failed: should have thrown error"
   with
-  | OtpValidationError (MissingRequiredCallback ("init", _)) -> ()
+  | OtpValidationError (MissingRequiredCallback ("init", _, _)) -> ()
   | OtpValidationError error ->
       fail
         ("Missing init test failed: wrong error: " ^ string_of_otp_error error)
@@ -76,10 +76,10 @@ let test_handle_call_invalid_arity () =
   let program = { items = [ OtpComponent worker ] } in
 
   try
-    validate_program program;
+    validate_program program None;
     fail "Invalid handle_call arity test failed: should have thrown error"
   with
-  | OtpValidationError (InvalidCallbackArity ("handle_call", _, 3, 2)) -> ()
+  | OtpValidationError (InvalidCallbackArity ("handle_call", _, 3, 2, _, _)) -> ()
   | OtpValidationError error ->
       fail
         ("Invalid handle_call arity test failed: wrong error: "
@@ -114,7 +114,7 @@ let test_handle_call_valid_arity () =
   let program = { items = [ OtpComponent worker ] } in
 
   try
-    validate_program program;
+    validate_program program None;
     ()
   with OtpValidationError error ->
     fail ("Valid handle_call test failed: " ^ string_of_otp_error error)
@@ -143,10 +143,10 @@ let test_handle_cast_invalid_arity () =
   let program = { items = [ OtpComponent worker ] } in
 
   try
-    validate_program program;
+    validate_program program None;
     fail "Invalid handle_cast arity test failed: should have thrown error"
   with
-  | OtpValidationError (InvalidCallbackArity ("handle_cast", _, 2, 1)) -> ()
+  | OtpValidationError (InvalidCallbackArity ("handle_cast", _, 2, 1, _, _)) -> ()
   | OtpValidationError error ->
       fail
         ("Invalid handle_cast arity test failed: wrong error: "
@@ -166,10 +166,10 @@ let test_callback_non_tuple_return () =
   let program = { items = [ OtpComponent worker ] } in
 
   try
-    validate_program program;
+    validate_program program None;
     fail "Non-tuple return test failed: should have thrown error"
   with
-  | OtpValidationError (InvalidCallbackReturn ("init", _)) -> ()
+  | OtpValidationError (InvalidCallbackReturn ("init", _, _, _)) -> ()
   | OtpValidationError error ->
       fail
         ("Non-tuple return test failed: wrong error: "
@@ -199,7 +199,7 @@ let test_format_status_any_return () =
   let program = { items = [ OtpComponent worker ] } in
 
   try
-    validate_program program;
+    validate_program program None;
     ()
   with OtpValidationError error ->
     fail ("Format status test failed: " ^ string_of_otp_error error)
@@ -223,7 +223,7 @@ let test_invalid_worker_name () =
   let program = { items = [ OtpComponent worker ] } in
 
   try
-    validate_program program;
+    validate_program program None;
     fail "Invalid worker name test failed: should have thrown error"
   with
   | OtpValidationError (InvalidWorkerName _) -> ()
@@ -254,7 +254,7 @@ let test_valid_supervisor () =
   let program = { items = [ OtpComponent supervisor; OtpComponent worker ] } in
 
   try
-    validate_program program;
+    validate_program program None;
     ()
   with OtpValidationError error ->
     fail ("Valid supervisor test failed: " ^ string_of_otp_error error)
@@ -273,7 +273,7 @@ let test_unknown_child () =
   let program = { items = [ OtpComponent supervisor ] } in
 
   try
-    validate_program program;
+    validate_program program None;
     fail "Unknown child test failed: should have thrown error"
   with
   | OtpValidationError (UnknownChild (_, _)) -> ()

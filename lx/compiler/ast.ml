@@ -53,14 +53,22 @@ type expr =
   | BinOp of expr * string * expr (* Binary operations *)
 
 (* Function clause for multiple arities *)
-type function_clause = { params : pattern list; body : expr }
+type function_clause = {
+  params : pattern list;
+  body : expr;
+  position : position option (* Position of the clause *)
+}
 
 (* Function definitions with multiple arities *)
-type function_def = { name : ident; clauses : function_clause list }
+type function_def = {
+  name : ident;
+  clauses : function_clause list;
+  position : position option (* Position of the function definition *)
+}
 
 (* Helper function to create single-clause function for backward compatibility *)
 let make_single_clause_function name params body =
-  { name; clauses = [ { params = List.map (fun p -> PVar p) params; body } ] }
+  { name; clauses = [ { params = List.map (fun p -> PVar p) params; body; position = None } ]; position = None }
 
 (* Formal specifications *)
 type spec = { name : ident; requires : expr list; ensures : expr list }

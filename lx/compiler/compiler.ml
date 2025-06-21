@@ -463,14 +463,14 @@ let parse_file (filename : string) : program =
       Error.parse_error ~filename:(Some filename) lexbuf message
 
 let compile_to_string_with_module_name (program : program)
-    (base_module_name : string) : (string * string) list =
+    (base_module_name : string) ?(filename : string option = None) () : (string * string) list =
   (* Type checking phase *)
   (try
      let _ = Typechecker.type_check_program program in
      (* OTP validation phase *)
-     try Otp_validator.validate_program program
+     try Otp_validator.validate_program program filename
      with Otp_validator.OtpValidationError error ->
-       Printf.eprintf "OTP Validation Error: %s\n"
+       Printf.eprintf "%s\n"
          (Otp_validator.string_of_otp_error error);
        failwith "OTP validation failed"
    with
@@ -508,7 +508,7 @@ let compile_to_string_with_module_name (program : program)
   main_module :: otp_modules
 
 let compile_to_string (program : program) : string =
-  let modules = compile_to_string_with_module_name program "generated" in
+  let modules = compile_to_string_with_module_name program "generated" () in
   (* Return only the main module for backward compatibility *)
   snd (List.hd modules)
 
@@ -535,10 +535,10 @@ let type_check_program (program : program) : Typechecker.type_env =
 
     (* Also run OTP validation *)
     (try
-       Otp_validator.validate_program program;
+       Otp_validator.validate_program program None;
        Printf.printf "\nOTP validation completed successfully.\n"
      with Otp_validator.OtpValidationError error ->
-       Printf.eprintf "OTP Validation Error: %s\n"
+       Printf.eprintf "%s\n"
          (Otp_validator.string_of_otp_error error);
        failwith "OTP validation failed");
 
@@ -558,7 +558,7 @@ let compile_file (filename : string) : unit =
   let program = parse_file filename in
   let base_name = Filename.remove_extension (Filename.basename filename) in
   let source_dir = Filename.dirname filename in
-  let modules = compile_to_string_with_module_name program base_name in
+  let modules = compile_to_string_with_module_name program base_name ~filename:(Some filename) () in
 
   (* Write each module to its own file in the same directory as the source *)
   List.iter

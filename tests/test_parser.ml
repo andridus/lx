@@ -6,7 +6,7 @@ let test_parse_simple_function () =
   match program.items with
   | [
    Function
-     { name = "num"; clauses = [ { params = []; body = Literal (LInt 42) } ] };
+     { name = "num"; clauses = [ { params = []; body = Literal (LInt 42); position = _ } ]; position = _ };
   ] ->
       ()
   | _ -> fail "Expected simple function definition"
@@ -16,10 +16,11 @@ let test_parse_function_with_params () =
   match program.items with
   | [
    Function
-     {
-       name = "add";
-       clauses = [ { params = [ PVar "x"; PVar "y" ]; body = Var "x" } ];
-     };
+           {
+        name = "add";
+        clauses = [ { params = [ PVar "x"; PVar "y" ]; body = Var "x"; position = _ } ];
+        position = _;
+      };
   ] ->
       ()
   | _ -> fail "Expected function with parameters"
@@ -29,9 +30,9 @@ let test_parse_multiple_functions () =
   match program.items with
   | [
    Function
-     { name = "first"; clauses = [ { params = []; body = Literal (LInt 1) } ] };
+     { name = "first"; clauses = [ { params = []; body = Literal (LInt 1); position = _ } ]; position = _ };
    Function
-     { name = "second"; clauses = [ { params = []; body = Literal (LInt 2) } ] };
+     { name = "second"; clauses = [ { params = []; body = Literal (LInt 2); position = _ } ]; position = _ };
   ] ->
       ()
   | _ -> fail "Expected two function definitions"

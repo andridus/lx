@@ -4,6 +4,8 @@ open Parser
 let filename_ref = ref None
 
 let set_filename filename = filename_ref := filename
+
+let get_filename () = !filename_ref
 }
 
 rule read = parse

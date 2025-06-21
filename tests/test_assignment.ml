@@ -22,7 +22,7 @@ fun test() {
   let lexbuf = Lexing.from_string source in
   let ast = Compiler.Parser.main Compiler.Lexer.read lexbuf in
   let modules =
-    Compiler.compile_to_string_with_module_name ast "test_assignment"
+    Compiler.compile_to_string_with_module_name ast "test_assignment" ()
   in
   let erlang_code =
     match modules with
@@ -46,7 +46,7 @@ fun test() {
   let lexbuf = Lexing.from_string source in
   let ast = Compiler.Parser.main Compiler.Lexer.read lexbuf in
   let modules =
-    Compiler.compile_to_string_with_module_name ast "test_multiple"
+    Compiler.compile_to_string_with_module_name ast "test_multiple" ()
   in
   let erlang_code =
     match modules with
@@ -74,7 +74,7 @@ fun test() {
   let ast = Compiler.Parser.main Compiler.Lexer.read lexbuf in
   try
     let _ =
-      Compiler.compile_to_string_with_module_name ast "test_reassignment"
+      Compiler.compile_to_string_with_module_name ast "test_reassignment" ()
     in
     Alcotest.fail "Expected reassignment error but compilation succeeded"
   with

@@ -5,13 +5,15 @@ open Ast
 
 (* OTP validation errors *)
 type otp_error =
-  | MissingRequiredCallback of string * string (* callback name, worker name *)
+  | MissingRequiredCallback of string * string * string option (* callback name, worker name, filename *)
   | InvalidCallbackArity of
       string
       * string
       * int
-      * int (* callback name, worker name, expected, actual *)
-  | InvalidCallbackReturn of string * string (* callback name, worker name *)
+      * int
+      * position option
+      * string option (* callback name, worker name, expected, actual, position, filename *)
+  | InvalidCallbackReturn of string * string * position option * string option (* callback name, worker name, position, filename *)
   | InvalidWorkerName of string
   | InvalidSupervisorName of string
   | CircularDependency of string list
@@ -19,29 +21,72 @@ type otp_error =
 
 exception OtpValidationError of otp_error
 
+(* Helper function to format position *)
+let format_position pos filename =
+  let file_prefix = match filename with
+    | None -> (match pos with
+               | Some p when p.filename <> None -> (match p.filename with Some f -> f ^ ":" | None -> "")
+               | _ -> "")
+    | Some f -> f ^ ":"
+  in
+  match pos with
+  | None -> if file_prefix <> "" then " in " ^ file_prefix else ""
+  | Some p -> Printf.sprintf " at %sline %d, column %d" file_prefix p.line p.column
+
+(* Helper function to get example for callback *)
+let get_callback_example = function
+  | "init" -> "fun init(args) { .{:ok, initial_state} }"
+  | "handle_call" -> "fun handle_call(request, from, state) { .{:reply, response, new_state} }"
+  | "handle_cast" -> "fun handle_cast(request, state) { .{:noreply, new_state} }"
+  | "handle_info" -> "fun handle_info(info, state) { .{:noreply, state} }"
+  | "terminate" -> "fun terminate(reason, state) { .{:ok} }"
+  | "code_change" -> "fun code_change(old_vsn, state, extra) { .{:ok, state} }"
+  | "format_status" -> "fun format_status(status) { status }"
+  | _ -> ""
+
 (* Pretty printing for OTP errors *)
 let string_of_otp_error = function
-  | MissingRequiredCallback (callback, worker) ->
-      "Worker must implement function " ^ callback
-      ^ " with parameter count equal to "
-      ^ (match callback with "init" -> "1" | _ -> "unknown")
-      ^ " in worker '" ^ worker ^ "'"
-  | InvalidCallbackArity (callback, worker, expected, actual) ->
-      "Function " ^ callback ^ " must have parameter count equal to "
-      ^ string_of_int expected
-      ^ (match callback with
-        | "init" -> ": (Args)"
-        | "handle_call" -> ": (Request, From, State)"
-        | "handle_cast" -> ": (Request, State)"
-        | "handle_info" -> ": (Info, State)"
-        | "terminate" -> ": (Reason, State)"
-        | "code_change" -> ": (OldVsn, State, Extra)"
-        | "format_status" -> ": (Status)"
-        | _ -> "")
-      ^ " in worker '" ^ worker ^ "', but found " ^ string_of_int actual
-      ^ " parameters"
-  | InvalidCallbackReturn (callback, worker) ->
-      "Function " ^ callback ^ " must return a tuple in worker '" ^ worker ^ "'"
+  | MissingRequiredCallback (callback, worker, filename) ->
+      let file_prefix = match filename with Some f -> f ^ ": " | None -> "" in
+      let example = get_callback_example callback in
+      Printf.sprintf "%sOTP Error: Worker '%s' is missing required callback function '%s'\n  Expected: %s"
+        file_prefix worker callback example
+  | InvalidCallbackArity (callback, worker, expected, actual, pos, filename) ->
+      let file_prefix = match filename with Some f -> f ^ ":" | None -> "" in
+      let position_info = match pos with
+        | Some p -> Printf.sprintf "%s%d:%d: " file_prefix p.line p.column
+        | None -> if file_prefix <> "" then file_prefix ^ " " else ""
+      in
+      let param_names = match callback with
+        | "init" -> "(args)"
+        | "handle_call" -> "(request, from, state)"
+        | "handle_cast" -> "(request, state)"
+        | "handle_info" -> "(info, state)"
+        | "terminate" -> "(reason, state)"
+        | "code_change" -> "(old_vsn, state, extra)"
+        | "format_status" -> "(status)"
+        | _ -> ""
+      in
+      let example = get_callback_example callback in
+      Printf.sprintf "%sOTP Error: Function '%s' in worker '%s' has incorrect number of parameters\n  Found: %d parameters\n  Expected: %d parameters %s\n  Correct syntax: %s"
+        position_info callback worker actual expected param_names example
+  | InvalidCallbackReturn (callback, worker, pos, filename) ->
+      let file_prefix = match filename with Some f -> f ^ ":" | None -> "" in
+      let position_info = match pos with
+        | Some p -> Printf.sprintf "%s%d:%d: " file_prefix p.line p.column
+        | None -> if file_prefix <> "" then file_prefix ^ " " else ""
+      in
+      let return_example = match callback with
+        | "init" -> ".{:ok, initial_state} or .{:stop, reason}"
+        | "handle_call" -> ".{:reply, response, new_state} or .{:noreply, new_state}"
+        | "handle_cast" -> ".{:noreply, new_state} or .{:stop, reason, new_state}"
+        | "handle_info" -> ".{:noreply, new_state} or .{:stop, reason, new_state}"
+        | "terminate" -> ".{:ok} (any value is acceptable)"
+        | "code_change" -> ".{:ok, new_state} or .{:error, reason}"
+        | _ -> "a tuple"
+      in
+      Printf.sprintf "%sOTP Error: Function '%s' in worker '%s' must return a tuple\n  Expected return format: %s"
+        position_info callback worker return_example
   | InvalidWorkerName name ->
       "Invalid worker name: '" ^ name ^ "'. Worker names must be valid atoms"
   | InvalidSupervisorName name ->
@@ -89,7 +134,7 @@ let get_worker_otp_callbacks (functions : function_def list) :
 
 (* Validate a single OTP callback function *)
 let validate_otp_callback (callback : otp_callback) (func : function_def)
-    (worker_name : string) : unit =
+    (worker_name : string) (filename : string option) : unit =
   let callback_name : string = string_of_otp_callback callback in
   let expected_arity : int = expected_arity_for_callback callback in
 
@@ -101,7 +146,7 @@ let validate_otp_callback (callback : otp_callback) (func : function_def)
         raise
           (OtpValidationError
              (InvalidCallbackArity
-                (callback_name, worker_name, expected_arity, actual_arity))))
+                (callback_name, worker_name, expected_arity, actual_arity, clause.position, filename))))
     func.clauses;
 
   (* Check that all clauses return tuples (except format_status which can return anything) *)
@@ -111,11 +156,11 @@ let validate_otp_callback (callback : otp_callback) (func : function_def)
         if not (returns_tuple clause.body) then
           raise
             (OtpValidationError
-               (InvalidCallbackReturn (callback_name, worker_name))))
+               (InvalidCallbackReturn (callback_name, worker_name, clause.position, filename))))
       func.clauses
 
 (* Validate worker component *)
-let validate_worker (worker : otp_component) =
+let validate_worker (worker : otp_component) (filename : string option) =
   match worker with
   | Worker { name; functions; specs = _ } ->
       (* Validate worker name *)
@@ -130,11 +175,11 @@ let validate_worker (worker : otp_component) =
         List.exists (fun (callback, _) -> callback = Init) otp_callbacks
       in
       if not has_init then
-        raise (OtpValidationError (MissingRequiredCallback ("init", name)));
+        raise (OtpValidationError (MissingRequiredCallback ("init", name, filename)));
 
       (* Validate each OTP callback *)
       List.iter
-        (fun (callback, func) -> validate_otp_callback callback func name)
+        (fun (callback, func) -> validate_otp_callback callback func name filename)
         otp_callbacks
   | Supervisor _ -> failwith "validate_worker called with supervisor component"
 
@@ -203,11 +248,11 @@ let validate_supervisor (supervisor : otp_component)
   | Worker _ -> failwith "validate_supervisor called with worker component"
 
 (* Main validation function *)
-let validate_otp_components (components : otp_component list) =
+let validate_otp_components (components : otp_component list) (filename : string option) =
   (* Validate each component individually *)
   List.iter
     (function
-      | Worker _ as w -> validate_worker w
+      | Worker _ as w -> validate_worker w filename
       | Supervisor _ as s -> validate_supervisor s components)
     components;
 
@@ -216,11 +261,11 @@ let validate_otp_components (components : otp_component list) =
   detect_circular_dependencies dependency_graph
 
 (* Validate a complete program *)
-let validate_program (program : program) =
+let validate_program (program : program) (filename : string option) =
   let components =
     List.filter_map
       (function OtpComponent comp -> Some comp | _ -> None)
       program.items
   in
 
-  validate_otp_components components
+  validate_otp_components components filename

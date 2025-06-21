@@ -865,18 +865,111 @@ fun example3() {
 ```
 
 ### OTP Validation Errors
-The compiler validates OTP callback functions:
 
+The LX compiler provides **enhanced OTP validation** with precise error reporting that follows the same format as syntax errors. All OTP validation errors include:
+
+- **Exact file location** with line and column numbers
+- **Clear error descriptions** explaining what's wrong
+- **Expected vs. actual information** for parameter counts and return types
+- **Correct syntax examples** showing how to fix the issue
+
+#### OTP Error Format
+```
+filename:line:column: OTP Error: [detailed_error_description]
+  Found: [actual_situation]
+  Expected: [expected_situation]
+  Correct syntax: [example_showing_fix]
+```
+
+#### Common OTP Validation Errors
+
+##### 1. Incorrect Parameter Count
 ```lx
 worker bad_worker {
   # Error: init must have exactly 1 parameter
   fun init(x, y) { .{:ok, 0} }
+}
+```
 
-  # Error: handle_call must have exactly 3 parameters
-  fun handle_call(request) { .{:reply, :ok, 0} }
+**Compiler Output:**
+```
+my/test1.lx:3:3: OTP Error: Function 'init' in worker 'bad_worker' has incorrect number of parameters
+  Found: 2 parameters
+  Expected: 1 parameters (args)
+  Correct syntax: fun init(args) { .{:ok, initial_state} }
+```
+
+##### 2. Missing Required Callback
+```lx
+worker incomplete_worker {
+  # Error: Missing required init function
+  fun handle_call(req, from, state) { .{:reply, :ok, state} }
+}
+```
+
+**Compiler Output:**
+```
+my/incomplete.lx: OTP Error: Worker 'incomplete_worker' is missing required callback function 'init'
+  Expected: fun init(args) { .{:ok, initial_state} }
+```
+
+##### 3. Incorrect Return Type
+```lx
+worker bad_worker {
+  fun init(args) { .{:ok, 0} }
 
   # Error: handle_call must return a tuple
   fun handle_call(req, from, state) { :ok }
+}
+```
+
+**Compiler Output:**
+```
+my/test1.lx:5:3: OTP Error: Function 'handle_call' in worker 'bad_worker' must return a tuple
+  Expected return format: .{:reply, response, new_state} or .{:noreply, new_state}
+```
+
+#### OTP Callback Parameter Requirements
+
+| Callback | Parameters | Parameter Names | Return Type |
+|----------|------------|----------------|-------------|
+| `init` | 1 | `(args)` | Tuple (required) |
+| `handle_call` | 3 | `(request, from, state)` | Tuple (required) |
+| `handle_cast` | 2 | `(request, state)` | Tuple (required) |
+| `handle_info` | 2 | `(info, state)` | Tuple (required) |
+| `terminate` | 2 | `(reason, state)` | Tuple (required) |
+| `code_change` | 3 | `(old_vsn, state, extra)` | Tuple (required) |
+| `format_status` | 1 | `(status)` | Any type (flexible) |
+
+#### Valid OTP Worker Example
+```lx
+worker my_worker {
+  # Required: init function with 1 parameter
+  fun init(args) {
+    initial_state = setup_state(args)
+    .{:ok, initial_state}
+  }
+
+  # Optional: handle_call with 3 parameters, returns tuple
+  fun handle_call(request, from, state) {
+    response = process_request(request, state)
+    new_state = update_state(state, request)
+    .{:reply, response, new_state}
+  }
+
+  # Optional: handle_cast with 2 parameters, returns tuple
+  fun handle_cast(request, state) {
+    new_state = handle_async_request(request, state)
+    .{:noreply, new_state}
+  }
+
+  # Optional: Other callbacks follow the same pattern
+  fun handle_info(info, state) { .{:noreply, state} }
+  fun terminate(reason, state) { .{:ok} }
+  fun code_change(old_vsn, state, extra) { .{:ok, state} }
+
+  # Special case: format_status can return any type
+  fun format_status(status) { status }
 }
 ```
 
@@ -1100,6 +1193,7 @@ Recent major improvements to the LX compiler include:
 - **Smart suggestions**: Provides specific variable naming suggestions for each error type
 - **Structured error format**: Consistent, readable error message structure
 - **Improved debugging**: Clear distinction between redefinition and shadowing errors
+- **Enhanced OTP validation**: Complete overhaul of OTP error messages with precise positioning, clear descriptions, and correct syntax examples
 
 #### 2. Optimized Block Compilation
 - **Inline expansion**: Blocks are now compiled as inline statements instead of anonymous functions
@@ -1131,40 +1225,77 @@ Variable 'pega_do_banco' is already defined in this scope and cannot be reassign
 - Actionable suggestions for resolution
 - Clear scope context ("within the same scope")
 
-#### 5. Technical Enhancements
+#### 5. Enhanced OTP Error Reporting System
+
+The OTP validation system has been completely rewritten to provide precise, actionable error messages:
+
+- **Position-aware OTP errors**: All OTP validation errors now include exact file location (line:column)
+- **Structured error format**: Consistent format matching syntax errors with "Found/Expected/Correct syntax" sections
+- **Comprehensive callback validation**: Validates parameter counts, return types, and required callbacks
+- **Helpful syntax examples**: Each error includes correct syntax examples for immediate reference
+- **Clear error categorization**: Distinguishes between parameter count errors, return type errors, and missing callbacks
+- **Integration with AST positions**: Function definitions now capture position information for precise error reporting
+
+**Example OTP Error Transformation:**
+
+Before:
+```
+OTP Validation Error: Function init must have parameter count equal to 1: (Args) in worker 'bad_worker', but found 2 parameters
+```
+
+After:
+```
+my/test1.lx:3:3: OTP Error: Function 'init' in worker 'bad_worker' has incorrect number of parameters
+  Found: 2 parameters
+  Expected: 1 parameters (args)
+  Correct syntax: fun init(args) { .{:ok, initial_state} }
+```
+
+#### 6. Technical Enhancements
 
 - **Menhir integration**: Better position tracking using `$startpos` instead of manual position functions
 - **ANSI color support**: Terminal-friendly colored output for better readability
 - **Exception handling**: Proper `CompilationError` exceptions with structured error data
 - **Test coverage**: Comprehensive test suite covering all error scenarios
 - **Backward compatibility**: All existing functionality preserved while adding new features
+- **AST position tracking**: Function definitions and clauses now include position information for better error reporting
 
 This reference document reflects the current state of the LX language implementation including:
 
 - **Advanced error reporting system** with colored output, precise position tracking, and contextual suggestions
+- **Enhanced OTP validation** with position-aware error messages, structured format, and syntax examples
 - **Enhanced variable scoping** with strict redefinition and shadowing prevention
 - **Optimized block compilation** with inline expansion for better performance
 - **Comprehensive testing framework** with full error scenario coverage
 - **Menhir-based parsing** with accurate position tracking using `$startpos`
+- **AST position integration** for function definitions and clauses
 - Arithmetic operations with proper precedence (`+`, `-`, `*`, `/`)
 - Pattern matching in function clauses with literal patterns
 - Recursive function support
 - Enhanced comment support with `#` syntax
-- OTP worker and supervisor definitions
+- OTP worker and supervisor definitions with comprehensive validation
 - Formal specification system
 
 The language continues to evolve with new features being added regularly. The most recent major additions include:
 
 1. **Revolutionary Error System (Latest)**: Complete overhaul of error reporting with:
-   - Precise line/column position tracking
+   - Precise line/column position tracking for all error types
    - Visual highlighting with bold yellow variable names
    - Contextual error messages showing first definition locations
    - Smart suggestions for variable naming conflicts
    - Structured error format for better readability
+   - **Enhanced OTP validation** with position-aware error messages and syntax examples
 
-2. **Enhanced Compilation Pipeline**: Improved error handling throughout the compilation process with proper exception types and comprehensive test coverage
+2. **Enhanced OTP Validation System**: Complete rewrite of OTP callback validation with:
+   - Precise file location tracking for all OTP errors
+   - Clear parameter count and return type validation
+   - Structured error format matching syntax errors
+   - Helpful syntax examples for immediate correction
+   - Comprehensive callback requirement documentation
 
-3. **Developer Experience**: Significantly improved debugging experience with clear, actionable error messages that help developers quickly identify and resolve issues
+3. **Enhanced Compilation Pipeline**: Improved error handling throughout the compilation process with proper exception types and comprehensive test coverage
+
+4. **Developer Experience**: Significantly improved debugging experience with clear, actionable error messages that help developers quickly identify and resolve issues in both language syntax and OTP patterns
 
 The LX compiler now provides one of the most advanced error reporting systems in functional programming languages, making it easier for developers to write correct, maintainable code while learning the language's scoping rules and best practices.
 

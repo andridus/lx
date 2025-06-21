@@ -126,8 +126,10 @@ let test_different_scopes () =
                           Assign ("result1", block1, None);
                           Assign ("result2", block2, None);
                         ];
+                    position = None;
                   };
                 ];
+              position = None;
             };
         ];
     }
@@ -160,8 +162,10 @@ let test_shadowing_parent_scope_fails () =
                           Assign ("x", Literal (LInt 42), None);
                           Assign ("result", inner_block, None);
                         ];
+                    position = None;
                   };
                 ];
+              position = None;
             };
         ];
     }
@@ -198,8 +202,10 @@ let test_same_scope_redefinition_fails_new () =
                           Assign ("x", Literal (LInt 100), None)
                           (* This should fail *);
                         ];
+                    position = None;
                   };
                 ];
+              position = None;
             };
         ];
     }
@@ -247,8 +253,10 @@ let test_complex_nested_scoping_new () =
                           Assign ("middle", inner_block, None);
                           Var "x";
                         ];
+                    position = None;
                   };
                 ];
+              position = None;
             };
         ];
     }

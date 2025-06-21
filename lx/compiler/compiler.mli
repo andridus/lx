@@ -22,7 +22,7 @@ val parse_file : string -> Ast.program
 val compile_to_string : Ast.program -> string
 
 val compile_to_string_with_module_name :
-  Ast.program -> string -> (string * string) list
+  Ast.program -> string -> ?filename:string option -> unit -> (string * string) list
 
 val compile_file : string -> unit
 
