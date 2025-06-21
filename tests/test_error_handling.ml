@@ -85,7 +85,7 @@ let test_variables_still_capitalized () =
   let code =
     {|
     fun test_vars(param) {
-      let x = param in
+      x = param
       x
     }
   |}

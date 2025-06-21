@@ -56,7 +56,6 @@ let string_of_otp_error = function
 (* Check if an expression returns a tuple *)
 let rec returns_tuple = function
   | Tuple _ -> true
-  | Let (_, _, body) -> returns_tuple body
   | If (_, then_expr, Some else_expr) ->
       returns_tuple then_expr && returns_tuple else_expr
   | If (_, then_expr, None) -> returns_tuple then_expr

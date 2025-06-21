@@ -41,24 +41,6 @@ let test_function_types () =
   with TypeError error ->
     fail ("Function types test failed: " ^ string_of_type_error error)
 
-let test_let_expressions () =
-  let program =
-    {
-      items =
-        [
-          Function
-            (make_single_clause_function "test_let" []
-               (Let ("x", Literal (LInt 10), Var "x")));
-        ];
-    }
-  in
-
-  try
-    let _ = type_check_program program in
-    ()
-  with TypeError error ->
-    fail ("Let expressions test failed: " ^ string_of_type_error error)
-
 let test_type_error () =
   let program =
     {
@@ -227,7 +209,6 @@ let tests =
   [
     ("basic types", `Quick, test_basic_types);
     ("function types", `Quick, test_function_types);
-    ("let expressions", `Quick, test_let_expressions);
     ("type error", `Quick, test_type_error);
     ("nil type", `Quick, test_nil_type);
     ("integer type", `Quick, test_integer_type);

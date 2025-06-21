@@ -43,18 +43,6 @@ let test_compile_function_with_params () =
       check bool ("contains: " ^ part) true contains)
     expected_parts
 
-let test_compile_let_expression () =
-  let let_expr = Let ("x", Literal (LInt 42), Var "x") in
-  let func = make_single_clause_function "num" [] let_expr in
-  let program = { items = [ Function func ] } in
-  let result = Compiler.compile_to_string program in
-  let expected_parts = [ "num() ->"; "(X_[a-z0-9]+ = 42, X_[a-z0-9]+)" ] in
-  List.iter
-    (fun part ->
-      let contains = string_matches_pattern result part in
-      check bool ("contains: " ^ part) true contains)
-    expected_parts
-
 let test_capitalize_var () =
   check string "capitalize empty" "" (Compiler.capitalize_var "");
   check string "capitalize single" "X" (Compiler.capitalize_var "x");
@@ -165,7 +153,6 @@ let tests =
   [
     ("compile function", `Quick, test_compile_function);
     ("compile function with params", `Quick, test_compile_function_with_params);
-    ("compile let expression", `Quick, test_compile_let_expression);
     ("capitalize variable names", `Quick, test_capitalize_var);
     ("empty program", `Quick, test_empty_program);
     ("compile nil", `Quick, test_compile_nil);

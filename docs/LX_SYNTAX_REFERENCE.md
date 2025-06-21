@@ -35,8 +35,7 @@ LX has several categories of keywords:
 - `true` - Boolean literal
 - `false` - Boolean literal
 - `nil` - Null/empty value
-- `let` - Variable binding with scope (legacy)
-- `in` - Used with `let` expressions (legacy)
+
 
 #### OTP Keywords
 - `worker` - Defines an OTP worker (gen_server)
@@ -165,12 +164,7 @@ x = 42
 x = 43  # Error: Variable 'x' is already defined and cannot be reassigned
 ```
 
-### Legacy Let Expressions
-For backward compatibility, `let` expressions are still supported:
-```lx
-let x = 42 in
-  x + 1
-```
+
 
 ### Block Expressions
 Block expressions allow grouping multiple statements and return the value of the last expression:
@@ -562,7 +556,6 @@ statement ::= expr
 ```
 expr ::= simple_expr
        | IDENT '=' expr                                    # Assignment
-       | 'let' IDENT '=' expr 'in' expr                   # Let binding (legacy)
        | expr '(' expr_list ')'                           # Function call
        | 'if' expr 'then' expr ('else' expr)?             # Conditional
        | 'case' expr '{' case_branch* '}'                 # Pattern matching
@@ -595,15 +588,15 @@ simple_pattern ::= '_'                                    # Wildcard
 
 The following words are reserved and cannot be used as identifiers:
 
-**Core**: `fun`, `case`, `if`, `then`, `else`, `for`, `when`, `true`, `false`, `nil`, `let`, `in`
+**Core**: `fun`, `case`, `if`, `then`, `else`, `for`, `when`, `true`, `false`, `nil`
 
 **OTP**: `worker`, `supervisor`, `strategy`, `children`, `one_for_one`, `one_for_all`, `rest_for_one`
 
 **Specs**: `spec`, `requires`, `ensures`, `matches`
 
-**Testing**: `describe`, `test`, `assert`
+**Testing**: `describe`, `assert`
 
-**Note**: The words `test` and `describe` can be used as function names when not in testing contexts, but they are reserved within test block definitions.
+**Note**: The word `describe` is reserved within test block definitions. The word `test` can be used as a function name in any context.
 
 ## Error Handling
 

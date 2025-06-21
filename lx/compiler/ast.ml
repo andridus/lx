@@ -37,7 +37,6 @@ type expr =
   | Literal of literal
   | Var of ident
   | Assign of ident * expr
-  | Let of ident * expr * expr
   | Fun of ident list * expr
   | App of expr * expr list
   | ExternalCall of string * string * expr list (* module, function, args *)

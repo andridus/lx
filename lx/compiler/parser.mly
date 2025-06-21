@@ -10,7 +10,7 @@ open Ast
 %token NIL
 
 (* Keywords *)
-%token LET IN FUN CASE IF THEN ELSE FOR WHEN
+%token FUN CASE IF THEN ELSE FOR WHEN IN
 
 (* OTP Keywords *)
 %token WORKER SUPERVISOR STRATEGY CHILDREN
@@ -136,8 +136,6 @@ expr:
   | e = simple_expr { e }
   | name = IDENT EQ value = expr
     { Assign (name, value) }
-  | LET name = IDENT EQ value = expr IN body = expr
-    { Let (name, value, body) }
   | func = expr LPAREN args = separated_list(COMMA, expr) RPAREN
     { App (func, args) }
   | IF cond = expr THEN then_expr = expr ELSE else_expr = expr

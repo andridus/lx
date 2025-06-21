@@ -75,21 +75,6 @@ let test_various_literals () =
         expected_parts)
     test_cases
 
-let test_let_expressions () =
-  (* Note: Let expressions now require both value and body *)
-  let input = "fun expr() { let x = 42 in x }" in
-  let program = Compiler.parse_string input in
-  let result = Compiler.compile_to_string program in
-  let expected_parts = [ "expr() ->"; "\\(X_[a-z0-9]+ = 42, X_[a-z0-9]+\\)" ] in
-  List.iter
-    (fun part ->
-      let contains =
-        if String.contains part '[' then string_matches_pattern result part
-        else string_contains_substring result part
-      in
-      check bool ("let expression contains: " ^ part) true contains)
-    expected_parts
-
 let test_empty_program () =
   let program = Compiler.parse_string "" in
   let result = Compiler.compile_to_string program in
@@ -113,7 +98,6 @@ let tests =
     ("function with parameters", `Quick, test_function_with_parameters);
     ("multiple functions", `Quick, test_multiple_functions);
     ("various literal types", `Quick, test_various_literals);
-    ("let expressions", `Quick, test_let_expressions);
     ("empty program", `Quick, test_empty_program);
     ("error handling for invalid syntax", `Quick, test_error_handling);
   ]

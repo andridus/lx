@@ -74,24 +74,28 @@ let add_var_to_scope ctx var_name =
 (* Check for reserved words in function names *)
 let reserved_words =
   [
-    "spec";
-    "worker";
-    "supervisor";
-    "strategy";
-    "children";
-    "requires";
-    "ensures";
-    "assert";
     "case";
     "if";
     "then";
     "else";
     "for";
     "when";
-    "let";
-    "in";
-    "fun";
+    "true";
+    "false";
+    "nil";
+    "worker";
+    "supervisor";
+    "strategy";
+    "children";
+    "one_for_one";
+    "one_for_all";
+    "rest_for_one";
+    "spec";
+    "requires";
+    "ensures";
     "matches";
+    "describe";
+    "assert";
   ]
 
 let is_reserved_word word = List.mem word reserved_words
@@ -142,10 +146,6 @@ let rec emit_expr ctx (e : expr) : string =
           (* For single assignment in block, use the inner value directly *)
           renamed ^ " = " ^ emit_expr ctx inner_value
       | _ -> renamed ^ " = " ^ emit_expr ctx value)
-  | Let (id, value, body) ->
-      let renamed = add_var_to_scope ctx id in
-      "(" ^ renamed ^ " = " ^ emit_expr ctx value ^ ", " ^ emit_expr ctx body
-      ^ ")"
   | Fun (params, body) ->
       let fun_ctx = create_scope (Some ctx) in
       let renamed_params = List.map (add_var_to_scope fun_ctx) params in

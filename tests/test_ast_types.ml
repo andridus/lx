@@ -175,34 +175,6 @@ let test_mixed_module_items () =
   | [ Function _; Spec _; Test _ ] -> ()
   | _ -> Alcotest.fail "Expected function, spec, and test block"
 
-(* Test Complex expressions *)
-let test_complex_expressions () =
-  let input =
-    "fun complex() {\n\
-    \    let x = (1, 2) in\n\
-    \    let y = [x, x] in\n\
-    \    if true then y else []\n\
-    \  }"
-  in
-  let program = Compiler.parse_string input in
-  let result = Compiler.compile_to_string program in
-  let expected_parts =
-    [ "complex() ->"; "{1, 2}"; "\\[X_[a-z0-9]+, X_[a-z0-9]+\\]"; "case true" ]
-  in
-  List.iter
-    (fun part ->
-      let contains =
-        if String.contains part '[' && String.contains part ']' then
-          (* Use regex matching for patterns with hash *)
-          try
-            let _ = Str.search_forward (Str.regexp part) result 0 in
-            true
-          with Not_found -> false
-        else string_contains_substring result part
-      in
-      check bool ("complex expression contains: " ^ part) true contains)
-    expected_parts
-
 (* Test Literal types coverage *)
 let test_all_literal_types () =
   let test_cases =
@@ -235,6 +207,5 @@ let tests =
     ("spec definitions", `Quick, test_spec_definitions);
     ("test blocks", `Quick, test_test_blocks);
     ("mixed module items", `Quick, test_mixed_module_items);
-    ("complex expressions", `Quick, test_complex_expressions);
     ("all literal types", `Quick, test_all_literal_types);
   ]

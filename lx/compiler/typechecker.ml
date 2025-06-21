@@ -347,11 +347,6 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
       let value_type, subst = infer_expr_original env value in
       (* Assignment returns the assigned value type *)
       (value_type, subst)
-  | Let (id, value, body) ->
-      let value_type, subst1 = infer_expr_original env value in
-      let new_env = (id, value_type) :: apply_subst_env subst1 env in
-      let body_type, subst2 = infer_expr_original new_env body in
-      (body_type, compose_subst subst1 subst2)
   | Fun (params, body) ->
       let param_types = List.map (fun _ -> fresh_type_var ()) params in
       let param_env = List.combine params param_types in
