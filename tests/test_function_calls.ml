@@ -173,7 +173,7 @@ let test_multiple_arities_compilation () =
     fun a {
       () { nil }
       (x) { x }
-      (x, y) { x }
+      (x, y) { x + y }
     }
   |}
   in
@@ -186,7 +186,7 @@ let test_multiple_arities_compilation () =
       "a(X_[a-z0-9]+) ->";
       "X_[a-z0-9]+;";
       "a(X_[a-z0-9]+, Y_[a-z0-9]+) ->";
-      "X_[a-z0-9]+\\.";
+      "X_[a-z0-9]+ \\+ Y_[a-z0-9]+\\.";
     ]
   in
   List.iter
@@ -271,10 +271,12 @@ let test_multiple_expressions_example () =
 
 let test_backward_compatibility () =
   (* Test that old syntax still works *)
-  let program = Compiler.parse_string "fun old_style(x, y) { x }" in
+  let program = Compiler.parse_string "fun old_style(x, y) { x + y }" in
   let result = Compiler.compile_to_string program in
   let expected_parts =
-    [ "old_style(X_[a-z0-9]+, Y_[a-z0-9]+) ->"; "X_[a-z0-9]+\\." ]
+    [
+      "old_style(X_[a-z0-9]+, Y_[a-z0-9]+) ->"; "X_[a-z0-9]+ \\+ Y_[a-z0-9]+\\.";
+    ]
   in
   List.iter
     (fun part ->
@@ -347,7 +349,7 @@ let test_multiple_clauses () =
                   { params = [ PVar "x" ]; body = Var "x"; position = None };
                   {
                     params = [ PVar "x"; PVar "y" ];
-                    body = Var "x";
+                    body = BinOp (Var "x", "+", Var "y");
                     position = None;
                   };
                 ];

@@ -31,11 +31,14 @@ let test_compile_function () =
     expected_parts
 
 let test_compile_function_with_params () =
-  let func = make_single_clause_function "add" [ "x"; "y" ] (Var "x") in
+  let func =
+    make_single_clause_function "add" [ "x"; "y" ]
+      (BinOp (Var "x", "+", Var "y"))
+  in
   let program = { items = [ Function func ] } in
   let result = Compiler.compile_to_string program in
   let expected_parts =
-    [ "add(X_[a-z0-9]+, Y_[a-z0-9]+) ->"; "X_[a-z0-9]+\\." ]
+    [ "add(X_[a-z0-9]+, Y_[a-z0-9]+) ->"; "X_[a-z0-9]+ \\+ Y_[a-z0-9]+\\." ]
   in
   List.iter
     (fun part ->

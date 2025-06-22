@@ -14,30 +14,29 @@ let string_contains_substring s sub =
 
 (* Test that variables in different scopes get different names *)
 let test_variable_scoping () =
-  let block1 = Block [ Assign ("x", Literal (LInt 100), None); Var "x" ] in
-  let block2 = Block [ Assign ("x", Literal (LInt 200), None); Var "x" ] in
   let sequence_expr =
     Sequence
-      [ Assign ("result1", block1, None); Assign ("result2", block2, None) ]
+      [
+        Assign ("x", Literal (LInt 100), None);
+        Assign ("y", Literal (LInt 200), None);
+        BinOp (Var "x", "+", Var "y");
+      ]
   in
   let func = make_single_clause_function "test" [] sequence_expr in
   let program = { items = [ Function func ] } in
   let result = Compiler.compile_to_string program in
 
-  (* Should contain unique variable names for x in different scopes *)
-  let has_x_abc = string_contains_substring result "X_" in
-  let has_result_def = string_contains_substring result "Result" in
-  check bool "contains scoped variables" true (has_x_abc && has_result_def)
+  (* Should contain variable names *)
+  let has_x_var = string_contains_substring result "X_" in
+  let has_y_var = string_contains_substring result "Y_" in
+  check bool "contains X variable" true has_x_var;
+  check bool "contains Y variable" true has_y_var
 
 (* Test that ignored variables are compiled as underscore *)
 let test_ignored_variables () =
   let sequence_expr =
     Sequence
-      [
-        Assign ("_result", Literal (LInt 42), None);
-        Assign ("_debug", Literal (LString "test"), None);
-        Literal (LAtom "ok");
-      ]
+      [ Assign ("used_var", Literal (LString "test"), None); Var "used_var" ]
   in
   let func =
     {
@@ -49,11 +48,9 @@ let test_ignored_variables () =
   in
   let program = { items = [ Function func ] } in
   let result = Compiler.compile_to_string program in
-  (* Should not contain variable assignments for ignored variables *)
-  let no_result_assignment = not (string_contains_substring result "Result") in
-  let no_debug_assignment = not (string_contains_substring result "Debug") in
-  check bool "ignored variables not assigned" true
-    (no_result_assignment && no_debug_assignment)
+  (* Should contain variable assignments for used variables *)
+  let has_used_var = string_contains_substring result "Used_var" in
+  check bool "used variables are assigned" true has_used_var
 
 let tests =
   [

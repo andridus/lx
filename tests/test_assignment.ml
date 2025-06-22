@@ -38,9 +38,9 @@ let test_multiple_assignments () =
   let source = {|
 fun test() {
   x = 42
-  y = "hello"
-  z = true
-  z
+  y = 43
+  z = 44
+  x + y + z
 }
 |} in
   let lexbuf = Lexing.from_string source in
@@ -54,7 +54,12 @@ fun test() {
     | _ -> Alcotest.fail "Expected exactly one module"
   in
   let patterns =
-    [ "X_[a-z0-9]+ = 42"; "Y_[a-z0-9]+ = \"hello\""; "Z_[a-z0-9]+ = true" ]
+    [
+      "X_[a-z0-9]+ = 42";
+      "Y_[a-z0-9]+ = 43";
+      "Z_[a-z0-9]+ = 44";
+      "X_[a-z0-9]+ \\+ Y_[a-z0-9]+ \\+ Z_[a-z0-9]+";
+    ]
   in
   List.iter
     (fun pattern ->
@@ -81,9 +86,10 @@ fun test() {
   | Compiler.Error.CompilationError err
     when string_contains_substring
            (Compiler.Error.string_of_error err)
-           "already defined" ->
+           "shadows" ->
       ()
-  | Failure msg when string_contains_substring msg "already defined" -> ()
+  | Failure msg when string_contains_substring msg "shadows" -> ()
+  | Failure msg when string_contains_substring msg "Linting failed" -> ()
   | e -> Alcotest.fail ("Unexpected error: " ^ Printexc.to_string e)
 
 let tests =

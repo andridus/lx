@@ -1,5 +1,153 @@
 open Ast
 
+(* Variable renaming context for scope simulation - copied from compiler.ml *)
+type rename_context = {
+  scope_hash : string;
+  var_map : (string, string) Hashtbl.t;
+  parent : rename_context option;
+  used_hashes : (string, bool) Hashtbl.t;
+}
+
+(* Helper functions copied from compiler.ml *)
+let generate_random_hash () =
+  let chars = "abcdefghijklmnopqrstuvwxyz0123456789" in
+  let len = String.length chars in
+  let hash_len = 3 in
+  let result = Bytes.create hash_len in
+  for i = 0 to hash_len - 1 do
+    let idx = Random.int len in
+    Bytes.set result i chars.[idx]
+  done;
+  Bytes.to_string result
+
+let rec generate_unique_hash used_hashes =
+  let hash = generate_random_hash () in
+  if Hashtbl.mem used_hashes hash then generate_unique_hash used_hashes
+  else (
+    Hashtbl.replace used_hashes hash true;
+    hash)
+
+let create_scope parent =
+  let parent_used_hashes =
+    match parent with Some p -> p.used_hashes | None -> Hashtbl.create 16
+  in
+  let scope_hash = generate_unique_hash parent_used_hashes in
+  {
+    scope_hash;
+    var_map = Hashtbl.create 16;
+    parent;
+    used_hashes =
+      (match parent with Some p -> p.used_hashes | None -> Hashtbl.create 16);
+  }
+
+let capitalize_var id =
+  if String.length id > 0 then
+    String.uppercase_ascii (String.sub id 0 1)
+    ^ String.sub id 1 (String.length id - 1)
+  else id
+
+let is_ignored_var var_name = String.length var_name > 0 && var_name.[0] = '_'
+
+let get_renamed_var ctx var_name =
+  if is_ignored_var var_name then "_"
+  else
+    let rec lookup ctx =
+      match Hashtbl.find_opt ctx.var_map var_name with
+      | Some renamed -> renamed
+      | None -> (
+          match ctx.parent with
+          | Some parent_ctx -> lookup parent_ctx
+          | None -> capitalize_var var_name)
+    in
+    lookup ctx
+
+let add_var_to_scope ctx var_name =
+  if is_ignored_var var_name then (
+    let renamed = "_" in
+    Hashtbl.replace ctx.var_map var_name renamed;
+    renamed)
+  else
+    let renamed = capitalize_var var_name ^ "_" ^ ctx.scope_hash in
+    Hashtbl.replace ctx.var_map var_name renamed;
+    renamed
+
+let emit_literal (l : literal) : string =
+  match l with
+  | LInt n -> string_of_int n
+  | LFloat f ->
+      let s = string_of_float f in
+      if String.ends_with ~suffix:"." s then s ^ "0"
+      else if not (String.contains s '.') then s ^ ".0"
+      else s
+  | LString s -> "\"" ^ s ^ "\""
+  | LBool true -> "true"
+  | LBool false -> "false"
+  | LAtom a -> a
+  | LNil -> "nil"
+
+let rec emit_pattern ctx (p : pattern) : string =
+  match p with
+  | PWildcard -> "_"
+  | PVar id -> if is_ignored_var id then "_" else get_renamed_var ctx id
+  | PAtom a -> a
+  | PLiteral l -> emit_literal l
+  | PTuple ps -> "{" ^ String.concat ", " (List.map (emit_pattern ctx) ps) ^ "}"
+  | PList ps -> "[" ^ String.concat ", " (List.map (emit_pattern ctx) ps) ^ "]"
+  | PCons (head, tail) ->
+      "[" ^ emit_pattern ctx head ^ " | " ^ emit_pattern ctx tail ^ "]"
+
+let rec emit_expr ctx (e : expr) : string =
+  match e with
+  | Literal l -> emit_literal l
+  | Var id -> get_renamed_var ctx id
+  | Assign (id, value, _pos) ->
+      if is_ignored_var id then emit_expr ctx value
+      else
+        let renamed = add_var_to_scope ctx id in
+        renamed ^ " = " ^ emit_expr ctx value
+  | Fun (params, body) ->
+      let fun_ctx = create_scope (Some ctx) in
+      let renamed_params = List.map (add_var_to_scope fun_ctx) params in
+      "fun("
+      ^ String.concat ", " renamed_params
+      ^ ") -> " ^ emit_expr fun_ctx body ^ " end"
+  | App (Var func_name, args) ->
+      func_name ^ "(" ^ String.concat ", " (List.map (emit_expr ctx) args) ^ ")"
+  | App (func, args) ->
+      emit_expr ctx func ^ "("
+      ^ String.concat ", " (List.map (emit_expr ctx) args)
+      ^ ")"
+  | ExternalCall (module_name, func_name, args) ->
+      module_name ^ ":" ^ func_name ^ "("
+      ^ String.concat ", " (List.map (emit_expr ctx) args)
+      ^ ")"
+  | Tuple exprs ->
+      "{" ^ String.concat ", " (List.map (emit_expr ctx) exprs) ^ "}"
+  | List exprs ->
+      "[" ^ String.concat ", " (List.map (emit_expr ctx) exprs) ^ "]"
+  | If (cond, then_expr, else_expr) ->
+      "case " ^ emit_expr ctx cond ^ " of true -> " ^ emit_expr ctx then_expr
+      ^ (match else_expr with
+        | Some e -> "; _ -> " ^ emit_expr ctx e
+        | None -> "; _ -> nil")
+      ^ " end"
+  | Match (value, cases) ->
+      "case " ^ emit_expr ctx value ^ " of "
+      ^ String.concat "; "
+          (List.map
+             (fun (p, e) -> emit_pattern ctx p ^ " -> " ^ emit_expr ctx e)
+             cases)
+      ^ " end"
+  | For (_, _, _) -> "% For expressions not yet implemented"
+  | Sequence exprs ->
+      let block_ctx = create_scope (Some ctx) in
+      String.concat ",\n    " (List.map (emit_expr block_ctx) exprs)
+  | Block exprs ->
+      let block_ctx = create_scope (Some ctx) in
+      String.concat ",\n    " (List.map (emit_expr block_ctx) exprs)
+  | BinOp (left, op, right) ->
+      emit_expr ctx left ^ " " ^ op ^ " " ^ emit_expr ctx right
+
 (* Helper function to extract application name from filename *)
 let extract_app_name filename =
   let basename = Filename.basename filename in
@@ -256,24 +404,40 @@ let generate_worker_module app_name worker_name functions =
           (func.name ^ "/" ^ string_of_int arity) :: !public_functions)
     functions;
 
-  (* Always include start_link and OTP callbacks *)
+  (* Always include start_link and ALL required OTP callbacks *)
+  let required_otp_exports =
+    [
+      "start_link/0";
+      "init/1";
+      "handle_call/3";
+      "handle_cast/2";
+      "handle_info/2";
+      "terminate/2";
+      "code_change/3";
+    ]
+  in
+
+  let implemented_otp_exports =
+    List.map
+      (fun name ->
+        let arity =
+          match name with
+          | "init" -> 1
+          | "handle_call" -> 3
+          | "handle_cast" -> 2
+          | "handle_info" -> 2
+          | "terminate" -> 2
+          | "code_change" -> 3
+          | "format_status" -> 1
+          | _ -> 0
+        in
+        name ^ "/" ^ string_of_int arity)
+      !otp_callbacks
+  in
+
   let otp_exports =
-    [ "start_link/0" ]
-    @ List.map
-        (fun name ->
-          let arity =
-            match name with
-            | "init" -> 1
-            | "handle_call" -> 3
-            | "handle_cast" -> 2
-            | "handle_info" -> 2
-            | "terminate" -> 2
-            | "code_change" -> 3
-            | "format_status" -> 1
-            | _ -> 0
-          in
-          name ^ "/" ^ string_of_int arity)
-        !otp_callbacks
+    List.sort_uniq String.compare
+      (required_otp_exports @ implemented_otp_exports)
   in
 
   let all_exports = otp_exports @ !public_functions in
@@ -315,30 +479,18 @@ let generate_worker_module app_name worker_name functions =
         let emit_clause func =
           match func.clauses with
           | [] -> Printf.sprintf "%s() ->\n    ok" name
-          | clause :: _ -> (
-              let params =
-                String.concat ", "
-                  (List.map
-                     (function
-                       | PVar name -> String.capitalize_ascii name
-                       | PWildcard -> "_"
-                       | _ -> "_")
-                     clause.params)
-              in
-
-              (* Generate simple implementations for OTP callbacks *)
-              match name with
-              | "init" -> Printf.sprintf "%s(%s) ->\n    {ok, #{}}" name params
-              | "handle_call" ->
-                  Printf.sprintf "%s(%s) ->\n    {reply, ok, #{}}" name params
-              | "handle_cast" ->
-                  Printf.sprintf "%s(%s) ->\n    {noreply, #{}}" name params
-              | "handle_info" ->
-                  Printf.sprintf "%s(%s) ->\n    {noreply, #{}}" name params
-              | "terminate" -> Printf.sprintf "%s(%s) ->\n    ok" name params
-              | "code_change" ->
-                  Printf.sprintf "%s(%s) ->\n    {ok, #{}}" name params
-              | _ -> Printf.sprintf "%s(%s) ->\n    ok" name params)
+          | clause :: _ ->
+              (* Generate function body using real compilation logic *)
+              let ctx = create_scope None in
+              (* Add pattern variables to scope *)
+              List.iter
+                (function
+                  | PVar name -> ignore (add_var_to_scope ctx name) | _ -> ())
+                clause.params;
+              let pattern_strings = List.map (emit_pattern ctx) clause.params in
+              name ^ "("
+              ^ String.concat ", " pattern_strings
+              ^ ") ->\n    " ^ emit_expr ctx clause.body
         in
 
         let clauses = List.map emit_clause funcs in
@@ -348,7 +500,36 @@ let generate_worker_module app_name worker_name functions =
   let grouped_functions = group_functions_by_name functions in
   let function_impls = List.map emit_function_with_clauses grouped_functions in
 
-  header ^ "\n" ^ String.concat "\n\n" function_impls
+  (* Generate default implementations for missing OTP callbacks *)
+  let required_callbacks =
+    [
+      ("init", "init(_Args) ->\n    error(not_implemented).");
+      ( "handle_call",
+        "handle_call(_Request, _From, _State) ->\n    error(not_implemented)."
+      );
+      ( "handle_cast",
+        "handle_cast(_Msg, _State) ->\n    error(not_implemented)." );
+      ( "handle_info",
+        "handle_info(_Info, _State) ->\n    error(not_implemented)." );
+      ("terminate", "terminate(_Reason, _State) ->\n    ok.");
+      ("code_change", "code_change(_OldVsn, State, _Extra) ->\n    {ok, State}.");
+    ]
+  in
+
+  let implemented_callback_names = List.map fst grouped_functions in
+
+  let default_implementations =
+    List.fold_left
+      (fun acc (callback_name, default_impl) ->
+        if not (List.mem callback_name implemented_callback_names) then
+          default_impl :: acc
+        else acc)
+      [] required_callbacks
+  in
+
+  let all_implementations = function_impls @ default_implementations in
+
+  header ^ "\n" ^ String.concat "\n\n" all_implementations
 
 (* Generate named supervisor module content *)
 let generate_named_supervisor_module app_name supervisor_name strategy children
@@ -461,6 +642,12 @@ let cleanup_old_files output_dir app_name =
 (* Main function to generate all application files *)
 let generate_application_files ?(skip_rebar = false) output_dir filename program
     app_def =
+  (* Linting phase - must pass before any generation *)
+  (try Linter.lint_program program
+   with Linter.LintError errors ->
+     Printf.eprintf "Lint Errors:\n%s\n" (Linter.string_of_lint_errors errors);
+     failwith "Linting failed - application generation aborted");
+
   let app_name = extract_app_name filename in
 
   (* Clean up old files before generating new ones *)

@@ -15,6 +15,7 @@ let string_contains_substring s sub =
 let test_simple_block_assignment () =
   let block_expr = Block [ Assign ("y", Literal (LInt 42), None); Var "y" ] in
   let assign_expr = Assign ("x", block_expr, None) in
+  let sequence_expr = Sequence [ assign_expr; Var "x" ] in
   let program =
     {
       items =
@@ -22,7 +23,8 @@ let test_simple_block_assignment () =
           Function
             {
               name = "test";
-              clauses = [ { params = []; body = assign_expr; position = None } ];
+              clauses =
+                [ { params = []; body = sequence_expr; position = None } ];
               visibility = Private;
               position = None;
             };
@@ -41,6 +43,7 @@ let test_nested_block_assignment () =
   let inner_block = Block [ Assign ("z", Literal (LInt 1), None); Var "z" ] in
   let outer_block = Block [ Assign ("y", inner_block, None); Var "y" ] in
   let assign_expr = Assign ("x", outer_block, None) in
+  let sequence_expr = Sequence [ assign_expr; Var "x" ] in
   let program =
     {
       items =
@@ -48,7 +51,8 @@ let test_nested_block_assignment () =
           Function
             {
               name = "test";
-              clauses = [ { params = []; body = assign_expr; position = None } ];
+              clauses =
+                [ { params = []; body = sequence_expr; position = None } ];
               visibility = Private;
               position = None;
             };
@@ -70,10 +74,11 @@ let test_multiple_assignments_in_block () =
         Assign ("a", Literal (LInt 1), None);
         Assign ("b", Literal (LInt 2), None);
         Assign ("c", Literal (LInt 3), None);
-        Var "c";
+        BinOp (BinOp (Var "a", "+", Var "b"), "+", Var "c");
       ]
   in
   let assign_expr = Assign ("x", block_expr, None) in
+  let sequence_expr = Sequence [ assign_expr; Var "x" ] in
   let program =
     {
       items =
@@ -81,7 +86,8 @@ let test_multiple_assignments_in_block () =
           Function
             {
               name = "test";
-              clauses = [ { params = []; body = assign_expr; position = None } ];
+              clauses =
+                [ { params = []; body = sequence_expr; position = None } ];
               visibility = Private;
               position = None;
             };
@@ -102,7 +108,11 @@ let test_block_with_sequence () =
   in
   let sequence_expr =
     Sequence
-      [ Assign ("x", block_expr, None); Assign ("y", Literal (LInt 1), None) ]
+      [
+        Assign ("x", block_expr, None);
+        Assign ("y", Literal (LInt 1), None);
+        BinOp (Var "x", "+", Var "y");
+      ]
   in
   let func = make_single_clause_function "test" [] sequence_expr in
   let program = { items = [ Function func ] } in

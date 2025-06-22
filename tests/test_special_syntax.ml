@@ -37,20 +37,22 @@ let test_module_macro () =
 
 (* Test ignored variables with underscore prefix *)
 let test_ignored_variables () =
-  let input = "fun test() { _ignored = \"value\"; :ok }" in
+  let input =
+    "fun test() { _used = gen_server.call(erlang.self(), :get); :ok }"
+  in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string program in
 
-  (* Should contain the value evaluation and final result *)
-  let should_contain = [ "\"value\","; "ok." ] in
+  (* Should contain the external call and final result, but no assignment *)
+  let should_contain = [ "gen_server:call(erlang:self(), get)"; "ok" ] in
   List.iter
     (fun expected ->
       let contains = string_contains_substring result expected in
-      check bool ("ignored variable should contain: " ^ expected) true contains)
+      check bool ("should contain: " ^ expected) true contains)
     should_contain;
 
   (* Should NOT contain assignment to ignored variable *)
-  let should_not_contain = [ "_ignored ="; "_Ignored ="; "Ignored_ =" ] in
+  let should_not_contain = [ "_used ="; "_Used ="; "Used_ =" ] in
   List.iter
     (fun forbidden ->
       let contains = string_contains_substring result forbidden in

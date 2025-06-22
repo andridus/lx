@@ -29,10 +29,10 @@ let test_simple_function_example () =
     expected_parts
 
 let test_function_with_parameters () =
-  let program = Compiler.parse_string "fun add(x, y) { x }" in
+  let program = Compiler.parse_string "fun add(x, y) { x + y }" in
   let result = Compiler.compile_to_string program in
   let expected_parts =
-    [ "add(X_[a-z0-9]+, Y_[a-z0-9]+) ->"; "X_[a-z0-9]+\\." ]
+    [ "add(X_[a-z0-9]+, Y_[a-z0-9]+) ->"; "X_[a-z0-9]+ \\+ Y_[a-z0-9]+\\." ]
   in
   List.iter
     (fun part ->

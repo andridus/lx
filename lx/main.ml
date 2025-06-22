@@ -45,6 +45,10 @@ let () =
       Printf.eprintf "OTP Validation Error: %s\n"
         (Compiler.Otp_validator.string_of_otp_error error);
       exit 1
+  | Compiler.Linter.LintError errors ->
+      Printf.eprintf "Lint Errors:\n%s\n"
+        (Compiler.Linter.string_of_lint_errors errors);
+      exit 1
   | Failure msg ->
       let string_contains_substring s sub =
         let len_s = String.length s in

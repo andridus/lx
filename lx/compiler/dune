@@ -9,6 +9,7 @@
   compiler
   typechecker
   otp_validator
+  linter
   error
   error_formatter
   app_generator

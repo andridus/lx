@@ -4,6 +4,7 @@ module Lexer = Lexer
 module Parser = Parser
 module Typechecker = Typechecker
 module Otp_validator = Otp_validator
+module Linter = Linter
 module Error = Error
 module App_generator = App_generator
 module Rebar_manager = Rebar_manager
@@ -602,6 +603,12 @@ let parse_file (filename : string) : program =
 let compile_to_string_with_module_name (program : program)
     (base_module_name : string) ?(filename : string option = None) () :
     (string * string) list =
+  (* Linting phase - must pass before any other validation *)
+  (try Linter.lint_program program
+   with Linter.LintError errors ->
+     Printf.eprintf "Lint Errors:\n%s\n" (Linter.string_of_lint_errors errors);
+     failwith "Linting failed - compilation aborted");
+
   (* Type checking phase *)
   (try
      let _ = Typechecker.type_check_program program in
@@ -669,6 +676,12 @@ let compile_to_string (program : program) : string =
 
 (* Type check a program without compilation *)
 let type_check_program (program : program) : Typechecker.type_env =
+  (* Linting phase - must pass before type checking *)
+  (try Linter.lint_program program
+   with Linter.LintError errors ->
+     Printf.eprintf "Lint Errors:\n%s\n" (Linter.string_of_lint_errors errors);
+     failwith "Linting failed - type checking aborted");
+
   try
     let type_env = Typechecker.type_check_program program in
     Printf.printf "Type checking completed successfully.\n";

@@ -13,6 +13,9 @@ module Typechecker = Typechecker
 (* Expose the OTP Validator module *)
 module Otp_validator = Otp_validator
 
+(* Expose the Linter module *)
+module Linter = Linter
+
 (* Expose the Error module *)
 module Error = Error
 

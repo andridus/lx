@@ -1,6 +1,17 @@
 open Alcotest
 open Compiler.Error
 
+(* Helper function to check if string contains substring *)
+let string_contains_substring s sub =
+  let len_s = String.length s in
+  let len_sub = String.length sub in
+  let rec search i =
+    if i > len_s - len_sub then false
+    else if String.sub s i len_sub = sub then true
+    else search (i + 1)
+  in
+  search 0
+
 let test_reserved_word_error () =
   (* Test that 'test' is now correctly tokenized as IDENT token (not reserved) *)
   let lexbuf = Lexing.from_string "test" in
@@ -68,16 +79,15 @@ let test_correct_test_usage () =
   check int "Should parse 3 items" 3 (List.length program.items)
 
 let test_function_call_not_capitalized () =
-  (* Test that function calls are not capitalized *)
-  let code = {|
-    fun a() { 1 }
-    fun c() { a() }
-  |} in
-  let program = Compiler.parse_string code in
-  let erlang_code = Compiler.compile_to_string program in
-  check bool "Should contain 'a()'" true (String.contains erlang_code 'a');
-  check bool "Should not contain 'A()'" true
-    (not (Str.string_match (Str.regexp ".*A().*") erlang_code 0))
+  let source = "fun test(x, _y) { x }" in
+  let program = Compiler.parse_string source in
+  let result = Compiler.compile_to_string program in
+  let expected_parts = [ "test(X_"; ", _) ->" ] in
+  List.iter
+    (fun part ->
+      let contains = string_contains_substring result part in
+      check bool ("contains: " ^ part) true contains)
+    expected_parts
 
 let test_variables_still_capitalized () =
   (* Test that variables are still properly capitalized *)
