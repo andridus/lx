@@ -130,7 +130,7 @@ let test_optional_types () =
   with TypeError error ->
     fail ("Optional type test failed: " ^ string_of_type_error error)
 
-(* Test for if-then-else with consistent types *)
+(* Test for if-else with consistent types *)
 let test_if_then_else_consistent () =
   let program =
     {
@@ -152,11 +152,11 @@ let test_if_then_else_consistent () =
     | Some TInteger -> ()
     | Some t ->
         fail
-          ("If-then-else test failed: expected TInteger, got "
+          ("If-else test failed: expected TInteger, got "
          ^ string_of_type t)
-    | None -> fail "If-then-else test failed: function not found"
+    | None -> fail "If-else test failed: function not found"
   with TypeError error ->
-    fail ("If-then-else test failed: " ^ string_of_type_error error)
+    fail ("If-else test failed: " ^ string_of_type_error error)
 
 (* Test for empty function body *)
 let test_empty_function_body () =
@@ -213,7 +213,7 @@ let tests =
     ("nil type", `Quick, test_nil_type);
     ("integer type", `Quick, test_integer_type);
     ("optional types", `Quick, test_optional_types);
-    ("if-then-else consistent", `Quick, test_if_then_else_consistent);
+    ("if-else consistent", `Quick, test_if_then_else_consistent);
     ("empty function body", `Quick, test_empty_function_body);
     ("tuple types", `Quick, test_tuple_types);
   ]

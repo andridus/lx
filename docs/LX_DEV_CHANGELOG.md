@@ -2,7 +2,131 @@
 
 This document tracks major improvements and features added to the LX language compiler and toolchain.
 
-## [Latest] Automatic Rebar3 Integration
+## [Latest] Syntax Cleanup - Removed `then` Token
+
+### Overview
+Removed the `then` token from the LX language to simplify syntax and eliminate inconsistencies. The language now uses a unified brace-based syntax for all conditional expressions.
+
+### Key Changes
+
+#### 1. Token Removal
+- **Lexer**: Removed `"then" -> THEN` token recognition
+- **Parser**: Removed `THEN` token from grammar rules
+- **Compiler**: Removed `"then"` from reserved words list
+- **Documentation**: Removed `then` from keyword documentation
+
+#### 2. Unified Conditional Syntax
+- **Before**: Mixed syntax support - both `if condition then expression` and `if condition { expression }`
+- **After**: Consistent brace-only syntax - `if condition { expression }`
+- **Clarity**: Eliminates confusion between different conditional syntaxes
+- **Consistency**: Aligns with block syntax used throughout the language
+
+#### 3. Updated Grammar Rules
+```diff
+- IF cond THEN then_expr ELSE else_expr
++ IF cond LBRACE then_expr RBRACE ELSE LBRACE else_expr RBRACE
+
+- IF cond THEN then_expr
++ IF cond LBRACE then_expr RBRACE
+```
+
+#### 4. Improved Error Messages
+- **Before**: "Missing 'then' keyword in if statement"
+- **After**: "Missing opening brace in if statement"
+- **Suggestions**: Updated to reflect brace-based syntax requirements
+
+### Technical Implementation
+
+#### Lexer Changes (`lexer.mll`)
+```diff
+- | "if" -> IF | "then" -> THEN | "else" -> ELSE
++ | "if" -> IF | "else" -> ELSE
+```
+
+#### Parser Changes (`parser.mly`)
+```diff
+- %token FUN CASE IF THEN ELSE FOR WHEN IN
++ %token FUN CASE IF ELSE FOR WHEN IN
+```
+
+#### Comprehensive Test Updates
+- **116 tests updated**: All conditional expression tests migrated to new syntax
+- **Test naming**: Renamed from "if-then" to "if" and "if-then-else" to "if-else"
+- **Error message validation**: Updated to match new error messages
+- **Backward compatibility**: Ensured no existing functionality was broken
+
+### Migration Guide
+
+#### Old Syntax (No Longer Supported)
+```lx
+# This syntax is no longer valid
+if condition then expression
+if condition then expr1 else expr2
+```
+
+#### New Syntax (Required)
+```lx
+# Use brace-based syntax
+if condition {
+  expression
+}
+
+if condition {
+  expr1
+} else {
+  expr2
+}
+```
+
+### Benefits
+
+#### 1. Syntax Consistency
+- **Unified blocks**: All control structures now use consistent brace syntax
+- **Reduced complexity**: Eliminates parser ambiguity between different conditional forms
+- **Better readability**: Clear visual separation of conditional blocks
+
+#### 2. Improved Maintainability
+- **Simpler grammar**: Fewer parser rules and token types to maintain
+- **Cleaner codebase**: Removed unused token handling code
+- **Consistent error handling**: Unified error messages for conditional syntax
+
+#### 3. Enhanced Developer Experience
+- **Clear expectations**: Developers know exactly which syntax to use
+- **Better tooling support**: Simplified syntax enables better IDE integration
+- **Consistent formatting**: Uniform code style across all LX projects
+
+### Validation
+
+#### Test Results
+- ✅ **All 116 tests pass** with the new syntax
+- ✅ **Compilation verified** - generates correct Erlang code
+- ✅ **Error handling tested** - proper error messages for invalid syntax
+- ✅ **Documentation updated** - removed references to `then` keyword
+
+#### Generated Code Quality
+```lx
+# LX source
+if true {
+  42
+} else {
+  0
+}
+
+# Generated Erlang (unchanged)
+case true of
+  true -> 42;
+  _ -> 0
+end
+```
+
+### Breaking Changes
+- **Syntax change**: Code using `if-then` syntax must be updated to use braces
+- **Migration required**: Existing LX code needs syntax updates
+- **Tools impact**: Any external tools parsing LX syntax need updates
+
+---
+
+## [Previous] Automatic Rebar3 Integration
 
 ### Overview
 Complete integration of rebar3 compilation into the LX compiler workflow, providing seamless OTP application compilation with automatic dependency management and error reporting.
@@ -399,7 +523,8 @@ Performance improvements and strict scoping rules to prevent common programming 
 
 ## Version History
 
-- **Latest**: Automatic Rebar3 Integration
+- **Latest**: Syntax Cleanup - Removed `then` Token
+- **v1.1**: Automatic Rebar3 Integration
 - **v1.0**: Advanced Ambiguity Detection & Typed Children Syntax
 - **v0.9**: Enhanced Supervisor Error Testing
 - **v0.8**: Special Syntax Features (underscore parameters, __MODULE__ macro, dot notation)

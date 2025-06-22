@@ -47,7 +47,7 @@ rule read = parse
       (* Check if it's a reserved word first *)
       match id with
       | "fun" -> FUN | "case" -> CASE
-      | "if" -> IF | "then" -> THEN | "else" -> ELSE | "for" -> FOR | "when" -> WHEN | "in" -> IN
+      | "if" -> IF | "else" -> ELSE | "for" -> FOR | "when" -> WHEN | "in" -> IN
       | "true" -> BOOL true | "false" -> BOOL false | "nil" -> NIL
       | "worker" -> WORKER | "supervisor" -> SUPERVISOR | "strategy" -> STRATEGY | "children" -> CHILDREN
       | "one_for_one" -> ONE_FOR_ONE | "one_for_all" -> ONE_FOR_ALL | "rest_for_one" -> REST_FOR_ONE

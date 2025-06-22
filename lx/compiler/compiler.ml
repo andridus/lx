@@ -90,7 +90,6 @@ let reserved_words =
   [
     "case";
     "if";
-    "then";
     "else";
     "for";
     "when";

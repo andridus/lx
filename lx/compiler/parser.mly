@@ -15,7 +15,7 @@ let make_position pos =
 %token MODULE_MACRO
 
 (* Keywords *)
-%token FUN CASE IF THEN ELSE FOR WHEN IN
+%token FUN CASE IF ELSE FOR WHEN IN
 
 (* OTP Keywords *)
 %token WORKER SUPERVISOR STRATEGY CHILDREN
@@ -199,14 +199,14 @@ expr:
     { BinOp (left, "*", right) }
   | left = expr DIV right = expr
     { BinOp (left, "/", right) }
-  | IF cond = expr THEN then_expr = expr ELSE else_expr = expr
+  | IF cond = expr LBRACE then_expr = expr RBRACE ELSE LBRACE else_expr = expr RBRACE
     { If (cond, then_expr, Some else_expr) }
-  | IF cond = expr THEN then_expr = expr
+  | IF cond = expr LBRACE then_expr = expr RBRACE
     { If (cond, then_expr, None) }
-  | IF _cond = expr THEN error
-    { failwith "Enhanced:Missing expression after 'then' in if statement|Suggestion:Add an expression after 'then'|Context:if statement" }
+  | IF _cond = expr LBRACE error
+    { failwith "Enhanced:Missing expression in if block|Suggestion:Add an expression inside the braces|Context:if statement" }
   | IF _cond = expr error
-    { failwith "Enhanced:Missing 'then' keyword in if statement|Suggestion:Add 'then' after the condition|Context:if statement" }
+    { failwith "Enhanced:Missing opening brace in if statement|Suggestion:Add '{' after the condition|Context:if statement" }
   | IF error
     { failwith "Enhanced:Missing condition after 'if' keyword|Suggestion:Add a boolean expression after 'if'|Context:if statement" }
   | CASE value = expr LBRACE cases = case_branch* RBRACE

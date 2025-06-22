@@ -117,7 +117,7 @@ let test_compile_tuples () =
       check bool ("contains: " ^ part) true contains)
     expected_parts
 
-(* Test for if-then without else compilation *)
+(* Test for if without else compilation *)
 let test_compile_if_then () =
   let if_expr = If (Literal (LBool true), Literal (LInt 42), None) in
   let func = make_single_clause_function "test_if" [] if_expr in
@@ -132,7 +132,7 @@ let test_compile_if_then () =
       check bool ("contains: " ^ part) true contains)
     expected_parts
 
-(* Test for if-then-else compilation *)
+(* Test for if-else compilation *)
 let test_compile_if_then_else () =
   let if_expr =
     If (Literal (LBool true), Literal (LInt 42), Some (Literal (LInt 0)))
@@ -158,6 +158,6 @@ let tests =
     ("compile nil", `Quick, test_compile_nil);
     ("compile empty function", `Quick, test_compile_empty_function);
     ("compile tuples", `Quick, test_compile_tuples);
-    ("compile if-then", `Quick, test_compile_if_then);
-    ("compile if-then-else", `Quick, test_compile_if_then_else);
+    ("compile if", `Quick, test_compile_if_then);
+    ("compile if-else", `Quick, test_compile_if_then_else);
   ]

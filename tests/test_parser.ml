@@ -170,9 +170,9 @@ let test_parse_tuples () =
         fail ("Failed to parse tuple: " ^ input))
     test_cases
 
-(* Test for if-then without else *)
+(* Test for if without else *)
 let test_parse_if_then () =
-  let program = Compiler.parse_string "fun check() { if true then 42 }" in
+  let program = Compiler.parse_string "fun check() { if true { 42 } }" in
   match program.items with
   | [
    Function
@@ -183,12 +183,12 @@ let test_parse_if_then () =
      };
   ] ->
       ()
-  | _ -> fail "Expected if-then without else"
+  | _ -> fail "Expected if without else"
 
-(* Test for if-then-else *)
+(* Test for if-else *)
 let test_parse_if_then_else () =
   let program =
-    Compiler.parse_string "fun check() { if true then 42 else 0 }"
+    Compiler.parse_string "fun check() { if true { 42 } else { 0 } }"
   in
   match program.items with
   | [
@@ -209,7 +209,7 @@ let test_parse_if_then_else () =
      };
   ] ->
       ()
-  | _ -> fail "Expected if-then-else"
+  | _ -> fail "Expected if-else"
 
 let tests =
   [
@@ -221,6 +221,6 @@ let tests =
     ("parse nil literal", `Quick, test_parse_nil);
     ("parse empty function", `Quick, test_parse_empty_function);
     ("parse tuples", `Quick, test_parse_tuples);
-    ("parse if-then", `Quick, test_parse_if_then);
-    ("parse if-then-else", `Quick, test_parse_if_then_else);
+    ("parse if", `Quick, test_parse_if_then);
+    ("parse if-else", `Quick, test_parse_if_then_else);
   ]

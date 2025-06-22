@@ -29,7 +29,6 @@ LX has several categories of keywords:
 - `fun` - Function definition
 - `case` - Pattern matching
 - `if` - Conditional expression
-- `then` - Used with `if` expressions
 - `else` - Used with `if` expressions
 - `for` - Loop iteration
 - `when` - Guard expressions
