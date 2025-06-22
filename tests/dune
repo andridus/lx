@@ -1,7 +1,7 @@
 (executable
  (public_name test_lx)
  (name test_main)
- (libraries compiler alcotest str)
+ (libraries compiler alcotest str unix)
  (modules
   test_main
   test_lexer
@@ -19,7 +19,8 @@
   test_blocks
   test_scoping
   test_special_syntax
-  test_supervisor_errors))
+  test_supervisor_errors
+  test_build_cleanup))
 
 (rule
  (alias runtest)

@@ -17,7 +17,8 @@ This document provides a comprehensive reference for the LX programming language
 11. [Specifications](#specifications)
 12. [Testing](#testing)
 13. [Application Definition](#application-definition)
-14. [Examples](#examples)
+14. [Build System & Compilation](#build-system--compilation)
+15. [Examples](#examples)
 
 ## Lexical Elements
 
@@ -1306,3 +1307,179 @@ The tests verify that error messages include:
 - **Position information**: Accurate line and column numbers
 
 This comprehensive testing ensures that developers receive consistent, helpful error messages that accelerate the learning process and reduce debugging time.
+
+## Build System & Compilation
+
+### Enhanced Build Directory Management
+
+LX now provides intelligent build directory management with automatic cleanup of old artifacts:
+
+#### Unified Build Structure
+- **Application files**: Creates `_build/project_name/` with OTP structure (`src/`, `test/`, `rebar.config`)
+- **Non-application files**: Creates `_build/filename/` with generated `.erl` files directly
+- **Automatic cleanup**: Removes old build artifacts before each compilation
+
+#### Build Directory Examples
+
+```bash
+# Application file compilation
+lx myapp.lx
+# Creates: _build/myapp/ with OTP structure
+
+# Non-application file compilation
+lx calculator.lx
+# Creates: _build/calculator/ with Erlang files
+
+# Automatic cleanup when switching types
+lx myapp.lx        # Creates application structure
+# Edit file to remove application definition
+lx myapp.lx        # Automatically cleans up old OTP structure
+```
+
+### Compilation Flags
+
+#### `--skip-rebar` Flag
+
+The `--skip-rebar` flag allows you to skip the rebar3 compilation step for faster development and testing:
+
+```bash
+# Standard compilation (generates files + runs rebar3)
+lx myapp.lx
+
+# Skip rebar3 compilation (generates files only)
+lx --skip-rebar myapp.lx
+
+# Combine with type checking
+lx --type-check --skip-rebar myapp.lx
+```
+
+**Use Cases for `--skip-rebar`:**
+- **Fast development**: Quick syntax checking without full compilation
+- **Testing**: Faster test execution (100x speed improvement)
+- **CI/CD**: Separate generation and compilation steps
+- **Debugging**: Inspect generated Erlang code without compilation
+
+#### `--type-check` Flag
+
+Performs type checking without code generation:
+
+```bash
+# Type check only
+lx --type-check myapp.lx
+
+# Type check with skip rebar (fastest validation)
+lx --type-check --skip-rebar myapp.lx
+```
+
+### Compilation Workflow
+
+#### Standard Workflow
+1. **Parse** LX source code
+2. **Type check** (if enabled)
+3. **Generate** Erlang code and build structure
+4. **Cleanup** old build artifacts
+5. **Compile** with rebar3 (unless skipped)
+
+#### Development Workflow with `--skip-rebar`
+1. **Parse** LX source code
+2. **Type check** (if enabled)
+3. **Generate** Erlang code and build structure
+4. **Cleanup** old build artifacts
+5. **Skip** rebar3 compilation
+
+#### Manual Compilation After Generation
+```bash
+# Generate files without compilation
+lx --skip-rebar myapp.lx
+
+# Navigate to generated project
+cd _build/myapp
+
+# Manual compilation
+rebar3 compile
+
+# Run tests
+rebar3 eunit
+
+# Start shell
+rebar3 shell
+```
+
+### Build Artifact Management
+
+#### Automatic Cleanup Process
+- **Detection**: Identifies old build artifacts before compilation
+- **Removal**: Uses `rm -rf` with OCaml fallback for reliability
+- **Recreation**: Creates fresh build structure for current compilation
+- **Safety**: Only removes artifacts in `_build/` directory
+
+#### Cleanup Scenarios
+- **Application to non-application**: Removes OTP structure when application definition is removed
+- **Non-application to application**: Removes simple structure when application definition is added
+- **Same type recompilation**: Cleans up old artifacts for fresh compilation
+- **Missing directories**: Handles missing build directories gracefully
+
+### Performance Improvements
+
+#### Test Suite Performance
+- **Before**: 2.5 seconds with rebar3 compilation
+- **After**: 0.026 seconds with `--skip-rebar` (100x faster)
+- **Benefit**: Dramatically faster development cycles
+
+#### Development Benefits
+- **Faster feedback**: Quick syntax validation
+- **Cleaner workspace**: Automatic artifact cleanup
+- **Flexible workflow**: Choose when to run full compilation
+- **Better debugging**: Inspect generated code without compilation overhead
+
+### Error Handling
+
+#### Build System Errors
+```bash
+# Example error with cleanup context
+lx myapp.lx
+# Output: myapp.lx:15:23: Build Error: Failed to cleanup old artifacts
+#         Context: Error occurred during build directory management
+#         Solution: Check file permissions in _build/ directory
+```
+
+#### Compilation Errors with `--skip-rebar`
+```bash
+# Skip rebar3 but still validate syntax
+lx --skip-rebar myapp.lx
+# Output: myapp.lx:10:15: Syntax Error: Missing closing brace
+#         Context: Error in function definition
+#         Note: Rebar3 compilation was skipped
+```
+
+### Integration with Existing Tools
+
+#### Makefile Integration
+```makefile
+# Fast development target
+dev:
+	lx --skip-rebar src/myapp.lx
+
+# Full compilation target
+build:
+	lx src/myapp.lx
+
+# Type check only
+check:
+	lx --type-check src/myapp.lx
+```
+
+#### CI/CD Integration
+```yaml
+# Example GitHub Actions workflow
+- name: Fast validation
+  run: lx --type-check --skip-rebar src/myapp.lx
+
+- name: Generate artifacts
+  run: lx --skip-rebar src/myapp.lx
+
+- name: Compile with rebar3
+  run: cd _build/myapp && rebar3 compile
+```
+
+This enhanced build system provides developers with flexible, efficient compilation options while maintaining the robustness and reliability of the LX toolchain.

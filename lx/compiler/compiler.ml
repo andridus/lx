@@ -641,7 +641,49 @@ let type_check_file (filename : string) : Typechecker.type_env =
   let program = parse_file filename in
   type_check_program program
 
-let compile_file (filename : string) : unit =
+(* Clean up any existing build artifacts for the given file *)
+let cleanup_build_artifacts build_dir base_name =
+  let project_build_dir = Filename.concat build_dir base_name in
+
+  (* Remove project directory if it exists (handles both app and non-app structures) *)
+  if Sys.file_exists project_build_dir then (
+    Printf.printf "Cleaning up old build artifacts for %s...\n" base_name;
+
+    let rec remove_dir dir =
+      try
+        if Sys.is_directory dir then (
+          let files = Sys.readdir dir in
+          Array.iter
+            (fun file ->
+              let full_path = Filename.concat dir file in
+              remove_dir full_path)
+            files;
+          Unix.rmdir dir)
+        else Sys.remove dir
+      with
+      | Sys_error _ -> () (* Silently ignore file not found errors *)
+      | Unix.Unix_error _ -> ()
+      | exn ->
+          Printf.eprintf "Warning: Unexpected error removing %s: %s\n" dir
+            (Printexc.to_string exn)
+    in
+
+    (* Try to remove using system command as more reliable fallback *)
+    let try_system_remove () =
+      let cmd = Printf.sprintf "rm -rf %s" (Filename.quote project_build_dir) in
+      let status = Unix.system cmd in
+      match status with WEXITED 0 -> true | _ -> false
+    in
+
+    (* Use system command first for more reliable cleanup, then OCaml as fallback *)
+    if not (try_system_remove ()) then
+      try remove_dir project_build_dir
+      with _ ->
+        Printf.eprintf
+          "Warning: Could not completely remove old build directory: %s\n"
+          project_build_dir)
+
+let compile_file ?(skip_rebar = false) (filename : string) : unit =
   let program = parse_file filename in
   let base_name = Filename.remove_extension (Filename.basename filename) in
   let source_dir = Filename.dirname filename in
@@ -649,26 +691,39 @@ let compile_file (filename : string) : unit =
   (* Check if there's an application definition *)
   let has_application = App_generator.find_application_def program <> None in
 
+  (* Create _build directory in the source directory *)
+  let build_dir = Filename.concat source_dir "_build" in
+  if not (Sys.file_exists build_dir) then Unix.mkdir build_dir 0o755;
+
+  (* Clean up any existing build artifacts before compilation *)
+  cleanup_build_artifacts build_dir base_name;
+
   if has_application then
     (* If there's an application definition, let App_generator handle everything *)
     match App_generator.find_application_def program with
     | Some app_def ->
-        App_generator.generate_application_files source_dir filename program
-          app_def;
-        Printf.printf "Generated application files for %s\n" base_name
+        (* Generate application files inside _build directory *)
+        App_generator.generate_application_files ~skip_rebar build_dir filename
+          program app_def;
+        Printf.printf "Generated application files for %s in _build/%s\n"
+          base_name base_name
     | None -> () (* This case should not happen *)
   else
-    (* No application definition, generate individual modules *)
+    (* No application definition, generate individual modules in _build/filename/ *)
+    let project_build_dir = Filename.concat build_dir base_name in
+    if not (Sys.file_exists project_build_dir) then
+      Unix.mkdir project_build_dir 0o755;
+
     let modules =
       compile_to_string_with_module_name program base_name
         ~filename:(Some filename) ()
     in
 
-    (* Write each module to its own file in the same directory as the source *)
+    (* Write each module to its own file in the build directory *)
     List.iter
       (fun (module_name, module_content) ->
         let output_filename =
-          Filename.concat source_dir (module_name ^ ".erl")
+          Filename.concat project_build_dir (module_name ^ ".erl")
         in
         let oc = open_out output_filename in
         output_string oc module_content;
@@ -676,4 +731,4 @@ let compile_file (filename : string) : unit =
         Printf.printf "Generated module: %s\n" output_filename)
       modules;
 
-    Printf.printf "Compiled %s\n" filename
+    Printf.printf "Compiled %s in _build/%s/\n" filename base_name

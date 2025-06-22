@@ -28,7 +28,7 @@ val compile_to_string_with_module_name :
   unit ->
   (string * string) list
 
-val compile_file : string -> unit
+val compile_file : ?skip_rebar:bool -> string -> unit
 
 (* Type checking functions *)
 val type_check_program : Ast.program -> Typechecker.type_env

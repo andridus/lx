@@ -40,8 +40,7 @@ let test_parse_error_with_position () =
   (* Test that parse errors include position information *)
   try
     ignore
-      (Compiler.parse_string ~filename:(Some "test.lx")
-         "fun test() { if true }");
+      (Compiler.parse_string ~filename:(Some "test.lx") "fun test() { if true }");
     fail "Expected parse error"
   with
   | CompilationError error ->

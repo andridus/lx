@@ -151,9 +151,7 @@ let test_if_then_else_consistent () =
     match List.assoc_opt "test_if_else" env with
     | Some TInteger -> ()
     | Some t ->
-        fail
-          ("If-else test failed: expected TInteger, got "
-         ^ string_of_type t)
+        fail ("If-else test failed: expected TInteger, got " ^ string_of_type t)
     | None -> fail "If-else test failed: function not found"
   with TypeError error ->
     fail ("If-else test failed: " ^ string_of_type_error error)

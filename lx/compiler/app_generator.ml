@@ -379,7 +379,8 @@ let cleanup_old_files output_dir app_name =
       files
 
 (* Main function to generate all application files *)
-let generate_application_files output_dir filename program app_def =
+let generate_application_files ?(skip_rebar = false) output_dir filename program
+    app_def =
   let app_name = extract_app_name filename in
 
   (* Clean up old files before generating new ones *)
@@ -483,16 +484,18 @@ let generate_application_files output_dir filename program app_def =
   Printf.printf "    └── test/\n";
   Printf.printf "        └── %s_SUITE.erl\n" app_name; *)
 
-  (* Compile the generated project with rebar3 *)
-  Printf.printf "\n";
-  try Rebar_manager.compile_project project_dir with
-  | Error.CompilationError _ as e -> raise e
-  | exn ->
-      Printf.eprintf "Warning: Failed to compile with rebar3: %s\n"
-        (Printexc.to_string exn);
-      Printf.eprintf
-        "You can manually compile the project by running 'rebar3 compile' in %s\n"
-        project_dir
+  (* Compile the generated project with rebar3 only if not skipped *)
+  if not skip_rebar then (
+    Printf.printf "\n";
+    try Rebar_manager.compile_project project_dir with
+    | Error.CompilationError _ as e -> raise e
+    | exn ->
+        Printf.eprintf "Warning: Failed to compile with rebar3: %s\n"
+          (Printexc.to_string exn);
+        Printf.eprintf
+          "You can manually compile the project by running 'rebar3 compile' in \
+           %s\n"
+          project_dir)
 
 (* Find application definition in the program *)
 let find_application_def program =
