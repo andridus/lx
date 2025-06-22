@@ -915,12 +915,52 @@ application {
 3. **Generate App Files**: Creates `.app.src`, `rebar.config`, and application module
 4. **Compile with Rebar**: Use `rebar3 compile` to build the final application
 
-### Integration with Rebar3
+### Automatic Rebar3 Integration
 
-The generated files are fully compatible with rebar3:
+LX now includes automatic rebar3 integration. When you compile an LX file with an application definition, the compiler will:
+
+1. **Generate** the complete OTP application structure
+2. **Download** rebar3 automatically if not found (to `~/.lx/rebar3`)
+3. **Compile** the project using rebar3
+4. **Display** compilation results in LX error format
+
+#### Compilation Process
+```bash
+# Simple compilation - everything is automatic
+lx myapp.lx
+
+# Output example:
+# Compiling project...
+# ===> Verifying dependencies...
+# ===> Analyzing applications...
+# ===> Compiling myapp
+# Project compiled successfully with rebar3
+# Generated application files for myapp
+```
+
+#### Rebar3 Management
+- **System Detection**: First checks if rebar3 is available in system PATH
+- **Auto-Download**: Downloads rebar3 to `~/.lx/rebar3` if not found
+- **Version Control**: Uses rebar3 version 3.23.0
+- **Cross-Platform**: Works on Linux systems (requires curl or wget)
+
+#### Error Integration
+Rebar3 compilation errors are automatically converted to LX's error format:
+
+```
+examples/myapp/src/myapp_worker.erl:15:23: Parse Error: Rebar3 compilation error: syntax error before: '}'
+Check the generated Erlang code for syntax errors
+  Context: This error occurred during rebar3 compilation of generated Erlang code
+```
+
+#### Manual Compilation (Optional)
+The generated files remain fully compatible with manual rebar3 usage:
 
 ```bash
-# Compile the application
+# Navigate to generated project
+cd myapp
+
+# Manual compilation
 rebar3 compile
 
 # Run tests
@@ -935,6 +975,79 @@ rebar3 shell
 ```
 
 ## Examples
+
+### Complete Application with Automatic Compilation
+
+```lx
+# File: shopping_app.lx
+application {
+  description "E-commerce Shopping Application"
+  vsn "2.1.0"
+  applications [kernel, stdlib, crypto, mnesia]
+}
+
+worker cart_manager {
+  fun init(user_id) {
+    initial_state = .{user_id, [], 0.0}
+    .{:ok, initial_state}
+  }
+
+  fun handle_call(:get_cart, _from, state) {
+    .{:reply, state, state}
+  }
+
+  fun handle_cast(.{:add_item, item}, .{user_id, items, total}) {
+    new_items = [item | items]
+    new_total = total + item.price
+    new_state = .{user_id, new_items, new_total}
+    .{:noreply, new_state}
+  }
+
+  fun handle_info(_info, state) {
+    .{:noreply, state}
+  }
+
+  fun terminate(_reason, _state) {
+    .{:ok}
+  }
+}
+
+supervisor cart_supervisor {
+  strategy one_for_one
+  children [cart_manager]
+}
+```
+
+```bash
+# Compile the complete application with one command
+lx shopping_app.lx
+
+# Output:
+# Compiling project...
+# ===> Verifying dependencies...
+# ===> Analyzing applications...
+# ===> Compiling shopping_app
+# Project compiled successfully with rebar3
+# Generated application files for shopping_app
+
+# Generated project structure:
+# shopping_app/
+# ├── rebar.config
+# ├── src/
+# │   ├── shopping_app.app.src
+# │   ├── shopping_app_app.erl
+# │   ├── shopping_app_supervisor.erl
+# │   └── shopping_app_cart_manager_worker.erl
+# ├── test/
+# │   └── shopping_app_SUITE.erl
+# └── _build/
+#     └── default/
+#         └── lib/
+#             └── shopping_app/
+#                 └── ebin/
+#                     ├── shopping_app.app
+#                     └── *.beam files
+```
 
 ### Variable Assignment and Blocks
 ```lx

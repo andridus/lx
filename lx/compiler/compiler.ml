@@ -6,6 +6,7 @@ module Typechecker = Typechecker
 module Otp_validator = Otp_validator
 module Error = Error
 module App_generator = App_generator
+module Rebar_manager = Rebar_manager
 open Ast
 
 (* Initialize random number generator *)

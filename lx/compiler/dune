@@ -11,7 +11,8 @@
   otp_validator
   error
   error_formatter
-  app_generator))
+  app_generator
+  rebar_manager))
 
 (menhir
  (modules parser))

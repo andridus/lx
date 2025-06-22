@@ -319,20 +319,46 @@ let cleanup_old_files output_dir app_name =
   let project_dir = Filename.concat output_dir app_name in
 
   (* Remove old project directory completely if it exists *)
-  if Sys.file_exists project_dir then (
-    let rec remove_dir dir =
-      if Sys.is_directory dir then (
-        let files = Sys.readdir dir in
-        Array.iter
-          (fun file ->
-            let full_path = Filename.concat dir file in
-            remove_dir full_path)
-          files;
-        Unix.rmdir dir)
-      else Sys.remove dir
-    in
-    remove_dir project_dir;
-    Printf.printf "Removed old project directory: %s\n" project_dir);
+  (if Sys.file_exists project_dir then
+     let rec remove_dir dir =
+       try
+         if Sys.is_directory dir then (
+           let files = Sys.readdir dir in
+           Array.iter
+             (fun file ->
+               let full_path = Filename.concat dir file in
+               remove_dir full_path)
+             files;
+           Unix.rmdir dir)
+         else Sys.remove dir
+       with
+       | Sys_error _ ->
+           (* Silently ignore Sys_error - these are usually "file not found" errors *)
+           ()
+       | Unix.Unix_error _ -> ()
+       | exn ->
+           Printf.eprintf "Warning: Unexpected error removing %s: %s\n" dir
+             (Printexc.to_string exn)
+     in
+
+     (* Try to remove using system command as fallback *)
+     let try_system_remove () =
+       let cmd = Printf.sprintf "rm -rf %s" (Filename.quote project_dir) in
+       let status = Unix.system cmd in
+       match status with
+       | WEXITED 0 ->
+           (* Suppress success message *)
+           true
+       | _ -> false
+     in
+
+     (* First try OCaml removal, then fallback to system command *)
+     try remove_dir project_dir (* Suppress success message *)
+     with _ ->
+       if not (try_system_remove ()) then
+         Printf.eprintf
+           "Warning: Could not completely remove old project directory: %s\n"
+           project_dir);
 
   (* Also remove any .erl files in the output directory that match the app name pattern *)
   let app_pattern = app_name ^ "_" in
@@ -436,26 +462,37 @@ let generate_application_files output_dir filename program app_def =
   let main_module_file = Filename.concat output_dir (app_name ^ ".erl") in
   if Sys.file_exists main_module_file then Sys.remove main_module_file;
 
-  Printf.printf "Generated OTP application structure:\n";
+  (* Suppress generated structure output *)
+  (* Printf.printf "Generated OTP application structure:\n";
   Printf.printf "  - %s/\n" project_dir;
   Printf.printf "    ├── rebar.config\n";
   Printf.printf "    ├── src/\n";
   Printf.printf "    │   ├── %s.app.src\n" app_name;
   Printf.printf "    │   ├── %s_app.erl\n" app_name;
   Printf.printf "    │   ├── %s_supervisor.erl\n" app_name;
-  List.iter
-    (function
-      | OtpComponent (Worker { name; _ }) ->
-          Printf.printf "    │   ├── %s_%s_worker.erl\n" app_name name
-      | OtpComponent (Supervisor { name; _ }) -> (
-          match name with
-          | Some n ->
-              Printf.printf "    │   ├── %s_%s_supervisor.erl\n" app_name n
-          | None -> () (* Anonymous supervisor is the main supervisor *))
-      | _ -> ())
-    program.items;
+  List.iter (function
+    | OtpComponent (Worker { name; _ }) ->
+        Printf.printf "    │   ├── %s_%s_worker.erl\n" app_name name
+    | OtpComponent (Supervisor { name; _ }) ->
+        (match name with
+          | Some n -> Printf.printf "    │   ├── %s_%s_supervisor.erl\n" app_name n
+          | None -> () (* Anonymous supervisor is the main supervisor *)
+        )
+    | _ -> ()
+  ) program.items;
   Printf.printf "    └── test/\n";
-  Printf.printf "        └── %s_SUITE.erl\n" app_name
+  Printf.printf "        └── %s_SUITE.erl\n" app_name; *)
+
+  (* Compile the generated project with rebar3 *)
+  Printf.printf "\n";
+  try Rebar_manager.compile_project project_dir with
+  | Error.CompilationError _ as e -> raise e
+  | exn ->
+      Printf.eprintf "Warning: Failed to compile with rebar3: %s\n"
+        (Printexc.to_string exn);
+      Printf.eprintf
+        "You can manually compile the project by running 'rebar3 compile' in %s\n"
+        project_dir
 
 (* Find application definition in the program *)
 let find_application_def program =
