@@ -112,7 +112,7 @@ let generate_app_module app_name =
   Printf.sprintf
     "-module(%s_app).\n\
      -behaviour(application).\n\
-     -compile(export_all).\n\n\
+     -export([start/2, stop/1]).\n\n\
      start(_Type, _Args) ->\n\
     \    %s_supervisor:start_link().\n\n\
      stop(_State) ->\n\
@@ -198,7 +198,7 @@ let generate_supervisor_module app_name program =
       Printf.sprintf
         "-module(%s_supervisor).\n\
          -behaviour(supervisor).\n\
-         -compile(export_all).\n\n\
+         -export([start_link/0, init/1]).\n\n\
          start_link() ->\n\
         \    supervisor:start_link({local, ?MODULE}, ?MODULE, []).\n\n\
          init([]) ->\n\
@@ -212,7 +212,7 @@ let generate_supervisor_module app_name program =
       Printf.sprintf
         "-module(%s_supervisor).\n\
          -behaviour(supervisor).\n\
-         -compile(export_all).\n\n\
+         -export([start_link/0, init/1]).\n\n\
          start_link() ->\n\
         \    supervisor:start_link({local, ?MODULE}, ?MODULE, []).\n\n\
          init([]) ->\n\
@@ -225,7 +225,7 @@ let generate_supervisor_module app_name program =
 let generate_test_suite app_name =
   Printf.sprintf
     "-module(%s_SUITE).\n\
-     -compile(export_all).\n\
+     -export([all/0, basic_test/1]).\n\
      -include_lib(\"common_test/include/ct.hrl\").\n\n\
      all() ->\n\
     \    [basic_test].\n\n\
@@ -236,37 +236,117 @@ let generate_test_suite app_name =
 (* Generate worker module content *)
 let generate_worker_module app_name worker_name functions =
   let module_name = app_name ^ "_" ^ worker_name ^ "_worker" in
+
+  (* Collect OTP callback functions and public functions *)
+  let otp_callbacks = ref [] in
+  let public_functions = ref [] in
+
+  List.iter
+    (fun (func : function_def) ->
+      if is_otp_callback_name func.name then
+        otp_callbacks := func.name :: !otp_callbacks
+      else if func.visibility = Public then
+        (* Calculate arity for public functions *)
+        let arity =
+          match func.clauses with
+          | [] -> 0
+          | clause :: _ -> List.length clause.params
+        in
+        public_functions :=
+          (func.name ^ "/" ^ string_of_int arity) :: !public_functions)
+    functions;
+
+  (* Always include start_link and OTP callbacks *)
+  let otp_exports =
+    [ "start_link/0" ]
+    @ List.map
+        (fun name ->
+          let arity =
+            match name with
+            | "init" -> 1
+            | "handle_call" -> 3
+            | "handle_cast" -> 2
+            | "handle_info" -> 2
+            | "terminate" -> 2
+            | "code_change" -> 3
+            | "format_status" -> 1
+            | _ -> 0
+          in
+          name ^ "/" ^ string_of_int arity)
+        !otp_callbacks
+  in
+
+  let all_exports = otp_exports @ !public_functions in
+  (* Remove duplicates from exports *)
+  let unique_exports = List.sort_uniq String.compare all_exports in
+  let exports_str = String.concat ", " unique_exports in
+
   let header =
     Printf.sprintf
       "-module(%s).\n\
        -behaviour(gen_server).\n\
-       -compile(export_all).\n\n\
+       -export([%s]).\n\n\
        start_link() ->\n\
       \    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).\n"
-      module_name
+      module_name exports_str
   in
 
-  (* Generate function implementations - simplified for now *)
-  let function_impls =
-    List.map
+  (* Group functions by name to handle multiple clauses *)
+  let group_functions_by_name (functions : function_def list) :
+      (string * function_def list) list =
+    let grouped = Hashtbl.create 16 in
+    List.iter
       (fun (func : function_def) ->
-        match func.name with
-        | "init" -> Printf.sprintf "init(_) ->\n    {ok, []}."
-        | "handle_call" ->
-            Printf.sprintf
-              "handle_call(Request, _From, State) ->\n    {reply, ok, State}."
-        | "handle_cast" ->
-            Printf.sprintf
-              "handle_cast(_Request, State) ->\n    {noreply, State}."
-        | "handle_info" ->
-            Printf.sprintf "handle_info(_Info, State) ->\n    {noreply, State}."
-        | "terminate" -> Printf.sprintf "terminate(_Reason, _State) ->\n    ok."
-        | "code_change" ->
-            Printf.sprintf
-              "code_change(_OldVsn, State, _Extra) ->\n    {ok, State}."
-        | _ -> Printf.sprintf "%s() ->\n    ok." func.name)
-      functions
+        let existing =
+          try Hashtbl.find grouped func.name with Not_found -> []
+        in
+        Hashtbl.replace grouped func.name (func :: existing))
+      functions;
+    Hashtbl.fold
+      (fun name funcs acc -> (name, List.rev funcs) :: acc)
+      grouped []
   in
+
+  (* Generate function implementation with all clauses *)
+  let emit_function_with_clauses (name, func_list) =
+    match func_list with
+    | [] -> Printf.sprintf "%s() ->\n    ok." name
+    | funcs ->
+        let emit_clause func =
+          match func.clauses with
+          | [] -> Printf.sprintf "%s() ->\n    ok" name
+          | clause :: _ -> (
+              let params =
+                String.concat ", "
+                  (List.map
+                     (function
+                       | PVar name -> String.capitalize_ascii name
+                       | PWildcard -> "_"
+                       | _ -> "_")
+                     clause.params)
+              in
+
+              (* Generate simple implementations for OTP callbacks *)
+              match name with
+              | "init" -> Printf.sprintf "%s(%s) ->\n    {ok, #{}}" name params
+              | "handle_call" ->
+                  Printf.sprintf "%s(%s) ->\n    {reply, ok, #{}}" name params
+              | "handle_cast" ->
+                  Printf.sprintf "%s(%s) ->\n    {noreply, #{}}" name params
+              | "handle_info" ->
+                  Printf.sprintf "%s(%s) ->\n    {noreply, #{}}" name params
+              | "terminate" -> Printf.sprintf "%s(%s) ->\n    ok" name params
+              | "code_change" ->
+                  Printf.sprintf "%s(%s) ->\n    {ok, #{}}" name params
+              | _ -> Printf.sprintf "%s(%s) ->\n    ok" name params)
+        in
+
+        let clauses = List.map emit_clause funcs in
+        String.concat ";\n\n" clauses ^ "."
+  in
+
+  let grouped_functions = group_functions_by_name functions in
+  let function_impls = List.map emit_function_with_clauses grouped_functions in
 
   header ^ "\n" ^ String.concat "\n\n" function_impls
 
@@ -278,7 +358,7 @@ let generate_named_supervisor_module app_name supervisor_name strategy children
     Printf.sprintf
       "-module(%s).\n\
        -behaviour(supervisor).\n\
-       -compile(export_all).\n\n\
+       -export([start_link/0, init/1]).\n\n\
        start_link() ->\n\
       \    supervisor:start_link({local, ?MODULE}, ?MODULE, []).\n"
       module_name

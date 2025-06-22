@@ -28,6 +28,7 @@ LX has several categories of keywords:
 
 #### Core Language Keywords
 - `fun` - Function definition
+- `pub` - Public function visibility modifier
 - `case` - Pattern matching
 - `if` - Conditional expression
 - `else` - Used with `if` expressions
@@ -409,6 +410,11 @@ fun add(x, y) {
   x + y
 }
 
+# Public function (exported in generated Erlang)
+pub fun public_add(x, y) {
+  x + y
+}
+
 # With multiple statements
 fun complex_calculation(a, b) {
   temp1 = a * 2
@@ -484,6 +490,75 @@ fun complex_function(input) {
 }
 ```
 
+### Function Visibility
+
+LX supports function visibility modifiers to control which functions are exported in the generated Erlang code:
+
+#### Private Functions (Default)
+```lx
+# Private function - not exported
+fun internal_helper(x, y) {
+  x + y
+}
+
+# OTP callbacks are automatically exported regardless of visibility
+fun handle_call(request, _from, state) {
+  .{:reply, :ok, state}
+}
+```
+
+#### Public Functions
+```lx
+# Public function - exported in generated Erlang
+pub fun api_function(data) {
+  processed = internal_helper(data, 42)
+  .{:ok, processed}
+}
+
+# Public function in worker
+worker my_worker {
+  fun init(_) { .{:ok, []} }
+
+  # Public API for external callers
+  pub fun get_data(worker_pid) {
+    gen_server.call(worker_pid, :get_data)
+  }
+
+  pub fun set_data(worker_pid, data) {
+    gen_server.call(worker_pid, .{:set_data, data})
+  }
+
+  # Private OTP callbacks (automatically exported)
+  fun handle_call(:get_data, _from, state) {
+    .{:reply, state, state}
+  }
+
+  fun handle_call(.{:set_data, data}, _from, _state) {
+    .{:reply, :ok, data}
+  }
+}
+```
+
+#### Generated Erlang Exports
+```erlang
+% Generated from the above example:
+-module(my_worker).
+-behaviour(gen_server).
+-export([start_link/0, init/1, handle_call/3, get_data/1, set_data/2]).
+
+% start_link/0 - automatically exported for OTP workers
+% init/1, handle_call/3 - OTP callbacks automatically exported
+% get_data/1, set_data/2 - public functions explicitly exported
+% internal_helper/2 would NOT be exported (private function)
+```
+
+#### Export Rules
+1. **OTP Callbacks**: Always exported regardless of visibility (`init/1`, `handle_call/3`, etc.)
+2. **Public Functions**: Functions marked with `pub` are exported
+3. **Private Functions**: Functions without `pub` are not exported (except OTP callbacks)
+4. **Worker Start Functions**: `start_link/0` is automatically exported for workers
+5. **Supervisor Functions**: `start_link/0` and `init/1` are automatically exported for supervisors
+
 ## Pattern Matching
 
 ### Basic Patterns
@@ -534,11 +609,18 @@ worker my_worker {
     .{:ok, initial_state}
   }
 
-  # Optional callback functions
-  fun handle_call(request, from, state) {
-    response = process_request(request, state)
-    new_state = update_state(state, request)
-    .{:reply, response, new_state}
+  # Optional callback functions with multiple clauses
+  fun handle_call(:get_state, _from, state) {
+    .{:reply, state, state}
+  }
+
+  fun handle_call(.{:set_value, value}, _from, state) {
+    new_state = update_state(state, value)
+    .{:reply, :ok, new_state}
+  }
+
+  fun handle_call(:reset, _from, _state) {
+    .{:reply, :ok, initial_state()}
   }
 
   fun handle_cast(request, state) {
@@ -565,7 +647,16 @@ worker my_worker {
     formatted
   }
 
-  # Regular helper functions
+  # Public helper functions (exported)
+  pub fun get_current_value(worker_pid) {
+    gen_server.call(worker_pid, :get_state)
+  }
+
+  pub fun set_value(worker_pid, value) {
+    gen_server.call(worker_pid, .{:set_value, value})
+  }
+
+  # Private helper functions (not exported)
   fun helper_function(x, y) {
     result = x + y
     result
@@ -863,7 +954,7 @@ When you compile a LX file with an application definition, the following files a
 ```erlang
 -module(myapp_app).
 -behaviour(application).
--compile(export_all).
+-export([start/2, stop/1]).
 
 start(_Type, _Args) ->
     myapp_sup:start_link().
@@ -1220,7 +1311,67 @@ describe "shopping cart tests" {
 
 ## Recent Improvements
 
-### Advanced Ambiguity Detection & Typed Children Syntax (Latest)
+### Public Function Support & Export System Overhaul (Latest)
+
+LX now includes comprehensive support for function visibility with automatic export generation, eliminating the use of `export_all` and providing precise control over module interfaces.
+
+#### Key Features
+- **`pub` keyword**: Mark functions as public for export in generated Erlang
+- **Automatic export generation**: No more `export_all` - only necessary functions are exported
+- **OTP callback detection**: Automatically exports required OTP callbacks
+- **Multiple function clauses**: Properly handles multiple clauses of the same function name
+- **Precise export lists**: Generates clean `-export([...])` directives
+
+#### Function Visibility System
+```lx
+worker calculator {
+  # Public API functions - exported
+  pub fun add(a, b) { a + b }
+  pub fun multiply(a, b) { a * b }
+
+  # Private helper - not exported
+  fun validate_input(x) { x > 0 }
+
+  # OTP callbacks - automatically exported
+  fun init(_) { .{:ok, 0} }
+
+  fun handle_call(:get, _from, state) {
+    .{:reply, state, state}
+  }
+
+  fun handle_call(.{:add, value}, _from, state) {
+    .{:reply, state + value, state + value}
+  }
+}
+```
+
+#### Generated Erlang (Clean Exports)
+```erlang
+-module(calculator_worker).
+-behaviour(gen_server).
+-export([add/2, multiply/2, start_link/0, init/1, handle_call/3]).
+
+% Multiple handle_call clauses properly generated
+handle_call(get, _From, State) ->
+    {reply, State, State};
+
+handle_call({add, Value}, _From, State) ->
+    {reply, State + Value, State + Value}.
+
+% Public functions exported
+add(A, B) -> A + B.
+multiply(A, B) -> A * B.
+
+% validate_input/1 NOT exported (private function)
+```
+
+#### Benefits
+- **Security**: Only intended functions are accessible externally
+- **Clean interfaces**: Clear separation between public API and internal implementation
+- **OTP compliance**: Follows Erlang/OTP best practices for module exports
+- **Maintainability**: Easy to understand what functions are part of the public API
+
+### Advanced Ambiguity Detection & Typed Children Syntax
 
 The LX compiler now includes comprehensive ambiguity detection for OTP components, ensuring developers receive clear, actionable feedback when name conflicts occur:
 

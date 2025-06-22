@@ -53,12 +53,18 @@ let test_capitalize_var () =
 let test_empty_program () =
   let program = { items = [] } in
   let result = Compiler.compile_to_string program in
-  let expected_parts = [ "-module(generated)"; "-compile(export_all)" ] in
+  let expected_parts = [ "-module(generated)" ] in
+  let unexpected_parts = [ "-compile(export_all)" ] in
   List.iter
     (fun part ->
       let contains = string_contains_substring result part in
       check bool ("contains: " ^ part) true contains)
-    expected_parts
+    expected_parts;
+  List.iter
+    (fun part ->
+      let contains = string_contains_substring result part in
+      check bool ("should not contain: " ^ part) false contains)
+    unexpected_parts
 
 (* Test for nil compilation *)
 let test_compile_nil () =

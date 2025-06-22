@@ -73,11 +73,11 @@ let test_empty_module_generation () =
       let contains_module =
         string_contains_substring module_content "-module(empty_app)"
       in
-      let contains_export =
+      let contains_export_all =
         string_contains_substring module_content "-compile(export_all)"
       in
       check bool "contains module declaration" true contains_module;
-      check bool "contains export declaration" true contains_export
+      check bool "should not contain export_all" false contains_export_all
   | _ -> fail "Expected exactly one module for empty program"
 
 (* Test module content structure *)
@@ -91,13 +91,9 @@ let test_module_content_structure () =
   match modules with
   | [ (_, module_content) ] ->
       let expected_parts =
-        [
-          "-module(greeting)";
-          "-compile(export_all)";
-          "hello(Name_[a-z0-9]+) ->";
-          "Name_[a-z0-9]+\\.";
-        ]
+        [ "-module(greeting)"; "hello(Name_[a-z0-9]+) ->"; "Name_[a-z0-9]+\\." ]
       in
+      let unexpected_parts = [ "-compile(export_all)" ] in
       List.iter
         (fun part ->
           let contains =
@@ -106,7 +102,12 @@ let test_module_content_structure () =
             else string_contains_substring module_content part
           in
           check bool ("contains: " ^ part) true contains)
-        expected_parts
+        expected_parts;
+      List.iter
+        (fun part ->
+          let contains = string_contains_substring module_content part in
+          check bool ("should not contain: " ^ part) false contains)
+        unexpected_parts
   | _ -> fail "Expected exactly one module"
 
 let tests =

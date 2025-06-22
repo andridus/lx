@@ -368,9 +368,56 @@ let emit_otp_component (component : otp_component) (base_module_name : string) :
   match component with
   | Worker { name; functions; specs; position = _ } ->
       let module_name = base_module_name ^ "_" ^ name ^ "_worker" in
+
+      (* Collect OTP callback functions and public functions *)
+      let otp_callbacks = ref [] in
+      let public_functions = ref [] in
+
+      List.iter
+        (fun (func : function_def) ->
+          if is_otp_callback_name func.name then
+            otp_callbacks := func.name :: !otp_callbacks
+          else if func.visibility = Public then
+            (* Calculate arity for public functions *)
+            let arity =
+              match func.clauses with
+              | [] -> 0
+              | clause :: _ -> List.length clause.params
+            in
+            public_functions :=
+              (func.name ^ "/" ^ string_of_int arity) :: !public_functions)
+        functions;
+
+      (* Always include start_link and OTP callbacks *)
+      let otp_exports =
+        [ "start_link/0" ]
+        @ List.map
+            (fun name ->
+              let arity =
+                match name with
+                | "init" -> 1
+                | "handle_call" -> 3
+                | "handle_cast" -> 2
+                | "handle_info" -> 2
+                | "terminate" -> 2
+                | "code_change" -> 3
+                | "format_status" -> 1
+                | _ -> 0
+              in
+              name ^ "/" ^ string_of_int arity)
+            !otp_callbacks
+      in
+
+      let all_exports = otp_exports @ !public_functions in
+      (* Remove duplicates from exports *)
+      let unique_exports = List.sort_uniq String.compare all_exports in
+      let exports_str = String.concat ", " unique_exports in
+
       let header =
-        "-module(" ^ module_name
-        ^ ").\n-behaviour(gen_server).\n-compile(export_all).\n\n"
+        "-module(" ^ module_name ^ ").\n-behaviour(gen_server).\n-export(["
+        ^ exports_str ^ "]).\n\n"
+        ^ "start_link() ->\n\
+          \    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).\n\n"
       in
 
       (* Generate all functions, including OTP callbacks *)
@@ -389,7 +436,9 @@ let emit_otp_component (component : otp_component) (base_module_name : string) :
       in
       let header =
         "-module(" ^ module_name
-        ^ ").\n-behaviour(supervisor).\n-compile(export_all).\n\n"
+        ^ ").\n-behaviour(supervisor).\n-export([start_link/0, init/1]).\n\n"
+        ^ "start_link() ->\n\
+          \    supervisor:start_link({local, ?MODULE}, ?MODULE, []).\n\n"
       in
 
       let strategy_str =
@@ -575,8 +624,26 @@ let compile_to_string_with_module_name (program : program)
   in
 
   (* Generate main module *)
+  (* Collect public functions from regular items *)
+  let public_functions = ref [] in
+  List.iter
+    (function
+      | Function func when func.visibility = Public ->
+          let arity =
+            match func.clauses with
+            | [] -> 0
+            | clause :: _ -> List.length clause.params
+          in
+          public_functions :=
+            (func.name ^ "/" ^ string_of_int arity) :: !public_functions
+      | _ -> ())
+    regular_items;
+
   let main_header =
-    "-module(" ^ base_module_name ^ ").\n-compile(export_all).\n\n"
+    if List.length !public_functions > 0 then
+      let exports_str = String.concat ", " !public_functions in
+      "-module(" ^ base_module_name ^ ").\n-export([" ^ exports_str ^ "]).\n\n"
+    else "-module(" ^ base_module_name ^ ").\n\n"
   in
   let main_items = List.map emit_module_item regular_items in
   let main_module =

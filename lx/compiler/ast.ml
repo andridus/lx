@@ -75,10 +75,14 @@ type function_clause = {
   position : position option (* Position of the clause *);
 }
 
+(* Function visibility *)
+type visibility = Public | Private
+
 (* Function definitions with multiple arities *)
 type function_def = {
   name : ident;
   clauses : function_clause list;
+  visibility : visibility;
   position : position option (* Position of the function definition *);
 }
 
@@ -88,6 +92,7 @@ let make_single_clause_function name params body =
     name;
     clauses =
       [ { params = List.map (fun p -> PVar p) params; body; position = None } ];
+    visibility = Private;
     position = None;
   }
 

@@ -15,7 +15,7 @@ let make_position pos =
 %token MODULE_MACRO
 
 (* Keywords *)
-%token FUN CASE IF ELSE FOR WHEN IN
+%token PUB FUN CASE IF ELSE FOR WHEN IN
 
 (* OTP Keywords *)
 %token WORKER SUPERVISOR STRATEGY CHILDREN
@@ -68,18 +68,30 @@ module_item:
   | a = application_def { Application a }
 
 function_def:
-  (* New syntax for multiple arities *)
+  (* Public functions - new syntax for multiple arities *)
+  | PUB FUN name = IDENT LBRACE clauses = function_clause+ RBRACE
+    { let pos = make_position $startpos in { name; clauses; visibility = Public; position = Some pos } }
+  (* Public functions - backward compatibility: single clause with pattern support *)
+  | PUB FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN LBRACE body = function_body RBRACE
+    { let pos = make_position $startpos in
+      let clause = { params; body; position = Some pos } in
+      { name; clauses = [clause]; visibility = Public; position = Some pos } }
+  | PUB FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN LBRACE RBRACE
+    { let pos = make_position $startpos in
+      let clause = { params; body = Literal LNil; position = Some pos } in
+      { name; clauses = [clause]; visibility = Public; position = Some pos } }
+  (* Private functions (default) - new syntax for multiple arities *)
   | FUN name = IDENT LBRACE clauses = function_clause+ RBRACE
-    { let pos = make_position $startpos in { name; clauses; position = Some pos } }
-  (* Backward compatibility: single clause with pattern support *)
+    { let pos = make_position $startpos in { name; clauses; visibility = Private; position = Some pos } }
+  (* Private functions (default) - backward compatibility: single clause with pattern support *)
   | FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN LBRACE body = function_body RBRACE
     { let pos = make_position $startpos in
       let clause = { params; body; position = Some pos } in
-      { name; clauses = [clause]; position = Some pos } }
+      { name; clauses = [clause]; visibility = Private; position = Some pos } }
   | FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN LBRACE RBRACE
     { let pos = make_position $startpos in
       let clause = { params; body = Literal LNil; position = Some pos } in
-      { name; clauses = [clause]; position = Some pos } }
+      { name; clauses = [clause]; visibility = Private; position = Some pos } }
   | FUN _name = IDENT LPAREN _params = separated_list(COMMA, pattern) RPAREN error
     { failwith "Enhanced:Missing function body - expected '{' after parameter list|Suggestion:Add '{' and '}' to define the function body|Context:function definition" }
   | FUN _name = IDENT error

@@ -102,6 +102,7 @@ let test_multiple_arities_parsing () =
            { params = [ PVar "x" ]; body = Var "x"; position = _ };
            { params = [ PVar "x"; PVar "y" ]; body = Var "x"; position = _ };
          ];
+       visibility = _;
        position = _;
      };
   ] ->
@@ -281,6 +282,113 @@ let test_backward_compatibility () =
       check bool ("contains: " ^ part) true contains)
     expected_parts
 
+let test_simple_function_call () =
+  let program =
+    {
+      items =
+        [
+          Function
+            {
+              name = "hello";
+              clauses =
+                [
+                  {
+                    params = [];
+                    body = Literal (LString "world");
+                    position = None;
+                  };
+                ];
+              visibility = Private;
+              position = None;
+            };
+        ];
+    }
+  in
+  let result = Compiler.compile_to_string program in
+  check bool "contains function definition" true
+    (String.contains result 'h' && String.contains result 'e')
+
+let test_function_with_parameters () =
+  let program =
+    {
+      items =
+        [
+          Function
+            {
+              name = "add";
+              clauses =
+                [
+                  {
+                    params = [ PVar "x"; PVar "y" ];
+                    body = BinOp (Var "x", "+", Var "y");
+                    position = None;
+                  };
+                ];
+              visibility = Private;
+              position = None;
+            };
+        ];
+    }
+  in
+  let result = Compiler.compile_to_string program in
+  check bool "function compiles" true (String.length result > 0)
+
+let test_multiple_clauses () =
+  let program =
+    {
+      items =
+        [
+          Function
+            {
+              name = "a";
+              clauses =
+                [
+                  { params = []; body = Literal LNil; position = None };
+                  { params = [ PVar "x" ]; body = Var "x"; position = None };
+                  {
+                    params = [ PVar "x"; PVar "y" ];
+                    body = Var "x";
+                    position = None;
+                  };
+                ];
+              visibility = Private;
+              position = None;
+            };
+        ];
+    }
+  in
+  let result = Compiler.compile_to_string program in
+  check bool "multiple clauses compile" true (String.length result > 0)
+
+let test_external_call () =
+  let program =
+    {
+      items =
+        [
+          Function
+            {
+              name = "test_external";
+              clauses =
+                [
+                  {
+                    params = [];
+                    body =
+                      ExternalCall
+                        ( "lists",
+                          "reverse",
+                          [ List [ Literal (LInt 1); Literal (LInt 2) ] ] );
+                    position = None;
+                  };
+                ];
+              visibility = Private;
+              position = None;
+            };
+        ];
+    }
+  in
+  let result = Compiler.compile_to_string program in
+  check bool "external call compiles" true (String.contains result 'l')
+
 let tests =
   [
     ("function call parsing", `Quick, test_function_call_parsing);
@@ -298,4 +406,8 @@ let tests =
     ("function with args", `Quick, test_function_with_args);
     ("multiple expressions example", `Quick, test_multiple_expressions_example);
     ("backward compatibility", `Quick, test_backward_compatibility);
+    ("simple function call", `Quick, test_simple_function_call);
+    ("function with parameters", `Quick, test_function_with_parameters);
+    ("multiple clauses", `Quick, test_multiple_clauses);
+    ("external call", `Quick, test_external_call);
   ]

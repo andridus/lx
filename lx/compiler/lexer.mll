@@ -46,7 +46,7 @@ rule read = parse
   | ['a'-'z''_']['a'-'z''A'-'Z''0'-'9''_']* as id {
       (* Check if it's a reserved word first *)
       match id with
-      | "fun" -> FUN | "case" -> CASE
+      | "pub" -> PUB | "fun" -> FUN | "case" -> CASE
       | "if" -> IF | "else" -> ELSE | "for" -> FOR | "when" -> WHEN | "in" -> IN
       | "true" -> BOOL true | "false" -> BOOL false | "nil" -> NIL
       | "worker" -> WORKER | "supervisor" -> SUPERVISOR | "strategy" -> STRATEGY | "children" -> CHILDREN

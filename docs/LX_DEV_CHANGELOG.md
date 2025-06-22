@@ -2,7 +2,256 @@
 
 This document tracks major improvements and features added to the LX language compiler and toolchain.
 
-## [Latest] Enhanced Build Directory Management & Cleanup System
+## [Latest] Public Function Support & Export System Overhaul
+
+### Overview
+Implemented comprehensive function visibility system with `pub` keyword support and automatic export generation, eliminating the use of `export_all` and providing precise control over module interfaces.
+
+### Key Features
+
+#### 1. Function Visibility System
+- **`pub` keyword**: New visibility modifier for marking functions as public
+- **Private by default**: Functions are private unless explicitly marked with `pub`
+- **OTP callback auto-export**: OTP callbacks are automatically exported regardless of visibility
+- **Clean export generation**: Generates precise `-export([...])` directives instead of `export_all`
+
+#### 2. Multiple Function Clause Support
+- **Function grouping**: Multiple definitions of the same function are grouped into clauses
+- **Proper Erlang generation**: Uses semicolon (`;`) syntax for multiple clauses
+- **Pattern matching support**: Enables proper pattern matching in OTP callbacks
+- **Eliminates duplicate functions**: Prevents "function already defined" errors
+
+#### 3. Enhanced Code Generation
+- **Automatic export collection**: Collects OTP callbacks and public functions for export lists
+- **Duplicate removal**: Uses `List.sort_uniq` to ensure clean export lists
+- **Type-safe generation**: Explicit type annotations prevent compilation errors
+- **Optimized output**: Generates clean, readable Erlang code
+
+#### 4. Comprehensive Test Updates
+- **116+ tests updated**: All function definitions updated to include visibility field
+- **Backward compatibility**: Maintained compatibility with existing test patterns
+- **Error handling tests**: Validated proper error messages for visibility-related issues
+- **Integration tests**: End-to-end testing with rebar3 compilation
+
+### Technical Implementation
+
+#### Lexer and Parser Changes
+```diff
+# Lexer (lexer.mll)
++ | "pub" -> PUB
+
+# Parser (parser.mly)
++ %token PUB
++ | PUB FUN IDENT LPAREN param_list RPAREN LBRACE expr RBRACE
+```
+
+#### AST Enhancements
+```ocaml
+(* New visibility type *)
+type visibility = Public | Private
+
+(* Updated function_def record *)
+type function_def = {
+  name : ident;
+  clauses : function_clause list;
+  visibility : visibility;  (* New field *)
+  position : position option;
+}
+```
+
+#### Export Generation Logic
+```ocaml
+(* Collect OTP callbacks and public functions *)
+let otp_callbacks = ref [] in
+let public_functions = ref [] in
+
+List.iter (fun (func : function_def) ->
+  if is_otp_callback_name func.name then
+    otp_callbacks := func.name :: !otp_callbacks
+  else if func.visibility = Public then
+    let arity = calculate_arity func in
+    public_functions := (func.name ^ "/" ^ string_of_int arity) :: !public_functions
+) functions;
+
+(* Generate clean export list *)
+let all_exports = otp_exports @ !public_functions in
+let unique_exports = List.sort_uniq String.compare all_exports in
+```
+
+#### Function Clause Grouping
+```ocaml
+(* Group functions by name to handle multiple clauses *)
+let group_functions_by_name (functions : function_def list) : (string * function_def list) list =
+  let grouped = Hashtbl.create 16 in
+  List.iter (fun (func : function_def) ->
+    let existing = try Hashtbl.find grouped func.name with Not_found -> [] in
+    Hashtbl.replace grouped func.name (func :: existing)
+  ) functions;
+  Hashtbl.fold (fun name funcs acc -> (name, List.rev funcs) :: acc) grouped []
+
+(* Generate function with all clauses *)
+let emit_function_with_clauses (name, func_list) =
+  let clauses = List.map emit_clause func_list in
+  String.concat ";\n\n" clauses ^ "."
+```
+
+### Usage Examples
+
+#### Function Visibility Declaration
+```lx
+worker calculator {
+  # Public API functions - exported
+  pub fun add(a, b) { a + b }
+  pub fun multiply(a, b) { a * b }
+
+  # Private helper - not exported
+  fun validate_input(x) { x > 0 }
+
+  # OTP callbacks - automatically exported
+  fun init(_) { .{:ok, 0} }
+
+  # Multiple clauses for same function
+  fun handle_call(:get, _from, state) {
+    .{:reply, state, state}
+  }
+
+  fun handle_call(.{:add, value}, _from, state) {
+    new_state = state + value
+    .{:reply, new_state, new_state}
+  }
+
+  fun handle_call(.{:multiply, value}, _from, state) {
+    new_state = state * value
+    .{:reply, new_state, new_state}
+  }
+}
+```
+
+#### Generated Erlang Output
+```erlang
+-module(calculator_worker).
+-behaviour(gen_server).
+-export([add/2, multiply/2, start_link/0, init/1, handle_call/3]).
+
+start_link() ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+% Multiple clauses properly generated with semicolons
+handle_call(get, _From, State) ->
+    {reply, State, State};
+
+handle_call({add, Value}, _From, State) ->
+    New_state = State + Value,
+    {reply, New_state, New_state};
+
+handle_call({multiply, Value}, _From, State) ->
+    New_state = State * Value,
+    {reply, New_state, New_state}.
+
+% Public functions exported
+add(A, B) -> A + B.
+multiply(A, B) -> A * B.
+
+% Private functions NOT exported
+% validate_input/1 would not appear in export list
+
+init(_) -> {ok, 0}.
+```
+
+### Compilation Results
+
+#### Before (with export_all)
+```erlang
+-module(my_worker).
+-behaviour(gen_server).
+-compile(export_all).  % Exports everything - security risk
+
+% Duplicate function definitions - compilation error
+handle_call(Request, _From, State) ->
+    {reply, ok, State}.
+
+handle_call(Request, _From, State) ->
+    {reply, ok, State}.
+```
+
+#### After (with precise exports)
+```erlang
+-module(my_worker).
+-behaviour(gen_server).
+-export([start_link/0, init/1, handle_call/3, public_function/2]).
+
+% Proper function clauses with semicolons
+handle_call(get_state, _From, State) ->
+    {reply, State, State};
+
+handle_call({set_state, Value}, _From, _State) ->
+    {reply, ok, Value}.
+
+% Only public functions in export list
+public_function(A, B) -> A + B.
+% private_helper/1 NOT exported
+```
+
+### Benefits
+
+#### 1. Security and Encapsulation
+- **Controlled interfaces**: Only intended functions are accessible externally
+- **Reduced attack surface**: Private functions cannot be called from outside the module
+- **Clear API boundaries**: Explicit distinction between public and private functions
+
+#### 2. OTP Compliance
+- **Best practices**: Follows Erlang/OTP conventions for module exports
+- **Rebar3 compatibility**: Generated code compiles cleanly with rebar3
+- **No compilation warnings**: Eliminates "export_all" deprecation warnings
+
+#### 3. Code Quality
+- **Maintainability**: Easy to identify public API functions
+- **Documentation**: Clear interface specification through visibility modifiers
+- **Refactoring safety**: Private functions can be changed without affecting external callers
+
+#### 4. Development Experience
+- **Clear syntax**: Simple `pub` keyword for public functions
+- **Automatic handling**: OTP callbacks exported automatically
+- **Error prevention**: Eliminates duplicate function definition errors
+
+### Migration Guide
+
+#### From Previous LX Versions
+```lx
+# Old syntax (still works for private functions)
+fun helper(x, y) { x + y }
+
+# New syntax for public functions
+pub fun api_function(x, y) { x + y }
+
+# OTP callbacks remain unchanged (automatically exported)
+fun init(_) { .{:ok, []} }
+fun handle_call(req, _from, state) { .{:reply, :ok, state} }
+```
+
+#### Generated Code Changes
+- **Before**: `-compile(export_all).`
+- **After**: `-export([specific, functions, only]).`
+
+### Test Coverage
+
+#### Comprehensive Test Updates
+- **All function definitions**: Updated to include `visibility` field
+- **Parser tests**: Added tests for `pub` keyword parsing
+- **Code generation tests**: Validated proper export list generation
+- **Integration tests**: End-to-end compilation with rebar3
+- **Error handling**: Tests for visibility-related error messages
+
+#### Test Categories
+1. **Syntax parsing**: `pub fun` keyword recognition
+2. **Export generation**: Correct export list creation
+3. **Function grouping**: Multiple clauses handled properly
+4. **OTP integration**: Automatic callback export validation
+5. **Compilation**: Successful rebar3 compilation of generated code
+
+---
+
+## [Previous] Enhanced Build Directory Management & Cleanup System
 
 ### Overview
 Implemented comprehensive build directory management with automatic cleanup of old artifacts when switching between application and non-application compilation modes. This prevents build artifact pollution and ensures clean compilation environments.
@@ -689,17 +938,38 @@ Performance improvements and strict scoping rules to prevent common programming 
 - **Code review process**: Peer review for all changes and improvements
 - **Performance monitoring**: Benchmarks for compilation speed and generated code quality
 
+### Security and Best Practices Improvements
+
+#### Elimination of `export_all`
+The latest version completely removes the use of `export_all` in generated Erlang code, addressing security and maintainability concerns:
+
+- **Security enhancement**: Prevents accidental exposure of internal functions
+- **OTP compliance**: Follows Erlang/OTP best practices for module design
+- **Explicit interfaces**: Clear specification of public API through export lists
+- **Reduced warnings**: Eliminates deprecation warnings from modern Erlang/OTP versions
+
+#### Function Clause Consolidation
+Resolved duplicate function definition errors by implementing proper function clause grouping:
+
+- **Pattern matching support**: Multiple `handle_call` clauses work correctly
+- **Clean Erlang output**: Uses proper semicolon syntax for function clauses
+- **Error elimination**: No more "function already defined" compilation errors
+- **OTP compatibility**: Proper support for gen_server callback patterns
+
 ### Future Roadmap
 - **Advanced type features**: Dependent types and refinement types
 - **Concurrency primitives**: Native support for OTP concurrency patterns
 - **IDE integration**: Language server protocol support for better developer experience
 - **Package management**: Native package manager for LX libraries and applications
+- **Module system**: Import/export system for multi-module projects
+- **Documentation generation**: Automatic API documentation from public functions
 
 ---
 
 ## Version History
 
-- **Latest**: Enhanced Build Directory Management & Cleanup System
+- **Latest**: Public Function Support & Export System Overhaul
+- **v1.3**: Enhanced Build Directory Management & Cleanup System
 - **v1.2**: Syntax Cleanup - Removed `then` Token
 - **v1.1**: Automatic Rebar3 Integration
 - **v1.0**: Advanced Ambiguity Detection & Typed Children Syntax

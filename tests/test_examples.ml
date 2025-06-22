@@ -78,12 +78,18 @@ let test_various_literals () =
 let test_empty_program () =
   let program = Compiler.parse_string "" in
   let result = Compiler.compile_to_string program in
-  let expected_parts = [ "-module(generated)"; "-compile(export_all)" ] in
+  let expected_parts = [ "-module(generated)" ] in
+  let unexpected_parts = [ "-compile(export_all)" ] in
   List.iter
     (fun part ->
       let contains = string_contains_substring result part in
       check bool ("empty program contains: " ^ part) true contains)
-    expected_parts
+    expected_parts;
+  List.iter
+    (fun part ->
+      let contains = string_contains_substring result part in
+      check bool ("empty program should not contain: " ^ part) false contains)
+    unexpected_parts
 
 let test_error_handling () =
   (* Test that parsing invalid syntax raises appropriate errors *)
