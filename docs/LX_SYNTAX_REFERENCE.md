@@ -18,7 +18,8 @@ This document provides a comprehensive reference for the LX programming language
 12. [Testing](#testing)
 13. [Application Definition](#application-definition)
 14. [Build System & Compilation](#build-system--compilation)
-15. [Examples](#examples)
+15. [Static Analysis & Linting System](#static-analysis--linting-system)
+16. [Examples](#examples)
 
 ## Lexical Elements
 
@@ -1063,7 +1064,6 @@ rebar3 release
 # Start the application
 rebar3 shell
 ```
-```
 
 ## Examples
 
@@ -1526,17 +1526,19 @@ lx --type-check --skip-rebar myapp.lx
 
 #### Standard Workflow
 1. **Parse** LX source code
-2. **Type check** (if enabled)
-3. **Generate** Erlang code and build structure
-4. **Cleanup** old build artifacts
-5. **Compile** with rebar3 (unless skipped)
+2. **Lint** - Comprehensive static analysis
+3. **Type check** (if enabled)
+4. **Generate** Erlang code and build structure
+5. **Cleanup** old build artifacts
+6. **Compile** with rebar3 (unless skipped)
 
 #### Development Workflow with `--skip-rebar`
 1. **Parse** LX source code
-2. **Type check** (if enabled)
-3. **Generate** Erlang code and build structure
-4. **Cleanup** old build artifacts
-5. **Skip** rebar3 compilation
+2. **Lint** - Comprehensive static analysis
+3. **Type check** (if enabled)
+4. **Generate** Erlang code and build structure
+5. **Cleanup** old build artifacts
+6. **Skip** rebar3 compilation
 
 #### Manual Compilation After Generation
 ```bash
@@ -1634,3 +1636,296 @@ check:
 ```
 
 This enhanced build system provides developers with flexible, efficient compilation options while maintaining the robustness and reliability of the LX toolchain.
+
+## Static Analysis & Linting System
+
+### Overview
+
+LX includes a comprehensive static analysis linter that runs automatically during compilation, providing extensive validation beyond basic syntax checking. The linter performs deep analysis of code quality, variable usage, OTP compliance, and catches common programming errors before they reach runtime.
+
+### Linter Integration
+
+#### Automatic Execution
+The linter runs automatically as part of the compilation pipeline:
+
+```bash
+# Linter runs automatically during compilation
+lx myapp.lx
+
+# Example output with lint errors:
+# Lint Errors:
+# myapp.lx:15:8: Error: Variable 'undefined_var' is used but not defined
+# myapp.lx:20:3: Warning: Function 'unused_helper/0' is defined but never used
+# Linting failed - compilation aborted
+```
+
+#### Blocking Behavior
+- **Error blocking**: Compilation stops immediately if lint errors are found
+- **Rebar3 protection**: Never proceeds to rebar3 compilation phase if lint issues exist
+- **Universal integration**: Works for both application and non-application projects
+
+### Variable Analysis
+
+#### Unused Variable Detection
+The linter identifies variables that are defined but never used:
+
+```lx
+fun example() {
+  used_var = 42
+  unused_var = 100      # Warning: Variable 'unused_var' is defined but never used
+  result = used_var + 10
+  result
+}
+```
+
+#### Undefined Variable Detection
+Catches references to variables that haven't been defined:
+
+```lx
+fun example() {
+  result = unknown_var + 42  # Error: Variable 'unknown_var' is used but not defined
+  result
+}
+```
+
+#### Ignored Variables
+Variables starting with underscore are properly handled:
+
+```lx
+fun example() {
+  _ignored = expensive_computation()  # OK: Underscore variables are ignored
+  _debug = log_message("debug info")  # OK: Side effect only
+  :ok
+}
+
+fun handle_call(request, _from, state) {
+  # '_from' parameter is properly ignored
+  .{:reply, :ok, state}
+}
+```
+
+#### Variable Shadowing Detection
+Prevents variable name conflicts between parent and child scopes:
+
+```lx
+fun example() {
+  x = 42
+  result = {
+    x = 100  # Error: Variable 'x' shadows a variable from parent scope
+    x + 1
+  }
+  result
+}
+```
+
+### Function Analysis
+
+#### Unused Function Detection
+Identifies private functions that are never called:
+
+```lx
+worker my_worker {
+  fun init(_) { .{:ok, []} }
+
+  fun helper_function() {  # Warning: Function 'helper_function/0' is defined but never used
+    :ok
+  }
+
+  pub fun public_api() {  # OK: Public functions are exempt from unused warnings
+    :ok
+  }
+}
+```
+
+#### Function Usage Rules
+- **Private functions**: Must be used somewhere in the code
+- **Public functions**: Exempt from unused analysis (marked with `pub`)
+- **OTP callbacks**: Automatically exempted from unused analysis
+
+### OTP-Specific Validation
+
+#### Callback Signature Validation
+Verifies OTP callback functions have correct parameter counts:
+
+```lx
+worker cart_worker {
+  fun init(_) { .{:ok, []} }  # Valid: init/1
+
+  fun handle_call(req, from) {  # Error: handle_call expects 3 parameters, found 2
+    .{:reply, :ok, []}
+  }
+
+  fun handle_cast(req, state) { # Valid: handle_cast/2
+    .{:noreply, state}
+  }
+
+  fun handle_info(info, state) { # Valid: handle_info/2
+    .{:noreply, state}
+  }
+
+  fun terminate(reason, state) { # Valid: terminate/2
+    :ok
+  }
+
+  fun code_change(old_vsn, state, extra) { # Valid: code_change/3
+    .{:ok, state}
+  }
+}
+```
+
+#### Supported OTP Callbacks
+- `init/1` - Initialize worker state
+- `handle_call/3` - Handle synchronous calls
+- `handle_cast/2` - Handle asynchronous casts
+- `handle_info/2` - Handle system messages
+- `handle_continue/2` - Handle continue messages
+- `terminate/2` - Cleanup on termination
+- `code_change/3` - Handle code upgrades
+- `format_status/1` - Format status for debugging
+
+#### Non-Mandatory Callbacks
+OTP callbacks are validated only when defined - they are not required to be present:
+
+```lx
+worker minimal_worker {
+  fun init(_) { .{:ok, []} }  # Only init/1 is required
+  # Other callbacks are optional and validated only if defined
+}
+```
+
+### Error Reporting
+
+#### Error Format
+Lint errors include precise positioning and helpful suggestions:
+
+```bash
+# Error format: filename:line:column: Severity: Message
+myapp.lx:15:8: Error: Variable 'undefined_var' is used but not defined
+  Suggestion: Define 'undefined_var' before using it, or check for typos
+
+myapp.lx:20:3: Warning: Function 'helper_function/0' is defined but never used
+  Suggestion: Remove function 'helper_function/0' or export it with 'pub helper_function()' if it's meant to be used externally
+```
+
+#### Severity Levels
+- **Error**: Blocks compilation completely (undefined variables, invalid OTP signatures)
+- **Warning**: Reported but don't block compilation (unused variables, unused functions)
+
+#### Context-Aware Analysis
+- **OTP callbacks**: Variables in OTP callbacks treated with higher severity
+- **Function context**: Analysis considers the current function being processed
+- **Scope awareness**: Tracks variable usage across different scopes
+
+### Special Syntax Handling
+
+#### Erlang Integration
+The linter properly handles Erlang-specific constructs:
+
+```lx
+worker my_worker {
+  fun get_module_name() {
+    __MODULE__  # OK: __MODULE__ macro is recognized
+  }
+
+  fun call_external() {
+    gen_server.call(__MODULE__, :request)  # OK: gen_server is recognized
+    io.format("Hello ~p~n", [__MODULE__])  # OK: io module is recognized
+  }
+}
+```
+
+#### Pattern Matching
+Variable binding in pattern matching is properly tracked:
+
+```lx
+fun process_result(result) {
+  case result {
+    .{:ok, value} -> {
+      # 'value' is properly tracked as defined and used
+      processed = transform(value)
+      processed
+    }
+    .{:error, reason} -> {
+      # 'reason' is properly tracked
+      log_error(reason)
+      nil
+    }
+  }
+}
+```
+
+### Lint Error Categories
+
+The linter detects various categories of issues:
+
+#### Variable Issues
+- **UnusedVariable**: Variables defined but never used
+- **UndefinedVariable**: Variables used but not defined
+- **VariableShadowing**: Variables that shadow parent scope variables
+
+#### Function Issues
+- **UnusedFunction**: Private functions that are never called
+- **UndefinedFunction**: Calls to non-existent functions
+- **InvalidOtpCallback**: OTP callbacks with incorrect signatures
+
+#### Code Quality Issues
+- **UnusedLiteral**: Literal values assigned to ignored variables
+- **UnreachableClause**: Function clauses that can never be reached
+- **OverlappingClause**: Function clauses with overlapping patterns
+
+### Best Practices
+
+#### Variable Naming
+```lx
+fun good_example() {
+  # Use meaningful names
+  user_count = get_user_count()
+
+  # Use underscore prefix for intentionally ignored variables
+  _debug_info = log_debug("Processing users")
+
+  # Use underscore for truly unused values
+  _ = expensive_side_effect()
+
+  user_count
+}
+```
+
+#### Function Organization
+```lx
+worker user_manager {
+  # OTP callbacks - automatically recognized
+  fun init(_) { .{:ok, []} }
+  fun handle_call(req, _from, state) { .{:reply, :ok, state} }
+
+  # Public API functions - mark with pub
+  pub fun create_user(name) {
+    gen_server.call(__MODULE__, .{:create, name})
+  }
+
+  # Private helpers - ensure they're used
+  fun validate_user_name(name) {
+    String.length(name) > 0
+  }
+}
+```
+
+#### Error Handling
+```lx
+fun process_data(input) {
+  case validate_input(input) {
+    .{:ok, valid_data} -> {
+      # All variables are used appropriately
+      processed = transform_data(valid_data)
+      .{:ok, processed}
+    }
+    .{:error, reason} -> {
+      # Error is properly handled
+      log_error(reason)
+      .{:error, reason}
+    }
+  }
+}
+```
+
+This comprehensive linting system ensures code quality and catches common errors early in the development process, leading to more reliable and maintainable LX applications.
