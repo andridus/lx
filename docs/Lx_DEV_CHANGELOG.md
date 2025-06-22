@@ -1,6 +1,6 @@
-# LX Language Development Changelog
+# Lx Language Development Changelog
 
-This document tracks major improvements and features added to the LX language compiler and toolchain.
+This document tracks major improvements and features added to the Lx language compiler and toolchain.
 
 ## [Latest] Comprehensive Linter System Integration
 
@@ -147,7 +147,7 @@ cart_worker.lx:20:3: Warning: Function 'helper_function/0' is defined but never 
 ### Compilation Workflow Integration
 
 #### Standard Compilation Process
-1. **Parse** LX source code into AST
+1. **Parse** Lx source code into AST
 2. **Lint** - Comprehensive static analysis (NEW)
 3. **Type Check** - Hindley-Milner type inference
 4. **OTP Validate** - OTP-specific pattern validation
@@ -464,7 +464,7 @@ public_function(A, B) -> A + B.
 
 ### Migration Guide
 
-#### From Previous LX Versions
+#### From Previous Lx Versions
 ```lx
 # Old syntax (still works for private functions)
 fun helper(x, y) { x + y }
@@ -678,7 +678,7 @@ fun hello() { "world" }
 ## [Latest] Syntax Cleanup - Removed `then` Token
 
 ### Overview
-Removed the `then` token from the LX language to simplify syntax and eliminate inconsistencies. The language now uses a unified brace-based syntax for all conditional expressions.
+Removed the `then` token from the Lx language to simplify syntax and eliminate inconsistencies. The language now uses a unified brace-based syntax for all conditional expressions.
 
 ### Key Changes
 
@@ -766,7 +766,7 @@ if condition {
 #### 3. Enhanced Developer Experience
 - **Clear expectations**: Developers know exactly which syntax to use
 - **Better tooling support**: Simplified syntax enables better IDE integration
-- **Consistent formatting**: Uniform code style across all LX projects
+- **Consistent formatting**: Uniform code style across all Lx projects
 
 ### Validation
 
@@ -778,7 +778,7 @@ if condition {
 
 #### Generated Code Quality
 ```lx
-# LX source
+# Lx source
 if true {
   42
 } else {
@@ -794,15 +794,15 @@ end
 
 ### Breaking Changes
 - **Syntax change**: Code using `if-then` syntax must be updated to use braces
-- **Migration required**: Existing LX code needs syntax updates
-- **Tools impact**: Any external tools parsing LX syntax need updates
+- **Migration required**: Existing Lx code needs syntax updates
+- **Tools impact**: Any external tools parsing Lx syntax need updates
 
 ---
 
 ## [Previous] Automatic Rebar3 Integration
 
 ### Overview
-Complete integration of rebar3 compilation into the LX compiler workflow, providing seamless OTP application compilation with automatic dependency management and error reporting.
+Complete integration of rebar3 compilation into the Lx compiler workflow, providing seamless OTP application compilation with automatic dependency management and error reporting.
 
 ### Key Features
 
@@ -820,7 +820,7 @@ Complete integration of rebar3 compilation into the LX compiler workflow, provid
 - **Clean Output**: Minimalist, focused compilation messages
 
 #### 3. Integrated Error Reporting
-- **LX Error Format**: Rebar3 errors converted to LX's standardized error format
+- **Lx Error Format**: Rebar3 errors converted to Lx's standardized error format
 - **Precise Location**: Shows exact file, line, and column for compilation errors
 - **Helpful Suggestions**: Provides actionable suggestions for common issues
 - **Context Information**: Explains that errors come from rebar3 compilation
@@ -841,7 +841,7 @@ Complete integration of rebar3 compilation into the LX compiler workflow, provid
 
 #### Compilation Pipeline Integration
 - **App Generator**: Enhanced to call rebar3 compilation after project generation
-- **Error Propagation**: Seamless error handling between LX and rebar3
+- **Error Propagation**: Seamless error handling between Lx and rebar3
 - **Output Formatting**: Clean, professional output with minimal noise
 
 #### Directory Management Improvements
@@ -1145,7 +1145,7 @@ Performance improvements and strict scoping rules to prevent common programming 
 #### 3. Smart Variable Renaming
 - **Unique identifiers**: Each scope gets unique variable names with suffixes
 - **Conflict prevention**: Avoids naming conflicts in generated Erlang code
-- **Debugging support**: Clear mapping between LX and Erlang variable names
+- **Debugging support**: Clear mapping between Lx and Erlang variable names
 
 ---
 
@@ -1208,7 +1208,7 @@ Resolved duplicate function definition errors by implementing proper function cl
 - **Advanced type features**: Dependent types and refinement types
 - **Concurrency primitives**: Native support for OTP concurrency patterns
 - **IDE integration**: Language server protocol support for better developer experience
-- **Package management**: Native package manager for LX libraries and applications
+- **Package management**: Native package manager for Lx libraries and applications
 - **Module system**: Import/export system for multi-module projects
 - **Documentation generation**: Automatic API documentation from public functions
 

@@ -1,6 +1,6 @@
-# LX Language Syntax Reference
+# Lx Language Syntax Reference
 
-This document provides a comprehensive reference for the LX programming language syntax. LX is a functional language designed for building OTP (Open Telecom Platform) applications with Erlang/BEAM interoperability.
+This document provides a comprehensive reference for the Lx programming language syntax. Lx is a functional language designed for building OTP (Open Telecom Platform) applications with Erlang/BEAM interoperability.
 
 ## Table of Contents
 
@@ -25,7 +25,7 @@ This document provides a comprehensive reference for the LX programming language
 
 ### Keywords
 
-LX has several categories of keywords:
+Lx has several categories of keywords:
 
 #### Core Language Keywords
 - `fun` - Function definition
@@ -163,7 +163,7 @@ x = 42  # End-of-line comment
 ## Expressions
 
 ### Variable Assignment
-LX supports direct variable assignment without explicit scoping keywords:
+Lx supports direct variable assignment without explicit scoping keywords:
 
 ```lx
 x = 42
@@ -199,7 +199,7 @@ example() ->
 
 ### Variable Scoping Rules
 
-LX has strict scoping rules to prevent common programming errors:
+Lx has strict scoping rules to prevent common programming errors:
 
 #### 1. Same Scope Redefinition - NOT ALLOWED
 ```lx
@@ -493,7 +493,7 @@ fun complex_function(input) {
 
 ### Function Visibility
 
-LX supports function visibility modifiers to control which functions are exported in the generated Erlang code:
+Lx supports function visibility modifiers to control which functions are exported in the generated Erlang code:
 
 #### Private Functions (Default)
 ```lx
@@ -720,11 +720,11 @@ supervisor empty_supervisor {
 }
 ```
 
-**Important**: The `children` field must always use bracket notation `[...]` even for empty lists. This ensures consistency with list syntax used elsewhere in LX.
+**Important**: The `children` field must always use bracket notation `[...]` even for empty lists. This ensures consistency with list syntax used elsewhere in Lx.
 
 #### Advanced: Typed Children Syntax
 
-LX supports an advanced typed children syntax to resolve ambiguity when workers and supervisors have the same name:
+Lx supports an advanced typed children syntax to resolve ambiguity when workers and supervisors have the same name:
 
 ```lx
 # Simple syntax (works when no name conflicts)
@@ -754,7 +754,7 @@ supervisor mixed_sup {
 
 #### Ambiguity Detection
 
-The LX compiler automatically detects when the same name is used for both a worker and supervisor, preventing ambiguous references:
+The Lx compiler automatically detects when the same name is used for both a worker and supervisor, preventing ambiguous references:
 
 ```lx
 worker cart {
@@ -841,7 +841,7 @@ test "standalone test" {
 ```
 
 ### Test Expressions
-Tests can contain any valid LX expression including assignments and blocks:
+Tests can contain any valid Lx expression including assignments and blocks:
 ```lx
 test "complex test with assignments" {
   input = "test_data"
@@ -862,12 +862,12 @@ test "complex test with assignments" {
 
 ## Application Definition
 
-LX provides a declarative syntax for defining OTP applications. The application definition generates the necessary `.app.src` file, `rebar.config`, and application module automatically.
+Lx provides a declarative syntax for defining OTP applications. The application definition generates the necessary `.app.src` file, `rebar.config`, and application module automatically.
 
 ### Basic Application Definition
 ```lx
 application {
-  description "My LX Application"
+  description "My Lx Application"
   vsn "1.0.0"
   applications [kernel, stdlib, crypto]
   registered [my_supervisor]
@@ -925,7 +925,7 @@ supervisor cart_supervisor {
 
 ### Generated Files
 
-When you compile a LX file with an application definition, the following files are automatically generated:
+When you compile a Lx file with an application definition, the following files are automatically generated:
 
 #### 1. `src/myapp.app.src`
 ```erlang
@@ -1002,19 +1002,19 @@ application {
 
 ### Compilation Process
 
-1. **Parse**: LX parses the application definition and OTP components
-2. **Generate Erlang**: Converts LX code to Erlang modules
+1. **Parse**: Lx parses the application definition and OTP components
+2. **Generate Erlang**: Converts Lx code to Erlang modules
 3. **Generate App Files**: Creates `.app.src`, `rebar.config`, and application module
 4. **Compile with Rebar**: Use `rebar3 compile` to build the final application
 
 ### Automatic Rebar3 Integration
 
-LX now includes automatic rebar3 integration. When you compile an LX file with an application definition, the compiler will:
+Lx now includes automatic rebar3 integration. When you compile a Lx file with an application definition, the compiler will:
 
 1. **Generate** the complete OTP application structure
 2. **Download** rebar3 automatically if not found (to `~/.lx/rebar3`)
 3. **Compile** the project using rebar3
-4. **Display** compilation results in LX error format
+4. **Display** compilation results in Lx error format
 
 #### Compilation Process
 ```bash
@@ -1037,7 +1037,7 @@ lx myapp.lx
 - **Cross-Platform**: Works on Linux systems (requires curl or wget)
 
 #### Error Integration
-Rebar3 compilation errors are automatically converted to LX's error format:
+Rebar3 compilation errors are automatically converted to Lx's error format:
 
 ```
 examples/myapp/src/myapp_worker.erl:15:23: Parse Error: Rebar3 compilation error: syntax error before: '}'
@@ -1313,7 +1313,7 @@ describe "shopping cart tests" {
 
 ### Public Function Support & Export System Overhaul (Latest)
 
-LX now includes comprehensive support for function visibility with automatic export generation, eliminating the use of `export_all` and providing precise control over module interfaces.
+Lx now includes comprehensive support for function visibility with automatic export generation, eliminating the use of `export_all` and providing precise control over module interfaces.
 
 #### Key Features
 - **`pub` keyword**: Mark functions as public for export in generated Erlang
@@ -1373,7 +1373,7 @@ multiply(A, B) -> A * B.
 
 ### Advanced Ambiguity Detection & Typed Children Syntax
 
-The LX compiler now includes comprehensive ambiguity detection for OTP components, ensuring developers receive clear, actionable feedback when name conflicts occur:
+The Lx compiler now includes comprehensive ambiguity detection for OTP components, ensuring developers receive clear, actionable feedback when name conflicts occur:
 
 #### Enhanced OTP Validation
 - **Ambiguity detection**: Automatically detects when the same name is used for both worker and supervisor
@@ -1414,7 +1414,7 @@ supervisor {
 
 ### Enhanced Supervisor Error Testing (Previous)
 
-The LX compiler includes comprehensive test coverage for supervisor error messages, ensuring developers receive clear, actionable feedback when syntax errors occur:
+The Lx compiler includes comprehensive test coverage for supervisor error messages, ensuring developers receive clear, actionable feedback when syntax errors occur:
 
 #### Test Suite Expansion
 - **7 new supervisor-specific tests** added to the test suite
@@ -1463,7 +1463,7 @@ This comprehensive testing ensures that developers receive consistent, helpful e
 
 ### Enhanced Build Directory Management
 
-LX now provides intelligent build directory management with automatic cleanup of old artifacts:
+Lx now provides intelligent build directory management with automatic cleanup of old artifacts:
 
 #### Unified Build Structure
 - **Application files**: Creates `_build/project_name/` with OTP structure (`src/`, `test/`, `rebar.config`)
@@ -1641,7 +1641,7 @@ This enhanced build system provides developers with flexible, efficient compilat
 
 ### Overview
 
-LX includes a comprehensive static analysis linter that runs automatically during compilation, providing extensive validation beyond basic syntax checking. The linter performs deep analysis of code quality, variable usage, OTP compliance, and catches common programming errors before they reach runtime.
+Lx includes a comprehensive static analysis linter that runs automatically during compilation, providing extensive validation beyond basic syntax checking. The linter performs deep analysis of code quality, variable usage, OTP compliance, and catches common programming errors before they reach runtime.
 
 ### Linter Integration
 
@@ -1928,4 +1928,4 @@ fun process_data(input) {
 }
 ```
 
-This comprehensive linting system ensures code quality and catches common errors early in the development process, leading to more reliable and maintainable LX applications.
+This comprehensive linting system ensures code quality and catches common errors early in the development process, leading to more reliable and maintainable Lx applications.

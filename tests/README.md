@@ -1,6 +1,6 @@
-# LX-Lang Compiler Test Suite
+# Lx-Lang Compiler Test Suite
 
-This directory contains a comprehensive test suite for the LX-Lang compiler, built using the Alcotest testing framework.
+This directory contains a comprehensive test suite for the Lx-Lang compiler, built using the Alcotest testing framework.
 
 ## Test Structure
 
