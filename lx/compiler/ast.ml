@@ -25,6 +25,12 @@ type pattern =
 (* OTP strategies for supervisors *)
 type otp_strategy = OneForOne | OneForAll | RestForOne
 
+(* Children specification for supervisors *)
+type children_spec =
+  | SimpleChildren of ident list (* children [worker1, worker2] *)
+  | TypedChildren of { workers : ident list; supervisors : ident list }
+(* children { worker [...], supervisor [...] } *)
+
 (* Special OTP callback function names *)
 type otp_callback =
   | Init
@@ -52,23 +58,38 @@ type expr =
   | Block of expr list (* Explicit block expressions {} *)
   | BinOp of expr * string * expr (* Binary operations *)
 
+(* Application definition for .app.src generation *)
+type application_def = {
+  description : string;
+  vsn : string;
+  applications : ident list option;
+      (* Optional dependencies, defaults to [kernel, stdlib] *)
+  registered : ident list option; (* Optional registered processes *)
+  env : (ident * expr) list option; (* Optional environment variables *)
+}
+
 (* Function clause for multiple arities *)
 type function_clause = {
   params : pattern list;
   body : expr;
-  position : position option (* Position of the clause *)
+  position : position option (* Position of the clause *);
 }
 
 (* Function definitions with multiple arities *)
 type function_def = {
   name : ident;
   clauses : function_clause list;
-  position : position option (* Position of the function definition *)
+  position : position option (* Position of the function definition *);
 }
 
 (* Helper function to create single-clause function for backward compatibility *)
 let make_single_clause_function name params body =
-  { name; clauses = [ { params = List.map (fun p -> PVar p) params; body; position = None } ]; position = None }
+  {
+    name;
+    clauses =
+      [ { params = List.map (fun p -> PVar p) params; body; position = None } ];
+    position = None;
+  }
 
 (* Formal specifications *)
 type spec = { name : ident; requires : expr list; ensures : expr list }
@@ -79,11 +100,17 @@ type describe_block = { name : string; tests : test_def list }
 
 (* OTP components *)
 type otp_component =
-  | Worker of { name : ident; functions : function_def list; specs : spec list }
-  | Supervisor of {
+  | Worker of {
       name : ident;
+      functions : function_def list;
+      specs : spec list;
+      position : position option;
+    }
+  | Supervisor of {
+      name : ident option; (* Nome opcional para supervisores anônimos *)
       strategy : otp_strategy;
-      children : ident list;
+      children : children_spec;
+      position : position option; (* Position of the supervisor definition *)
     }
 
 (* Module items *)
@@ -92,6 +119,7 @@ type module_item =
   | OtpComponent of otp_component
   | Spec of spec
   | Test of describe_block
+  | Application of application_def
 
 (* Complete program *)
 type program = { items : module_item list }

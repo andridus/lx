@@ -17,13 +17,11 @@ let test_underscore_parameters () =
   let input = "fun init(_) { :ok }" in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string program in
-  let expected_parts = ["init(_) ->"; "ok."] in
+  let expected_parts = [ "init(_) ->"; "ok." ] in
   List.iter
     (fun part ->
       let contains = string_contains_substring result part in
-      check bool
-        ("underscore parameter contains: " ^ part)
-        true contains)
+      check bool ("underscore parameter contains: " ^ part) true contains)
     expected_parts
 
 (* Test __MODULE__ macro compilation *)
@@ -35,8 +33,7 @@ let test_module_macro () =
   match program.items with
   | [ Function { clauses = [ { body = Var "?MODULE"; _ } ]; _ } ] ->
       check bool "__MODULE__ macro parses correctly" true true
-  | _ ->
-      check bool "__MODULE__ macro parses correctly" false true
+  | _ -> check bool "__MODULE__ macro parses correctly" false true
 
 (* Test ignored variables with underscore prefix *)
 let test_ignored_variables () =
@@ -45,17 +42,15 @@ let test_ignored_variables () =
   let result = Compiler.compile_to_string program in
 
   (* Should contain the value evaluation and final result *)
-  let should_contain = ["\"value\","; "ok."] in
+  let should_contain = [ "\"value\","; "ok." ] in
   List.iter
     (fun expected ->
       let contains = string_contains_substring result expected in
-      check bool
-        ("ignored variable should contain: " ^ expected)
-        true contains)
+      check bool ("ignored variable should contain: " ^ expected) true contains)
     should_contain;
 
   (* Should NOT contain assignment to ignored variable *)
-  let should_not_contain = ["_ignored ="; "_Ignored ="; "Ignored_ ="] in
+  let should_not_contain = [ "_ignored ="; "_Ignored ="; "Ignored_ =" ] in
   List.iter
     (fun forbidden ->
       let contains = string_contains_substring result forbidden in
@@ -71,31 +66,36 @@ let test_valid_dot_syntax () =
 
   (* Test that dot syntax parses correctly as ExternalCall *)
   match program.items with
-  | [ Function { clauses = [ { body = ExternalCall ("gen_server", "call", _); _ } ]; _ } ] ->
+  | [
+   Function
+     { clauses = [ { body = ExternalCall ("gen_server", "call", _); _ } ]; _ };
+  ] ->
       check bool "dot syntax parses correctly" true true
-  | _ ->
-      check bool "dot syntax parses correctly" false true
+  | _ -> check bool "dot syntax parses correctly" false true
 
 (* Test worker with special syntax features *)
 let test_worker_special_syntax () =
   let worker_code =
-    "worker cart {
-      fun init(_) {
-        .{:ok, []}
-      }
-      fun handle_call(:get, _from, state) {
-        .{:reply, :ok, state}
-      }
-    }" in
+    "worker cart {\n\
+    \      fun init(_) {\n\
+    \        .{:ok, []}\n\
+    \      }\n\
+    \      fun handle_call(:get, _from, state) {\n\
+    \        .{:reply, :ok, state}\n\
+    \      }\n\
+    \    }"
+  in
 
   let program = Compiler.parse_string worker_code in
 
-      (* Test that worker parses correctly *)
+  (* Test that worker parses correctly *)
   match program.items with
-  | [ OtpComponent (Worker { name = "cart"; functions = _; specs = _ }) ] ->
+  | [
+   OtpComponent
+     (Worker { name = "cart"; functions = _; specs = _; position = _ });
+  ] ->
       check bool "worker parses correctly" true true
-  | _ ->
-      check bool "worker parses correctly" false true
+  | _ -> check bool "worker parses correctly" false true
 
 (* Test parsing of __MODULE__ token *)
 let test_module_macro_parsing () =

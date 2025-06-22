@@ -21,6 +21,9 @@ let make_position pos =
 %token WORKER SUPERVISOR STRATEGY CHILDREN
 %token ONE_FOR_ONE ONE_FOR_ALL REST_FOR_ONE
 
+(* Application Keywords *)
+%token APPLICATION DESCRIPTION VSN APPLICATIONS REGISTERED ENV
+
 (* Spec Keywords *)
 %token SPEC REQUIRES ENSURES MATCHES
 
@@ -62,6 +65,7 @@ module_item:
   | s = spec_def { Spec s }
   | t = test_block { Test t }
   | standalone_test = standalone_test_def { Test { name = "Standalone Tests"; tests = [standalone_test] } }
+  | a = application_def { Application a }
 
 function_def:
   (* New syntax for multiple arities *)
@@ -96,18 +100,40 @@ otp_component:
   | s = supervisor_def { s }
 
 worker_def:
-  | WORKER name = IDENT LBRACE
-      functions = function_def*
-      specs = spec_def*
-    RBRACE
-    { Worker { name; functions; specs } }
+  | WORKER name = IDENT LBRACE functions = function_def* specs = spec_def* RBRACE
+    { let pos = make_position $startpos in
+      Worker { name; functions; specs; position = Some pos } }
 
 supervisor_def:
   | SUPERVISOR name = IDENT LBRACE
       STRATEGY strategy = otp_strategy
       CHILDREN LBRACKET children = separated_list(COMMA, IDENT) RBRACKET
     RBRACE
-    { Supervisor { name; strategy; children } }
+    { let pos = make_position $startpos in
+      Supervisor { name = Some name; strategy; children = SimpleChildren children; position = Some pos } }
+
+  | SUPERVISOR name = IDENT LBRACE
+      STRATEGY strategy = otp_strategy
+      CHILDREN LBRACE children_spec = children_specification RBRACE
+    RBRACE
+    { let pos = make_position $startpos in
+      Supervisor { name = Some name; strategy; children = children_spec; position = Some pos } }
+
+  | SUPERVISOR LBRACE
+      STRATEGY strategy = otp_strategy
+      CHILDREN LBRACKET children = separated_list(COMMA, IDENT) RBRACKET
+    RBRACE
+    { let pos = make_position $startpos in
+      Supervisor { name = None; strategy; children = SimpleChildren children; position = Some pos } }
+
+  | SUPERVISOR LBRACE
+      STRATEGY strategy = otp_strategy
+      CHILDREN LBRACE children_spec = children_specification RBRACE
+    RBRACE
+    { let pos = make_position $startpos in
+      Supervisor { name = None; strategy; children = children_spec; position = Some pos } }
+
+  (* Error cases *)
   | SUPERVISOR name = IDENT LBRACE
       STRATEGY strategy = otp_strategy
       CHILDREN _first_child = IDENT error
@@ -115,7 +141,7 @@ supervisor_def:
   | SUPERVISOR name = IDENT LBRACE
       STRATEGY _strategy = otp_strategy
       CHILDREN error
-    { failwith ("Enhanced:Invalid supervisor children field - expected '[' after 'children' keyword|Suggestion:Use 'children [worker1, worker2]' or 'children []' for empty list|Context:Supervisor children must be enclosed in brackets|Example:supervisor " ^ name ^ " {\n  strategy one_for_one\n  children [worker1, worker2]\n}") }
+    { failwith ("Enhanced:Invalid supervisor children field - expected '[' or '{' after 'children' keyword|Suggestion:Use 'children [worker1, worker2]' or 'children { worker [worker1], supervisor [supervisor1] }'|Context:Supervisor children must be enclosed in brackets or braces|Example:supervisor " ^ name ^ " {\n  strategy one_for_one\n  children [worker1, worker2]\n}") }
 
 otp_strategy:
   | ONE_FOR_ONE { OneForOne }
@@ -271,3 +297,42 @@ statement_list:
 
 statement:
   | e = expr { e }
+
+application_def:
+  | APPLICATION LBRACE fields = application_field* RBRACE
+    { let description = ref "Generated with LX" in
+      let vsn = ref "0.1.0" in
+      let applications = ref None in
+      let registered = ref None in
+      let env = ref None in
+      List.iter (function
+        | `Description s -> description := s
+        | `Vsn s -> vsn := s
+        | `Applications apps -> applications := Some apps
+        | `Registered regs -> registered := Some regs
+        | `Env envs -> env := Some envs
+      ) fields;
+      { description = !description; vsn = !vsn; applications = !applications;
+        registered = !registered; env = !env } }
+
+application_field:
+  | DESCRIPTION desc = STRING { `Description desc }
+  | VSN version = STRING { `Vsn version }
+  | APPLICATIONS LBRACKET apps = separated_list(COMMA, IDENT) RBRACKET { `Applications apps }
+  | REGISTERED LBRACKET regs = separated_list(COMMA, IDENT) RBRACKET { `Registered regs }
+  | ENV LBRACKET envs = separated_list(COMMA, env_pair) RBRACKET { `Env envs }
+
+env_pair:
+  | key = IDENT COLON value = expr { (key, value) }
+
+children_specification:
+  | WORKER LBRACKET workers = separated_list(COMMA, IDENT) RBRACKET
+    { TypedChildren { workers; supervisors = [] } }
+  | SUPERVISOR LBRACKET supervisors = separated_list(COMMA, IDENT) RBRACKET
+    { TypedChildren { workers = []; supervisors } }
+  | WORKER LBRACKET workers = separated_list(COMMA, IDENT) RBRACKET
+    SUPERVISOR LBRACKET supervisors = separated_list(COMMA, IDENT) RBRACKET
+    { TypedChildren { workers; supervisors } }
+  | SUPERVISOR LBRACKET supervisors = separated_list(COMMA, IDENT) RBRACKET
+    WORKER LBRACKET workers = separated_list(COMMA, IDENT) RBRACKET
+    { TypedChildren { workers; supervisors } }

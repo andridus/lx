@@ -1,6 +1,6 @@
 (library
  (name compiler)
- (public_name lxc.compiler)
+ (public_name lx.compiler)
  (libraries unix str)
  (modules
   ast
@@ -10,7 +10,8 @@
   typechecker
   otp_validator
   error
-  error_formatter))
+  error_formatter
+  app_generator))
 
 (menhir
  (modules parser))

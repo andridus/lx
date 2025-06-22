@@ -5,12 +5,28 @@ open Compiler.Otp_validator
 
 let test_valid_worker_with_init () =
   let init_func =
-    make_single_clause_function "init" [ "args" ]
-      (Tuple [ Literal (LAtom "ok"); Literal (LAtom "state") ])
+    {
+      name = "init";
+      clauses =
+        [
+          {
+            params = [ PVar "args" ];
+            body = Tuple [ Literal (LAtom "ok"); Var "state" ];
+            position = None;
+          };
+        ];
+      position = None;
+    }
   in
 
   let worker =
-    Worker { name = "test_worker"; functions = [ init_func ]; specs = [] }
+    Worker
+      {
+        name = "test_worker";
+        functions = [ init_func ];
+        specs = [];
+        position = None;
+      }
   in
 
   let program = { items = [ OtpComponent worker ] } in
@@ -33,6 +49,7 @@ let test_worker_missing_init () =
         functions = [ some_func ];
         (* Missing init function *)
         specs = [];
+        position = None;
       }
   in
 
@@ -49,8 +66,18 @@ let test_worker_missing_init () =
 
 let test_handle_call_invalid_arity () =
   let init_func =
-    make_single_clause_function "init" [ "args" ]
-      (Tuple [ Literal (LAtom "ok"); Literal (LAtom "state") ])
+    {
+      name = "init";
+      clauses =
+        [
+          {
+            params = [ PVar "args" ];
+            body = Tuple [ Literal (LAtom "ok"); Var "state" ];
+            position = None;
+          };
+        ];
+      position = None;
+    }
   in
 
   let handle_call_func =
@@ -70,6 +97,7 @@ let test_handle_call_invalid_arity () =
         name = "test_worker";
         functions = [ init_func; handle_call_func ];
         specs = [];
+        position = None;
       }
   in
 
@@ -79,7 +107,8 @@ let test_handle_call_invalid_arity () =
     validate_program program None;
     fail "Invalid handle_call arity test failed: should have thrown error"
   with
-  | OtpValidationError (InvalidCallbackArity ("handle_call", _, 3, 2, _, _)) -> ()
+  | OtpValidationError (InvalidCallbackArity ("handle_call", _, 3, 2, _, _)) ->
+      ()
   | OtpValidationError error ->
       fail
         ("Invalid handle_call arity test failed: wrong error: "
@@ -87,8 +116,18 @@ let test_handle_call_invalid_arity () =
 
 let test_handle_call_valid_arity () =
   let init_func =
-    make_single_clause_function "init" [ "args" ]
-      (Tuple [ Literal (LAtom "ok"); Literal (LAtom "state") ])
+    {
+      name = "init";
+      clauses =
+        [
+          {
+            params = [ PVar "args" ];
+            body = Tuple [ Literal (LAtom "ok"); Var "state" ];
+            position = None;
+          };
+        ];
+      position = None;
+    }
   in
 
   let handle_call_func =
@@ -108,6 +147,7 @@ let test_handle_call_valid_arity () =
         name = "test_worker";
         functions = [ init_func; handle_call_func ];
         specs = [];
+        position = None;
       }
   in
 
@@ -121,8 +161,18 @@ let test_handle_call_valid_arity () =
 
 let test_handle_cast_invalid_arity () =
   let init_func =
-    make_single_clause_function "init" [ "args" ]
-      (Tuple [ Literal (LAtom "ok"); Literal (LAtom "state") ])
+    {
+      name = "init";
+      clauses =
+        [
+          {
+            params = [ PVar "args" ];
+            body = Tuple [ Literal (LAtom "ok"); Var "state" ];
+            position = None;
+          };
+        ];
+      position = None;
+    }
   in
 
   let handle_cast_func =
@@ -137,6 +187,7 @@ let test_handle_cast_invalid_arity () =
         name = "test_worker";
         functions = [ init_func; handle_cast_func ];
         specs = [];
+        position = None;
       }
   in
 
@@ -146,7 +197,8 @@ let test_handle_cast_invalid_arity () =
     validate_program program None;
     fail "Invalid handle_cast arity test failed: should have thrown error"
   with
-  | OtpValidationError (InvalidCallbackArity ("handle_cast", _, 2, 1, _, _)) -> ()
+  | OtpValidationError (InvalidCallbackArity ("handle_cast", _, 2, 1, _, _)) ->
+      ()
   | OtpValidationError error ->
       fail
         ("Invalid handle_cast arity test failed: wrong error: "
@@ -154,13 +206,29 @@ let test_handle_cast_invalid_arity () =
 
 let test_callback_non_tuple_return () =
   let init_func =
-    make_single_clause_function "init" [ "args" ]
-      (Literal (LAtom "not_a_tuple"))
+    {
+      name = "init";
+      clauses =
+        [
+          {
+            params = [ PVar "args" ];
+            body = Literal (LAtom "not_a_tuple");
+            position = None;
+          };
+        ];
+      position = None;
+    }
     (* Should return a tuple *)
   in
 
   let worker =
-    Worker { name = "test_worker"; functions = [ init_func ]; specs = [] }
+    Worker
+      {
+        name = "test_worker";
+        functions = [ init_func ];
+        specs = [];
+        position = None;
+      }
   in
 
   let program = { items = [ OtpComponent worker ] } in
@@ -177,8 +245,18 @@ let test_callback_non_tuple_return () =
 
 let test_format_status_any_return () =
   let init_func =
-    make_single_clause_function "init" [ "args" ]
-      (Tuple [ Literal (LAtom "ok"); Literal (LAtom "state") ])
+    {
+      name = "init";
+      clauses =
+        [
+          {
+            params = [ PVar "args" ];
+            body = Tuple [ Literal (LAtom "ok"); Var "state" ];
+            position = None;
+          };
+        ];
+      position = None;
+    }
   in
 
   let format_status_func =
@@ -193,6 +271,7 @@ let test_format_status_any_return () =
         name = "test_worker";
         functions = [ init_func; format_status_func ];
         specs = [];
+        position = None;
       }
   in
 
@@ -206,8 +285,18 @@ let test_format_status_any_return () =
 
 let test_invalid_worker_name () =
   let init_func =
-    make_single_clause_function "init" [ "args" ]
-      (Tuple [ Literal (LAtom "ok"); Literal (LAtom "state") ])
+    {
+      name = "init";
+      clauses =
+        [
+          {
+            params = [ PVar "args" ];
+            body = Tuple [ Literal (LAtom "ok"); Var "state" ];
+            position = None;
+          };
+        ];
+      position = None;
+    }
   in
 
   let worker =
@@ -217,6 +306,7 @@ let test_invalid_worker_name () =
         (* Invalid atom name *)
         functions = [ init_func ];
         specs = [];
+        position = None;
       }
   in
 
@@ -236,19 +326,36 @@ let test_valid_supervisor () =
   let supervisor =
     Supervisor
       {
-        name = "test_supervisor";
+        name = Some "test_supervisor";
         strategy = OneForOne;
-        children = [ "test_worker" ];
+        children = SimpleChildren [ "test_worker" ];
+        position = None;
       }
   in
 
   let init_func =
-    make_single_clause_function "init" [ "args" ]
-      (Tuple [ Literal (LAtom "ok"); Literal (LAtom "state") ])
+    {
+      name = "init";
+      clauses =
+        [
+          {
+            params = [ PVar "args" ];
+            body = Tuple [ Literal (LAtom "ok"); Var "state" ];
+            position = None;
+          };
+        ];
+      position = None;
+    }
   in
 
   let worker =
-    Worker { name = "test_worker"; functions = [ init_func ]; specs = [] }
+    Worker
+      {
+        name = "test_worker";
+        functions = [ init_func ];
+        specs = [];
+        position = None;
+      }
   in
 
   let program = { items = [ OtpComponent supervisor; OtpComponent worker ] } in
@@ -263,14 +370,78 @@ let test_unknown_child () =
   let supervisor =
     Supervisor
       {
-        name = "test_supervisor";
+        name = Some "test_supervisor";
         strategy = OneForOne;
-        children = [ "unknown_worker" ];
-        (* Worker doesn't exist *)
+        children = SimpleChildren [ "unknown_worker" ];
+        position = None;
       }
   in
 
   let program = { items = [ OtpComponent supervisor ] } in
+
+  try
+    validate_program program None;
+    fail "Unknown child test failed: should have thrown error"
+  with
+  | OtpValidationError (UnknownChild (_, _)) -> ()
+  | OtpValidationError error ->
+      fail
+        ("Unknown child test failed: wrong error: " ^ string_of_otp_error error)
+
+let test_unknown_child_with_nonexistent_worker () =
+  let supervisor =
+    Supervisor
+      {
+        name = Some "test_supervisor";
+        strategy = OneForOne;
+        children = SimpleChildren [ "nonexistent_worker" ];
+        position = None;
+      }
+  in
+
+  let init_func =
+    {
+      name = "init";
+      clauses =
+        [
+          {
+            params = [ PVar "args" ];
+            body = Tuple [ Literal (LAtom "ok"); Var "state" ];
+            position = None;
+          };
+        ];
+      position = None;
+    }
+  in
+
+  let worker =
+    Worker
+      {
+        name = "test_worker";
+        functions = [ init_func ];
+        specs = [];
+        position = None;
+      }
+  in
+
+  let supervisor2 =
+    Supervisor
+      {
+        name = Some "test_supervisor2";
+        strategy = OneForOne;
+        children = SimpleChildren [ "another_nonexistent" ];
+        position = None;
+      }
+  in
+
+  let program =
+    {
+      items =
+        [
+          OtpComponent supervisor; OtpComponent worker; OtpComponent supervisor2;
+        ];
+    }
+  in
 
   try
     validate_program program None;
@@ -293,4 +464,7 @@ let tests =
     ("invalid worker name", `Quick, test_invalid_worker_name);
     ("valid supervisor", `Quick, test_valid_supervisor);
     ("unknown child", `Quick, test_unknown_child);
+    ( "unknown child with nonexistent worker",
+      `Quick,
+      test_unknown_child_with_nonexistent_worker );
   ]

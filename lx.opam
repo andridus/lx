@@ -1,5 +1,5 @@
 opam-version: "2.0"
-name: "lxc"
+name: "lx"
 version: "0.1.0"
 synopsis: "LX Language Compiler"
 description: "A compiler for the LX programming language"

@@ -1,5 +1,5 @@
 (executable
- (public_name test_lxc)
+ (public_name test_lx)
  (name test_main)
  (libraries compiler alcotest str)
  (modules

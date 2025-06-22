@@ -23,7 +23,9 @@ let string_matches_pattern s pattern =
 let test_module_name_generation () =
   let func = make_single_clause_function "example" [] (Literal (LInt 42)) in
   let program = { items = [ Function func ] } in
-  let modules = Compiler.compile_to_string_with_module_name program "my_app" () in
+  let modules =
+    Compiler.compile_to_string_with_module_name program "my_app" ()
+  in
 
   match modules with
   | [ (module_name, module_content) ] ->

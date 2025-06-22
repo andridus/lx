@@ -755,5 +755,8 @@ let type_check_program (program : program) : type_env =
             (fun test_env test ->
               let _, subst = infer_expr env_with_functions test.body in
               apply_subst_env subst test_env)
-            env_acc desc.tests)
+            env_acc desc.tests
+      | Application _ ->
+          (* Application definitions don't affect type checking *)
+          env_acc)
     env_with_functions program.items

@@ -53,6 +53,8 @@ rule read = parse
       | "one_for_one" -> ONE_FOR_ONE | "one_for_all" -> ONE_FOR_ALL | "rest_for_one" -> REST_FOR_ONE
       | "spec" -> SPEC | "requires" -> REQUIRES | "ensures" -> ENSURES | "matches" -> MATCHES
       | "assert" -> ASSERT
+      | "application" -> APPLICATION | "description" -> DESCRIPTION | "vsn" -> VSN
+      | "applications" -> APPLICATIONS | "registered" -> REGISTERED | "env" -> ENV
       | word when List.mem word ["spec"; "worker"; "supervisor"] ->
           (* Other commonly misused reserved words *)
           Error.reserved_word_error ~filename:(!filename_ref) lexbuf word

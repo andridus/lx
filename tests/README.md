@@ -87,4 +87,4 @@ To add new tests:
 ## Dependencies
 
 - `alcotest`: Testing framework
-- `lxc_lib`: The compiler library being tested
+- `lx_lib`: The compiler library being tested

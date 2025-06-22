@@ -5,6 +5,7 @@ module Parser = Parser
 module Typechecker = Typechecker
 module Otp_validator = Otp_validator
 module Error = Error
+module App_generator = App_generator
 open Ast
 
 (* Initialize random number generator *)
@@ -55,8 +56,7 @@ let create_scope parent =
       (match parent with Some p -> p.used_hashes | None -> Hashtbl.create 16);
   }
 
-let is_ignored_var var_name =
-  String.length var_name > 0 && var_name.[0] = '_'
+let is_ignored_var var_name = String.length var_name > 0 && var_name.[0] = '_'
 
 let get_renamed_var ctx var_name =
   if is_ignored_var var_name then
@@ -74,11 +74,11 @@ let get_renamed_var ctx var_name =
     lookup ctx
 
 let add_var_to_scope ctx var_name =
-  if is_ignored_var var_name then
+  if is_ignored_var var_name then (
     (* For ignored variables, use underscore in Erlang *)
     let renamed = "_" in
     Hashtbl.replace ctx.var_map var_name renamed;
-    renamed
+    renamed)
   else
     let renamed = capitalize_var var_name ^ "_" ^ ctx.scope_hash in
     Hashtbl.replace ctx.var_map var_name renamed;
@@ -128,7 +128,12 @@ let check_function_name name =
 let emit_literal (l : literal) : string =
   match l with
   | LInt n -> string_of_int n
-  | LFloat f -> string_of_float f
+  | LFloat f ->
+      let s = string_of_float f in
+      (* Ensure float always has proper format for Erlang *)
+      if String.ends_with ~suffix:"." s then s ^ "0"
+      else if not (String.contains s '.') then s ^ ".0"
+      else s
   | LString s -> "\"" ^ s ^ "\""
   | LBool true -> "true"
   | LBool false -> "false"
@@ -138,9 +143,7 @@ let emit_literal (l : literal) : string =
 let rec emit_pattern ctx (p : pattern) : string =
   match p with
   | PWildcard -> "_"
-  | PVar id ->
-      if is_ignored_var id then "_"
-      else get_renamed_var ctx id
+  | PVar id -> if is_ignored_var id then "_" else get_renamed_var ctx id
   | PAtom a -> a (* Atoms in Erlang don't need colon prefix *)
   | PLiteral l -> emit_literal l
   | PTuple ps -> "{" ^ String.concat ", " (List.map (emit_pattern ctx) ps) ^ "}"
@@ -182,16 +185,25 @@ and emit_block_inline ctx var_name renamed_var exprs =
       ^ ",\n    " ^ end_comment ^ "\n    " ^ renamed_var ^ " = " ^ result_expr
 
 and emit_expr ctx (e : expr) : string =
-
   (* Check for invalid colon syntax patterns in any expression *)
   (match e with
   | Sequence exprs | Block exprs ->
       (* Check for the invalid pattern: module_var followed by function call with atom *)
       let rec check_pattern = function
         | Var module_name :: App (Literal (LAtom func_name), _) :: _ ->
-            failwith ("Enhanced:Invalid module call syntax detected - use '.' instead of ':' for module calls|Suggestion:Change '" ^ module_name ^ ":" ^ func_name ^ "(...)' to '" ^ module_name ^ "." ^ func_name ^ "(...)'|Context:Lx uses dot notation for module calls, not colon notation")
+            failwith
+              ("Enhanced:Invalid module call syntax detected - use '.' instead \
+                of ':' for module calls|Suggestion:Change '" ^ module_name ^ ":"
+             ^ func_name ^ "(...)' to '" ^ module_name ^ "." ^ func_name
+             ^ "(...)'|Context:Lx uses dot notation for module calls, not \
+                colon notation")
         | Var module_name :: Literal (LAtom func_name) :: _ :: _ ->
-            failwith ("Enhanced:Invalid module call syntax detected - use '.' instead of ':' for module calls|Suggestion:Change '" ^ module_name ^ ":" ^ func_name ^ "(...)' to '" ^ module_name ^ "." ^ func_name ^ "(...)'|Context:Lx uses dot notation for module calls, not colon notation")
+            failwith
+              ("Enhanced:Invalid module call syntax detected - use '.' instead \
+                of ':' for module calls|Suggestion:Change '" ^ module_name ^ ":"
+             ^ func_name ^ "(...)' to '" ^ module_name ^ "." ^ func_name
+             ^ "(...)'|Context:Lx uses dot notation for module calls, not \
+                colon notation")
         | _ :: rest -> check_pattern rest
         | [] -> ()
       in
@@ -202,8 +214,10 @@ and emit_expr ctx (e : expr) : string =
   | Literal l -> emit_literal l
   | Var id -> get_renamed_var ctx id
   | Assign (id, value, _pos) -> (
-      (* Check if this is an ignored variable assignment *)
-      if is_ignored_var id then
+      if
+        (* Check if this is an ignored variable assignment *)
+        is_ignored_var id
+      then
         (* For ignored variables, just evaluate the right side for side effects *)
         emit_expr ctx value
       else
@@ -271,15 +285,24 @@ and emit_expr ctx (e : expr) : string =
 and detect_and_transform_external_calls exprs =
   let rec transform acc = function
     | [] -> List.rev acc
-    | [expr] -> List.rev (expr :: acc)
+    | [ expr ] -> List.rev (expr :: acc)
     | Var module_name :: Literal (LAtom func_name) :: App (_, _) :: _rest ->
         (* Pattern: module_var, :func_atom, function_call -> This is invalid syntax! *)
-        failwith ("Enhanced:Invalid module call syntax detected - use '.' instead of ':' for module calls|Suggestion:Change '" ^ module_name ^ ":" ^ func_name ^ "()' to '" ^ module_name ^ "." ^ func_name ^ "()'|Context:Lx uses dot notation for module calls, not colon notation")
+        failwith
+          ("Enhanced:Invalid module call syntax detected - use '.' instead of \
+            ':' for module calls|Suggestion:Change '" ^ module_name ^ ":"
+         ^ func_name ^ "()' to '" ^ module_name ^ "." ^ func_name
+         ^ "()'|Context:Lx uses dot notation for module calls, not colon \
+            notation")
     | Var module_name :: Literal (LAtom func_name) :: _arg1 :: _arg2 :: _rest ->
         (* Pattern: module_var, :func_atom, arg1, arg2, ... -> This is also invalid syntax! *)
-        failwith ("Enhanced:Invalid module call syntax detected - use '.' instead of ':' for module calls|Suggestion:Change '" ^ module_name ^ ":" ^ func_name ^ "(...)' to '" ^ module_name ^ "." ^ func_name ^ "(...)'|Context:Lx uses dot notation for module calls, not colon notation")
-    | expr :: rest ->
-        transform (expr :: acc) rest
+        failwith
+          ("Enhanced:Invalid module call syntax detected - use '.' instead of \
+            ':' for module calls|Suggestion:Change '" ^ module_name ^ ":"
+         ^ func_name ^ "(...)' to '" ^ module_name ^ "." ^ func_name
+         ^ "(...)'|Context:Lx uses dot notation for module calls, not colon \
+            notation")
+    | expr :: rest -> transform (expr :: acc) rest
   in
   transform [] exprs
 
@@ -334,12 +357,17 @@ let emit_describe_block (desc : describe_block) : string =
   let test_functions = List.map emit_test_def desc.tests in
   "% Test suite: " ^ desc.name ^ "\n" ^ String.concat "\n\n" test_functions
 
+(* Helper function to extract children list from children_spec *)
+let get_children_list = function
+  | SimpleChildren children -> children
+  | TypedChildren { workers; supervisors } -> workers @ supervisors
+
 (* Generate OTP component code *)
-let emit_otp_component (base_module_name : string) (component : otp_component) :
+let emit_otp_component (component : otp_component) (base_module_name : string) :
     string * string =
   match component with
-  | Worker { name; functions; specs } ->
-      let module_name = base_module_name ^ "_" ^ name in
+  | Worker { name; functions; specs; position = _ } ->
+      let module_name = base_module_name ^ "_" ^ name ^ "_worker" in
       let header =
         "-module(" ^ module_name
         ^ ").\n-behaviour(gen_server).\n-compile(export_all).\n\n"
@@ -353,8 +381,12 @@ let emit_otp_component (base_module_name : string) (component : otp_component) :
 
       let all_code = spec_code @ function_code in
       (module_name, header ^ String.concat "\n\n" all_code)
-  | Supervisor { name; strategy; children } ->
-      let module_name = base_module_name ^ "_" ^ name in
+  | Supervisor { name; strategy; children; position = _ } ->
+      let module_name =
+        match name with
+        | Some n -> base_module_name ^ "_" ^ n ^ "_supervisor"
+        | None -> base_module_name ^ "_supervisor"
+      in
       let header =
         "-module(" ^ module_name
         ^ ").\n-behaviour(supervisor).\n-compile(export_all).\n\n"
@@ -370,9 +402,10 @@ let emit_otp_component (base_module_name : string) (component : otp_component) :
       let children_specs =
         List.map
           (fun child ->
-            "#{id => " ^ child ^ ", start => {" ^ base_module_name ^ "_" ^ child
+            let child_module = base_module_name ^ "_" ^ child ^ "_worker" in
+            "#{id => " ^ child_module ^ ", start => {" ^ child_module
             ^ ", start_link, []}}")
-          children
+          (get_children_list children)
       in
 
       let supervisor_code =
@@ -390,6 +423,7 @@ let emit_module_item (item : module_item) : string =
   | OtpComponent _ -> "% OTP component handled separately"
   | Spec spec -> emit_spec spec
   | Test desc -> emit_describe_block desc
+  | Application _ -> "% Application definition handled separately"
 
 (* Helper function to check if string contains substring *)
 let string_contains_substring s sub =
@@ -517,15 +551,15 @@ let parse_file (filename : string) : program =
       Error.parse_error ~filename:(Some filename) lexbuf message
 
 let compile_to_string_with_module_name (program : program)
-    (base_module_name : string) ?(filename : string option = None) () : (string * string) list =
+    (base_module_name : string) ?(filename : string option = None) () :
+    (string * string) list =
   (* Type checking phase *)
   (try
      let _ = Typechecker.type_check_program program in
      (* OTP validation phase *)
      try Otp_validator.validate_program program filename
      with Otp_validator.OtpValidationError error ->
-       Printf.eprintf "%s\n"
-         (Otp_validator.string_of_otp_error error);
+       Printf.eprintf "%s\n" (Otp_validator.string_of_otp_error error);
        failwith "OTP validation failed"
    with
   | Error.CompilationError _ as e -> raise e
@@ -554,7 +588,7 @@ let compile_to_string_with_module_name (program : program)
     List.map
       (function
         | OtpComponent component ->
-            emit_otp_component base_module_name component
+            emit_otp_component component base_module_name
         | _ -> failwith "Expected OTP component")
       otp_components
   in
@@ -592,8 +626,7 @@ let type_check_program (program : program) : Typechecker.type_env =
        Otp_validator.validate_program program None;
        Printf.printf "\nOTP validation completed successfully.\n"
      with Otp_validator.OtpValidationError error ->
-       Printf.eprintf "%s\n"
-         (Otp_validator.string_of_otp_error error);
+       Printf.eprintf "%s\n" (Otp_validator.string_of_otp_error error);
        failwith "OTP validation failed");
 
     type_env
@@ -612,16 +645,35 @@ let compile_file (filename : string) : unit =
   let program = parse_file filename in
   let base_name = Filename.remove_extension (Filename.basename filename) in
   let source_dir = Filename.dirname filename in
-  let modules = compile_to_string_with_module_name program base_name ~filename:(Some filename) () in
 
-  (* Write each module to its own file in the same directory as the source *)
-  List.iter
-    (fun (module_name, module_content) ->
-      let output_filename = Filename.concat source_dir (module_name ^ ".erl") in
-      let oc = open_out output_filename in
-      output_string oc module_content;
-      close_out oc;
-      Printf.printf "Generated module: %s\n" output_filename)
-    modules;
+  (* Check if there's an application definition *)
+  let has_application = App_generator.find_application_def program <> None in
 
-  Printf.printf "Compiled %s -> %d modules\n" filename (List.length modules)
+  if has_application then
+    (* If there's an application definition, let App_generator handle everything *)
+    match App_generator.find_application_def program with
+    | Some app_def ->
+        App_generator.generate_application_files source_dir filename program
+          app_def;
+        Printf.printf "Generated application files for %s\n" base_name
+    | None -> () (* This case should not happen *)
+  else
+    (* No application definition, generate individual modules *)
+    let modules =
+      compile_to_string_with_module_name program base_name
+        ~filename:(Some filename) ()
+    in
+
+    (* Write each module to its own file in the same directory as the source *)
+    List.iter
+      (fun (module_name, module_content) ->
+        let output_filename =
+          Filename.concat source_dir (module_name ^ ".erl")
+        in
+        let oc = open_out output_filename in
+        output_string oc module_content;
+        close_out oc;
+        Printf.printf "Generated module: %s\n" output_filename)
+      modules;
+
+    Printf.printf "Compiled %s\n" filename

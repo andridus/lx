@@ -16,7 +16,8 @@ This document provides a comprehensive reference for the LX programming language
 10. [OTP Components](#otp-components)
 11. [Specifications](#specifications)
 12. [Testing](#testing)
-13. [Examples](#examples)
+13. [Application Definition](#application-definition)
+14. [Examples](#examples)
 
 ## Lexical Elements
 
@@ -629,6 +630,76 @@ supervisor empty_supervisor {
 
 **Important**: The `children` field must always use bracket notation `[...]` even for empty lists. This ensures consistency with list syntax used elsewhere in LX.
 
+#### Advanced: Typed Children Syntax
+
+LX supports an advanced typed children syntax to resolve ambiguity when workers and supervisors have the same name:
+
+```lx
+# Simple syntax (works when no name conflicts)
+supervisor simple_sup {
+  strategy one_for_one
+  children [cart, payment]
+}
+
+# Typed syntax (recommended when there are name conflicts)
+supervisor advanced_sup {
+  strategy one_for_one
+  children {
+    worker [cart, payment]
+    supervisor [cart_manager, payment_manager]
+  }
+}
+
+# Mixed typed syntax
+supervisor mixed_sup {
+  strategy one_for_all
+  children {
+    worker [cart]
+    supervisor [payment_manager]
+  }
+}
+```
+
+#### Ambiguity Detection
+
+The LX compiler automatically detects when the same name is used for both a worker and supervisor, preventing ambiguous references:
+
+```lx
+worker cart {
+  fun init(_) { .{:ok, []} }
+}
+
+supervisor cart {
+  strategy one_for_one
+  children { worker [cart] }
+}
+
+# This will cause a compilation error:
+supervisor main_supervisor {
+  strategy one_for_one
+  children [cart]  # ERROR: Ambiguous - cart worker or cart supervisor?
+}
+
+# Correct solution using typed syntax:
+supervisor main_supervisor {
+  strategy one_for_one
+  children {
+    supervisor [cart]  # Explicitly specify the supervisor
+  }
+}
+```
+
+**Error Message Example:**
+```
+myapp.lx:15:1: OTP Error: Ambiguous reference 'cart' in supervisor 'main supervisor'
+  Problem: 'cart' is used for both worker and supervisor components
+  Solution: Use typed children syntax to specify the component type:
+    children {
+      worker [cart]     # if referring to the worker
+      supervisor [cart] # if referring to the supervisor
+    }
+```
+
 #### Supervisor Strategies
 - `one_for_one` - Restart only the failed child
 - `one_for_all` - Restart all children when one fails
@@ -697,435 +768,171 @@ test "complex test with assignments" {
 }
 ```
 
-## Grammar Rules
+## Application Definition
 
-### Program Structure
-```
-program ::= module_item* EOF
+LX provides a declarative syntax for defining OTP applications. The application definition generates the necessary `.app.src` file, `rebar.config`, and application module automatically.
 
-module_item ::= function_def
-              | otp_component
-              | spec_def
-              | test_block
-              | standalone_test
-
-function_def ::= 'fun' IDENT '{' function_clause+ '}'           # Multiple clauses
-               | 'fun' IDENT '(' params ')' '{' function_body '}'  # Single clause
-
-function_clause ::= '(' params ')' '{' function_body '}'
-
-function_body ::= expr
-                | expr ';' function_body
-                | statement_list
-
-statement_list ::= statement
-                 | statement statement_list
-
-statement ::= expr
-```
-
-### Expression Grammar
-```
-expr ::= arithmetic_expr
-       | IDENT '=' expr                                    # Assignment
-       | expr '(' expr_list ')'                           # Function call
-       | 'if' expr 'then' expr ('else' expr)?             # Conditional
-       | 'case' expr '{' case_branch* '}'                 # Pattern matching
-       | 'for' IDENT 'in' expr '{' expr '}'               # For loop
-
-arithmetic_expr ::= term
-                  | arithmetic_expr '+' term               # Addition
-                  | arithmetic_expr '-' term               # Subtraction
-
-term ::= factor
-       | term '*' factor                                   # Multiplication
-       | term '/' factor                                   # Division
-
-factor ::= simple_expr
-         | '(' arithmetic_expr ')'                         # Grouping
-
-simple_expr ::= literal
-              | IDENT                                      # Variable
-              | IDENT '.' IDENT '(' expr_list ')'         # External call
-              | IDENT '.' IDENT                           # Module reference
-              | '(' expr ')'                              # Grouping
-              | '.{' expr_list '}'                        # Tuple
-              | '[' expr_list ']'                         # List
-              | '{' statement_list '}'                    # Block expression
-              | '{' '}'                                   # Empty block
-
-case_branch ::= pattern '->' expr
-
-pattern ::= simple_pattern
-          | pattern '::' pattern                          # Cons pattern
-
-simple_pattern ::= '_'                                    # Wildcard
-                 | IDENT                                  # Variable
-                 | ATOM                                   # Atom
-                 | literal                                # Literal
-                 | '.{' pattern_list '}'                  # Tuple pattern
-                 | '[' pattern_list ']'                   # List pattern
-```
-
-### OTP Component Grammar
-```
-otp_component ::= worker_def
-                | supervisor_def
-
-worker_def ::= 'worker' IDENT '{' worker_body '}'
-
-worker_body ::= function_def*
-              | spec_def*
-
-supervisor_def ::= 'supervisor' IDENT '{' supervisor_body '}'
-
-supervisor_body ::= 'strategy' otp_strategy 'children' children_list
-
-otp_strategy ::= 'one_for_one'
-               | 'one_for_all'
-               | 'rest_for_one'
-
-children_list ::= '[' separated_list(COMMA, IDENT) ']'     # List with children
-                | '[' ']'                                   # Empty list
-```
-
-## Reserved Words
-
-The following words are reserved and cannot be used as identifiers:
-
-**Core**: `fun`, `case`, `if`, `then`, `else`, `for`, `when`, `true`, `false`, `nil`
-
-**OTP**: `worker`, `supervisor`, `strategy`, `children`, `one_for_one`, `one_for_all`, `rest_for_one`
-
-**Specs**: `spec`, `requires`, `ensures`, `matches`
-
-**Testing**: `describe`, `assert`
-
-**Note**: The word `describe` is reserved within test block definitions. The word `test` can be used as a function name in any context.
-
-## Error Handling
-
-### Enhanced Error Reporting
-
-LX provides detailed error messages with improved formatting and position tracking for better debugging experience:
-
-#### Colored Error Output
-All error messages are displayed with **enhanced visual formatting** for better visibility and readability:
-- **Yellow colored error messages** for quick identification
-- **Bold variable names** highlighted in yellow for emphasis
-- **Precise position information** showing exact line and column numbers
-- **Contextual information** with first definition locations
-
-#### Variable Scoping Errors
-LX enforces strict scoping rules with enhanced error messages that show exact locations and provide helpful context:
-
-##### Same Scope Redefinition Error
-When attempting to redefine a variable within the same scope:
-
+### Basic Application Definition
 ```lx
-# Error: Variable redefinition in same scope
-fun example1() {
-  x = 42
-  x = 43  # Error: Cannot reassign variable in same scope
+application {
+  description "My LX Application"
+  vsn "1.0.0"
+  applications [kernel, stdlib, crypto]
+  registered [my_supervisor]
+  env []
 }
 ```
 
-**Enhanced Error Output:**
-```
-12:5: Variable x is already defined within the same scope and cannot be reassigned (first defined at line 11, column 5)
-  Suggestion: Use a different variable name like 'x_new', 'x_2', or 'updated_x'
-```
+### Application Fields
 
-In this example:
-- `12:5` - Shows the exact line (12) and column (5) where the redefinition occurs
-- `x` - The variable name is highlighted in **bold yellow**
-- `(first defined at line 11, column 5)` - Shows where the variable was originally defined
-- The suggestion provides practical alternatives for variable naming
+#### Required Fields
+- **description**: String describing the application
+- **vsn**: Version string for the application
 
-##### Variable Shadowing Error
-When attempting to shadow a parent scope variable:
+#### Optional Fields
+- **applications**: List of OTP applications this application depends on (defaults to `[kernel, stdlib]`)
+- **registered**: List of registered process names (automatically includes supervisors)
+- **env**: List of environment variables as key-value pairs
 
+### Complete Application Example
 ```lx
-# Error: Variable shadowing parent scope
-fun example2() {
-  x = 42
-  result = {
-    x = 100  # Error: Cannot shadow parent scope variable
-    x + 1
-  }
-}
-```
-
-**Enhanced Error Output:**
-```
-15:7: Variable x cannot shadow parent scope variable (defined in parent scope at line 13, column 3)
-  Suggestion: Use a different variable name like 'x_local', 'inner_x', or 'x_block'
-```
-
-In this example:
-- `15:7` - Shows the exact line (15) and column (7) where the shadowing attempt occurs
-- `x` - The variable name is highlighted in **bold yellow**
-- `(defined in parent scope at line 13, column 3)` - Shows the parent scope definition location
-- The suggestion provides scope-specific naming alternatives
-
-#### Position Tracking Features
-
-1. **Exact Line and Column Numbers**: Errors show precise locations where issues occur using menhir's position tracking
-2. **First Definition Location**: For redefinition errors, shows where the variable was originally defined
-3. **Scope Context Information**: Provides helpful context about scope relationships
-4. **File Path Display**: Shows the full file path for easy navigation in IDEs
-
-#### Error Message Structure
-
-Each error message follows a consistent, enhanced format:
-```
-[line:column]: Variable [BOLD_YELLOW]variable_name[/BOLD_YELLOW] [error_description] (context_info)
-  Suggestion: [helpful_suggestion]
-  Context: [additional_context_if_applicable]
-```
-
-**Key Visual Elements:**
-- **Position prefix** (`line:column:`) in standard text color
-- **Variable name** in bold yellow for immediate identification
-- **Error description** in standard text with contextual information
-- **Suggestions** providing actionable solutions
-- **Context information** showing related definitions and scope relationships
-
-#### Compilation Error Types
-
-The LX compiler now uses a sophisticated error system with specific error types:
-
-1. **VariableRedefinition**: Triggered when attempting to reassign a variable in the same scope
-2. **VariableShadowing**: Triggered when attempting to define a variable that shadows a parent scope
-3. **Enhanced position tracking**: All errors include precise line and column information
-4. **Contextual suggestions**: Each error type provides specific suggestions for resolution
-
-#### Technical Implementation
-
-The error system includes several technical improvements:
-
-- **Menhir position integration**: Uses `$startpos` for accurate position capture
-- **Color-coded output**: ANSI color codes for terminal display
-- **Structured error objects**: Comprehensive error information with suggestions
-- **Exception handling**: Proper `CompilationError` exceptions with detailed context
-- **Test coverage**: Comprehensive test suite validating error message accuracy
-
-### Syntax Errors
-LX provides detailed error messages for common syntax mistakes:
-
-```lx
-# Error: Missing function body
-fun my_func(x, y)  # Missing { }
-
-# Error: Reserved word usage in wrong context
-fun spec() { }  # 'spec' is reserved for specifications
-
-# Error: Missing description in test
-test { }  # Should be: test "description" { }
-
-# Error: Invalid supervisor syntax (missing brackets)
-supervisor my_sup {
-  strategy one_for_one
-  children worker1, worker2  # Error: brackets required
-}
-# Compiler output: "Invalid supervisor children field - brackets are required around the children list"
-# Should be: children [worker1, worker2]
-```
-
-### Variable Scoping Errors
-LX enforces strict scoping rules with clear error messages:
-
-```lx
-# Error: Same scope redefinition
-fun example1() {
-  x = 42
-  x = 43  # Error: Variable 'x' is already defined in this scope and cannot be reassigned
+# File: myapp.lx
+application {
+  description "My Shopping Cart Application"
+  vsn "1.0.0"
+  applications [kernel, stdlib, crypto, mnesia]
+  registered [cart_supervisor]
+  env [max_items: 100, timeout: 5000]
 }
 
-# Error: Shadowing parent scope
-fun example2() {
-  x = 42
-  result = {
-    x = 100  # Error: Variable 'x' is already defined in parent scope and cannot be shadowed
-    x + 1
-  }
-}
-
-# Valid: Different sibling scopes
-fun example3() {
-  result1 = {
-    x = 100  # OK: First block scope
-    x + 10
-  }
-
-  result2 = {
-    x = 200  # OK: Different block scope
-    x + 20
-  }
-
-  .{result1, result2}
-}
-```
-
-### OTP Validation Errors
-
-The LX compiler provides **enhanced OTP validation** with precise error reporting that follows the same format as syntax errors. All OTP validation errors include:
-
-- **Exact file location** with line and column numbers
-- **Clear error descriptions** explaining what's wrong
-- **Expected vs. actual information** for parameter counts and return types
-- **Correct syntax examples** showing how to fix the issue
-
-#### OTP Error Format
-```
-filename:line:column: OTP Error: [detailed_error_description]
-  Found: [actual_situation]
-  Expected: [expected_situation]
-  Correct syntax: [example_showing_fix]
-```
-
-#### Common OTP Validation Errors
-
-##### 1. Incorrect Parameter Count
-```lx
-worker bad_worker {
-  # Error: init must have exactly 1 parameter
-  fun init(x, y) { .{:ok, 0} }
-}
-```
-
-**Compiler Output:**
-```
-my/test1.lx:3:3: OTP Error: Function 'init' in worker 'bad_worker' has incorrect number of parameters
-  Found: 2 parameters
-  Expected: 1 parameters (args)
-  Correct syntax: fun init(args) { .{:ok, initial_state} }
-```
-
-##### 2. Missing Required Callback
-```lx
-worker incomplete_worker {
-  # Error: Missing required init function
-  fun handle_call(req, from, state) { .{:reply, :ok, state} }
-}
-```
-
-**Compiler Output:**
-```
-my/incomplete.lx: OTP Error: Worker 'incomplete_worker' is missing required callback function 'init'
-  Expected: fun init(args) { .{:ok, initial_state} }
-```
-
-##### 3. Incorrect Return Type
-```lx
-worker bad_worker {
-  fun init(args) { .{:ok, 0} }
-
-  # Error: handle_call must return a tuple
-  fun handle_call(req, from, state) { :ok }
-}
-```
-
-**Compiler Output:**
-```
-my/test1.lx:5:3: OTP Error: Function 'handle_call' in worker 'bad_worker' must return a tuple
-  Expected return format: .{:reply, response, new_state} or .{:noreply, new_state}
-```
-
-#### OTP Callback Parameter Requirements
-
-| Callback | Parameters | Parameter Names | Return Type |
-|----------|------------|----------------|-------------|
-| `init` | 1 | `(args)` | Tuple (required) |
-| `handle_call` | 3 | `(request, from, state)` | Tuple (required) |
-| `handle_cast` | 2 | `(request, state)` | Tuple (required) |
-| `handle_info` | 2 | `(info, state)` | Tuple (required) |
-| `terminate` | 2 | `(reason, state)` | Tuple (required) |
-| `code_change` | 3 | `(old_vsn, state, extra)` | Tuple (required) |
-| `format_status` | 1 | `(status)` | Any type (flexible) |
-
-#### Valid OTP Worker Example
-```lx
-worker my_worker {
-  # Required: init function with 1 parameter
-  fun init(args) {
-    initial_state = setup_state(args)
+# Define worker components
+worker cart_worker {
+  fun init(user_id) {
+    initial_state = .{user_id, [], 0.0}
     .{:ok, initial_state}
   }
 
-  # Optional: handle_call with 3 parameters, returns tuple
-  fun handle_call(request, from, state) {
-    response = process_request(request, state)
-    new_state = update_state(state, request)
-    .{:reply, response, new_state}
+  fun handle_call(:get_cart, _from, state) {
+    .{:reply, state, state}
   }
 
-  # Optional: handle_cast with 2 parameters, returns tuple
-  fun handle_cast(request, state) {
-    new_state = handle_async_request(request, state)
+  fun handle_cast(.{:add_item, item}, .{user_id, items, total}) {
+    new_items = [item | items]
+    new_total = total + item.price
+    new_state = .{user_id, new_items, new_total}
     .{:noreply, new_state}
   }
+}
 
-  # Optional: Other callbacks follow the same pattern
-  fun handle_info(info, state) { .{:noreply, state} }
-  fun terminate(reason, state) { .{:ok} }
-  fun code_change(old_vsn, state, extra) { .{:ok, state} }
-
-  # Special case: format_status can return any type
-  fun format_status(status) { status }
+# Define supervisor components
+supervisor cart_supervisor {
+  strategy one_for_one
+  children [cart_worker]
 }
 ```
 
-## Compilation Optimizations
+### Generated Files
 
-### Block Expression Optimization
+When you compile a LX file with an application definition, the following files are automatically generated:
 
-LX compiles block expressions as inline statements rather than anonymous functions for better performance. This optimization:
-
-- **Eliminates function call overhead** - No anonymous function creation or invocation
-- **Improves readability** - Generated Erlang code is more straightforward
-- **Maintains proper scoping** - Variables are renamed with unique suffixes to prevent conflicts
-- **Preserves semantics** - Block behavior remains identical to the original design
-
-**Example Transformation:**
-
-```lx
-fun calculate() {
-  result = {
-    x = 10
-    y = 20
-    x + y
-  }
-  result * 2
-}
-```
-
-**Generates optimized Erlang:**
-
+#### 1. `src/myapp.app.src`
 ```erlang
-calculate() ->
-    % start block Result_abc
-    X_abc = 10,
-    Y_abc = 20,
-    % end block Result_abc
-    Result_def = X_abc + Y_abc,
-    Result_def * 2.
+{application, myapp, [
+  {description, "My Shopping Cart Application"},
+  {vsn, "1.0.0"},
+  {modules, [myapp_app, cart_supervisor, cart_worker]},
+  {registered, [cart_supervisor]},
+  {mod, {myapp_app, []}},
+  {applications, [kernel, stdlib, crypto, mnesia]},
+  {env, []}
+]}.
 ```
-## Best Practices
 
-1. **Use descriptive names** for functions and variables
-2. **Respect scoping rules** - avoid shadowing and use unique names in sibling scopes
-3. **Use block expressions** for complex calculations and better code organization
-4. **Always provide init function** in workers
-5. **Return tuples from OTP callbacks** (except format_status)
-6. **Use pattern matching** instead of nested if-else
-7. **Write tests** for your functions with descriptive names
-8. **Use specifications** to document function contracts
-9. **Follow consistent indentation** (2 or 4 spaces)
-10. **Use atoms** for status values (`:ok`, `:error`, etc.)
-11. **Use `#` for comments**, not `//`
-12. **Leverage inline block compilation** for better performance
-13. **Design clear variable scopes** - use different names for different purposes
+#### 2. `rebar.config`
+```erlang
+{erl_opts, [debug_info]}.
+{deps, []}.
+
+{applications, [kernel, stdlib]}.
+
+{project_plugins, []}.
+{sub_dirs, []}.
+```
+
+#### 3. `src/myapp_app.erl`
+```erlang
+-module(myapp_app).
+-behaviour(application).
+-compile(export_all).
+
+start(_Type, _Args) ->
+    myapp_sup:start_link().
+
+stop(_State) ->
+    ok.
+```
+
+### Application Name Inference
+
+The application name is automatically inferred from the filename:
+- `myapp.lx` → application name: `myapp`
+- `shopping_cart.lx` → application name: `shopping_cart`
+
+### Module Collection
+
+The compiler automatically collects all modules for the `{modules, [...]}` field:
+- Application module: `<app_name>_app`
+- All workers defined in the file
+- All supervisors defined in the file
+- All standalone functions (grouped into the main module)
+
+### Registered Processes
+
+The `{registered, [...]}` field is populated by:
+1. Automatically detected supervisors
+2. User-defined registered processes from the `registered` field
+3. Duplicates are automatically removed
+
+### Environment Variables
+
+Environment variables can be defined using the `env` field:
+```lx
+application {
+  description "My App"
+  vsn "1.0.0"
+  env [
+    max_connections: 100,
+    timeout: 5000,
+    debug_mode: true
+  ]
+}
+```
+
+### Compilation Process
+
+1. **Parse**: LX parses the application definition and OTP components
+2. **Generate Erlang**: Converts LX code to Erlang modules
+3. **Generate App Files**: Creates `.app.src`, `rebar.config`, and application module
+4. **Compile with Rebar**: Use `rebar3 compile` to build the final application
+
+### Integration with Rebar3
+
+The generated files are fully compatible with rebar3:
+
+```bash
+# Compile the application
+rebar3 compile
+
+# Run tests
+rebar3 eunit
+
+# Create a release
+rebar3 release
+
+# Start the application
+rebar3 shell
+```
+```
 
 ## Examples
 
@@ -1300,9 +1107,50 @@ describe "shopping cart tests" {
 
 ## Recent Improvements
 
-### Enhanced Supervisor Error Testing (Latest)
+### Advanced Ambiguity Detection & Typed Children Syntax (Latest)
 
-The LX compiler now includes comprehensive test coverage for supervisor error messages, ensuring developers receive clear, actionable feedback when syntax errors occur:
+The LX compiler now includes comprehensive ambiguity detection for OTP components, ensuring developers receive clear, actionable feedback when name conflicts occur:
+
+#### Enhanced OTP Validation
+- **Ambiguity detection**: Automatically detects when the same name is used for both worker and supervisor
+- **Precise error reporting**: Shows exact file location with line:column format
+- **Clear error messages**: Uses "main supervisor" instead of technical terms
+- **Practical solutions**: Provides specific syntax examples for resolution
+
+#### Typed Children Syntax
+- **Simple syntax**: `children [worker1, worker2]` for basic cases
+- **Typed syntax**: `children { worker [...], supervisor [...] }` for complex scenarios
+- **Mixed support**: Can combine worker and supervisor children in one declaration
+- **Backward compatibility**: Existing simple syntax continues to work when no conflicts exist
+
+#### Error Message Improvements
+```lx
+# Before: Compilation succeeds with potential runtime issues
+# After: Clear compile-time error with solution
+
+supervisor {
+  children [cart]  # Error if both worker and supervisor named 'cart' exist
+}
+
+# Error output:
+# myapp.lx:10:1: OTP Error: Ambiguous reference 'cart' in supervisor 'main supervisor'
+#   Problem: 'cart' is used for both worker and supervisor components
+#   Solution: Use typed children syntax to specify the component type:
+#     children {
+#       worker [cart]     # if referring to the worker
+#       supervisor [cart] # if referring to the supervisor
+#     }
+```
+
+#### Technical Implementation
+- **AST enhancement**: Added position tracking to OTP components
+- **Parser updates**: Captures exact line/column information for error reporting
+- **Validation engine**: Intelligent type-aware dependency checking
+- **Test coverage**: 116+ comprehensive tests including ambiguity scenarios
+
+### Enhanced Supervisor Error Testing (Previous)
+
+The LX compiler includes comprehensive test coverage for supervisor error messages, ensuring developers receive clear, actionable feedback when syntax errors occur:
 
 #### Test Suite Expansion
 - **7 new supervisor-specific tests** added to the test suite
@@ -1346,506 +1194,3 @@ The tests verify that error messages include:
 - **Position information**: Accurate line and column numbers
 
 This comprehensive testing ensures that developers receive consistent, helpful error messages that accelerate the learning process and reduce debugging time.
-
-### Special Syntax Features (Previous)
-
-The LX compiler now supports several special syntax features for improved Erlang/OTP integration:
-
-#### 1. Underscore Parameters and Ignored Variables
-- **Underscore parameters**: Use `_` or `_name` in function parameters to ignore values
-- **Ignored variable assignments**: Variables starting with `_` are evaluated for side effects but don't create bindings
-- **Wildcard patterns**: `_` can be used in pattern matching to ignore values
-
-```lx
-# Underscore parameters
-fun init(_) { .{:ok, []} }
-fun handle_call(:get, _from, state) { .{:reply, state, state} }
-
-# Ignored variables
-fun process() {
-  _debug = log_message("Processing started")  # Side effect only
-  result = do_work()
-  result
-}
-```
-
-#### 2. Module Reference Macro
-- **`__MODULE__` macro**: Compiles to `?MODULE` in Erlang for self-references
-- **Seamless integration**: Works in any expression context
-- **Type-safe**: Properly integrated with the type system
-
-```lx
-fun get_current_module() { __MODULE__ }
-fun call_self() { gen_server.call(__MODULE__, :request) }
-```
-
-#### 3. Enhanced External Call Syntax
-- **Dot notation**: Use `module.function(args)` for external calls
-- **Compile-time validation**: Ensures correct syntax usage
-- **Error detection**: Catches invalid colon syntax and suggests corrections
-
-```lx
-# Correct syntax
-gen_server.call(__MODULE__, :get)
-io.format("Hello ~p~n", [__MODULE__])
-
-# Invalid syntax (detected and reported)
-# gen_server:call(__MODULE__, :get)  # Error: use '.' instead of ':'
-```
-
-#### 4. Consistent Supervisor Syntax Enforcement
-- **Bracket-only syntax**: Supervisors now require bracket syntax for children lists for consistency
-- **List notation consistency**: Aligns with list syntax used throughout the language
-- **Required brackets**: Both `children [worker1, worker2]` and `children []` require brackets
-- **Grammar simplification**: Parser rules simplified to only accept `[separated_list(COMMA, IDENT)]`
-- **Clear error messages**: Invalid syntax without brackets provides clear parse errors
-
-```lx
-# Correct syntax (required):
-supervisor my_sup {
-  strategy one_for_one
-  children [worker1, worker2]    # Brackets required
-}
-
-supervisor empty_sup {
-  strategy one_for_one
-  children []                    # Brackets required even for empty lists
-}
-```
-
-#### 5. Enhanced Test Coverage with Supervisor Error Validation
-- **115+ tests**: Including comprehensive supervisor error message tests
-- **Supervisor error testing**: 7 new tests specifically for supervisor syntax validation
-- **Error message validation**: Tests verify precise error messages, suggestions, and context
-- **Position tracking**: Tests ensure accurate line and column reporting
-- **Parser validation**: Tests ensure correct AST generation for supervisor syntax
-- **Compilation verification**: Tests verify correct Erlang output
-- **Error detection**: Tests verify proper error reporting for invalid syntax
-
-**New Supervisor Error Tests:**
-- `supervisor_missing_brackets_multiple_children`: Tests error when multiple children lack brackets
-- `supervisor_missing_brackets_single_child`: Tests error when single child lacks brackets
-- `supervisor_invalid_children_syntax`: Tests error for completely invalid children syntax
-- `supervisor_correct_syntax_with_brackets`: Validates correct bracket syntax parsing
-- `supervisor_empty_children_with_brackets`: Validates empty bracket syntax parsing
-- `supervisor_error_message_contains_suggestion`: Validates suggestion field presence
-- `supervisor_error_message_educational`: Validates educational context messages
-
-### Enhanced Error Reporting & Improved Compilation System
-
-Previous major improvements to the LX compiler include:
-
-#### 1. Advanced Error Reporting System (Latest)
-- **Precise position tracking**: Errors now show exact line and column numbers using menhir's `$startpos`
-- **Visual enhancement**: Variable names highlighted in bold yellow, error messages in yellow
-- **Contextual error messages**: Shows first definition location for redefinition errors
-- **Smart suggestions**: Provides specific variable naming suggestions for each error type
-- **Structured error format**: Consistent, readable error message structure
-- **Improved debugging**: Clear distinction between redefinition and shadowing errors
-- **Enhanced OTP validation**: Complete overhaul of OTP error messages with precise positioning, clear descriptions, and correct syntax examples
-
-#### 2. Optimized Block Compilation
-- **Inline expansion**: Blocks are now compiled as inline statements instead of anonymous functions
-- **Performance boost**: Eliminates function call overhead
-- **Better debugging**: Generated code includes helpful comments marking block boundaries
-
-#### 3. Strict Scoping Rules
-- **No shadowing**: Variables from parent scopes cannot be redefined in child scopes
-- **Same-scope protection**: Variables cannot be reassigned within the same scope
-- **Sibling scope freedom**: Different blocks can use the same variable names safely
-
-#### 4. Enhanced Error Message Examples
-
-**Before (old system):**
-```
-Variable 'pega_do_banco' is already defined in this scope and cannot be reassigned
-```
-
-**After (new system):**
-```
-12:5: Variable pega_do_banco is already defined within the same scope and cannot be reassigned (first defined at line 11, column 5)
-  Suggestion: Use a different variable name like 'pega_do_banco_new', 'pega_do_banco_2', or 'updated_pega_do_banco'
-```
-
-**Key improvements:**
-- Exact position information (line 12, column 5)
-- Only variable name in bold yellow formatting
-- Context about first definition location
-- Actionable suggestions for resolution
-- Clear scope context ("within the same scope")
-
-#### 5. Enhanced OTP Error Reporting System
-
-The OTP validation system has been completely rewritten to provide precise, actionable error messages:
-
-- **Position-aware OTP errors**: All OTP validation errors now include exact file location (line:column)
-- **Structured error format**: Consistent format matching syntax errors with "Found/Expected/Correct syntax" sections
-- **Comprehensive callback validation**: Validates parameter counts, return types, and required callbacks
-- **Helpful syntax examples**: Each error includes correct syntax examples for immediate reference
-- **Clear error categorization**: Distinguishes between parameter count errors, return type errors, and missing callbacks
-- **Integration with AST positions**: Function definitions now capture position information for precise error reporting
-
-**Example OTP Error Transformation:**
-
-Before:
-```
-OTP Validation Error: Function init must have parameter count equal to 1: (Args) in worker 'bad_worker', but found 2 parameters
-```
-
-After:
-```
-my/test1.lx:3:3: OTP Error: Function 'init' in worker 'bad_worker' has incorrect number of parameters
-  Found: 2 parameters
-  Expected: 1 parameters (args)
-  Correct syntax: fun init(args) { .{:ok, initial_state} }
-```
-
-#### 6. Technical Enhancements
-
-- **Menhir integration**: Better position tracking using `$startpos` instead of manual position functions
-- **ANSI color support**: Terminal-friendly colored output for better readability
-- **Exception handling**: Proper `CompilationError` exceptions with structured error data
-- **Test coverage**: Comprehensive test suite covering all error scenarios
-- **Backward compatibility**: All existing functionality preserved while adding new features
-- **AST position tracking**: Function definitions and clauses now include position information for better error reporting
-
-This reference document reflects the current state of the LX language implementation including:
-
-- **Advanced error reporting system** with colored output, precise position tracking, and contextual suggestions
-- **Enhanced OTP validation** with position-aware error messages, structured format, and syntax examples
-- **Enhanced variable scoping** with strict redefinition and shadowing prevention
-- **Optimized block compilation** with inline expansion for better performance
-- **Comprehensive testing framework** with full error scenario coverage
-- **Menhir-based parsing** with accurate position tracking using `$startpos`
-- **AST position integration** for function definitions and clauses
-- Arithmetic operations with proper precedence (`+`, `-`, `*`, `/`)
-- Pattern matching in function clauses with literal patterns
-- Recursive function support
-- Enhanced comment support with `#` syntax
-- OTP worker and supervisor definitions with comprehensive validation
-- Formal specification system
-
-The language continues to evolve with new features being added regularly. The most recent major additions include:
-
-1. **Revolutionary Error System (Latest)**: Complete overhaul of error reporting with:
-   - Precise line/column position tracking for all error types
-   - Visual highlighting with bold yellow variable names
-   - Contextual error messages showing first definition locations
-   - Smart suggestions for variable naming conflicts
-   - Structured error format for better readability
-   - **Enhanced OTP validation** with position-aware error messages and syntax examples
-
-2. **Enhanced OTP Validation System**: Complete rewrite of OTP callback validation with:
-   - Precise file location tracking for all OTP errors
-   - Clear parameter count and return type validation
-   - Structured error format matching syntax errors
-   - Helpful syntax examples for immediate correction
-   - Comprehensive callback requirement documentation
-
-3. **Enhanced Compilation Pipeline**: Improved error handling throughout the compilation process with proper exception types and comprehensive test coverage
-
-4. **Developer Experience**: Significantly improved debugging experience with clear, actionable error messages that help developers quickly identify and resolve issues in both language syntax and OTP patterns
-
-The LX compiler now provides one of the most advanced error reporting systems in functional programming languages, making it easier for developers to write correct, maintainable code while learning the language's scoping rules and best practices.
-
-## Complete Example: Worker with All Special Syntax Features
-
-Here's a comprehensive example demonstrating all the special syntax features implemented:
-
-```lx
-worker advanced_cart {
-  # Underscore parameter ignores initialization arguments
-  fun init(_) {
-    _startup_log = logger.info("Cart worker starting up")  # Ignored variable
-    initial_state = .{[], 0}
-    .{:ok, initial_state}
-  }
-
-  # Multiple underscore parameters and __MODULE__ usage
-  fun handle_call(request, _from, state) {
-    case request {
-      :get_cart ->
-        .{:reply, state, state}
-
-      :get_module ->
-        .{:reply, __MODULE__, state}  # __MODULE__ macro
-
-      .{:add_item, item} -> {
-        _validation_log = validator.check_item(item)  # Side effect only
-        new_state = add_to_cart(state, item)
-        .{:reply, :ok, new_state}
-      }
-
-      _ ->
-        .{:reply, :unknown_request, state}
-    }
-  }
-
-  # Ignored parameter and external module calls
-  fun handle_cast(.{:log_activity, activity}, state) {
-    _log_result = logger.info("Activity: ~p", [activity])  # Ignored assignment
-    metrics.increment("cart_activity")  # External call with dot notation
-    .{:noreply, state}
-  }
-
-  # Multiple ignored parameters
-  fun handle_info(_info, state) {
-    _debug = logger.debug("Received info message")  # Side effect only
-    .{:noreply, state}
-  }
-
-  # Pattern matching with wildcards and ignored variables
-  fun terminate(reason, state) {
-    case reason {
-      :normal -> {
-        _cleanup = logger.info("Normal shutdown")
-        cleanup_resources(state)
-      }
-      _ -> {
-        _error_log = logger.error("Abnormal shutdown: ~p", [reason])
-        emergency_cleanup(state)
-      }
-    }
-    .{:ok}
-  }
-
-  # Helper functions demonstrating all features
-  fun add_to_cart(.{items, count}, new_item) {
-    _validation = validate_item(new_item)  # Ignored validation result
-    updated_items = [new_item | items]
-    .{updated_items, count + 1}
-  }
-
-  fun validate_item(item) {
-    # Use external validation service
-    validation_service.validate(__MODULE__, item)
-  }
-
-  fun cleanup_resources(.{items, _count}) {
-    # Pattern matching with wildcard
-    _cleanup_result = storage.save_items(items)  # Side effect only
-    _shutdown_log = logger.info("Resources cleaned up")
-    :ok
-  }
-}
-```
-
-**Generated Erlang output:**
-```erlang
--module(advanced_cart).
--behaviour(gen_server).
--compile(export_all).
-
-init(_) ->
-    logger:info("Cart worker starting up"),
-    Initial_state_abc = {[], 0},
-    {ok, Initial_state_abc}.
-
-handle_call(get_cart, _, State_def) ->
-    {reply, State_def, State_def};
-handle_call(get_module, _, State_def) ->
-    {reply, ?MODULE, State_def};
-handle_call({add_item, Item_ghi}, _, State_def) ->
-    validator:check_item(Item_ghi),
-    New_state_jkl = add_to_cart(State_def, Item_ghi),
-    {reply, ok, New_state_jkl};
-handle_call(_, _, State_def) ->
-    {reply, unknown_request, State_def}.
-
-handle_cast({log_activity, Activity_mno}, State_pqr) ->
-    logger:info("Activity: ~p", [Activity_mno]),
-    metrics:increment("cart_activity"),
-    {noreply, State_pqr}.
-
-handle_info(_, State_stu) ->
-    logger:debug("Received info message"),
-    {noreply, State_stu}.
-
-% ... additional functions with proper variable renaming and ignored variable handling
-```
-
-This example showcases:
-- **Underscore parameters** (`_`, `_from`, `_info`, `_count`)
-- **Ignored variable assignments** (`_startup_log`, `_validation_log`, etc.)
-- **`__MODULE__` macro** usage for self-reference
-- **External function calls** with dot notation (`logger.info`, `metrics.increment`)
-- **Pattern matching** with wildcards and ignored variables
-- **Proper Erlang compilation** with variable renaming and optimization
-
-#### Practical Error Examples
-
-Here are real-world examples showing how the enhanced error system helps developers:
-
-##### Example 1: Variable Redefinition in Function
-```lx
-fun process_data() {
-  result = fetch_data()
-  result = validate_data(result)  # Error: redefinition
-  result
-}
-```
-
-**Compiler Output:**
-```
-3:3: Variable result is already defined within the same scope and cannot be reassigned (first defined at line 2, column 3)
-  Suggestion: Use a different variable name like 'result_new', 'result_2', or 'updated_result'
-```
-
-**Fix:**
-```lx
-fun process_data() {
-  result = fetch_data()
-  validated_result = validate_data(result)  # Use different name
-  validated_result
-}
-```
-
-##### Example 2: Variable Shadowing in Block
-```lx
-fun calculate_total(items) {
-  total = 0
-  processed_items = {
-    total = calculate_subtotal(items)  # Error: shadowing
-    total + tax
-  }
-  processed_items
-}
-```
-
-**Compiler Output:**
-```
-4:5: Variable total cannot shadow parent scope variable (defined in parent scope at line 2, column 3)
-  Suggestion: Use a different variable name like 'total_local', 'inner_total', or 'total_block'
-```
-
-**Fix:**
-```lx
-fun calculate_total(items) {
-  total = 0
-  processed_items = {
-    subtotal = calculate_subtotal(items)  # Use different name
-    subtotal + tax
-  }
-  processed_items
-}
-```
-
-##### Example 3: Complex Nested Scoping
-```lx
-fun complex_processing(data) {
-  stage1 = {
-    processed = clean_data(data)
-    validated = validate(processed)
-    validated
-  }
-
-  stage2 = {
-    processed = transform_data(stage1)  # OK: different scope
-    final_result = finalize(processed)
-    final_result
-  }
-
-  .{stage1, stage2}
-}
-```
-
-This example compiles successfully because `processed` is used in different sibling scopes, which is allowed.
-
-### Complete OTP Application Example
-
-Here's a comprehensive example showing both worker and supervisor definitions with both syntax variations:
-
-```lx
-# Define workers first
-worker cart_worker {
-  fun init(user_id) {
-    initial_state = .{user_id, [], 0.0}
-    .{:ok, initial_state}
-  }
-
-  fun handle_call(:get_cart, _from, state) {
-    .{:reply, state, state}
-  }
-
-  fun handle_cast(.{:add_item, item}, .{user_id, items, total}) {
-    new_items = [item | items]
-    new_total = total + item.price
-    new_state = .{user_id, new_items, new_total}
-    .{:noreply, new_state}
-  }
-}
-
-worker inventory_worker {
-  fun init(_) {
-    .{:ok, .{}}
-  }
-
-  fun handle_call(.{:check_stock, item_id}, _from, state) {
-    stock_level = check_inventory(item_id)
-    .{:reply, stock_level, state}
-  }
-}
-
-# Supervisor with bracket syntax (recommended)
-supervisor shop_supervisor {
-  strategy one_for_one
-  children [cart_worker, inventory_worker]
-}
-
-# Another supervisor with different strategy
-supervisor alt_shop_supervisor {
-  strategy one_for_all
-  children [cart_worker, inventory_worker]
-}
-
-# Supervisor with empty children list
-supervisor empty_supervisor {
-  strategy rest_for_one
-  children []
-}
-```
-
-**Generated Erlang Modules:**
-
-For the main supervisor (`shop_supervisor`):
-```erlang
--module(shop_supervisor).
--behaviour(supervisor).
--compile(export_all).
-
-init([]) ->
-    Children = [
-        {cart_worker, {cart_worker, start_link, []}, permanent, 5000, worker, [cart_worker]},
-        {inventory_worker, {inventory_worker, start_link, []}, permanent, 5000, worker, [inventory_worker]}
-    ],
-    {ok, {#{strategy => one_for_one, intensity => 10, period => 60}, Children}}.
-```
-
-For the cart worker:
-```erlang
--module(cart_worker).
--behaviour(gen_server).
--compile(export_all).
-
-init(User_id_abc) ->
-    Initial_state_def = {User_id_abc, [], 0.0},
-    {ok, Initial_state_def}.
-
-handle_call(get_cart, _, State_ghi) ->
-    {reply, State_ghi, State_ghi}.
-
-handle_cast({add_item, Item_jkl}, {User_id_mno, Items_pqr, Total_stu}) ->
-    New_items_vwx = [Item_jkl | Items_pqr],
-    New_total_yza = Total_stu + element(2, Item_jkl),  % Assuming item.price is second element
-    New_state_bcd = {User_id_mno, New_items_vwx, New_total_yza},
-    {noreply, New_state_bcd}.
-```
-
-This comprehensive example demonstrates:
-- **Multiple workers** with different callback functions
-- **Consistent bracket syntax** for supervisor children lists
-- **Different supervisor strategies** (`one_for_one`, `one_for_all`, `rest_for_one`)
-- **Empty children lists** using bracket notation
-- **Proper OTP structure** with init, handle_call, and handle_cast callbacks
-- **Pattern matching** in function parameters and case expressions
-- **External references** between workers in the supervisor children list

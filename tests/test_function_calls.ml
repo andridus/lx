@@ -94,16 +94,16 @@ let test_multiple_arities_parsing () =
   match program.items with
   | [
    Function
-           {
-        name = "a";
-        clauses =
-          [
-                                    { params = []; body = Literal LNil; position = _ };
-            { params = [ PVar "x" ]; body = Var "x"; position = _ };
-            { params = [ PVar "x"; PVar "y" ]; body = Var "x"; position = _ };
-          ];
-                  position = _;
-      };
+     {
+       name = "a";
+       clauses =
+         [
+           { params = []; body = Literal LNil; position = _ };
+           { params = [ PVar "x" ]; body = Var "x"; position = _ };
+           { params = [ PVar "x"; PVar "y" ]; body = Var "x"; position = _ };
+         ];
+       position = _;
+     };
   ] ->
       ()
   | _ -> fail "Expected function with multiple arities"

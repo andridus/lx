@@ -1,10 +1,10 @@
 (lang dune 3.19)
-(name lxc)
+(name lx)
 
 (using menhir 2.1)
 
 (package
- (name lxc)
+ (name lx)
  (depends
   ocaml
   dune

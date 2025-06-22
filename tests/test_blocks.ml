@@ -20,7 +20,11 @@ let test_simple_block_assignment () =
       items =
         [
           Function
-            { name = "test"; clauses = [ { params = []; body = assign_expr; position = None } ]; position = None };
+            {
+              name = "test";
+              clauses = [ { params = []; body = assign_expr; position = None } ];
+              position = None;
+            };
         ];
     }
   in
@@ -41,7 +45,11 @@ let test_nested_block_assignment () =
       items =
         [
           Function
-            { name = "test"; clauses = [ { params = []; body = assign_expr; position = None } ]; position = None };
+            {
+              name = "test";
+              clauses = [ { params = []; body = assign_expr; position = None } ];
+              position = None;
+            };
         ];
     }
   in
@@ -69,7 +77,11 @@ let test_multiple_assignments_in_block () =
       items =
         [
           Function
-            { name = "test"; clauses = [ { params = []; body = assign_expr; position = None } ]; position = None };
+            {
+              name = "test";
+              clauses = [ { params = []; body = assign_expr; position = None } ];
+              position = None;
+            };
         ];
     }
   in
