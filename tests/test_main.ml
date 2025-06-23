@@ -22,4 +22,5 @@ let () =
       ("Build Cleanup Tests", Test_build_cleanup.tests);
       ("Guards Tests", Test_guards.tests);
       ("Logical Operators Tests", Test_logical_operators.tests);
+      ("Send Operator Tests", Test_send_operator.tests);
     ]

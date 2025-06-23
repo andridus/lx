@@ -13,6 +13,7 @@ type lx_type =
   | TString
   | TBool
   | TAtom
+  | TPid
   | TNil
   | TOption of lx_type
   | TFun of lx_type * lx_type
@@ -171,6 +172,7 @@ let rec string_of_type = function
   | TString -> "string"
   | TBool -> "bool"
   | TAtom -> "atom"
+  | TPid -> "pid"
   | TNil -> "nil"
   | TOption t -> "?" ^ string_of_type t
   | TFun (t1, t2) -> "(" ^ string_of_type t1 ^ " -> " ^ string_of_type t2 ^ ")"
@@ -761,6 +763,23 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
           let final_subst = compose_subst (compose_subst combined_subst bool_unify1) bool_unify2 in
           (TBool, final_subst)
       | _ -> failwith ("Unknown binary operator: " ^ op))
+  | Send (target_expr, message_expr) ->
+      (* Type check target and message *)
+      let target_type, s1 = infer_expr env target_expr in
+      let message_type, s2 = infer_expr (apply_subst_env s1 env) message_expr in
+      let combined_subst = compose_subst s1 s2 in
+
+      (* Validate target type - should be pid, atom (registered name), or tuple *)
+      let target_type_applied = apply_subst combined_subst target_type in
+      (match target_type_applied with
+       | TPid | TAtom | TTuple _ -> ()  (* Valid target types *)
+       | TVar _ -> ()  (* Allow type variables for flexibility *)
+       | _ ->
+           let context = "send operation target" in
+           raise (TypeError (UnificationError (target_type_applied, TPid, Some context))));
+
+      (* Send operation returns the message *)
+      (apply_subst combined_subst message_type, combined_subst)
 
 (* Type inference for function clauses *)
 let infer_function_clause (env : type_env) (clause : function_clause) :

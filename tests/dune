@@ -22,7 +22,8 @@
   test_supervisor_errors
   test_build_cleanup
   test_guards
-  test_logical_operators))
+  test_logical_operators
+  test_send_operator))
 
 (rule
  (alias runtest)

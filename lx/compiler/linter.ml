@@ -491,6 +491,9 @@ let rec lint_expr ctx errors expr =
       lint_expr ctx errors right
   | UnaryOp (_, operand) ->
       lint_expr ctx errors operand
+  | Send (target, message) ->
+      let errors = lint_expr ctx errors target in
+      lint_expr ctx errors message
   | _ -> errors
 
 (* Guard expression analysis *)

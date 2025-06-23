@@ -78,6 +78,7 @@ type expr =
   | Block of expr list (* Explicit block expressions {} *)
   | BinOp of expr * string * expr (* Binary operations *)
   | UnaryOp of string * expr (* Unary operations *)
+  | Send of expr * expr (* Send operator: target ! message *)
 
 (* Application definition for .app.src generation *)
 type application_def = {

@@ -44,6 +44,7 @@ rule read = parse
   | "-"             { MINUS }
   | "*"             { MULT }
   | "/"             { DIV }
+  | "!"             { SEND }
 
   (* Special tokens *)
   | "__MODULE__"    { MODULE_MACRO }

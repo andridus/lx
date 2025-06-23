@@ -36,7 +36,7 @@ let make_position pos =
 %token LPAREN RPAREN LBRACE RBRACE LBRACKET RBRACKET
 %token DOT_LBRACE
 %token COMMA SEMICOLON CONS COLON DOT
-%token PLUS MINUS MULT DIV
+%token PLUS MINUS MULT DIV SEND
 
 %token EOF
 
@@ -50,6 +50,7 @@ let make_position pos =
 %left OR
 %left AND
 %right NOT
+%right SEND (* Send operator - right associative, lower precedence *)
 %left EQEQ NEQ LT GT LEQ GEQ
 %left PLUS MINUS
 %left MULT DIV
@@ -258,6 +259,8 @@ expr:
     { BinOp (left, "andalso", right) }
   | left = expr ORELSE right = expr
     { BinOp (left, "orelse", right) }
+  | left = expr SEND right = expr
+    { Send (left, right) }
   | NOT right = expr
     { UnaryOp ("not", right) }
   | IF cond = expr LBRACE then_expr = expr RBRACE ELSE LBRACE else_expr = expr RBRACE

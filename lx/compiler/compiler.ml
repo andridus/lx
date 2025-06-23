@@ -352,6 +352,8 @@ and emit_expr ctx (e : expr) : string =
         | other -> other (* Keep other operators as is *)
       in
       emit_expr ctx left ^ " " ^ erlang_op ^ " " ^ emit_expr ctx right
+  | Send (target, message) ->
+      emit_expr ctx target ^ " ! " ^ emit_expr ctx message
 
 (* Helper function to detect and transform external call patterns *)
 and detect_and_transform_external_calls exprs =

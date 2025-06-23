@@ -149,6 +149,8 @@ let rec emit_expr ctx (e : expr) : string =
       op ^ " " ^ emit_expr ctx operand
   | BinOp (left, op, right) ->
       emit_expr ctx left ^ " " ^ op ^ " " ^ emit_expr ctx right
+  | Send (target, message) ->
+      emit_expr ctx target ^ " ! " ^ emit_expr ctx message
 
 (* Helper function to extract application name from filename *)
 let extract_app_name filename =

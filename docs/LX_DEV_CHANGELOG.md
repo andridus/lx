@@ -2,7 +2,126 @@
 
 This document tracks major improvements and features added to the Lx language compiler and toolchain.
 
-## [Latest] Case Expression Syntax Simplification
+## [Latest] Send Operator Implementation
+
+### Overview
+Implemented the send operator (`!`) for message passing between processes, enabling essential OTP functionality. This operator allows sending messages to process identifiers (PIDs), atoms, and tuples, following Erlang's message passing semantics.
+
+### Key Changes
+
+#### 1. Send Operator Syntax
+- **New operator**: Added `!` operator for message passing
+- **Syntax**: `target ! message` (identical to Erlang)
+- **Precedence**: Right associative, lower precedence than arithmetic operators
+- **Type safety**: Validates target types (pid, atom, tuple)
+
+#### 2. Compiler Components Updated
+- **Lexer**: Added `SEND` token for `!` operator
+- **Parser**: Added grammar rule for send expressions with proper precedence
+- **AST**: Added `Send of expr * expr` variant to expression type
+- **Type checker**: Added `TPid` type and validation for send operations
+- **Code generation**: Generates correct Erlang `!` syntax
+
+#### 3. Type System Enhancement
+- **New type**: Added `TPid` type for process identifiers
+- **Target validation**: Ensures send targets are valid (pid, atom, tuple, or type variables)
+- **Return type**: Send operation returns the sent message type
+- **Error messages**: Clear error reporting for invalid send targets
+
+### Syntax and Usage
+
+#### Basic Send Operations
+```lx
+# Send message to PID
+pid ! :hello
+
+# Send message to registered atom
+:my_process ! .{:request, data}
+
+# Send to tuple (for distributed messaging)
+.{:node, :process} ! message
+```
+
+#### Chained Send Operations
+```lx
+# Right associative - equivalent to: pid1 ! (pid2 ! message)
+pid1 ! pid2 ! message
+```
+
+#### OTP Integration
+```lx
+worker my_worker {
+  handle_call(.{:forward, pid, message}, _from, state) {
+    # Send message to another process
+    pid ! message
+    .{:reply, :ok, state}
+  }
+}
+```
+
+### Generated Erlang Code
+
+The send operator compiles directly to Erlang's native message passing:
+
+```lx
+# Lx source
+fun notify_process(pid, message) {
+  pid ! message
+}
+```
+
+```erlang
+% Generated Erlang
+notify_process(Pid, Message) ->
+    Pid ! Message.
+```
+
+### Type Checking Examples
+
+#### Valid Send Operations
+```lx
+# These compile successfully
+pid ! :message        # pid type to atom
+:registered ! data     # atom to any type
+.{node, proc} ! msg    # tuple to any type
+```
+
+#### Invalid Send Operations (Compile Errors)
+```lx
+42 ! message           # Error: Cannot send to integer
+"string" ! message     # Error: Cannot send to string
+[1, 2, 3] ! message    # Error: Cannot send to list
+```
+
+### Benefits
+
+#### 1. OTP Compatibility
+- **Native messaging**: Direct support for Erlang/OTP message passing
+- **Process communication**: Enables actor-model programming patterns
+- **Distributed systems**: Support for node-to-node communication
+
+#### 2. Type Safety
+- **Compile-time validation**: Catches invalid send targets at compile time
+- **Clear errors**: Descriptive error messages for type mismatches
+- **Return type tracking**: Proper type inference for send expressions
+
+#### 3. Performance
+- **Zero overhead**: Compiles directly to Erlang's optimized message passing
+- **Native BEAM support**: Leverages BEAM VM's efficient messaging system
+
+### Testing Coverage
+
+Comprehensive test suite covering:
+- Basic send operator parsing and compilation
+- Operator precedence and associativity
+- AST structure validation
+- OTP context integration
+- Return value semantics
+- Error case handling
+
+This implementation provides essential message passing capabilities for building robust OTP applications in Lx.
+
+## [Previous] Case Expression Syntax Simplification
 
 ### Overview
 Simplified case expression syntax by removing semicolon requirements between case branches. The language now uses a cleaner, more intuitive syntax that aligns with modern functional programming languages while maintaining full Erlang compatibility.

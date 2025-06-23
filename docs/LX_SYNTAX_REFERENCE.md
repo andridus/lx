@@ -66,6 +66,7 @@ Lx has several categories of keywords:
 - `=` - Assignment/binding
 - `->` - Function arrow, case branch
 - `|` - Pipe operator
+- `!` - Send operator (message passing)
 - `_` - Wildcard pattern
 - `::` - List cons operator
 - `.` - Module access
@@ -537,6 +538,129 @@ value = get_cached_value(key) orelse compute_and_cache(key)
 ```
 
 **Compilation**: Logical operators map directly to their Erlang equivalents, ensuring optimal performance in the BEAM VM.
+
+### Send Expressions (Message Passing)
+
+The send operator (`!`) enables message passing between processes, a fundamental feature for OTP applications. It follows Erlang's message passing semantics exactly.
+
+#### Basic Syntax
+```lx
+target ! message
+```
+
+#### Supported Target Types
+- **Process ID (PID)**: Direct message to a specific process
+- **Atom**: Message to a registered process name
+- **Tuple**: For distributed messaging (e.g., `{node, process}`)
+
+#### Basic Examples
+```lx
+# Send to PID
+pid ! :hello
+
+# Send to registered process
+:my_process ! .{:request, data}
+
+# Send to remote node
+.{:node@host, :worker} ! :start
+
+# Send complex data
+worker_pid ! .{:update, "new_value", 42}
+```
+
+#### Operator Precedence and Associativity
+The send operator is **right associative** with **lower precedence** than arithmetic operators:
+
+```lx
+# Right associative - equivalent to: pid1 ! (pid2 ! message)
+pid1 ! pid2 ! message
+
+# Precedence - equivalent to: pid ! (x + y)
+pid ! x + y
+
+# Use parentheses for different grouping
+(pid ! x) + y
+```
+
+#### Return Value
+Send expressions return the sent message:
+
+```lx
+# The send operation returns the message
+result = pid ! :hello    # result is :hello
+status = worker ! data   # status is data
+
+# Useful for chaining or logging
+log("Sent: " + (pid ! message))
+```
+
+#### Type Safety
+The type checker validates send targets at compile time:
+
+```lx
+# Valid send targets
+pid ! message           # pid type
+:registered ! data      # atom type
+.{node, proc} ! msg     # tuple type
+
+# Invalid send targets (compile errors)
+42 ! message           # Error: Cannot send to integer
+"string" ! message     # Error: Cannot send to string
+[1, 2, 3] ! message    # Error: Cannot send to list
+```
+
+#### OTP Integration
+Send expressions work seamlessly in OTP contexts:
+
+```lx
+worker my_worker {
+  handle_call(.{:forward, target_pid, message}, _from, state) {
+    # Forward message to another process
+    target_pid ! message
+    .{:reply, :ok, state}
+  }
+
+  handle_cast(.{:broadcast, pids, message}, state) {
+    # Send to multiple processes
+    for pid in pids {
+      pid ! message
+    }
+    .{:noreply, state}
+  }
+}
+```
+
+#### Pattern Matching with Send
+```lx
+fun notify_process {
+  (:urgent, pid, message) {
+    # Send urgent message
+    pid ! .{:urgent, message}
+  }
+  (:normal, pid, message) {
+    # Send normal message
+    pid ! message
+  }
+}
+```
+
+#### Generated Erlang Code
+Send expressions compile directly to Erlang's native message passing:
+
+```lx
+# Lx source
+fun notify(pid, message) {
+  pid ! .{:notification, message}
+}
+```
+
+```erlang
+% Generated Erlang
+notify(Pid, Message) ->
+    Pid ! {notification, Message}.
+```
+
+**Performance**: Send operations have zero overhead as they compile directly to BEAM VM's optimized message passing instructions.
 
 ### For Loops
 ```lx
