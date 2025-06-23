@@ -12,6 +12,26 @@ type literal =
   | LAtom of string
   | LNil
 
+(* Guard expressions for when clauses *)
+type guard_expr =
+  | GuardAnd of guard_expr * guard_expr
+  | GuardOr of guard_expr * guard_expr
+  | GuardAndalso of guard_expr * guard_expr
+  | GuardOrelse of guard_expr * guard_expr
+  | GuardNot of guard_expr
+  | GuardBinOp of guard_value * string * guard_value
+  | GuardCall of string * guard_value list
+  | GuardAtom of guard_atom
+
+and guard_value =
+  | GuardAtomValue of guard_atom
+  | GuardCallValue of string * guard_value list
+
+and guard_atom =
+  | GuardVar of string
+  | GuardLiteral of literal
+  | GuardCallAtom of string * guard_atom list
+
 (* Pattern matching *)
 type pattern =
   | PWildcard
@@ -51,12 +71,13 @@ type expr =
   | ExternalCall of string * string * expr list (* module, function, args *)
   | Tuple of expr list
   | List of expr list
-  | Match of expr * (pattern * expr) list
+  | Match of expr * (pattern * guard_expr option * expr) list
   | If of expr * expr * expr option
   | For of ident * expr * expr
   | Sequence of expr list (* Function body sequences *)
   | Block of expr list (* Explicit block expressions {} *)
   | BinOp of expr * string * expr (* Binary operations *)
+  | UnaryOp of string * expr (* Unary operations *)
 
 (* Application definition for .app.src generation *)
 type application_def = {
@@ -73,6 +94,7 @@ type function_clause = {
   params : pattern list;
   body : expr;
   position : position option (* Position of the clause *);
+  guard : guard_expr option;
 }
 
 (* Function visibility *)
@@ -91,7 +113,7 @@ let make_single_clause_function name params body =
   {
     name;
     clauses =
-      [ { params = List.map (fun p -> PVar p) params; body; position = None } ];
+      [ { params = List.map (fun p -> PVar p) params; body; position = None; guard = None } ];
     visibility = Private;
     position = None;
   }

@@ -148,7 +148,7 @@ let rec returns_tuple = function
   | If (_, then_expr, Some else_expr) ->
       returns_tuple then_expr && returns_tuple else_expr
   | If (_, then_expr, None) -> returns_tuple then_expr
-  | Match (_, cases) -> List.for_all (fun (_, expr) -> returns_tuple expr) cases
+  | Match (_, cases) -> List.for_all (fun (_, _, expr) -> returns_tuple expr) cases
   | Sequence exprs -> (
       match List.rev exprs with [] -> false | last :: _ -> returns_tuple last)
   | _ -> false

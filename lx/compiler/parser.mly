@@ -15,7 +15,7 @@ let make_position pos =
 %token MODULE_MACRO
 
 (* Keywords *)
-%token PUB FUN CASE IF ELSE FOR WHEN IN
+%token PUB FUN CASE IF ELSE FOR WHEN IN AND OR NOT ANDALSO ORELSE
 
 (* OTP Keywords *)
 %token WORKER SUPERVISOR STRATEGY CHILDREN
@@ -45,6 +45,11 @@ let make_position pos =
 %left PIPE
 %left CONS
 %left COMMA
+%left ORELSE
+%left ANDALSO
+%left OR
+%left AND
+%right NOT
 %left EQEQ NEQ LT GT LEQ GEQ
 %left PLUS MINUS
 %left MULT DIV
@@ -74,25 +79,41 @@ function_def:
   | PUB FUN name = IDENT LBRACE clauses = function_clause+ RBRACE
     { let pos = make_position $startpos in { name; clauses; visibility = Public; position = Some pos } }
   (* Public functions - backward compatibility: single clause with pattern support *)
+  | PUB FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr LBRACE body = function_body RBRACE
+    { let pos = make_position $startpos in
+      let clause = { params; body; position = Some pos; guard = Some guard } in
+      { name; clauses = [clause]; visibility = Public; position = Some pos } }
   | PUB FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN LBRACE body = function_body RBRACE
     { let pos = make_position $startpos in
-      let clause = { params; body; position = Some pos } in
+      let clause = { params; body; position = Some pos; guard = None } in
+      { name; clauses = [clause]; visibility = Public; position = Some pos } }
+  | PUB FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr LBRACE RBRACE
+    { let pos = make_position $startpos in
+      let clause = { params; body = Literal LNil; position = Some pos; guard = Some guard } in
       { name; clauses = [clause]; visibility = Public; position = Some pos } }
   | PUB FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN LBRACE RBRACE
     { let pos = make_position $startpos in
-      let clause = { params; body = Literal LNil; position = Some pos } in
+      let clause = { params; body = Literal LNil; position = Some pos; guard = None } in
       { name; clauses = [clause]; visibility = Public; position = Some pos } }
   (* Private functions (default) - new syntax for multiple arities *)
   | FUN name = IDENT LBRACE clauses = function_clause+ RBRACE
     { let pos = make_position $startpos in { name; clauses; visibility = Private; position = Some pos } }
   (* Private functions (default) - backward compatibility: single clause with pattern support *)
+  | FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr LBRACE body = function_body RBRACE
+    { let pos = make_position $startpos in
+      let clause = { params; body; position = Some pos; guard = Some guard } in
+      { name; clauses = [clause]; visibility = Private; position = Some pos } }
   | FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN LBRACE body = function_body RBRACE
     { let pos = make_position $startpos in
-      let clause = { params; body; position = Some pos } in
+      let clause = { params; body; position = Some pos; guard = None } in
+      { name; clauses = [clause]; visibility = Private; position = Some pos } }
+  | FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr LBRACE RBRACE
+    { let pos = make_position $startpos in
+      let clause = { params; body = Literal LNil; position = Some pos; guard = Some guard } in
       { name; clauses = [clause]; visibility = Private; position = Some pos } }
   | FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN LBRACE RBRACE
     { let pos = make_position $startpos in
-      let clause = { params; body = Literal LNil; position = Some pos } in
+      let clause = { params; body = Literal LNil; position = Some pos; guard = None } in
       { name; clauses = [clause]; visibility = Private; position = Some pos } }
   | FUN _name = IDENT LPAREN _params = separated_list(COMMA, pattern) RPAREN error
     { failwith "Enhanced:Missing function body - expected '{' after parameter list|Suggestion:Add '{' and '}' to define the function body|Context:function definition" }
@@ -102,10 +123,14 @@ function_def:
     { failwith "Enhanced:Missing function name after 'fun' keyword|Suggestion:Provide a valid identifier name for the function|Context:function definition" }
 
 function_clause:
+  | LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr LBRACE body = function_body RBRACE
+    { let pos = make_position $startpos in { params; body; position = Some pos; guard = Some guard } }
   | LPAREN params = separated_list(COMMA, pattern) RPAREN LBRACE body = function_body RBRACE
-    { let pos = make_position $startpos in { params; body; position = Some pos } }
+    { let pos = make_position $startpos in { params; body; position = Some pos; guard = None } }
+  | LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr LBRACE RBRACE
+    { let pos = make_position $startpos in { params; body = Literal LNil; position = Some pos; guard = Some guard } }
   | LPAREN params = separated_list(COMMA, pattern) RPAREN LBRACE RBRACE
-    { let pos = make_position $startpos in { params; body = Literal LNil; position = Some pos } }
+    { let pos = make_position $startpos in { params; body = Literal LNil; position = Some pos; guard = None } }
   | error
     { failwith "Enhanced:Invalid function clause syntax - expected parameter list in parentheses|Suggestion:For single clause functions use 'fun name() { body }', for multiple clause functions use 'fun name { (params) { body } }'|Context:function clause definition" }
 
@@ -225,6 +250,16 @@ expr:
     { BinOp (left, "<=", right) }
   | left = expr GEQ right = expr
     { BinOp (left, ">=", right) }
+  | left = expr AND right = expr
+    { BinOp (left, "and", right) }
+  | left = expr OR right = expr
+    { BinOp (left, "or", right) }
+  | left = expr ANDALSO right = expr
+    { BinOp (left, "andalso", right) }
+  | left = expr ORELSE right = expr
+    { BinOp (left, "orelse", right) }
+  | NOT right = expr
+    { UnaryOp ("not", right) }
   | IF cond = expr LBRACE then_expr = expr RBRACE ELSE LBRACE else_expr = expr RBRACE
     { If (cond, then_expr, Some else_expr) }
   | IF cond = expr LBRACE then_expr = expr RBRACE
@@ -235,7 +270,7 @@ expr:
     { failwith "Enhanced:Missing opening brace in if statement|Suggestion:Add '{' after the condition|Context:if statement" }
   | IF error
     { failwith "Enhanced:Missing condition after 'if' keyword|Suggestion:Add a boolean expression after 'if'|Context:if statement" }
-  | CASE value = expr LBRACE cases = case_branch* RBRACE
+  | CASE value = expr LBRACE cases = nonempty_list(case_branch) RBRACE
     { Match (value, cases) }
   | FOR var = IDENT IN iterable = expr LBRACE body = expr RBRACE
     { For (var, iterable, body) }
@@ -271,8 +306,10 @@ simple_expr:
     { Literal LNil }
 
 case_branch:
+  | pattern = pattern WHEN guard = guard_expr ARROW body = expr
+    { (pattern, Some guard, body) }
   | pattern = pattern ARROW body = expr
-    { (pattern, body) }
+    { (pattern, None, body) }
 
 pattern:
   | p = simple_pattern { p }
@@ -350,6 +387,59 @@ application_field:
 
 env_pair:
   | key = IDENT COLON value = expr { (key, value) }
+
+(* Guard expressions *)
+guard_expr:
+  | guard_and_expr { $1 }
+
+guard_and_expr:
+  | guard_andalso_expr { $1 }
+  | left = guard_and_expr AND right = guard_andalso_expr { GuardAnd (left, right) }
+
+guard_andalso_expr:
+  | guard_or_expr { $1 }
+  | left = guard_andalso_expr ANDALSO right = guard_or_expr { GuardAndalso (left, right) }
+
+guard_or_expr:
+  | guard_orelse_expr { $1 }
+  | left = guard_or_expr OR right = guard_orelse_expr { GuardOr (left, right) }
+
+guard_orelse_expr:
+  | guard_primary { $1 }
+  | left = guard_orelse_expr ORELSE right = guard_primary { GuardOrelse (left, right) }
+
+guard_primary:
+  | NOT guard = guard_primary { GuardNot guard }
+  | LPAREN guard = guard_expr RPAREN { guard }
+  | left = guard_value op = guard_op right = guard_value { GuardBinOp (left, op, right) }
+  | func = IDENT LPAREN args = separated_list(COMMA, guard_value) RPAREN { GuardCall (func, args) }
+  | atom = guard_atom { GuardAtom atom }
+
+guard_value:
+  | atom = guard_atom { GuardAtomValue atom }
+  | func = IDENT LPAREN args = separated_list(COMMA, guard_value) RPAREN { GuardCallValue (func, args) }
+
+guard_atom:
+  | name = IDENT { GuardVar name }
+  | lit = literal { GuardLiteral lit }
+  | MINUS lit = literal {
+      match lit with
+      | LInt i -> GuardLiteral (LInt (-i))
+      | LFloat f -> GuardLiteral (LFloat (-.f))
+      | _ -> failwith "Enhanced:Invalid negative literal in guard|Suggestion:Only numbers can be negative in guards|Context:guard expression"
+  }
+
+guard_op:
+  | EQEQ { "==" }
+  | NEQ { "!=" }
+  | LT { "<" }
+  | GT { ">" }
+  | LEQ { "<=" }
+  | GEQ { ">=" }
+  | PLUS { "+" }
+  | MINUS { "-" }
+  | MULT { "*" }
+  | DIV { "/" }
 
 children_specification:
   | WORKER LBRACKET workers = separated_list(COMMA, IDENT) RBRACKET

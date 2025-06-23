@@ -146,6 +146,14 @@ type type_error =
 
 exception TypeError of type_error
 
+(* Guard type checking error *)
+type guard_error =
+  | InvalidGuardFunction of string
+  | InvalidGuardCall of string * int * int (* function, given arity, expected arity *)
+  | UndefinedGuardVariable of string
+
+exception GuardError of guard_error
+
 (* Global type variable counter *)
 let type_var_counter = ref 0
 
@@ -241,6 +249,114 @@ let compose_subst (s1 : substitution) (s2 : substitution) : substitution =
   let s1_applied = List.map (fun (var, typ) -> (var, apply_subst s2 typ)) s1 in
   s1_applied @ s2
 
+(* Type inference for literals *)
+let infer_literal = function
+  | LInt _ -> TInteger
+  | LFloat _ -> TFloat
+  | LString _ -> TString
+  | LBool _ -> TBool
+  | LAtom _ -> TAtom
+  | LNil -> TNil
+
+(* Guard type checking functions *)
+let rec infer_guard_expr (env : type_env) (guard : guard_expr) : substitution =
+  match guard with
+  | GuardAnd (g1, g2) | GuardOr (g1, g2) | GuardAndalso (g1, g2) | GuardOrelse (g1, g2) ->
+      let s1 = infer_guard_expr env g1 in
+      let s2 = infer_guard_expr (apply_subst_env s1 env) g2 in
+      compose_subst s1 s2
+  | GuardNot g ->
+      infer_guard_expr env g
+  | GuardBinOp (left, _op, right) ->
+      (* Type check operands and ensure comparison returns boolean *)
+      let _ = infer_guard_value env left in
+      let _ = infer_guard_value env right in
+      []  (* Comparisons always return boolean *)
+  | GuardCall (func, args) ->
+      (* Validate built-in guard functions *)
+      validate_guard_call_values func args;
+      []
+  | GuardAtom atom ->
+      let _typ = infer_guard_atom env atom in
+      (* Ensure guard atom evaluates to boolean if used alone *)
+      []
+
+and infer_guard_atom (env : type_env) (atom : guard_atom) : lx_type =
+  match atom with
+  | GuardVar var ->
+      (try List.assoc var env
+       with Not_found -> raise (GuardError (UndefinedGuardVariable var)))
+  | GuardLiteral lit ->
+      infer_literal lit
+  | GuardCallAtom (func, args) ->
+      validate_guard_call func args;
+      (* Return appropriate type based on guard function *)
+      match func with
+      | "hd" | "tl" ->
+          incr type_var_counter;
+          TVar !type_var_counter (* Generic type for head/tail *)
+      | "length" -> TInteger
+      | "element" ->
+          incr type_var_counter;
+          TVar !type_var_counter (* Generic type for element *)
+      | "is_atom" | "is_integer" | "is_float" | "is_number"
+      | "is_boolean" | "is_list" | "is_tuple" -> TBool
+      | "abs" | "round" | "trunc" -> TInteger
+      | _ ->
+          incr type_var_counter;
+          TVar !type_var_counter (* Generic type for unknown functions *)
+
+and validate_guard_call (func : string) (args : guard_atom list) : unit =
+  match func with
+  | "is_atom" | "is_integer" | "is_float" | "is_number"
+  | "is_boolean" | "is_list" | "is_tuple" ->
+      if List.length args != 1 then
+        raise (GuardError (InvalidGuardCall (func, List.length args, 1)))
+  | "abs" | "round" | "trunc" | "hd" | "tl" | "length" ->
+      if List.length args != 1 then
+        raise (GuardError (InvalidGuardCall (func, List.length args, 1)))
+  | "element" ->
+      if List.length args != 2 then
+        raise (GuardError (InvalidGuardCall (func, List.length args, 2)))
+  | _ ->
+      raise (GuardError (InvalidGuardFunction func))
+
+and validate_guard_call_values (func : string) (args : guard_value list) : unit =
+  match func with
+  | "is_atom" | "is_integer" | "is_float" | "is_number"
+  | "is_boolean" | "is_list" | "is_tuple" ->
+      if List.length args != 1 then
+        raise (GuardError (InvalidGuardCall (func, List.length args, 1)))
+  | "abs" | "round" | "trunc" | "hd" | "tl" | "length" ->
+      if List.length args != 1 then
+        raise (GuardError (InvalidGuardCall (func, List.length args, 1)))
+  | "element" ->
+      if List.length args != 2 then
+        raise (GuardError (InvalidGuardCall (func, List.length args, 2)))
+  | _ ->
+      raise (GuardError (InvalidGuardFunction func))
+
+and infer_guard_value (env : type_env) (value : guard_value) : lx_type =
+  match value with
+  | GuardAtomValue atom -> infer_guard_atom env atom
+  | GuardCallValue (func, args) ->
+      validate_guard_call_values func args;
+      (* Return appropriate type based on guard function *)
+      match func with
+      | "hd" | "tl" ->
+          incr type_var_counter;
+          TVar !type_var_counter (* Generic type for head/tail *)
+      | "length" -> TInteger
+      | "element" ->
+          incr type_var_counter;
+          TVar !type_var_counter (* Generic type for element *)
+      | "is_atom" | "is_integer" | "is_float" | "is_number"
+      | "is_boolean" | "is_list" | "is_tuple" -> TBool
+      | "abs" | "round" | "trunc" -> TInteger
+      | _ ->
+          incr type_var_counter;
+          TVar !type_var_counter (* Generic type for unknown functions *)
+
 (* Occurs check for infinite types *)
 let rec occurs_check (var : type_var) (typ : lx_type) : bool =
   match typ with
@@ -285,15 +401,6 @@ let rec unify (t1 : lx_type) (t2 : lx_type) : substitution =
   | TOption t1, TOption t2 -> unify t1 t2
   | TOtpReply t1, TOtpReply t2 -> unify t1 t2
   | _ -> raise (TypeError (UnificationError (t1, t2, None)))
-
-(* Type inference for literals *)
-let infer_literal = function
-  | LInt _ -> TInteger
-  | LFloat _ -> TFloat
-  | LString _ -> TString
-  | LBool _ -> TBool
-  | LAtom _ -> TAtom
-  | LNil -> TNil
 
 (* Type inference for patterns *)
 let rec infer_pattern (env : type_env) (pattern : pattern) :
@@ -520,7 +627,7 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
       let result_type = fresh_type_var () in
       let final_subst, _ =
         List.fold_left
-          (fun (subst_acc, env_acc) (pattern, case_expr) ->
+          (fun (subst_acc, env_acc) (pattern, guard_opt, case_expr) ->
             let pattern_type, pattern_env, pattern_subst =
               infer_pattern env_acc pattern
             in
@@ -533,13 +640,20 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
             let case_env =
               pattern_env @ apply_subst_env combined_subst env_acc
             in
-            let case_type, case_subst = infer_expr case_env case_expr in
+            (* Type check guard if present *)
+            let guard_subst =
+              match guard_opt with
+              | Some guard -> infer_guard_expr case_env guard
+              | None -> []
+            in
+            let case_env_with_guard = apply_subst_env guard_subst case_env in
+            let case_type, case_subst = infer_expr case_env_with_guard case_expr in
             let unify_subst2 =
               unify (apply_subst case_subst result_type) case_type
             in
             let final_subst =
               compose_subst
-                (compose_subst combined_subst case_subst)
+                (compose_subst (compose_subst combined_subst guard_subst) case_subst)
                 unify_subst2
             in
             (final_subst, apply_subst_env final_subst env_acc))
@@ -610,6 +724,15 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
             infer_expr (apply_subst_env final_subst env) last_expr
           in
           (last_type, compose_subst final_subst last_subst))
+  | UnaryOp (op, operand) -> (
+      let operand_type, subst = infer_expr env operand in
+      match op with
+      | "not" ->
+          (* not operator requires boolean operand and returns boolean *)
+          let bool_unify = unify (apply_subst subst operand_type) TBool in
+          let final_subst = compose_subst subst bool_unify in
+          (TBool, final_subst)
+      | _ -> failwith ("Unknown unary operator: " ^ op))
   | BinOp (left, op, right) -> (
       let left_type, subst1 = infer_expr env left in
       let right_type, subst2 = infer_expr (apply_subst_env subst1 env) right in
@@ -631,6 +754,12 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
       | "==" | "!=" | "<" | ">" | "<=" | ">=" ->
           (* For now, allow comparison of any types - could be more strict *)
           (TBool, combined_subst)
+      (* Logical operations require boolean operands and return boolean *)
+      | "and" | "or" | "andalso" | "orelse" ->
+          let bool_unify1 = unify (apply_subst combined_subst left_type) TBool in
+          let bool_unify2 = unify (apply_subst combined_subst right_type) TBool in
+          let final_subst = compose_subst (compose_subst combined_subst bool_unify1) bool_unify2 in
+          (TBool, final_subst)
       | _ -> failwith ("Unknown binary operator: " ^ op))
 
 (* Type inference for function clauses *)
@@ -647,13 +776,21 @@ let infer_function_clause (env : type_env) (clause : function_clause) :
       [] clause.params param_types
   in
   let new_env = param_env @ env in
-  let body_type, subst = infer_expr new_env clause.body in
+  (* Type check guard if present *)
+  let guard_subst =
+    match clause.guard with
+    | Some guard -> infer_guard_expr new_env guard
+    | None -> []
+  in
+  let env_with_guard = apply_subst_env guard_subst new_env in
+  let body_type, subst = infer_expr env_with_guard clause.body in
+  let combined_subst = compose_subst guard_subst subst in
   let fun_type =
     List.fold_right
       (fun param_type acc -> TFun (param_type, acc))
       param_types body_type
   in
-  (fun_type, subst)
+  (fun_type, combined_subst)
 
 (* Type inference for function definitions with multiple arities *)
 let infer_function_def (env : type_env) (func : function_def) :

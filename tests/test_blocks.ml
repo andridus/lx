@@ -24,7 +24,7 @@ let test_simple_block_assignment () =
             {
               name = "test";
               clauses =
-                [ { params = []; body = sequence_expr; position = None } ];
+                [ { params = []; body = sequence_expr; position = None; guard = None } ];
               visibility = Private;
               position = None;
             };
@@ -52,7 +52,7 @@ let test_nested_block_assignment () =
             {
               name = "test";
               clauses =
-                [ { params = []; body = sequence_expr; position = None } ];
+                [ { params = []; body = sequence_expr; position = None; guard = None } ];
               visibility = Private;
               position = None;
             };
@@ -87,7 +87,7 @@ let test_multiple_assignments_in_block () =
             {
               name = "test";
               clauses =
-                [ { params = []; body = sequence_expr; position = None } ];
+                [ { params = []; body = sequence_expr; position = None; guard = None } ];
               visibility = Private;
               position = None;
             };

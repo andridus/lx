@@ -135,7 +135,7 @@ let rec emit_expr ctx (e : expr) : string =
       "case " ^ emit_expr ctx value ^ " of "
       ^ String.concat "; "
           (List.map
-             (fun (p, e) -> emit_pattern ctx p ^ " -> " ^ emit_expr ctx e)
+             (fun (p, _guard_opt, e) -> emit_pattern ctx p ^ " -> " ^ emit_expr ctx e)
              cases)
       ^ " end"
   | For (_, _, _) -> "% For expressions not yet implemented"
@@ -145,6 +145,8 @@ let rec emit_expr ctx (e : expr) : string =
   | Block exprs ->
       let block_ctx = create_scope (Some ctx) in
       String.concat ",\n    " (List.map (emit_expr block_ctx) exprs)
+  | UnaryOp (op, operand) ->
+      op ^ " " ^ emit_expr ctx operand
   | BinOp (left, op, right) ->
       emit_expr ctx left ^ " " ^ op ^ " " ^ emit_expr ctx right
 

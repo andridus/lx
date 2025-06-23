@@ -461,9 +461,13 @@ let rec lint_expr ctx errors expr =
   | Match (expr, cases) ->
       let errors = lint_expr ctx errors expr in
       List.fold_left
-        (fun acc (pattern, case_expr) ->
+        (fun acc (pattern, guard_opt, case_expr) ->
           let case_ctx = create_context (Some ctx) in
           let acc = lint_pattern case_ctx acc pattern in
+          let acc = match guard_opt with
+            | Some guard -> lint_guard_expr case_ctx acc guard
+            | None -> acc
+          in
           let acc = lint_expr case_ctx acc case_expr in
           (* Check for unused variables in this case *)
           let unused_errors = check_unused_variables case_ctx in
@@ -485,7 +489,89 @@ let rec lint_expr ctx errors expr =
   | BinOp (left, _, right) ->
       let errors = lint_expr ctx errors left in
       lint_expr ctx errors right
+  | UnaryOp (_, operand) ->
+      lint_expr ctx errors operand
   | _ -> errors
+
+(* Guard expression analysis *)
+and lint_guard_expr ctx errors guard =
+  match guard with
+  | GuardAnd (g1, g2) | GuardOr (g1, g2) | GuardAndalso (g1, g2) | GuardOrelse (g1, g2) ->
+      let errors = lint_guard_expr ctx errors g1 in
+      lint_guard_expr ctx errors g2
+  | GuardNot g ->
+      lint_guard_expr ctx errors g
+  | GuardBinOp (left, _, right) ->
+      let errors = lint_guard_value ctx errors left in
+      lint_guard_value ctx errors right
+  | GuardCall (func, args) ->
+      (* Validate guard function names *)
+      let errors = match func with
+        | "is_atom" | "is_integer" | "is_float" | "is_number"
+        | "is_boolean" | "is_list" | "is_tuple" | "abs" | "round" | "trunc"
+        | "hd" | "tl" | "length" | "element" ->
+            errors
+        | _ ->
+            let error = create_lint_error
+              (UndefinedVariable (func, None))
+              { line = 0; column = 0; filename = None }
+              `Error
+            in
+            error :: errors
+      in
+      List.fold_left (lint_guard_value ctx) errors args
+  | GuardAtom atom ->
+      lint_guard_atom ctx errors atom
+
+and lint_guard_atom ctx errors atom =
+  match atom with
+  | GuardVar var_name ->
+      use_variable ctx var_name None;
+      if not (lookup_variable ctx var_name) && not (is_ignored_var var_name) then
+        let error = create_lint_error
+          (UndefinedVariable (var_name, None))
+          { line = 0; column = 0; filename = None }
+          `Error
+        in
+        error :: errors
+      else errors
+  | GuardLiteral _ -> errors
+  | GuardCallAtom (func, args) ->
+      (* Validate guard function names *)
+      let errors = match func with
+        | "is_atom" | "is_integer" | "is_float" | "is_number"
+        | "is_boolean" | "is_list" | "is_tuple" | "abs" | "round" | "trunc"
+        | "hd" | "tl" | "length" | "element" ->
+            errors
+        | _ ->
+            let error = create_lint_error
+              (UndefinedVariable (func, None))
+              { line = 0; column = 0; filename = None }
+              `Error
+            in
+            error :: errors
+      in
+      List.fold_left (lint_guard_atom ctx) errors args
+
+and lint_guard_value ctx errors value =
+  match value with
+  | GuardAtomValue atom -> lint_guard_atom ctx errors atom
+  | GuardCallValue (func, args) ->
+      (* Validate guard function names *)
+      let errors = match func with
+        | "is_atom" | "is_integer" | "is_float" | "is_number"
+        | "is_boolean" | "is_list" | "is_tuple" | "abs" | "round" | "trunc"
+        | "hd" | "tl" | "length" | "element" ->
+            errors
+        | _ ->
+            let error = create_lint_error
+              (UndefinedVariable (func, None))
+              { line = 0; column = 0; filename = None }
+              `Error
+            in
+            error :: errors
+      in
+      List.fold_left (lint_guard_value ctx) errors args
 
 (* Function definition analysis *)
 let lint_function_def ctx (func_def : function_def) =
@@ -498,6 +584,10 @@ let lint_function_def ctx (func_def : function_def) =
       let clause_ctx = create_context (Some func_ctx) in
       let clause_errors =
         List.fold_left (lint_pattern clause_ctx) [] clause.params
+      in
+      let clause_errors = match clause.guard with
+        | Some guard -> lint_guard_expr clause_ctx clause_errors guard
+        | None -> clause_errors
       in
       let clause_errors = lint_expr clause_ctx clause_errors clause.body in
       (* Check for unused variables in this clause *)

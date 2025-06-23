@@ -131,7 +131,7 @@ let test_pattern_types () =
   in
   match program.items with
   | [ Function { clauses = [ { body = Match (_, cases); _ } ]; _ } ] -> (
-      let patterns = List.map fst cases in
+      let patterns = List.map (fun (p, _, _) -> p) cases in
       match patterns with
       | [ PWildcard; PVar "y"; PAtom "atom" ] -> ()
       | _ -> Alcotest.fail "Expected wildcard, variable, and atom patterns")

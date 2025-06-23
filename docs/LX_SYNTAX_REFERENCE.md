@@ -34,7 +34,7 @@ Lx has several categories of keywords:
 - `if` - Conditional expression
 - `else` - Used with `if` expressions
 - `for` - Loop iteration
-- `when` - Guard expressions
+- `when` - Guard expressions (supports function calls like `hd/1`, `length/1`, `is_list/1`)
 - `true` - Boolean literal
 - `false` - Boolean literal
 - `nil` - Null/empty value
@@ -79,6 +79,11 @@ Lx has several categories of keywords:
 - `>` - Greater than (comparison)
 - `<=` - Less than or equal to (comparison)
 - `>=` - Greater than or equal to (comparison)
+- `and` - Logical AND (strict evaluation)
+- `or` - Logical OR (strict evaluation)
+- `not` - Logical NOT (unary operator)
+- `andalso` - Logical AND (short-circuit evaluation)
+- `orelse` - Logical OR (short-circuit evaluation)
 
 ### Punctuation
 - `(` `)` - Parentheses (grouping, function calls)
@@ -430,6 +435,109 @@ result = x + 10 == y * 2  # Equivalent to: (x + 10) == (y * 2)
 
 **Note**: Lx uses traditional comparison operators (`!=`, `<=`) in source code, but these are automatically converted to Erlang's operators (`/=`, `=<`) during compilation.
 
+### Logical Expressions
+
+Lx provides comprehensive support for logical operations with both strict and short-circuit evaluation semantics:
+
+#### Strict Logical Operators
+Strict operators evaluate **all operands** regardless of whether the result is already determined:
+
+```lx
+# Strict AND - both expressions are always evaluated
+result = expensive_check(x) and expensive_check(y)
+
+# Strict OR - both expressions are always evaluated
+result = check_condition_a() or check_condition_b()
+
+# Logical NOT
+result = not is_empty(list)
+```
+
+#### Short-Circuit Logical Operators
+Short-circuit operators evaluate the second operand **only if necessary**:
+
+```lx
+# Short-circuit AND - second expression evaluated only if first is true
+result = x > 0 andalso expensive_validation(x)
+
+# Short-circuit OR - second expression evaluated only if first is false
+result = cache_hit(key) orelse compute_expensive_value(key)
+```
+
+#### Operator Precedence
+Logical operators follow proper precedence rules:
+
+```lx
+# Precedence from highest to lowest:
+# 1. not (unary)
+# 2. andalso
+# 3. orelse
+# 4. and
+# 5. or
+
+# Examples:
+result1 = a orelse b andalso c    # Equivalent to: a orelse (b andalso c)
+result2 = a or b and c            # Equivalent to: a or (b and c)
+result3 = not a and b             # Equivalent to: (not a) and b
+```
+
+#### Complex Logical Expressions
+```lx
+fun validate_user(user, permissions) {
+  # Complex validation with mixed operators
+  is_valid = is_atom(user) and user != :anonymous and
+             (has_permission(user, :read) orelse has_permission(user, :admin))
+
+  # Short-circuit for performance
+  can_access = is_authenticated(user) andalso
+               (is_admin(user) orelse check_specific_access(user, resource))
+
+  is_valid and can_access
+}
+```
+
+#### Logical Operators in Guards
+All logical operators work seamlessly in function guards and case guards:
+
+```lx
+# Function guards with logical operators
+fun process_value {
+  (x, y) when x > 0 and y < 10 -> :small_positive
+  (x, y) when x == 0 or y == 0 -> :has_zero
+  (x) when not is_atom(x) -> :not_atom
+  (x, y) when x > 100 andalso y > 100 -> :both_large
+  (x, y) when x < 0 orelse y < 0 -> :has_negative
+  (_) -> :other
+}
+
+# Case guards with logical operators
+fun categorize(value, context) {
+  case value {
+    x when x > 0 and x < 10 -> :small
+    x when x >= 10 andalso x < 100 -> :medium
+    x when x >= 100 orelse context == :force_large -> :large
+    _ -> :unknown
+  }
+}
+```
+
+#### Performance Considerations
+- **Strict operators** (`and`, `or`): Use when you need all expressions evaluated for side effects
+- **Short-circuit operators** (`andalso`, `orelse`): Use for performance optimization and to avoid errors
+
+```lx
+# Use strict AND when both checks have important side effects
+result = log_attempt(user) and validate_credentials(user)
+
+# Use short-circuit AND to avoid expensive operations
+result = is_valid_user(user) andalso perform_expensive_check(user)
+
+# Use short-circuit OR for fallback values
+value = get_cached_value(key) orelse compute_and_cache(key)
+```
+
+**Compilation**: Logical operators map directly to their Erlang equivalents, ensuring optimal performance in the BEAM VM.
+
 ### For Loops
 ```lx
 for item in list {
@@ -647,6 +755,172 @@ case list {
   [head | tail] -> "cons pattern"
 }
 ```
+
+### Guard Expressions with Function Calls
+
+Lx supports comprehensive guard expressions with function calls, enabling complex conditional logic in function clauses and case branches. Guard functions provide type checking, list operations, and arithmetic operations that are evaluated at runtime.
+
+#### Basic Guard Function Calls
+```lx
+fun process_list {
+  (x) when hd(x) == :ok {
+    :head_is_ok
+  }
+  (x) when length(x) > 3 {
+    :long_list
+  }
+  (x) when is_list(x) {
+    :valid_list
+  }
+  (x) when is_atom(x) {
+    :atom_value
+  }
+}
+```
+
+#### Nested Function Calls in Guards
+```lx
+fun validate_nested_data {
+  (x) when length(tl(x)) > 0 {
+    :tail_not_empty
+  }
+  (x) when hd(tl(x)) != :end {
+    :nested_calls_work
+  }
+  (data) when is_list(data) andalso length(data) > 0 {
+    :non_empty_list
+  }
+}
+```
+
+#### Complex Guard Expressions
+```lx
+fun advanced_validation {
+  (x, y) when hd(x) == :start andalso length(y) > 0 {
+    :both_conditions_met
+  }
+  (data) when is_list(data) andalso length(data) >= 3 andalso hd(data) == :valid {
+    :complex_validation_passed
+  }
+  (list) when length(list) > 5 orelse hd(list) == :priority {
+    :meets_criteria
+  }
+}
+```
+
+#### Supported Guard Functions
+
+##### List Functions
+- `hd(List)` - Returns the head (first element) of a list
+- `tl(List)` - Returns the tail (all elements except the first) of a list
+- `length(List)` - Returns the number of elements in a list
+- `element(N, Tuple)` - Returns the Nth element of a tuple (1-indexed)
+
+##### Type Testing Functions
+- `is_atom(Term)` - Tests if term is an atom
+- `is_integer(Term)` - Tests if term is an integer
+- `is_float(Term)` - Tests if term is a float
+- `is_number(Term)` - Tests if term is a number (integer or float)
+- `is_boolean(Term)` - Tests if term is a boolean
+- `is_list(Term)` - Tests if term is a list
+- `is_tuple(Term)` - Tests if term is a tuple
+
+##### Arithmetic Functions
+- `abs(Number)` - Returns the absolute value of a number
+- `round(Float)` - Rounds a float to the nearest integer
+- `trunc(Float)` - Truncates a float to an integer (removes decimal part)
+
+#### Guard Functions in Case Expressions
+```lx
+fun categorize_data(value) {
+  case value {
+    x when is_integer(x) andalso x > 100 -> :large_number
+    x when is_list(x) andalso length(x) == 0 -> :empty_list
+    x when is_list(x) andalso hd(x) == :special -> :special_list
+    x when is_atom(x) -> :atom_value
+    _ -> :unknown_type
+  }
+}
+```
+
+#### OTP Worker with Guard Functions
+```lx
+worker list_processor {
+  fun handle_call(request, _from, state) when is_list(state) andalso length(state) < 100 {
+    case request {
+      .{:add, item} when length(state) < 99 -> {
+        new_state = [item | state]
+        .{:reply, :ok, new_state}
+      }
+      :get_head when length(state) > 0 -> {
+        .{:reply, hd(state), state}
+      }
+      :get_tail when length(state) > 1 -> {
+        .{:reply, tl(state), state}
+      }
+      _ -> .{:reply, :error, state}
+    }
+  }
+
+  fun handle_call(_, _from, state) {
+    # Fallback for when state is not a list or is too large
+    .{:reply, .{:error, :invalid_state}, state}
+  }
+}
+```
+
+#### Generated Erlang Code
+
+Guard function calls are compiled directly to Erlang guard expressions:
+
+```lx
+# Lx source
+fun test_guards {
+  (x) when hd(x) == :ok { :head_ok }
+  (x) when length(tl(x)) > 0 { :tail_not_empty }
+  (x) when hd(tl(x)) != :end { :nested_check }
+}
+```
+
+```erlang
+% Generated Erlang
+test_guards(X) when hd(X) == ok ->
+    head_ok;
+test_guards(X) when length(tl(X)) > 0 ->
+    tail_not_empty;
+test_guards(X) when hd(tl(X)) /= end ->
+    nested_check.
+```
+
+#### Error Handling
+
+The Lx compiler validates guard function calls at compile time:
+
+```lx
+# Valid guard functions
+fun valid_guards {
+  (x) when length(x) > 0 { :ok }          # Valid: length/1
+  (x) when is_list(x) { :ok }             # Valid: is_list/1
+  (x, y) when element(1, x) == y { :ok }  # Valid: element/2
+}
+
+# Invalid guard functions (compile errors)
+fun invalid_guards {
+  (x) when unknown_function(x) { :error }    # Error: unknown function
+  (x) when length(x, y) > 0 { :error }       # Error: wrong arity
+  (x) when append(x, [1]) == [] { :error }   # Error: append not allowed in guards
+}
+```
+
+#### Benefits
+
+- **Type Safety**: Compile-time validation of guard function calls and arguments
+- **Performance**: Guard functions are evaluated efficiently by the BEAM VM
+- **Expressiveness**: Complex conditional logic without nested if-else statements
+- **Erlang Compatibility**: Direct mapping to Erlang guard BIFs
+- **Readability**: Clear, declarative conditional expressions
+
+This comprehensive guard system enables sophisticated pattern matching and conditional logic while maintaining full compatibility with Erlang/OTP conventions.
 
 ## OTP Components
 
@@ -1360,7 +1634,74 @@ describe "shopping cart tests" {
 
 ## Recent Improvements
 
-### Public Function Support & Export System Overhaul (Latest)
+### Guard Function Calls Implementation (Latest)
+
+Lx now includes comprehensive support for function calls in guard expressions, enabling complex guard conditions with nested function calls and full Erlang compatibility.
+
+#### Key Features
+- **Built-in guard functions**: Complete support for `hd/1`, `tl/1`, `length/1`, `element/2`
+- **Type checking functions**: Full support for `is_atom/1`, `is_integer/1`, `is_list/1`, etc.
+- **Nested function calls**: Complex expressions like `length(tl(x))` and `hd(tl(x))`
+- **Arithmetic functions**: Support for `abs/1`, `round/1`, `trunc/1` in guards
+- **Seamless Erlang integration**: Direct mapping to Erlang guard BIFs
+
+#### Enhanced Guard Capabilities
+```lx
+# Function calls in guards
+fun process_data {
+  (x) when hd(x) == :ok { :head_valid }
+  (x) when length(x) > 3 { :sufficient_data }
+  (x) when is_list(x) andalso length(x) > 0 { :non_empty_list }
+}
+
+# Nested function calls
+fun validate_complex {
+  (data) when length(tl(data)) > 0 { :tail_has_elements }
+  (list) when hd(tl(list)) != :end { :second_element_valid }
+  (x) when is_list(x) andalso hd(x) == :start andalso length(x) >= 3 {
+    :valid_sequence
+  }
+}
+```
+
+#### OTP Integration
+```lx
+worker list_manager {
+  fun handle_call(request, _from, state) when is_list(state) andalso length(state) < 100 {
+    case request {
+      :get_head when length(state) > 0 -> .{:reply, hd(state), state}
+      .{:add, item} when length(state) < 99 -> .{:reply, :ok, [item | state]}
+      _ -> .{:reply, :error, state}
+    }
+  }
+}
+```
+
+#### Generated Erlang Code
+```lx
+# Lx source with guard function calls
+fun test {
+  (x) when hd(x) == ok { :valid }
+  (x) when length(tl(x)) > 0 { :tail_not_empty }
+}
+```
+
+```erlang
+% Generated Erlang - direct mapping
+test(X) when hd(X) == ok ->
+    valid;
+test(X) when length(tl(X)) > 0 ->
+    tail_not_empty.
+```
+
+#### Benefits
+- **Enhanced expressiveness**: Complex guard conditions without nested if-else
+- **Type safety**: Compile-time validation of guard function calls
+- **Performance**: Efficient evaluation in BEAM VM
+- **Erlang compatibility**: Perfect mapping to Erlang guard semantics
+- **Code clarity**: Declarative conditional expressions
+
+### Public Function Support & Export System Overhaul (Previous)
 
 Lx now includes comprehensive support for function visibility with automatic export generation, eliminating the use of `export_all` and providing precise control over module interfaces.
 

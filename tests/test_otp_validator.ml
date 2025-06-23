@@ -13,6 +13,7 @@ let test_valid_worker_with_init () =
             params = [ PVar "args" ];
             body = Tuple [ Literal (LAtom "ok"); Var "state" ];
             position = None;
+            guard = None;
           };
         ];
       visibility = Private;

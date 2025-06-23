@@ -2,7 +2,833 @@
 
 This document tracks major improvements and features added to the Lx language compiler and toolchain.
 
-## [Latest] Comparison Operators Implementation
+## [Latest] Case Expression Syntax Simplification
+
+### Overview
+Simplified case expression syntax by removing semicolon requirements between case branches. The language now uses a cleaner, more intuitive syntax that aligns with modern functional programming languages while maintaining full Erlang compatibility.
+
+### Key Changes
+
+#### 1. Simplified Case Syntax
+- **Removed semicolons**: Case branches no longer require semicolon separators
+- **Clean syntax**: More readable and intuitive case expressions
+- **Consistent style**: Aligns with the rest of Lx's clean syntax design
+- **Breaking change**: Old semicolon syntax is no longer supported
+
+#### 2. Updated Parser Grammar
+- **Streamlined grammar**: Simplified parser rules for case expressions
+- **Reduced conflicts**: Fewer parser conflicts with cleaner grammar
+- **Better error messages**: Clearer error reporting for invalid syntax
+
+### Syntax Changes
+
+#### Before (No Longer Supported)
+```lx
+case value {
+  pattern1 -> expression1;
+  pattern2 -> expression2;
+  _ -> default_expression
+}
+```
+
+#### After (Current Syntax)
+```lx
+case value {
+  pattern1 -> expression1
+  pattern2 -> expression2
+  _ -> default_expression
+}
+```
+
+### Usage Examples
+
+#### Basic Case Expressions
+```lx
+fun process_result(result) {
+  case result {
+    :ok -> "success"
+    :error -> "failure"
+    :timeout -> "timeout"
+    _ -> "unknown"
+  }
+}
+```
+
+#### Pattern Matching with Literals
+```lx
+fun describe_number(n) {
+  case n {
+    0 -> "zero"
+    1 -> "one"
+    2 -> "two"
+    _ -> "other"
+  }
+}
+```
+
+#### Complex Pattern Matching
+```lx
+fun handle_response(response) {
+  case response {
+    .{:ok, data} -> process_data(data)
+    .{:error, reason} -> handle_error(reason)
+    .{:timeout, _} -> retry_request()
+    _ -> unknown_response()
+  }
+}
+```
+
+#### Guard Expressions in Case
+```lx
+fun categorize_value(value) {
+  case value {
+    x when x > 100 -> :large
+    x when x > 10 -> :medium
+    x when x > 0 -> :small
+    _ -> :invalid
+  }
+}
+```
+
+### Generated Erlang Code
+
+The simplified syntax generates identical, efficient Erlang code:
+
+```lx
+# Lx source
+fun test_case(x) {
+  case x {
+    1 -> :one
+    2 -> :two
+    _ -> :other
+  }
+}
+```
+
+```erlang
+% Generated Erlang
+test_case(X) ->
+    case X of
+        1 -> one;
+        2 -> two;
+        _ -> other
+    end.
+```
+
+### Benefits
+
+#### 1. Improved Readability
+- **Cleaner syntax**: Eliminates visual noise from unnecessary semicolons
+- **Better flow**: More natural reading experience
+- **Consistent style**: Matches other language constructs in Lx
+
+#### 2. Developer Experience
+- **Less typing**: Fewer characters required for case expressions
+- **Fewer errors**: No more missing semicolon syntax errors
+- **Intuitive**: Aligns with expectations from other modern languages
+
+#### 3. Language Consistency
+- **Unified style**: Consistent with function definitions and other constructs
+- **Simplified grammar**: Cleaner parser implementation
+- **Maintainability**: Easier to maintain and extend
+
+### Migration Guide
+
+#### For Existing Code
+If you have existing Lx code with semicolons in case expressions, simply remove the semicolons:
+
+```lx
+# Old syntax (no longer works)
+case value {
+  :ok -> result;
+  :error -> fallback;
+  _ -> default
+}
+
+# New syntax (required)
+case value {
+  :ok -> result
+  :error -> fallback
+  _ -> default
+}
+```
+
+#### Automatic Migration
+A simple find-and-replace can update existing code:
+- Find: `-> expression;`
+- Replace: `-> expression`
+
+This change makes Lx case expressions more elegant and easier to read while maintaining full compatibility with Erlang's pattern matching semantics.
+
+## [Previous] Complete Guard Function Calls Implementation
+
+### Overview
+Implemented comprehensive support for function calls in guard expressions, enabling complex guard conditions with nested function calls. This enhancement provides full Erlang-compatible guard functionality, allowing developers to use built-in guard functions like `hd/1`, `tl/1`, `length/1`, and type checking functions in any guard context.
+
+### Key Features
+
+#### 1. Guard Function Call Support
+- **Built-in guard functions**: Full support for `hd/1`, `tl/1`, `length/1`, `element/2`
+- **Type checking functions**: Complete support for `is_atom/1`, `is_integer/1`, `is_list/1`, etc.
+- **Arithmetic functions**: Support for `abs/1`, `round/1`, `trunc/1` in guards
+- **Nested function calls**: Enables complex expressions like `length(tl(x))` and `hd(tl(x))`
+- **Comparison integration**: Function calls can be used in any comparison operation
+
+#### 2. Advanced Guard Expressions
+- **Function call comparisons**: `hd(x) == :ok`, `length(list) > 0`
+- **Nested calls**: `hd(tl(x)) != :end`, `length(tl(list)) >= 3`
+- **Mixed expressions**: `is_list(x) andalso length(x) > 0`
+- **Complex conditions**: Multiple levels of function nesting with logical operators
+
+#### 3. Seamless Erlang Integration
+- **Direct mapping**: Guard function calls map directly to Erlang guard BIFs
+- **Optimal code generation**: Generates efficient Erlang guard expressions
+- **Type safety**: Full integration with type checking system
+- **Error validation**: Compile-time validation of guard function calls
+
+### Technical Implementation
+
+#### AST Extensions (`ast.ml`)
+```ocaml
+(* Enhanced guard value system for function calls *)
+type guard_value =
+  | GuardAtomValue of guard_atom
+  | GuardCallValue of string * guard_value list
+
+(* Updated guard expressions to use guard_value *)
+type guard_expr =
+  | GuardBinOp of guard_value * string * guard_value
+  | GuardCall of string * guard_value list
+  (* ... other variants ... *)
+```
+
+#### Parser Grammar (`parser.mly`)
+```ocaml
+(* Enhanced grammar for nested function calls *)
+guard_primary:
+  | left = guard_value op = guard_op right = guard_value
+    { GuardBinOp (left, op, right) }
+  | func = IDENT LPAREN args = separated_list(COMMA, guard_value) RPAREN
+    { GuardCall (func, args) }
+
+guard_value:
+  | atom = guard_atom { GuardAtomValue atom }
+  | func = IDENT LPAREN args = separated_list(COMMA, guard_value) RPAREN
+    { GuardCallValue (func, args) }
+```
+
+#### Type System Integration (`typechecker.ml`)
+```ocaml
+(* Type checking for guard function calls *)
+and infer_guard_value (env : type_env) (value : guard_value) : lx_type =
+  match value with
+  | GuardCallValue (func, args) ->
+      validate_guard_call_values func args;
+      match func with
+      | "hd" | "tl" -> TVar (fresh_type_var ())
+      | "length" -> TInteger
+      | "is_atom" | "is_integer" | "is_list" -> TBool
+      | "abs" | "round" | "trunc" -> TInteger
+      (* ... other functions ... *)
+```
+
+#### Code Generation (`compiler.ml`)
+```ocaml
+(* Efficient Erlang code generation *)
+and emit_guard_value ctx (value : guard_value) : string =
+  match value with
+  | GuardCallValue (func, args) ->
+      let erlang_func = match func with
+        | "is_atom" -> "is_atom"
+        | "is_list" -> "is_list"
+        | other -> other
+      in
+      erlang_func ^ "(" ^ String.concat ", " (List.map (emit_guard_value ctx) args) ^ ")"
+```
+
+### Usage Examples
+
+#### Basic Guard Function Calls
+```lx
+fun process_list {
+  (x) when hd(x) == :ok {
+    :head_is_ok
+  }
+  (x) when length(x) > 3 {
+    :long_list
+  }
+  (x) when is_list(x) {
+    :is_list
+  }
+}
+```
+
+#### Nested Function Calls
+```lx
+fun validate_nested_list {
+  (x) when length(tl(x)) > 0 {
+    :tail_not_empty
+  }
+  (x) when hd(tl(x)) != :end {
+    :nested_calls_work
+  }
+  (x) when is_list(x) andalso length(x) > 0 {
+    :non_empty_list
+  }
+}
+```
+
+#### Complex Guard Expressions
+```lx
+fun advanced_validation {
+  (x, y) when hd(x) == :start andalso length(y) > 0 {
+    :both_conditions_met
+  }
+  (data) when is_list(data) andalso length(data) >= 3 andalso hd(data) == :valid {
+    :complex_validation_passed
+  }
+}
+```
+
+#### OTP Worker with Guard Functions
+```lx
+worker list_processor {
+  fun handle_call(request, _from, state) when is_list(state) andalso length(state) < 100 {
+    case request {
+      .{:add, item} when length(state) < 99 -> {
+        new_state = [item | state]
+        .{:reply, :ok, new_state}
+      }
+      :get_head when length(state) > 0 -> {
+        .{:reply, hd(state), state}
+      }
+      _ -> .{:reply, :error, state}
+    }
+  }
+}
+```
+
+### Generated Erlang Code
+
+#### Input Lx Code
+```lx
+fun test_guards {
+  (x) when hd(x) == ok { :head_ok }
+  (x) when length(tl(x)) > 0 { :tail_not_empty }
+  (x) when hd(tl(x)) /= end { :nested_check }
+}
+```
+
+#### Generated Erlang
+```erlang
+test_guards(X) when hd(X) == ok ->
+    head_ok;
+test_guards(X) when length(tl(X)) > 0 ->
+    tail_not_empty;
+test_guards(X) when hd(tl(X)) /= end ->
+    nested_check.
+```
+
+### Supported Guard Functions
+
+#### List Functions
+- `hd(List)` - Returns the head of a list
+- `tl(List)` - Returns the tail of a list
+- `length(List)` - Returns the length of a list
+- `element(N, Tuple)` - Returns the Nth element of a tuple
+
+#### Type Testing Functions
+- `is_atom(Term)` - Tests if term is an atom
+- `is_integer(Term)` - Tests if term is an integer
+- `is_float(Term)` - Tests if term is a float
+- `is_number(Term)` - Tests if term is a number
+- `is_boolean(Term)` - Tests if term is a boolean
+- `is_list(Term)` - Tests if term is a list
+- `is_tuple(Term)` - Tests if term is a tuple
+
+#### Arithmetic Functions
+- `abs(Number)` - Returns absolute value
+- `round(Float)` - Rounds a float to nearest integer
+- `trunc(Float)` - Truncates a float to integer
+
+### Benefits
+
+#### 1. Enhanced Guard Expressiveness
+- **Complex conditions**: Enable sophisticated guard logic with function calls
+- **Nested operations**: Support for multi-level function call nesting
+- **Type safety**: Full compile-time validation of guard expressions
+- **Erlang compatibility**: Perfect mapping to Erlang guard semantics
+
+#### 2. Improved OTP Development
+- **Rich callback guards**: Complex validation in OTP callback functions
+- **Pattern matching enhancement**: More precise pattern matching with guards
+- **Performance**: Efficient guard evaluation in BEAM VM
+- **Code clarity**: Expressive guard conditions improve code readability
+
+#### 3. Developer Experience
+- **Familiar syntax**: Uses standard function call syntax in guards
+- **Error reporting**: Clear error messages for invalid guard functions
+- **Type checking**: Integration with Hindley-Milner type inference
+- **Documentation**: Comprehensive examples and usage patterns
+
+#### 4. Language Completeness
+- **Erlang parity**: Matches Erlang's guard expression capabilities
+- **Foundation for OTP**: Enables full OTP pattern implementation
+- **Functional programming**: Supports advanced functional programming patterns
+- **Production ready**: Suitable for complex, production-grade applications
+
+### Validation and Testing
+
+#### Comprehensive Test Coverage
+- **Basic function calls**: Tests for all supported guard functions
+- **Nested calls**: Validation of complex nested expressions
+- **Type checking**: Integration with type system validation
+- **Error handling**: Tests for invalid function calls and arguments
+- **Code generation**: Verification of correct Erlang output
+
+#### Error Handling Examples
+```lx
+# Invalid function in guard
+fun invalid_guard {
+  (x) when unknown_function(x) == :ok { :error }  # Compile error
+}
+
+# Invalid arity
+fun invalid_arity {
+  (x) when length(x, y) > 0 { :error }  # Compile error: length/1 expects 1 argument
+}
+
+# Type safety
+fun type_safe_guards {
+  (x) when is_list(x) andalso length(x) > 0 { :valid }  # Type safe
+}
+```
+
+This implementation provides complete guard function call support, enabling developers to write sophisticated, type-safe guard expressions that compile to efficient Erlang code.
+
+## [Previous] Complete Logical Operators Implementation
+
+### Overview
+Implemented comprehensive support for all logical operators in the Lx language, including both strict evaluation operators (`and`, `or`, `not`) and short-circuit operators (`andalso`, `orelse`). This implementation provides full compatibility with Erlang's logical operator semantics while maintaining the familiar syntax developers expect.
+
+### Key Features
+
+#### 1. Complete Logical Operator Set
+- **Strict operators**: `and`, `or`, `not` - evaluate all operands even if the result is already determined
+- **Short-circuit operators**: `andalso`, `orelse` - evaluate the second operand only if necessary
+- **Unary operator**: `not` for boolean negation
+- **Proper precedence**: Follows standard logical operator precedence rules
+- **Type safety**: All logical operations properly integrated with the type system
+
+#### 2. Seamless Erlang Integration
+- **Direct mapping**: LX logical operators map directly to Erlang equivalents
+- **Guard compatibility**: Full support for logical operators in function guards and case guards
+- **Correct compilation**: Generates proper Erlang syntax with correct operator precedence
+- **No performance overhead**: Direct operator mapping with optimal Erlang code generation
+
+#### 3. Enhanced Type System Integration
+- **Boolean enforcement**: Logical operators require boolean operands and return boolean results
+- **Type inference**: Proper integration with Hindley-Milner type inference
+- **Type checking**: Validates logical operands and ensures type safety
+- **Clear error messages**: Helpful type error messages for invalid logical operations
+
+### Technical Implementation
+
+#### Lexer Enhancements (`lexer.mll`)
+```ocaml
+(* Logical operator tokens *)
+| "and" -> AND | "or" -> OR | "not" -> NOT
+| "andalso" -> ANDALSO | "orelse" -> ORELSE
+```
+
+#### Parser Grammar (`parser.mly`)
+```ocaml
+(* Token declarations *)
+%token AND OR NOT ANDALSO ORELSE
+
+(* Precedence rules - short-circuit operators have different precedence *)
+%left ORELSE
+%left ANDALSO
+%left OR
+%left AND
+%right NOT
+
+(* Grammar rules for logical expressions *)
+| left = expr AND right = expr { BinOp (left, "and", right) }
+| left = expr OR right = expr { BinOp (left, "or", right) }
+| left = expr ANDALSO right = expr { BinOp (left, "andalso", right) }
+| left = expr ORELSE right = expr { BinOp (left, "orelse", right) }
+| NOT right = expr { UnaryOp ("not", right) }
+```
+
+#### AST Extensions (`ast.ml`)
+```ocaml
+(* Added unary operations to the AST *)
+type expr =
+  | (* ... existing variants ... *)
+  | BinOp of expr * string * expr (* Binary operations *)
+  | UnaryOp of string * expr (* Unary operations - NEW *)
+```
+
+### Usage Examples
+
+#### Basic Logical Operations
+```lx
+fun test_logic(a, b) {
+  strict_and = a and b        # Evaluates both a and b
+  strict_or = a or b          # Evaluates both a and b
+  short_and = a andalso b     # Evaluates b only if a is true
+  short_or = a orelse b       # Evaluates b only if a is false
+  negation = not a            # Boolean negation
+
+  .{strict_and, strict_or, short_and, short_or, negation}
+}
+```
+
+#### Logical Operators with Comparisons
+```lx
+fun validate_range(x, min, max) {
+  # Strict evaluation - both comparisons always evaluated
+  in_range_strict = x >= min and x <= max
+
+  # Short-circuit evaluation - second comparison skipped if first fails
+  in_range_fast = x >= min andalso x <= max
+
+  # Complex logical expressions
+  valid = (x > 0 andalso x < 100) orelse x == -1
+
+  if valid {
+    :valid
+  } else {
+    :invalid
+  }
+}
+```
+
+#### Logical Operators in Guards
+```lx
+fun process_value {
+  (x, y) when x > 0 and y < 10 -> :small_positive
+  (x, y) when x == 0 or y == 0 -> :has_zero
+  (x) when not is_atom(x) -> :not_atom
+  (_) -> :other
+}
+```
+
+### Operator Precedence
+
+The logical operators follow proper precedence rules:
+
+1. **Unary operators** (`not`) - highest precedence
+2. **Short-circuit AND** (`andalso`) - higher than short-circuit OR
+3. **Short-circuit OR** (`orelse`) - lower than andalso
+4. **Strict AND** (`and`) - higher than strict OR
+5. **Strict OR** (`or`) - lowest logical precedence
+
+```lx
+# These expressions demonstrate precedence:
+result1 = a orelse b andalso c    # Equivalent to: a orelse (b andalso c)
+result2 = a or b and c            # Equivalent to: a or (b and c)
+result3 = not a and b             # Equivalent to: (not a) and b
+```
+
+### Strict vs Short-Circuit Semantics
+
+#### Strict Operators (`and`, `or`)
+```lx
+fun test_strict(x, y) {
+  # Both expensive_check(x) and expensive_check(y) are ALWAYS called
+  result = expensive_check(x) and expensive_check(y)
+  result
+}
+```
+
+#### Short-Circuit Operators (`andalso`, `orelse`)
+```lx
+fun test_short_circuit(x, y) {
+  # expensive_check(y) is called ONLY if expensive_check(x) returns true
+  result = expensive_check(x) andalso expensive_check(y)
+  result
+}
+```
+
+### Benefits
+
+#### 1. Complete Language Feature Set
+- **Full logical operations**: All essential logical operators implemented
+- **Erlang compatibility**: Perfect mapping to Erlang's logical operator semantics
+- **Performance options**: Choice between strict and short-circuit evaluation
+- **Type safety**: Compile-time validation of logical expressions
+
+#### 2. Developer Experience
+- **Familiar syntax**: Uses traditional logical operator syntax
+- **Clear semantics**: Obvious distinction between strict and short-circuit operators
+- **Proper precedence**: Follows standard logical operator precedence
+- **Guard integration**: Seamless use in guard expressions
+
+#### 3. Code Quality
+- **Readable conditions**: Clear, expressive logical statements
+- **Performance control**: Explicit choice of evaluation strategy
+- **Type safety**: Prevents logical errors at compile time
+- **Erlang optimization**: Generates optimal Erlang code
+
+## [Previous] Guards Implementation
+
+### Overview
+Implemented guard expressions (when clauses) in Lx to enable conditional function clauses and pattern matching. Guards are essential for OTP applications and functional programming patterns, providing Erlang-style conditional logic with full type safety.
+
+### Key Features
+
+#### 1. Complete Guard Expression Support
+- **Function guards**: `when` clauses in function definitions
+- **Case guards**: Conditional pattern matching in case expressions
+- **Type tests**: Built-in guard functions like `is_atom(x)`, `is_integer(x)`
+- **Comparisons**: All comparison operators in guard context
+- **Logical operations**: `and`, `or`, `not` operators in guards
+- **Arithmetic**: Basic arithmetic operations in guard expressions
+
+#### 2. Seamless Erlang Integration
+- **Correct syntax**: Generates proper Erlang guard syntax
+- **Operator conversion**: `and` → `,`, `or` → `;`, `!=` → `/=`, `<=` → `=<`
+- **Type test mapping**: Direct mapping to Erlang guard BIFs
+- **No performance overhead**: Compiles to native Erlang guard expressions
+
+#### 3. Enhanced Parser Support
+- **Negative numbers**: Support for negative literals in guards (`x < -10`)
+- **Complex expressions**: Nested guard expressions with proper precedence
+- **Case syntax**: Updated case branches to require semicolon separators
+- **Grammar integration**: Full integration with existing expression parsing
+
+### Technical Implementation
+
+#### AST Extensions (`ast.ml`)
+```ocaml
+(* Guard expression types *)
+type guard_expr =
+  | GuardAnd of guard_expr * guard_expr
+  | GuardOr of guard_expr * guard_expr
+  | GuardNot of guard_expr
+  | GuardBinOp of guard_atom * string * guard_atom
+  | GuardCall of string * guard_atom list
+  | GuardAtom of guard_atom
+
+and guard_atom =
+  | GuardVar of string
+  | GuardLiteral of literal
+
+(* Updated function_clause to include guard *)
+type function_clause = {
+  name : string;
+  params : pattern list;
+  guard : guard_expr option;  (* Added guard field *)
+  body : expr;
+  position : position option;
+}
+
+(* Updated case branch to include guard *)
+type case_branch = pattern * guard_expr option * expr
+```
+
+#### Parser Grammar (`parser.mly`)
+```ocaml
+(* Function clauses with guards *)
+function_clause:
+  | LPAREN params=separated_list(COMMA, pattern) RPAREN
+    WHEN guard=guard_expr LBRACE body=function_body RBRACE
+    { let pos = make_position $startpos in
+      { params; body; position = Some pos; guard = Some guard } }
+
+(* Case branches with guards *)
+case_branch:
+  | pattern=pattern WHEN guard=guard_expr ARROW body=expr
+    { (pattern, Some guard, body) }
+
+(* Guard expressions with proper precedence *)
+guard_expr:
+  | guard_and_expr { $1 }
+
+guard_and_expr:
+  | guard_or_expr { $1 }
+  | left=guard_and_expr AND right=guard_or_expr { GuardAnd (left, right) }
+
+guard_or_expr:
+  | guard_primary { $1 }
+  | left=guard_or_expr OR right=guard_primary { GuardOr (left, right) }
+
+guard_primary:
+  | NOT guard=guard_primary { GuardNot guard }
+  | LPAREN guard=guard_expr RPAREN { guard }
+  | left=guard_atom op=guard_op right=guard_atom { GuardBinOp (left, op, right) }
+  | func=IDENT LPAREN args=separated_list(COMMA, guard_atom) RPAREN
+    { GuardCall (func, args) }
+  | atom=guard_atom { GuardAtom atom }
+
+guard_atom:
+  | name=IDENT { GuardVar name }
+  | lit=literal { GuardLiteral lit }
+  | MINUS lit=literal {  (* Support for negative numbers *)
+      match lit with
+      | LInt i -> GuardLiteral (LInt (-i))
+      | LFloat f -> GuardLiteral (LFloat (-.f))
+      | _ -> failwith "Enhanced:Invalid negative literal in guard"
+  }
+```
+
+#### Type System Integration (`typechecker.ml`)
+```ocaml
+(* Guard expression type checking *)
+let rec infer_guard_expr (env : type_env) (guard : guard_expr) : substitution =
+  match guard with
+  | GuardAnd (g1, g2) | GuardOr (g1, g2) ->
+      let s1 = infer_guard_expr env g1 in
+      let s2 = infer_guard_expr (apply_subst_env s1 env) g2 in
+      compose_subst s1 s2
+  | GuardNot g ->
+      infer_guard_expr env g
+  | GuardBinOp (left, op, right) ->
+      let _ = infer_guard_atom env left in
+      let _ = infer_guard_atom env right in
+      []  (* Comparisons always return boolean *)
+  | GuardCall (func, args) ->
+      validate_guard_call func args;
+      []
+  | GuardAtom atom ->
+      let _typ = infer_guard_atom env atom in
+      []
+
+and validate_guard_call (func : string) (args : guard_atom list) : unit =
+  match func with
+  | "is_atom" | "is_integer" | "is_float" | "is_number"
+  | "is_boolean" | "is_list" | "is_tuple" ->
+      if List.length args != 1 then
+        raise (GuardError (InvalidGuardCall (func, List.length args, 1)))
+  | "abs" | "round" | "trunc" ->
+      if List.length args != 1 then
+        raise (GuardError (InvalidGuardCall (func, List.length args, 1)))
+  | _ ->
+      raise (GuardError (InvalidGuardFunction func))
+```
+
+#### Code Generation (`compiler.ml`)
+```ocaml
+(* Guard expression code generation *)
+let rec emit_guard_expr ctx guard =
+  match guard with
+  | GuardAnd (g1, g2) ->
+      emit_guard_expr ctx g1 ^ ", " ^ emit_guard_expr ctx g2
+  | GuardOr (g1, g2) ->
+      emit_guard_expr ctx g1 ^ "; " ^ emit_guard_expr ctx g2
+  | GuardNot g ->
+      "not " ^ emit_guard_expr ctx g
+  | GuardBinOp (left, op, right) ->
+      let erlang_op = match op with
+        | "!=" -> "/="     (* Erlang uses /= for not equal *)
+        | "<=" -> "=<"     (* Erlang uses =< for less than or equal *)
+        | other -> other
+      in
+      emit_guard_atom ctx left ^ " " ^ erlang_op ^ " " ^ emit_guard_atom ctx right
+  | GuardCall (func, args) ->
+      func ^ "(" ^ String.concat ", " (List.map (emit_guard_atom ctx) args) ^ ")"
+  | GuardAtom atom ->
+      emit_guard_atom ctx atom
+
+(* Function clause emission with guards *)
+let emit_function_clause (func_name : string) (clause : function_clause) : string =
+  let guard_str = match clause.guard with
+    | Some guard -> " when " ^ emit_guard_expr ctx guard
+    | None -> ""
+  in
+  func_name ^ "(" ^ params_str ^ ")" ^ guard_str ^ " -> " ^ body_str
+```
+
+### Usage Examples
+
+#### Function Guards
+```lx
+fun process_number {
+  (x) when x > 0 { x * 2 }
+  (x) when x == 0 { 0 }
+  (_) { 0 }
+}
+
+fun validate_user {
+  (user) when is_atom(user) and user != :anonymous {
+    .{:valid, user}
+  }
+  (_) {
+    .{:error, :invalid_user}
+  }
+}
+```
+
+#### Case Guards
+```lx
+fun categorize_value(value) {
+  case value {
+    x when x > 100 -> :large;
+    x when x > 10 -> :medium;
+    x when x > 0 -> :small;
+    x when x == 0 -> :zero;
+    _ -> :negative
+  }
+}
+```
+
+#### OTP Callback Guards
+```lx
+worker my_server {
+  fun handle_call {
+    (request, _from, state) when is_atom(request) ->
+      .{:reply, :ok, state}
+    (request, _from, state) when is_tuple(request) ->
+      .{:reply, .{:error, :invalid_format}, state}
+    (_, _from, state) ->
+      .{:reply, .{:error, :unknown_request}, state}
+  }
+}
+```
+
+#### Generated Erlang Code
+```lx
+# LX source
+fun test {
+  (x) when x > 0 and x <= 100 { :valid }
+  (x) when x != 0 { :non_zero }
+  (_) { :other }
+}
+```
+
+```erlang
+% Generated Erlang
+test(X) when X > 0, X =< 100 ->
+    valid;
+test(X) when X /= 0 ->
+    non_zero;
+test(_) ->
+    other.
+```
+
+### Benefits
+
+#### 1. Functional Programming Power
+- **Pattern matching**: Enhanced pattern matching with conditional logic
+- **Type safety**: Compile-time validation of guard expressions
+- **Erlang compatibility**: Perfect integration with Erlang/OTP patterns
+- **Performance**: Efficient guard evaluation in the BEAM VM
+
+#### 2. Developer Experience
+- **Familiar syntax**: Erlang-style guard syntax
+- **Clear semantics**: Obvious guard evaluation rules
+- **Type tests**: Built-in type checking functions
+- **Error messages**: Clear error reporting for invalid guards
+
+#### 3. OTP Integration
+- **Callback guards**: Guards in OTP callback functions
+- **Message handling**: Conditional message processing
+- **State validation**: Guard-based state checking
+- **Error handling**: Pattern-based error handling with guards
+
+## [Previous] Comparison Operators Implementation
 
 ### Overview
 Implemented comprehensive support for comparison operators in the Lx language, enabling traditional comparison syntax while maintaining seamless Erlang/BEAM compatibility. This fundamental addition enables proper conditional logic and boolean expressions throughout the language.

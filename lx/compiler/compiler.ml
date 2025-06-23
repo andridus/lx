@@ -185,6 +185,64 @@ and emit_block_inline ctx var_name renamed_var exprs =
       ^ String.concat ",\n    " statements
       ^ ",\n    " ^ end_comment ^ "\n    " ^ renamed_var ^ " = " ^ result_expr
 
+(* Guard expression emission *)
+and emit_guard_expr ctx (guard : guard_expr) : string =
+  match guard with
+  | GuardAnd (g1, g2) ->
+      emit_guard_expr ctx g1 ^ ", " ^ emit_guard_expr ctx g2
+  | GuardOr (g1, g2) ->
+      emit_guard_expr ctx g1 ^ "; " ^ emit_guard_expr ctx g2
+  | GuardAndalso (g1, g2) ->
+      emit_guard_expr ctx g1 ^ " andalso " ^ emit_guard_expr ctx g2
+  | GuardOrelse (g1, g2) ->
+      emit_guard_expr ctx g1 ^ " orelse " ^ emit_guard_expr ctx g2
+  | GuardNot g ->
+      "not " ^ emit_guard_expr ctx g
+  | GuardBinOp (left, op, right) ->
+      let erlang_op = match op with
+        | "!=" -> "/="
+        | "<=" -> "=<"
+        | other -> other
+      in
+      emit_guard_value ctx left ^ " " ^ erlang_op ^ " " ^ emit_guard_value ctx right
+  | GuardCall (func, args) ->
+      let erlang_func = match func with
+        | "is_atom" -> "is_atom"
+        | "is_integer" -> "is_integer"
+        | "is_float" -> "is_float"
+        | "is_number" -> "is_number"
+        | "is_boolean" -> "is_boolean"
+        | "is_list" -> "is_list"
+        | "is_tuple" -> "is_tuple"
+        | other -> other
+      in
+      erlang_func ^ "(" ^ String.concat ", " (List.map (emit_guard_value ctx) args) ^ ")"
+  | GuardAtom atom ->
+      emit_guard_atom ctx atom
+
+and emit_guard_atom ctx (atom : guard_atom) : string =
+  match atom with
+  | GuardVar var -> get_renamed_var ctx var
+  | GuardLiteral lit -> emit_literal lit
+  | GuardCallAtom (func, args) ->
+      func ^ "(" ^ String.concat ", " (List.map (emit_guard_atom ctx) args) ^ ")"
+
+and emit_guard_value ctx (value : guard_value) : string =
+  match value with
+  | GuardAtomValue atom -> emit_guard_atom ctx atom
+  | GuardCallValue (func, args) ->
+      let erlang_func = match func with
+        | "is_atom" -> "is_atom"
+        | "is_integer" -> "is_integer"
+        | "is_float" -> "is_float"
+        | "is_number" -> "is_number"
+        | "is_boolean" -> "is_boolean"
+        | "is_list" -> "is_list"
+        | "is_tuple" -> "is_tuple"
+        | other -> other
+      in
+      erlang_func ^ "(" ^ String.concat ", " (List.map (emit_guard_value ctx) args) ^ ")"
+
 and emit_expr ctx (e : expr) : string =
   (* Check for invalid colon syntax patterns in any expression *)
   (match e with
@@ -265,7 +323,12 @@ and emit_expr ctx (e : expr) : string =
       "case " ^ emit_expr ctx value ^ " of "
       ^ String.concat "; "
           (List.map
-             (fun (p, e) -> emit_pattern ctx p ^ " -> " ^ emit_expr ctx e)
+             (fun (p, guard_opt, e) ->
+               let guard_str = match guard_opt with
+                 | Some guard -> " when " ^ emit_guard_expr ctx guard
+                 | None -> ""
+               in
+               emit_pattern ctx p ^ guard_str ^ " -> " ^ emit_expr ctx e)
              cases)
       ^ " end"
   | For (_, _, _) -> "% For expressions not yet implemented"
@@ -279,6 +342,8 @@ and emit_expr ctx (e : expr) : string =
       let block_ctx = create_scope (Some ctx) in
       let transformed_exprs = detect_and_transform_external_calls exprs in
       String.concat ",\n    " (List.map (emit_expr block_ctx) transformed_exprs)
+  | UnaryOp (op, operand) ->
+      op ^ " " ^ emit_expr ctx operand
   | BinOp (left, op, right) ->
       let erlang_op =
         match op with
@@ -321,9 +386,13 @@ let emit_function_clause (func_name : string) (clause : function_clause) :
     (function PVar name -> ignore (add_var_to_scope ctx name) | _ -> ())
     clause.params;
   let pattern_strings = List.map (emit_pattern ctx) clause.params in
+  let guard_str = match clause.guard with
+    | Some guard -> " when " ^ emit_guard_expr ctx guard
+    | None -> ""
+  in
   func_name ^ "("
   ^ String.concat ", " pattern_strings
-  ^ ") ->\n    " ^ emit_expr ctx clause.body
+  ^ ")" ^ guard_str ^ " ->\n    " ^ emit_expr ctx clause.body
 
 let emit_function_def (func : function_def) : string =
   check_function_name func.name;

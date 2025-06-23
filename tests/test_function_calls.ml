@@ -98,9 +98,9 @@ let test_multiple_arities_parsing () =
        name = "a";
        clauses =
          [
-           { params = []; body = Literal LNil; position = _ };
-           { params = [ PVar "x" ]; body = Var "x"; position = _ };
-           { params = [ PVar "x"; PVar "y" ]; body = Var "x"; position = _ };
+                       { params = []; body = Literal LNil; position = _; guard = _ };
+                       { params = [ PVar "x" ]; body = Var "x"; position = _; guard = _ };
+                       { params = [ PVar "x"; PVar "y" ]; body = Var "x"; position = _; guard = _ };
          ];
        visibility = _;
        position = _;
@@ -298,6 +298,7 @@ let test_simple_function_call () =
                     params = [];
                     body = Literal (LString "world");
                     position = None;
+                    guard = None;
                   };
                 ];
               visibility = Private;
@@ -324,6 +325,7 @@ let test_function_with_parameters () =
                     params = [ PVar "x"; PVar "y" ];
                     body = BinOp (Var "x", "+", Var "y");
                     position = None;
+                    guard = None;
                   };
                 ];
               visibility = Private;
@@ -345,12 +347,13 @@ let test_multiple_clauses () =
               name = "a";
               clauses =
                 [
-                  { params = []; body = Literal LNil; position = None };
-                  { params = [ PVar "x" ]; body = Var "x"; position = None };
+                  { params = []; body = Literal LNil; position = None; guard = None };
+                  { params = [ PVar "x" ]; body = Var "x"; position = None; guard = None };
                   {
                     params = [ PVar "x"; PVar "y" ];
                     body = BinOp (Var "x", "+", Var "y");
                     position = None;
+                    guard = None;
                   };
                 ];
               visibility = Private;
@@ -380,6 +383,7 @@ let test_external_call () =
                           "reverse",
                           [ List [ Literal (LInt 1); Literal (LInt 2) ] ] );
                     position = None;
+                    guard = None;
                   };
                 ];
               visibility = Private;
