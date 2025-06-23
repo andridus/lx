@@ -23,7 +23,8 @@
   test_build_cleanup
   test_guards
   test_logical_operators
-  test_send_operator))
+  test_send_operator
+  test_tuple_detection))
 
 (rule
  (alias runtest)

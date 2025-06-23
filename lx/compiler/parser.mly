@@ -4,6 +4,26 @@ open Ast
 (* Helper function to convert menhir position to our position type *)
 let make_position pos =
   { line = pos.Lexing.pos_lnum; column = pos.Lexing.pos_cnum - pos.Lexing.pos_bol + 1; filename = None }
+
+(* Helper types and functions for tuple detection *)
+type simple_tuple_element =
+  | STEIdent of string
+  | STEAtom of string
+  | STELiteral of literal
+
+let string_of_literal = function
+  | LString s -> "\"" ^ s ^ "\""
+  | LInt i -> string_of_int i
+  | LFloat f -> string_of_float f
+  | LBool true -> "true"
+  | LBool false -> "false"
+  | LAtom a -> ":" ^ a
+  | LNil -> "nil"
+
+let string_of_simple_tuple_element = function
+  | STEIdent s -> s
+  | STEAtom a -> ":" ^ a
+  | STELiteral lit -> string_of_literal lit
 %}
 
 (* Tokens *)
@@ -311,6 +331,28 @@ simple_expr:
       | es -> Block es }
   | LBRACE RBRACE
     { Literal LNil }
+  (* Smart error detection for potential tuple syntax misuse *)
+  | LBRACE first_var = IDENT COMMA rest_vars = separated_nonempty_list(COMMA, IDENT) RBRACE
+    { let all_vars = first_var :: rest_vars in
+      let vars_str = String.concat ", " all_vars in
+      let suggestion = ".{" ^ vars_str ^ "}" in
+      failwith ("Enhanced:Invalid block syntax - looks like you're trying to create a tuple|Suggestion:Use '" ^ suggestion ^ "' for tuple syntax instead of '{" ^ vars_str ^ "}'|Context:In Lx, tuples are created with .{} syntax, not {} syntax. Curly braces {} are used for code blocks and function bodies") }
+  (* Detect tuple-like patterns with atoms and literals *)
+  | LBRACE first_atom = ATOM COMMA rest_elements = separated_nonempty_list(COMMA, simple_tuple_element) RBRACE
+    { let first_str = ":" ^ first_atom in
+      let rest_strs = List.map string_of_simple_tuple_element rest_elements in
+      let all_elements = first_str :: rest_strs in
+      let elements_str = String.concat ", " all_elements in
+      let suggestion = ".{" ^ elements_str ^ "}" in
+      failwith ("Enhanced:Invalid block syntax - looks like you're trying to create a tuple|Suggestion:Use '" ^ suggestion ^ "' for tuple syntax instead of '{" ^ elements_str ^ "}'|Context:In Lx, tuples are created with .{} syntax, not {} syntax. Curly braces {} are used for code blocks and function bodies") }
+  (* Detect tuple-like patterns starting with literals *)
+  | LBRACE first_lit = literal COMMA rest_elements = separated_nonempty_list(COMMA, simple_tuple_element) RBRACE
+    { let first_str = string_of_literal first_lit in
+      let rest_strs = List.map string_of_simple_tuple_element rest_elements in
+      let all_elements = first_str :: rest_strs in
+      let elements_str = String.concat ", " all_elements in
+      let suggestion = ".{" ^ elements_str ^ "}" in
+      failwith ("Enhanced:Invalid block syntax - looks like you're trying to create a tuple|Suggestion:Use '" ^ suggestion ^ "' for tuple syntax instead of '{" ^ elements_str ^ "}'|Context:In Lx, tuples are created with .{} syntax, not {} syntax. Curly braces {} are used for code blocks and function bodies") }
 
 case_branch:
   | pattern = pattern WHEN guard = guard_expr ARROW body = expr
@@ -355,6 +397,11 @@ literal:
   | b = BOOL { LBool b }
   | a = ATOM { LAtom a }
   | NIL { LNil }
+
+simple_tuple_element:
+  | name = IDENT { STEIdent name }
+  | atom = ATOM { STEAtom atom }
+  | lit = literal { STELiteral lit }
 
 standalone_test_def:
   | IDENT name = STRING LBRACE body = expr RBRACE
