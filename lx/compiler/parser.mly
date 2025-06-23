@@ -32,6 +32,7 @@ let make_position pos =
 
 (* Operators and Punctuation *)
 %token EQ ARROW PIPE WILDCARD
+%token EQEQ NEQ LT GT LEQ GEQ
 %token LPAREN RPAREN LBRACE RBRACE LBRACKET RBRACKET
 %token DOT_LBRACE
 %token COMMA SEMICOLON CONS COLON DOT
@@ -44,6 +45,7 @@ let make_position pos =
 %left PIPE
 %left CONS
 %left COMMA
+%left EQEQ NEQ LT GT LEQ GEQ
 %left PLUS MINUS
 %left MULT DIV
 %left DOT COLON (* Highest precedence for module calls *)
@@ -211,6 +213,18 @@ expr:
     { BinOp (left, "*", right) }
   | left = expr DIV right = expr
     { BinOp (left, "/", right) }
+  | left = expr EQEQ right = expr
+    { BinOp (left, "==", right) }
+  | left = expr NEQ right = expr
+    { BinOp (left, "!=", right) }
+  | left = expr LT right = expr
+    { BinOp (left, "<", right) }
+  | left = expr GT right = expr
+    { BinOp (left, ">", right) }
+  | left = expr LEQ right = expr
+    { BinOp (left, "<=", right) }
+  | left = expr GEQ right = expr
+    { BinOp (left, ">=", right) }
   | IF cond = expr LBRACE then_expr = expr RBRACE ELSE LBRACE else_expr = expr RBRACE
     { If (cond, then_expr, Some else_expr) }
   | IF cond = expr LBRACE then_expr = expr RBRACE

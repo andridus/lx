@@ -18,6 +18,12 @@ rule read = parse
   | "#" [^ '\n']* eof { EOF }
 
   (* Operators and Punctuation *)
+  | "=="            { EQEQ }
+  | "!="            { NEQ }
+  | "<="            { LEQ }
+  | ">="            { GEQ }
+  | "<"             { LT }
+  | ">"             { GT }
   | "="             { EQ }
   | "->"            { ARROW }
   | "|"             { PIPE }

@@ -280,7 +280,13 @@ and emit_expr ctx (e : expr) : string =
       let transformed_exprs = detect_and_transform_external_calls exprs in
       String.concat ",\n    " (List.map (emit_expr block_ctx) transformed_exprs)
   | BinOp (left, op, right) ->
-      emit_expr ctx left ^ " " ^ op ^ " " ^ emit_expr ctx right
+      let erlang_op =
+        match op with
+        | "!=" -> "/=" (* Erlang uses /= for not equal *)
+        | "<=" -> "=<" (* Erlang uses =< for less than or equal *)
+        | other -> other (* Keep other operators as is *)
+      in
+      emit_expr ctx left ^ " " ^ erlang_op ^ " " ^ emit_expr ctx right
 
 (* Helper function to detect and transform external call patterns *)
 and detect_and_transform_external_calls exprs =

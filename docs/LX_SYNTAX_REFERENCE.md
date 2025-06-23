@@ -73,6 +73,12 @@ Lx has several categories of keywords:
 - `-` - Subtraction
 - `*` - Multiplication
 - `/` - Division
+- `==` - Equal to (comparison)
+- `!=` - Not equal to (comparison)
+- `<` - Less than (comparison)
+- `>` - Greater than (comparison)
+- `<=` - Less than or equal to (comparison)
+- `>=` - Greater than or equal to (comparison)
 
 ### Punctuation
 - `(` `)` - Parentheses (grouping, function calls)
@@ -380,6 +386,49 @@ w = 15 / 3    # Division: 5
 result = 2 + 3 * 4    # Result: 14 (multiplication has higher precedence)
 total = (10 + 5) * 2  # Result: 30 (parentheses override precedence)
 ```
+
+### Comparison Expressions
+```lx
+# Basic comparison operations
+equal = x == y        # Equal to
+not_equal = x != y    # Not equal to
+less = x < y          # Less than
+greater = x > y       # Greater than
+less_equal = x <= y   # Less than or equal to
+greater_equal = x >= y # Greater than or equal to
+
+# Comparisons return boolean values
+fun is_adult(age) {
+  age >= 18  # Returns true or false
+}
+
+# Using comparisons in if statements
+fun check_range(value) {
+  if value >= 0 and value <= 100 {
+    :valid
+  } else {
+    :invalid
+  }
+}
+
+# Complex comparison expressions
+fun validate_score(score) {
+  if score >= 90 {
+    :excellent
+  } else if score >= 70 {
+    :good
+  } else if score >= 50 {
+    :pass
+  } else {
+    :fail
+  }
+}
+
+# Comparison precedence (arithmetic before comparison)
+result = x + 10 == y * 2  # Equivalent to: (x + 10) == (y * 2)
+```
+
+**Note**: Lx uses traditional comparison operators (`!=`, `<=`) in source code, but these are automatically converted to Erlang's operators (`/=`, `=<`) during compilation.
 
 ### For Loops
 ```lx

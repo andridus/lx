@@ -627,6 +627,10 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
             compose_subst (compose_subst combined_subst int_unify1) int_unify2
           in
           (TInteger, final_subst)
+      (* Comparison operations return boolean *)
+      | "==" | "!=" | "<" | ">" | "<=" | ">=" ->
+          (* For now, allow comparison of any types - could be more strict *)
+          (TBool, combined_subst)
       | _ -> failwith ("Unknown binary operator: " ^ op))
 
 (* Type inference for function clauses *)

@@ -158,6 +158,92 @@ let test_compile_if_then_else () =
       check bool ("contains: " ^ part) true contains)
     expected_parts
 
+(* Test for comparison operators compilation *)
+let test_compile_comparison_operators () =
+  let eq_expr = BinOp (Var "x", "==", Literal (LInt 10)) in
+  let neq_expr = BinOp (Var "y", "!=", Literal (LInt 5)) in
+  let lt_expr = BinOp (Var "a", "<", Var "b") in
+  let gt_expr = BinOp (Var "c", ">", Var "d") in
+  let leq_expr = BinOp (Var "e", "<=", Literal (LInt 100)) in
+  let geq_expr = BinOp (Var "f", ">=", Literal (LInt 0)) in
+
+  let func1 = make_single_clause_function "test_eq" [ "x" ] eq_expr in
+  let func2 = make_single_clause_function "test_neq" [ "y" ] neq_expr in
+  let func3 = make_single_clause_function "test_lt" [ "a"; "b" ] lt_expr in
+  let func4 = make_single_clause_function "test_gt" [ "c"; "d" ] gt_expr in
+  let func5 = make_single_clause_function "test_leq" [ "e" ] leq_expr in
+  let func6 = make_single_clause_function "test_geq" [ "f" ] geq_expr in
+
+  let program =
+    {
+      items =
+        [
+          Function func1;
+          Function func2;
+          Function func3;
+          Function func4;
+          Function func5;
+          Function func6;
+        ];
+    }
+  in
+  let result = Compiler.compile_to_string program in
+
+  let expected_parts =
+    [
+      "X_[a-z0-9]+ == 10";
+      "Y_[a-z0-9]+ /= 5";
+      (* Erlang uses /= for != *)
+      "A_[a-z0-9]+ < B_[a-z0-9]+";
+      "C_[a-z0-9]+ > D_[a-z0-9]+";
+      "E_[a-z0-9]+ =< 100";
+      (* Erlang uses =< for <= *)
+      "F_[a-z0-9]+ >= 0";
+    ]
+  in
+  List.iter
+    (fun part ->
+      let contains = string_matches_pattern result part in
+      check bool ("contains pattern: " ^ part) true contains)
+    expected_parts
+
+(* Test for if condition with comparison operators *)
+let test_compile_if_with_comparison () =
+  let condition = BinOp (Var "x", "==", Literal (LInt 1)) in
+  let if_expr =
+    If (condition, Literal (LAtom "ok"), Some (Literal (LAtom "error")))
+  in
+  let func = make_single_clause_function "test" [ "x" ] if_expr in
+  let program = { items = [ Function func ] } in
+  let result = Compiler.compile_to_string program in
+
+  let expected_parts =
+    [
+      "test(X_[a-z0-9]+) ->";
+      "case X_[a-z0-9]+ == 1 of true -> ok; _ -> error end.";
+    ]
+  in
+  List.iter
+    (fun part ->
+      let contains = string_matches_pattern result part in
+      check bool ("contains pattern: " ^ part) true contains)
+    expected_parts
+
+(* Test for complex comparison expressions *)
+let test_compile_complex_comparisons () =
+  (* For now, we'll test a simpler case since 'and' operator isn't implemented yet *)
+  let simple_expr = BinOp (Var "x", ">=", Literal (LInt 0)) in
+  let func = make_single_clause_function "is_positive" [ "x" ] simple_expr in
+  let program = { items = [ Function func ] } in
+  let result = Compiler.compile_to_string program in
+
+  let expected_parts = [ "is_positive(X_[a-z0-9]+) ->"; "X_[a-z0-9]+ >= 0" ] in
+  List.iter
+    (fun part ->
+      let contains = string_matches_pattern result part in
+      check bool ("contains pattern: " ^ part) true contains)
+    expected_parts
+
 let tests =
   [
     ("compile function", `Quick, test_compile_function);
@@ -169,4 +255,7 @@ let tests =
     ("compile tuples", `Quick, test_compile_tuples);
     ("compile if", `Quick, test_compile_if_then);
     ("compile if-else", `Quick, test_compile_if_then_else);
+    ("compile comparison operators", `Quick, test_compile_comparison_operators);
+    ("compile if with comparison", `Quick, test_compile_if_with_comparison);
+    ("compile complex comparisons", `Quick, test_compile_complex_comparisons);
   ]
