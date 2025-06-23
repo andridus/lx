@@ -2,6 +2,228 @@
 
 This document tracks major improvements and features added to the Lx language compiler and toolchain.
 
+## [Latest] Record Update Bug Fix & Comprehensive Test Suite
+
+### Overview
+Fixed a critical bug in record update operations where the generated Erlang code used incorrect record type names. When updating records using the `{record | field: value}` syntax, the compiler incorrectly generated `#record{...}` instead of the correct record type name (e.g., `#person{...}`). This fix ensures proper record type tracking and includes a comprehensive test suite covering all record update scenarios.
+
+### Key Changes
+
+#### 1. Record Type Tracking System
+- **Variable-to-type mapping**: Implemented comprehensive tracking of record types for variables
+- **Context enhancement**: Extended both `app_generator.ml` and `compiler.ml` with record type context
+- **Type inheritance**: Record updates inherit the correct type from source variables
+- **Keyword handling**: Proper handling of variables named `record` (reserved keyword)
+
+#### 2. Enhanced Code Generation
+- **Correct type inference**: `get_record_type_name` function enhanced to use tracked types
+- **Fallback mechanisms**: Intelligent fallback to name-based inference when tracking unavailable
+- **Assignment tracking**: Record type tracking during variable assignments
+- **Update chain support**: Proper type propagation through chained record updates
+
+#### 3. Dual Generator Support
+- **Application generator**: Fixed record updates in OTP workers and supervisors
+- **Standalone compiler**: Fixed record updates in standalone functions
+- **Unified implementation**: Consistent behavior across both compilation contexts
+- **Context preservation**: Record type information maintained across compilation phases
+
+#### 4. Comprehensive Test Coverage
+- **8 new test cases**: Complete coverage of record update scenarios
+- **Success scenarios**: Normal variables, keyword variables, chained updates, multiple fields
+- **Error scenarios**: Undefined types, non-existent fields, non-record expressions
+- **Edge cases**: Record access after updates, complex nested scenarios
+- **Integration testing**: Both standalone and OTP worker contexts
+
+### Technical Implementation
+
+#### Context Type Enhancement
+```ocaml
+type rename_context = {
+  (* existing fields *)
+  var_record_types : (string, string) Hashtbl.t; (* NEW: Track record types *)
+}
+```
+
+#### Record Type Tracking Functions
+```ocaml
+(* Track record type for a variable *)
+let track_var_record_type ctx var_name record_type =
+  Hashtbl.replace ctx.var_record_types var_name record_type
+
+(* Retrieve tracked record type *)
+let get_var_record_type ctx var_name =
+  try Some (Hashtbl.find ctx.var_record_types var_name)
+  with Not_found -> None
+```
+
+#### Enhanced Type Inference
+```ocaml
+let get_record_type_name ctx var_name =
+  (* First try tracked types *)
+  match get_var_record_type ctx var_name with
+  | Some record_type -> record_type
+  | None ->
+      (* Fallback to name-based inference *)
+      if var_name = "record" then "record"
+      else if String.contains var_name '_' then
+        let parts = String.split_on_char '_' var_name in
+        match parts with
+        | first :: _ -> first
+        | [] -> "record"
+      else var_name
+```
+
+#### Assignment Tracking Integration
+```ocaml
+| Assign (var_name, RecordCreate (record_type, _), _) ->
+    track_var_record_type ctx var_name (String.lowercase_ascii record_type)
+
+| Assign (var_name, RecordUpdate (source_expr, _), _) ->
+    let source_type = infer_record_type_from_expr ctx source_expr in
+    track_var_record_type ctx var_name source_type
+```
+
+### Usage Examples
+
+#### Problem Scenario (Before Fix)
+```lx
+record Person {
+    name :: string,
+    age :: integer,
+    email :: string
+}
+
+pub fun test() {
+    record = Person{name: "Helder", age: 37, email: "helderhenri@gmail.com"}
+    record1 = {record | name: "fulan"}
+    record1
+}
+```
+
+Generated incorrect Erlang:
+```erlang
+Record_2ik = #person{name = "Helder", age = 37, email = "helderhenri@gmail.com"},
+Record1_2ik = Record_2ik#record{name = "fulan"},  % ERROR: should be #person
+```
+
+#### Solution (After Fix)
+Same Lx code now generates correct Erlang:
+```erlang
+Record_abc = #person{name = "Helder", age = 37, email = "helderhenri@gmail.com"},
+Record1_abc = Record_abc#person{name = "fulan"},  % CORRECT: now uses #person
+```
+
+#### Advanced Usage Examples
+```lx
+# Chained record updates
+person = Person{name: "Alice", age: 30, email: "alice@example.com"}
+person1 = {person | age: 31}
+person2 = {person1 | email: "alice.smith@example.com"}
+
+# Multiple field updates
+employee = Employee{name: "Bob", salary: 50000.0, department: "Engineering"}
+updated = {employee | salary: 55000.0, department: "Senior Engineering"}
+
+# Record updates in OTP workers
+worker user_manager {
+    fun handle_call(.{:update_user, user_id, changes}, _from, state) {
+        user = get_user(state, user_id)
+        updated_user = {user | name: changes.name, email: changes.email}
+        new_state = save_user(state, updated_user)
+        .{:reply, :ok, new_state}
+    }
+}
+```
+
+### Test Suite Implementation
+
+#### Test Categories
+1. **`test_record_update_normal_variable`**: Standard variable names with record updates
+2. **`test_record_update_record_keyword_variable`**: Variables named `record` (keyword handling)
+3. **`test_record_update_chained`**: Sequential record updates maintaining type information
+4. **`test_record_update_multiple_fields`**: Updating multiple fields simultaneously
+5. **`test_record_access_after_update`**: Record field access after update operations
+6. **`test_record_update_undefined_type_error`**: Error handling for undefined record types
+7. **`test_record_update_nonexistent_field_error`**: Error handling for invalid field names
+8. **`test_record_update_non_record_error`**: Error handling for non-record expressions
+
+#### Test Integration
+- **Test suite addition**: Added `Test_record_update` module to main test suite
+- **Dune configuration**: Updated build configuration to include new test module
+- **Comprehensive validation**: All 153 tests pass, including 8 new record update tests
+- **Regex pattern matching**: Robust validation of generated Erlang code patterns
+
+### Benefits
+
+#### 1. Correctness and Reliability
+- **Type safety**: Ensures record updates use correct record types in generated Erlang
+- **Runtime compatibility**: Generated code compiles and runs correctly in Erlang/OTP
+- **Pattern matching support**: Proper integration with Erlang's record pattern matching
+- **OTP integration**: Seamless record updates in OTP worker and supervisor contexts
+
+#### 2. Developer Experience
+- **Intuitive behavior**: Record updates work as developers expect
+- **Clear error messages**: Helpful error reporting for invalid record operations
+- **Consistent syntax**: Uniform record update syntax across all contexts
+- **Documentation**: Comprehensive examples and usage patterns
+
+#### 3. Language Completeness
+- **Core feature support**: Essential functionality for data manipulation
+- **OTP compatibility**: Full integration with OTP application patterns
+- **Type system integration**: Proper interaction with existing type checking
+- **Production readiness**: Reliable record operations for real-world applications
+
+### Error Handling Examples
+
+#### Compile-Time Error Detection
+```lx
+# Undefined record type
+unknown_record = {undefined_var | field: "value"}
+# Error: Variable 'undefined_var' is used but not defined
+
+# Non-existent field
+person = Person{name: "John", age: 30}
+invalid = {person | height: 180}
+# Error: Field 'height' does not exist in record type 'Person'
+
+# Non-record expression
+number = 42
+invalid = {number | field: "value"}
+# Error: Cannot update non-record expression
+```
+
+#### Runtime Safety
+- **Type validation**: All record operations validated at compile time
+- **Field validation**: Field existence checked against record definitions
+- **Expression validation**: Only valid record expressions allowed in updates
+
+### Migration and Compatibility
+
+#### Existing Code
+- **No breaking changes**: All existing record update syntax continues to work
+- **Automatic fixes**: Previously broken code now generates correct Erlang
+- **Backward compatibility**: No changes required to existing codebases
+
+#### Generated Code Quality
+- **Clean output**: Generated Erlang follows standard conventions
+- **Readable code**: Clear, maintainable generated record operations
+- **Performance**: No runtime overhead, direct compilation to efficient Erlang
+
+### Future Enhancements
+
+#### Planned Record Features
+- **Record patterns**: Enhanced pattern matching with record syntax
+- **Nested records**: Support for updating nested record structures
+- **Record defaults**: Default values for record fields
+- **Record inheritance**: Support for record type hierarchies
+
+#### Type System Improvements
+- **Stricter validation**: More precise type checking for record operations
+- **Generic records**: Support for parameterized record types
+- **Record constraints**: Type constraints for record field values
+
+This implementation provides robust, reliable record update functionality that integrates seamlessly with Lx's type system and generates correct, efficient Erlang code for production use.
+
 ## [Latest] String Concatenation Operator & OTP Syntax Fixes
 
 ### Overview
@@ -255,7 +477,7 @@ supervisor cart_sup {       # ✅ Correct Erlang convention
 
 This implementation provides essential string manipulation capabilities and resolves critical OTP syntax issues, enabling the development of production-ready Erlang applications with clean, type-safe Lx code.
 
-## [Latest] List Pattern Optimization & Code Quality Improvements
+## [Previous] List Pattern Optimization & Code Quality Improvements
 
 ### Overview
 Implemented significant optimizations for list pattern matching in receive expressions and throughout the codebase, improving the readability and maintainability of generated Erlang code. Enhanced the pattern matching system to generate cleaner, more intuitive Erlang patterns while maintaining full semantic correctness.

@@ -24,4 +24,5 @@ let () =
       ("Logical Operators Tests", Test_logical_operators.tests);
       ("Send Operator Tests", Test_send_operator.tests);
       ("Tuple Detection Tests", Test_tuple_detection.tests);
+      ("Record Update Tests", Test_record_update.tests);
     ]

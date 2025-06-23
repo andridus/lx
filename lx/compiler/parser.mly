@@ -249,6 +249,8 @@ expr:
   | e = simple_expr { e }
   | name = IDENT EQ value = expr
     { let pos = make_position $startpos in Assign (name, value, Some pos) }
+  | RECORD EQ value = expr
+    { let pos = make_position $startpos in Assign ("record", value, Some pos) }
   | func = expr LPAREN args = separated_list(COMMA, expr) RPAREN
     { App (func, args) }
   (* Error case: detect incorrect colon syntax and provide helpful error *)
@@ -315,6 +317,7 @@ expr:
 simple_expr:
   | l = literal { Literal l }
   | name = IDENT { Var name }
+  | RECORD { Var "record" }
   | MODULE_MACRO { Var "?MODULE" }
   (* External function call: module.function(args) *)
   | module_name = IDENT DOT func_name = IDENT LPAREN args = separated_list(COMMA, expr) RPAREN
@@ -322,6 +325,8 @@ simple_expr:
   (* Record field access *)
   | record_var = IDENT DOT field_name = IDENT
     { RecordAccess (Var record_var, field_name) }
+  | RECORD DOT field_name = IDENT
+    { RecordAccess (Var "record", field_name) }
 
   | LPAREN e = expr RPAREN { e }
   | LPAREN elements = separated_list(COMMA, expr) RPAREN

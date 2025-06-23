@@ -26,6 +26,9 @@ type lint_error_kind =
   | UnusedExternalCall of string * string (* module, function *)
   | UnusedLiteral of
       string * Error.position option (* literal_value, position *)
+  | UnusedComplexStructure of
+      string * Error.position option (* structure_description, position *)
+  | UnusedRecord of string * Error.position option (* record_name, position *)
 
 type lint_error = {
   kind : lint_error_kind;

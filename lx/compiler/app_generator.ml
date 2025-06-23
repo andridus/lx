@@ -6,6 +6,8 @@ type rename_context = {
   var_map : (string, string) Hashtbl.t;
   parent : rename_context option;
   used_hashes : (string, bool) Hashtbl.t;
+  (* Track record types for variables *)
+  var_record_types : (string, string) Hashtbl.t;
 }
 
 (* Helper functions copied from compiler.ml *)
@@ -38,6 +40,7 @@ let create_scope parent =
     parent;
     used_hashes =
       (match parent with Some p -> p.used_hashes | None -> Hashtbl.create 16);
+    var_record_types = Hashtbl.create 16;
   }
 
 let capitalize_var id =
@@ -70,6 +73,23 @@ let add_var_to_scope ctx var_name =
     let renamed = capitalize_var var_name ^ "_" ^ ctx.scope_hash in
     Hashtbl.replace ctx.var_map var_name renamed;
     renamed
+
+(* Track the record type for a variable *)
+let track_var_record_type ctx var_name record_type =
+  if not (is_ignored_var var_name) then
+    Hashtbl.replace ctx.var_record_types var_name record_type
+
+(* Get the record type for a variable *)
+let get_var_record_type ctx var_name =
+  let rec lookup ctx =
+    match Hashtbl.find_opt ctx.var_record_types var_name with
+    | Some record_type -> Some record_type
+    | None -> (
+        match ctx.parent with
+        | Some parent_ctx -> lookup parent_ctx
+        | None -> None)
+  in
+  lookup ctx
 
 let emit_literal (l : literal) : string =
   match l with
@@ -110,19 +130,27 @@ let rec emit_pattern ctx (p : pattern) : string =
 let rec get_record_type_name ctx (expr : expr) : string =
   match expr with
   | Var var_name -> (
-      (* Get the renamed variable to analyze the pattern *)
-      let renamed_var = get_renamed_var ctx var_name in
-      (* Try to extract record type from variable name pattern *)
-      (* Variables created from records often have the pattern RecordName_hash *)
-      let parts = String.split_on_char '_' renamed_var in
-      match parts with
-      | record_name :: _
-        when String.length record_name > 0
-             && String.get record_name 0 >= 'A'
-             && String.get record_name 0 <= 'Z' ->
-          String.lowercase_ascii record_name
-      | _ -> "record"
-      (* fallback *))
+      (* First try to get the tracked record type *)
+      match get_var_record_type ctx var_name with
+      | Some record_type -> String.lowercase_ascii record_type
+      | None -> (
+          (* Special case: if the variable is "record", it's a keyword used as variable *)
+          if var_name = "record" then
+            (* For the keyword "record" used as variable, we can't infer the type from the name *)
+            (* This should have been tracked when the variable was assigned *)
+            "record" (* fallback - this indicates the tracking failed *)
+          else
+            (* Fallback: try to extract record type from variable name pattern *)
+            let renamed_var = get_renamed_var ctx var_name in
+            let parts = String.split_on_char '_' renamed_var in
+            match parts with
+            | record_name :: _
+              when String.length record_name > 0
+                   && String.get record_name 0 >= 'A'
+                   && String.get record_name 0 <= 'Z' ->
+                String.lowercase_ascii record_name
+            | _ -> "record"
+            (* fallback *)))
   | RecordCreate (record_name, _) -> String.lowercase_ascii record_name
   | RecordAccess (inner_expr, _) -> get_record_type_name ctx inner_expr
   | RecordUpdate (inner_expr, _) -> get_record_type_name ctx inner_expr
@@ -134,9 +162,19 @@ and emit_expr ctx (e : expr) : string =
   | Var id -> get_renamed_var ctx id
   | Assign (id, value, _pos) ->
       if is_ignored_var id then emit_expr ctx value
-      else
+      else (
         let renamed = add_var_to_scope ctx id in
-        renamed ^ " = " ^ emit_expr ctx value
+        (* Track record type if the value is a record *)
+        (match value with
+        | RecordCreate (record_name, _) ->
+            track_var_record_type ctx id record_name
+        | RecordUpdate (inner_expr, _) ->
+            (* When updating a record, inherit the type from the source *)
+            let source_type = get_record_type_name ctx inner_expr in
+            if source_type <> "record" then
+              track_var_record_type ctx id source_type
+        | _ -> ());
+        renamed ^ " = " ^ emit_expr ctx value)
   | Fun (params, body) ->
       let fun_ctx = create_scope (Some ctx) in
       let renamed_params = List.map (add_var_to_scope fun_ctx) params in
@@ -205,7 +243,7 @@ and emit_expr ctx (e : expr) : string =
                field_name ^ " = " ^ emit_expr ctx update_expr)
              field_updates)
       in
-      let record_type_name = get_record_type_name ctx record_expr in
+            let record_type_name = get_record_type_name ctx record_expr in
       emit_expr ctx record_expr ^ "#" ^ record_type_name ^ "{" ^ updates_str
       ^ "}"
   | Receive (clauses, timeout_opt) -> (

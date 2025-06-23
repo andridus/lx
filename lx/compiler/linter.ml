@@ -27,6 +27,9 @@ type lint_error_kind =
   | UnusedExternalCall of string * string (* module, function *)
   | UnusedLiteral of
       string * Error.position option (* literal_value, position *)
+  | UnusedComplexStructure of
+      string * Error.position option (* structure_description, position *)
+  | UnusedRecord of string * Error.position option (* record_name, position *)
 
 type lint_error = {
   kind : lint_error_kind;
@@ -45,6 +48,8 @@ type lint_context = {
   parent_scope : lint_context option;
   current_function : string option;
   defined_functions : (string, unit) Hashtbl.t; (* Track defined functions *)
+  defined_records : (string, Error.position option) Hashtbl.t; (* Track defined records *)
+  used_records : (string, Error.position option) Hashtbl.t; (* Track used records *)
 }
 
 let create_context parent =
@@ -57,6 +62,14 @@ let create_context parent =
     defined_functions =
       (match parent with
       | Some p -> p.defined_functions
+      | None -> Hashtbl.create 16);
+    defined_records =
+      (match parent with
+      | Some p -> p.defined_records
+      | None -> Hashtbl.create 16);
+    used_records =
+      (match parent with
+      | Some p -> p.used_records
       | None -> Hashtbl.create 16);
   }
 
@@ -106,6 +119,11 @@ let string_of_lint_error_kind = function
   | UnusedLiteral (literal_value, _) ->
       Printf.sprintf "Literal value '%s' is constructed but never used"
         literal_value
+  | UnusedComplexStructure (structure_desc, _) ->
+      Printf.sprintf "Complex structure %s is constructed but never used"
+        structure_desc
+  | UnusedRecord (record_name, _) ->
+      Printf.sprintf "Record '%s' is defined but never used" record_name
 
 let make_lint_suggestion = function
   | UnusedVariable (var, _) ->
@@ -156,6 +174,15 @@ let make_lint_suggestion = function
       Some
         "Remove the unused literal or assign it to a variable if needed for \
          side effects"
+  | UnusedComplexStructure (_, _) ->
+      Some
+        "Remove the unused complex structure or assign it to a regular \
+         variable if it's meant to be used"
+  | UnusedRecord (record_name, _) ->
+      Some
+        (Printf.sprintf
+           "Remove the record definition for '%s' or use it in your code"
+           record_name)
   | _ -> None
 
 let create_lint_error kind position severity =
@@ -204,6 +231,15 @@ let rec lookup_function ctx func_name =
     match ctx.parent_scope with
     | Some parent -> lookup_function parent func_name
     | None -> false
+
+(* Record tracking functions *)
+let define_record ctx record_name position =
+  Hashtbl.replace ctx.defined_records record_name position
+
+let use_record ctx record_name position =
+  Hashtbl.replace ctx.used_records record_name position
+
+
 
 (* Convert Ast.position to Error.position *)
 let convert_position = function
@@ -408,7 +444,9 @@ let rec lint_pattern ctx errors pattern =
   | PCons (head, tail) ->
       let errors = lint_pattern ctx errors head in
       lint_pattern ctx errors tail
-  | PRecord (_record_name, field_patterns) ->
+  | PRecord (record_name, field_patterns) ->
+      (* Mark record as used *)
+      use_record ctx record_name None;
       (* Lint field patterns in record pattern matching *)
       List.fold_left
         (fun acc (_field_name, field_pattern) ->
@@ -445,6 +483,24 @@ let check_unused_variables ctx =
     ctx.defined_vars;
   !errors
 
+(* Check for unused records in a context *)
+let check_unused_records ctx =
+  let errors = ref [] in
+  Hashtbl.iter
+    (fun record_name position ->
+      if not (Hashtbl.mem ctx.used_records record_name) then
+        let error =
+          create_lint_error
+            (UnusedRecord (record_name, position))
+            (match position with
+            | Some p -> p
+            | None -> { line = 0; column = 0; filename = None })
+            `Error
+        in
+        errors := error :: !errors)
+    ctx.defined_records;
+  !errors
+
 (* Expression analysis *)
 let rec lint_expr ctx errors expr =
   match expr with
@@ -469,7 +525,7 @@ let rec lint_expr ctx errors expr =
       else errors
   | Assign (var_name, value_expr, position) -> (
       let errors = lint_expr ctx errors value_expr in
-      (* Check if assigning a literal to an ignored variable *)
+      (* Check if assigning a literal or complex structure to an ignored variable *)
       let errors =
         if is_ignored_var var_name then
           match value_expr with
@@ -487,6 +543,49 @@ let rec lint_expr ctx errors expr =
               let error =
                 create_lint_error
                   (UnusedLiteral (literal_str, convert_position position))
+                  (match convert_position position with
+                  | Some p -> p
+                  | None -> { line = 0; column = 0; filename = None })
+                  `Error
+              in
+              error :: errors
+          | RecordCreate (record_name, field_assignments) ->
+              let fields_str =
+                String.concat ", "
+                  (List.map (fun (field, _) -> field) field_assignments)
+              in
+              let structure_desc =
+                Printf.sprintf "record %s{%s}" record_name fields_str
+              in
+              let error =
+                create_lint_error
+                  (UnusedComplexStructure (structure_desc, convert_position position))
+                  (match convert_position position with
+                  | Some p -> p
+                  | None -> { line = 0; column = 0; filename = None })
+                  `Error
+              in
+              error :: errors
+          | Tuple exprs when List.length exprs > 1 ->
+              let structure_desc =
+                Printf.sprintf "tuple with %d elements" (List.length exprs)
+              in
+              let error =
+                create_lint_error
+                  (UnusedComplexStructure (structure_desc, convert_position position))
+                  (match convert_position position with
+                  | Some p -> p
+                  | None -> { line = 0; column = 0; filename = None })
+                  `Error
+              in
+              error :: errors
+          | List exprs when List.length exprs > 0 ->
+              let structure_desc =
+                Printf.sprintf "list with %d elements" (List.length exprs)
+              in
+              let error =
+                create_lint_error
+                  (UnusedComplexStructure (structure_desc, convert_position position))
                   (match convert_position position with
                   | Some p -> p
                   | None -> { line = 0; column = 0; filename = None })
@@ -595,7 +694,9 @@ let rec lint_expr ctx errors expr =
           let errors = lint_expr ctx errors timeout_expr in
           lint_expr ctx errors timeout_body
       | None -> errors)
-  | RecordCreate (_record_name, field_assignments) ->
+  | RecordCreate (record_name, field_assignments) ->
+      (* Mark record as used *)
+      use_record ctx record_name None;
       (* Lint field assignment expressions *)
       List.fold_left
         (fun acc (_field_name, field_expr) -> lint_expr ctx acc field_expr)
@@ -753,14 +854,15 @@ let lint_module_item ctx item =
       func_errors @ callback_errors @ unused_func_errors
   | OtpComponent (Supervisor _) -> [] (* Supervisors don't have much to lint *)
   | Spec _ | Test _ | Application _ -> []
-  | RecordDef _ -> []
-(* Records don't need linting for now *)
-(* These don't need variable linting *)
+  | RecordDef record_def ->
+      (* Define the record in the context *)
+      define_record ctx record_def.record_name (convert_position record_def.position);
+      [] (* No immediate errors from record definition *)
 
 let lint_program ?(skip_unused_functions = false) program =
   let root_ctx = create_root_context () in
 
-  (* First pass: collect all defined functions *)
+  (* First pass: collect all defined functions and records *)
   List.iter
     (fun item ->
       match item with
@@ -770,6 +872,8 @@ let lint_program ?(skip_unused_functions = false) program =
             (fun (func_def : function_def) ->
               define_function root_ctx func_def.name)
             functions
+      | RecordDef record_def ->
+          define_record root_ctx record_def.record_name (convert_position record_def.position)
       | _ -> ())
     program.items;
 
@@ -796,8 +900,11 @@ let lint_program ?(skip_unused_functions = false) program =
       else []
   in
 
+  (* Check for unused records *)
+  let unused_record_errors = check_unused_records root_ctx in
+
   (* Treat all lint issues as errors - no warnings allowed *)
-  let all_lint_errors = all_errors @ unused_func_errors in
+  let all_lint_errors = all_errors @ unused_func_errors @ unused_record_errors in
 
   if List.length all_lint_errors > 0 then raise (LintError all_lint_errors)
   else Printf.printf "Linting completed successfully (no issues found)\n"
