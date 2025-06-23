@@ -61,7 +61,7 @@ application {
   vsn "1.0.0"
 }
 
-fun hello() {
+pub fun hello() {
   "Hello from app!"
 }
 |}
@@ -88,11 +88,11 @@ fun hello() {
     (* Now change to non-application *)
     let non_app_content =
       {|
-fun hello() {
+pub fun hello() {
   "Hello from module!"
 }
 
-fun add(a, b) {
+pub fun add(a, b) {
   a + b
 }
 |}
@@ -132,11 +132,11 @@ let test_cleanup_non_application_to_application () =
     let test_file = Filename.concat temp_dir "test_module.lx" in
     let non_app_content =
       {|
-fun greet(name) {
+pub fun greet(name) {
   name
 }
 
-fun calculate(x, y) {
+pub fun calculate(x, y) {
   x + y
 }
 |}
@@ -165,11 +165,11 @@ application {
   vsn "2.0.0"
 }
 
-fun greet(name) {
+pub fun greet(name) {
   name
 }
 
-fun calculate(x, y) {
+pub fun calculate(x, y) {
   x + y
 }
 |}
@@ -218,7 +218,7 @@ application {
   vsn "1.0.0"
 }
 
-fun version() {
+pub fun version() {
   "v1"
 }
 |}
@@ -244,11 +244,11 @@ application {
   vsn "2.0.0"
 }
 
-fun version() {
+pub fun version() {
   "v2"
 }
 
-fun new_feature() {
+pub fun new_feature() {
   "added in v2"
 }
 |}
@@ -278,7 +278,7 @@ let test_cleanup_handles_missing_directory () =
     (* Create a test file *)
     let test_file = Filename.concat temp_dir "test_missing.lx" in
     let content = {|
-fun test() {
+pub fun test() {
   "test"
 }
 |} in

@@ -16,16 +16,16 @@ let string_contains_substring s sub =
 let test_tuple_expressions () =
   let test_cases =
     [
-      ("fun num() { (42, \"hello\") }", [ "{42, \"hello\"}" ]);
-      ("fun num() { (1, 2, 3) }", [ "{1, 2, 3}" ]);
-      ("fun num() { () }", [ "{}" ]);
+      ("pub fun num() { (42, \"hello\") }", [ "{42, \"hello\"}" ]);
+      ("pub fun num() { (1, 2, 3) }", [ "{1, 2, 3}" ]);
+      ("pub fun num() { () }", [ "{}" ]);
     ]
   in
 
   List.iter
     (fun (input, expected_parts) ->
       let program = Compiler.parse_string input in
-      let result = Compiler.compile_to_string program in
+      let result = Compiler.compile_to_string_for_tests program in
       List.iter
         (fun part ->
           let contains = string_contains_substring result part in
@@ -39,16 +39,16 @@ let test_tuple_expressions () =
 let test_list_expressions () =
   let test_cases =
     [
-      ("fun num() { [1, 2, 3] }", [ "[1, 2, 3]" ]);
-      ("fun str() { [\"a\", \"b\"] }", [ "[\"a\", \"b\"]" ]);
-      ("fun num() { [] }", [ "[]" ]);
+      ("pub fun num() { [1, 2, 3] }", [ "[1, 2, 3]" ]);
+      ("pub fun str() { [\"a\", \"b\"] }", [ "[\"a\", \"b\"]" ]);
+      ("pub fun num() { [] }", [ "[]" ]);
     ]
   in
 
   List.iter
     (fun (input, expected_parts) ->
       let program = Compiler.parse_string input in
-      let result = Compiler.compile_to_string program in
+      let result = Compiler.compile_to_string_for_tests program in
       List.iter
         (fun part ->
           let contains = string_contains_substring result part in
@@ -62,9 +62,9 @@ let test_list_expressions () =
 let test_if_expressions () =
   let test_cases =
     [
-      ( "fun boolean() { if true { 42 } else { 0 } }",
+      ( "pub fun boolean() { if true { 42 } else { 0 } }",
         [ "case true of true -> 42; _ -> 0" ] );
-      ( "fun boolean() { if false { \"no\" } else { \"yes\" } }",
+      ( "pub fun boolean() { if false { \"no\" } else { \"yes\" } }",
         [ "case false of true -> \"no\"; _ -> \"yes\"" ] );
     ]
   in
@@ -72,7 +72,7 @@ let test_if_expressions () =
   List.iter
     (fun (input, expected_parts) ->
       let program = Compiler.parse_string input in
-      let result = Compiler.compile_to_string program in
+      let result = Compiler.compile_to_string_for_tests program in
       List.iter
         (fun part ->
           let contains = string_contains_substring result part in
@@ -87,11 +87,11 @@ let test_if_expressions () =
 let test_case_expressions () =
   let test_cases =
     [
-      ( "fun num() { case 42 { 42 -> \"found\" } }",
+      ( "pub fun num() { case 42 { 42 -> \"found\" } }",
         [ "case 42 of 42 -> \"found\"" ] );
-      ( "fun str(x) { case x { _ -> \"default\" } }",
+      ( "pub fun str(x) { case x { _ -> \"default\" } }",
         [ "case X_[a-z0-9]+ of _ -> \"default\"" ] );
-      ( "fun atom(a) { case a { :hello -> \"hi\" } }",
+      ( "pub fun atom(a) { case a { :hello -> \"hi\" } }",
         [ "case A_[a-z0-9]+ of hello -> \"hi\"" ] );
     ]
   in
@@ -99,7 +99,7 @@ let test_case_expressions () =
   List.iter
     (fun (input, expected_parts) ->
       let program = Compiler.parse_string input in
-      let result = Compiler.compile_to_string program in
+      let result = Compiler.compile_to_string_for_tests program in
       List.iter
         (fun part ->
           let contains =
@@ -121,7 +121,7 @@ let test_case_expressions () =
 let test_pattern_types () =
   let program =
     Compiler.parse_string
-      "fun num() {\n\
+      "pub fun num() {\n\
       \  case x {\n\
       \    _ -> 1\n\
       \    y -> 2\n\
@@ -165,7 +165,7 @@ let test_test_blocks () =
 let test_mixed_module_items () =
   let input =
     "\n\
-    \    fun hello() { \"world\" }\n\
+    \    pub fun hello() { \"world\" }\n\
     \    spec hello {}\n\
     \    describe \"Tests\" { test \"hello test\" { hello() } }\n\
     \  "
@@ -179,12 +179,12 @@ let test_mixed_module_items () =
 let test_all_literal_types () =
   let test_cases =
     [
-      ("fun num() { 42 }", LInt 42);
-      ("fun num() { 3.14 }", LFloat 3.14);
-      ("fun str() { \"hello\" }", LString "hello");
-      ("fun bool() { true }", LBool true);
-      ("fun bool() { false }", LBool false);
-      ("fun atom() { :atom }", LAtom "atom");
+      ("pub fun num() { 42 }", LInt 42);
+      ("pub fun num() { 3.14 }", LFloat 3.14);
+      ("pub fun str() { \"hello\" }", LString "hello");
+      ("pub fun bool() { true }", LBool true);
+      ("pub fun bool() { false }", LBool false);
+      ("pub fun atom() { :atom }", LAtom "atom");
     ]
   in
 

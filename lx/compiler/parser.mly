@@ -36,6 +36,7 @@ let string_of_simple_tuple_element = function
 
 (* Keywords *)
 %token PUB FUN CASE IF ELSE FOR WHEN IN AND OR NOT ANDALSO ORELSE RECEIVE AFTER
+%token RECORD
 
 (* OTP Keywords *)
 %token WORKER SUPERVISOR STRATEGY CHILDREN
@@ -56,7 +57,7 @@ let string_of_simple_tuple_element = function
 %token LPAREN RPAREN LBRACE RBRACE LBRACKET RBRACKET
 %token DOT_LBRACE
 %token COMMA SEMICOLON CONS COLON DOT
-%token PLUS MINUS MULT DIV SEND
+%token CONCAT PLUS MINUS MULT DIV SEND
 
 %token EOF
 
@@ -72,6 +73,7 @@ let string_of_simple_tuple_element = function
 %right NOT
 %right SEND (* Send operator - right associative, lower precedence *)
 %left EQEQ NEQ LT GT LEQ GEQ
+%left CONCAT (* String concatenation *)
 %left PLUS MINUS
 %left MULT DIV
 %left DOT COLON (* Highest precedence for module calls *)
@@ -94,6 +96,7 @@ module_item:
   | t = test_block { Test t }
   | standalone_test = standalone_test_def { Test { name = "Standalone Tests"; tests = [standalone_test] } }
   | a = application_def { Application a }
+  | r = record_def { RecordDef r }
 
 function_def:
   (* Public functions - new syntax for multiple arities *)
@@ -251,6 +254,8 @@ expr:
   (* Error case: detect incorrect colon syntax and provide helpful error *)
   | module_name = IDENT COLON func_name = IDENT LPAREN _args = separated_list(COMMA, expr) RPAREN %prec COLON
     { failwith ("Enhanced:Invalid module call syntax - use '.' instead of ':' for module calls|Suggestion:Change '" ^ module_name ^ ":" ^ func_name ^ "()' to '" ^ module_name ^ "." ^ func_name ^ "()'|Context:Lx uses dot notation for module calls, not colon notation") }
+  | left = expr CONCAT right = expr
+    { BinOp (left, "++", right) }
   | left = expr PLUS right = expr
     { BinOp (left, "+", right) }
   | left = expr MINUS right = expr
@@ -301,6 +306,11 @@ expr:
     { Receive (clauses, None) }
   | RECEIVE LBRACE clauses = nonempty_list(receive_clause) RBRACE AFTER timeout = expr LBRACE timeout_body = expr RBRACE
     { Receive (clauses, Some (timeout, timeout_body)) }
+  (* Record expressions *)
+  | record_name = UPPER_IDENT LBRACE fields = separated_list(COMMA, record_field_init) RBRACE
+    { RecordCreate (record_name, fields) }
+  | LBRACE expr = expr PIPE updates = separated_list(COMMA, record_field_update) RBRACE
+    { RecordUpdate (expr, updates) }
 
 simple_expr:
   | l = literal { Literal l }
@@ -309,9 +319,9 @@ simple_expr:
   (* External function call: module.function(args) *)
   | module_name = IDENT DOT func_name = IDENT LPAREN args = separated_list(COMMA, expr) RPAREN
     { ExternalCall (module_name, func_name, args) }
-
-  (* Module reference without call (backward compatibility) *)
-  | module_name = IDENT DOT func_name = IDENT { Var (module_name ^ "." ^ func_name) }
+  (* Record field access *)
+  | record_var = IDENT DOT field_name = IDENT
+    { RecordAccess (Var record_var, field_name) }
 
   | LPAREN e = expr RPAREN { e }
   | LPAREN elements = separated_list(COMMA, expr) RPAREN
@@ -389,6 +399,9 @@ simple_pattern:
     { PCons (head, tail) }
   | LBRACKET first = pattern COMMA rest = separated_nonempty_list(COMMA, pattern) PIPE tail = pattern RBRACKET
     { List.fold_right (fun elem acc -> PCons (elem, acc)) (first :: rest) tail }
+  (* Record patterns *)
+  | record_name = UPPER_IDENT LBRACE fields = separated_list(COMMA, record_pattern_field) RBRACE
+    { PRecord (record_name, fields) }
 
 literal:
   | s = STRING { LString s }
@@ -451,6 +464,20 @@ application_field:
 
 env_pair:
   | key = IDENT COLON value = expr { (key, value) }
+
+record_field_init:
+  | field_name = IDENT COLON value = expr
+    { (field_name, value) }
+
+record_field_update:
+  | field_name = IDENT COLON value = expr
+    { (field_name, value) }
+
+record_pattern_field:
+  | field_name = IDENT COLON pattern = pattern
+    { (field_name, pattern) }
+  | field_name = IDENT
+    { (field_name, PVar field_name) }  (* Shorthand: {name} = {name: name} *)
 
 (* Guard expressions *)
 guard_expr:
@@ -516,3 +543,19 @@ children_specification:
   | SUPERVISOR LBRACKET supervisors = separated_list(COMMA, IDENT) RBRACKET
     WORKER LBRACKET workers = separated_list(COMMA, IDENT) RBRACKET
     { TypedChildren { workers; supervisors } }
+
+record_def:
+  | RECORD name = UPPER_IDENT LBRACE fields = separated_list(COMMA, record_field) RBRACE
+    { let pos = make_position $startpos in { record_name = name; fields = fields; position = Some pos } }
+
+record_field:
+  | field_name = IDENT CONS field_type = type_expr
+    { { field_name; field_type; default_value = None } }
+  | field_name = IDENT CONS field_type = type_expr EQ default = expr
+    { { field_name; field_type; default_value = Some default } }
+
+type_expr:
+  | IDENT { TypeName $1 }
+  | type_expr PIPE type_expr { TypeUnion ($1, $3) }
+  | LBRACKET type_expr RBRACKET { TypeList $2 }
+  | LPAREN types = separated_list(COMMA, type_expr) RPAREN { TypeTuple types }

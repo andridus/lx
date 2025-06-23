@@ -22,7 +22,7 @@ let string_matches_pattern s pattern =
 let test_compile_function () =
   let func = make_single_clause_function "num" [] (Literal (LInt 42)) in
   let program = { items = [ Function func ] } in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
   let expected_parts = [ "-module(generated)"; "num() ->"; "42." ] in
   List.iter
     (fun part ->
@@ -36,7 +36,7 @@ let test_compile_function_with_params () =
       (BinOp (Var "x", "+", Var "y"))
   in
   let program = { items = [ Function func ] } in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
   let expected_parts =
     [ "add(X_[a-z0-9]+, Y_[a-z0-9]+) ->"; "X_[a-z0-9]+ \\+ Y_[a-z0-9]+\\." ]
   in
@@ -55,7 +55,7 @@ let test_capitalize_var () =
 
 let test_empty_program () =
   let program = { items = [] } in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
   let expected_parts = [ "-module(generated)" ] in
   let unexpected_parts = [ "-compile(export_all)" ] in
   List.iter
@@ -73,7 +73,7 @@ let test_empty_program () =
 let test_compile_nil () =
   let func = make_single_clause_function "test_nil" [] (Literal LNil) in
   let program = { items = [ Function func ] } in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
   let expected_parts = [ "test_nil() ->"; "nil." ] in
   List.iter
     (fun part ->
@@ -85,7 +85,7 @@ let test_compile_nil () =
 let test_compile_empty_function () =
   let func = make_single_clause_function "empty" [] (Literal LNil) in
   let program = { items = [ Function func ] } in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
   let expected_parts = [ "empty() ->"; "nil." ] in
   List.iter
     (fun part ->
@@ -108,7 +108,7 @@ let test_compile_tuples () =
   let program =
     { items = [ Function func1; Function func2; Function func3 ] }
   in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
 
   let expected_parts =
     [
@@ -131,7 +131,7 @@ let test_compile_if_then () =
   let if_expr = If (Literal (LBool true), Literal (LInt 42), None) in
   let func = make_single_clause_function "test_if" [] if_expr in
   let program = { items = [ Function func ] } in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
   let expected_parts =
     [ "test_if() ->"; "case true of true -> 42; _ -> nil end." ]
   in
@@ -148,7 +148,7 @@ let test_compile_if_then_else () =
   in
   let func = make_single_clause_function "test_if_else" [] if_expr in
   let program = { items = [ Function func ] } in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
   let expected_parts =
     [ "test_if_else() ->"; "case true of true -> 42; _ -> 0 end." ]
   in
@@ -187,7 +187,7 @@ let test_compile_comparison_operators () =
         ];
     }
   in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
 
   let expected_parts =
     [
@@ -215,7 +215,7 @@ let test_compile_if_with_comparison () =
   in
   let func = make_single_clause_function "test" [ "x" ] if_expr in
   let program = { items = [ Function func ] } in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
 
   let expected_parts =
     [
@@ -235,7 +235,7 @@ let test_compile_complex_comparisons () =
   let simple_expr = BinOp (Var "x", ">=", Literal (LInt 0)) in
   let func = make_single_clause_function "is_positive" [ "x" ] simple_expr in
   let program = { items = [ Function func ] } in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
 
   let expected_parts = [ "is_positive(X_[a-z0-9]+) ->"; "X_[a-z0-9]+ >= 0" ] in
   List.iter

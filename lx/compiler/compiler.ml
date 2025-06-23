@@ -168,6 +168,38 @@ let rec emit_pattern ctx (p : pattern) : string =
           "[" ^ elements_str
           ^ "]" (* [a, b, c] instead of [a | [b | [c | []]]] *)
       | _ -> "[" ^ elements_str ^ " | " ^ emit_pattern ctx final_tail ^ "]")
+  | PRecord (record_name, field_patterns) ->
+      let record_name_lower = String.lowercase_ascii record_name in
+      let fields_str =
+        String.concat ", "
+          (List.map
+             (fun (field_name, field_pattern) ->
+               field_name ^ " = " ^ emit_pattern ctx field_pattern)
+             field_patterns)
+      in
+      "#" ^ record_name_lower ^ "{" ^ fields_str ^ "}"
+
+(* Helper function to determine the record type name from an expression *)
+let rec get_record_type_name ctx (expr : expr) : string =
+  match expr with
+  | Var var_name -> (
+      (* Get the renamed variable to analyze the pattern *)
+      let renamed_var = get_renamed_var ctx var_name in
+      (* Try to extract record type from variable name pattern *)
+      (* Variables created from records often have the pattern RecordName_hash *)
+      let parts = String.split_on_char '_' renamed_var in
+      match parts with
+      | record_name :: _
+        when String.length record_name > 0
+             && String.get record_name 0 >= 'A'
+             && String.get record_name 0 <= 'Z' ->
+          String.lowercase_ascii record_name
+      | _ -> "record"
+      (* fallback *))
+  | RecordCreate (record_name, _) -> String.lowercase_ascii record_name
+  | RecordAccess (inner_expr, _) -> get_record_type_name ctx inner_expr
+  | RecordUpdate (inner_expr, _) -> get_record_type_name ctx inner_expr
+  | _ -> "record" (* fallback for unknown expressions *)
 
 (* Emit block expressions inline with proper variable scoping *)
 and emit_block_inline ctx var_name renamed_var exprs =
@@ -374,6 +406,31 @@ and emit_expr ctx (e : expr) : string =
       emit_expr ctx left ^ " " ^ erlang_op ^ " " ^ emit_expr ctx right
   | Send (target, message) ->
       emit_expr ctx target ^ " ! " ^ emit_expr ctx message
+  | RecordCreate (record_name, field_inits) ->
+      let record_name_lower = String.lowercase_ascii record_name in
+      let fields_str =
+        String.concat ", "
+          (List.map
+             (fun (field_name, field_expr) ->
+               field_name ^ " = " ^ emit_expr ctx field_expr)
+             field_inits)
+      in
+      "#" ^ record_name_lower ^ "{" ^ fields_str ^ "}"
+  | RecordAccess (record_expr, field_name) ->
+      (* Try to infer the record type from the expression *)
+      let record_type_name = get_record_type_name ctx record_expr in
+      emit_expr ctx record_expr ^ "#" ^ record_type_name ^ "." ^ field_name
+  | RecordUpdate (record_expr, field_updates) ->
+      let updates_str =
+        String.concat ", "
+          (List.map
+             (fun (field_name, update_expr) ->
+               field_name ^ " = " ^ emit_expr ctx update_expr)
+             field_updates)
+      in
+      let record_type_name = get_record_type_name ctx record_expr in
+      emit_expr ctx record_expr ^ "#" ^ record_type_name ^ "{" ^ updates_str
+      ^ "}"
   | Receive (clauses, timeout_opt) -> (
       let clauses_str =
         String.concat ";\n        " (List.map (emit_receive_clause ctx) clauses)
@@ -594,6 +651,23 @@ let emit_module_item (item : module_item) : string =
   | Spec spec -> emit_spec spec
   | Test desc -> emit_describe_block desc
   | Application _ -> "% Application definition handled separately"
+  | RecordDef record_def ->
+      let record_name_lower = String.lowercase_ascii record_def.record_name in
+      let fields_str =
+        String.concat ", "
+          (List.map
+             (fun field ->
+               let default_str =
+                 match field.default_value with
+                 | Some expr ->
+                     let ctx = create_scope None in
+                     " = " ^ emit_expr ctx expr
+                 | None -> ""
+               in
+               field.field_name ^ default_str)
+             record_def.fields)
+      in
+      "-record(" ^ record_name_lower ^ ", {" ^ fields_str ^ "})."
 
 (* Helper function to check if string contains substring *)
 let string_contains_substring s sub =
@@ -793,6 +867,27 @@ let compile_to_string (program : program) : string =
   let modules = compile_to_string_with_module_name program "generated" () in
   (* Return only the main module for backward compatibility *)
   snd (List.hd modules)
+
+(* Special version for tests that skips unused function checking *)
+let compile_to_string_for_tests (program : program) : string =
+  (* Linting phase - skip unused function checking for tests *)
+  (try Linter.lint_program ~skip_unused_functions:true program
+   with Linter.LintError errors ->
+     Printf.eprintf "Lint Errors:\n%s\n" (Linter.string_of_lint_errors errors);
+     failwith "Linting failed - compilation aborted");
+
+  (* Type checking phase *)
+  (try ignore (Typechecker.type_check_program program) with
+  | Error.CompilationError _ as e -> raise e
+  | Typechecker.TypeError error ->
+      Printf.eprintf "Type Error: %s\n" (Typechecker.string_of_type_error error);
+      failwith "Type checking failed");
+
+  (* Generate code *)
+  let base_module_name = "generated" in
+  let main_header = "-module(" ^ base_module_name ^ ").\n\n" in
+  let main_items = List.map emit_module_item program.items in
+  main_header ^ String.concat "\n\n" main_items
 
 (* Type check a program without compilation *)
 let type_check_program (program : program) : Typechecker.type_env =

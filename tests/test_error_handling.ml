@@ -51,7 +51,8 @@ let test_parse_error_with_position () =
   (* Test that parse errors include position information *)
   try
     ignore
-      (Compiler.parse_string ~filename:(Some "test.lx") "fun test() { if true }");
+      (Compiler.parse_string ~filename:(Some "test.lx")
+         "pub fun test() { if true }");
     fail "Expected parse error"
   with
   | CompilationError error ->
@@ -64,7 +65,7 @@ let test_correct_test_usage () =
   (* Test that 'test' can be used correctly in test blocks *)
   let code =
     {|
-    fun hello() { "world" }
+    pub fun hello() { "world" }
     describe "Tests" {
       test "hello test" {
         hello()
@@ -79,9 +80,9 @@ let test_correct_test_usage () =
   check int "Should parse 3 items" 3 (List.length program.items)
 
 let test_function_call_not_capitalized () =
-  let source = "fun test(x, _y) { x }" in
+  let source = "pub fun test(x, _y) { x }" in
   let program = Compiler.parse_string source in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
   let expected_parts = [ "test(X_"; ", _) ->" ] in
   List.iter
     (fun part ->
@@ -91,14 +92,16 @@ let test_function_call_not_capitalized () =
 
 let test_variables_still_capitalized () =
   (* Test that variables are still properly capitalized *)
-  let code = {|
-    fun test_vars(param) {
+  let code =
+    {|
+    pub fun test_vars(param) {
       x = param
       x
     }
-  |} in
+  |}
+  in
   let program = Compiler.parse_string code in
-  let erlang_code = Compiler.compile_to_string program in
+  let erlang_code = Compiler.compile_to_string_for_tests program in
   check bool "Parameters should be capitalized" true
     (String.contains erlang_code 'P');
   check bool "Variables should be capitalized" true

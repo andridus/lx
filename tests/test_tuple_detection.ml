@@ -15,7 +15,7 @@ let string_contains_substring s sub =
 let test_tuple_detection_variables_only () =
   (* Test detection of {var1, var2, var3} pattern *)
   try
-    ignore (Compiler.parse_string "fun test() { result = {x, y, z} }");
+    ignore (Compiler.parse_string "pub fun test() { result = {x, y, z} }");
     fail "Expected parse error for incorrect tuple syntax"
   with
   | CompilationError error ->
@@ -35,7 +35,8 @@ let test_tuple_detection_atom_literals () =
   (* Test detection of {:atom, literal, var} pattern *)
   try
     ignore
-      (Compiler.parse_string "fun test() { status = {:ok, 42, \"success\"} }");
+      (Compiler.parse_string
+         "pub fun test() { status = {:ok, 42, \"success\"} }");
     fail "Expected parse error for incorrect tuple syntax"
   with
   | CompilationError error ->
@@ -54,7 +55,7 @@ let test_tuple_detection_atom_literals () =
 let test_tuple_detection_mixed_content () =
   (* Test detection of atom-first tuple pattern *)
   try
-    ignore (Compiler.parse_string "fun test() { status = {:error, 500} }");
+    ignore (Compiler.parse_string "pub fun test() { status = {:error, 500} }");
     fail "Expected parse error for incorrect tuple syntax"
   with
   | CompilationError error ->
@@ -73,7 +74,7 @@ let test_tuple_detection_mixed_content () =
 let test_tuple_detection_in_receive () =
   (* Test detection in a simpler assignment context *)
   try
-    ignore (Compiler.parse_string "fun test() { result = {x, y, z} }");
+    ignore (Compiler.parse_string "pub fun test() { result = {x, y, z} }");
     fail "Expected parse error for incorrect tuple syntax"
   with
   | CompilationError error ->
@@ -88,7 +89,7 @@ let test_tuple_detection_in_receive () =
 let test_correct_tuple_syntax_works () =
   (* Test that correct tuple syntax compiles successfully *)
   let result =
-    Compiler.parse_string "fun test() { .{:result, 200, \"done\"} }"
+    Compiler.parse_string "pub fun test() { .{:result, 200, \"done\"} }"
   in
   match result.items with
   | [
@@ -110,7 +111,7 @@ let test_correct_tuple_syntax_works () =
              guard = _;
            };
          ];
-       visibility = Private;
+       visibility = Public;
        position = _;
      };
   ] ->
@@ -119,7 +120,7 @@ let test_correct_tuple_syntax_works () =
 
 let test_correct_block_syntax_works () =
   (* Test that correct block syntax still works *)
-  let result = Compiler.parse_string "fun test() { x = 42; x }" in
+  let result = Compiler.parse_string "pub fun test() { x = 42; x }" in
   match result.items with
   | [
    Compiler.Ast.Function
@@ -134,7 +135,7 @@ let test_correct_block_syntax_works () =
              guard = _;
            };
          ];
-       visibility = Private;
+       visibility = Public;
        position = _;
      };
   ] ->
@@ -146,7 +147,7 @@ let test_position_accuracy () =
   try
     ignore
       (Compiler.parse_string ~filename:(Some "test.lx")
-         "fun test() {\n  result = {x, y}\n}");
+         "pub fun test() {\n  result = {x, y}\n}");
     fail "Expected parse error with position"
   with
   | CompilationError error ->
@@ -160,10 +161,10 @@ let test_no_false_positives () =
   (* Test that legitimate block expressions don't trigger tuple detection *)
   let legitimate_blocks =
     [
-      "fun test() { if true { :ok } else { :error } }";
-      "fun test() { case x { 1 -> :one _ -> :other } }";
-      "fun test() { receive { :msg -> :received } }";
-      "fun test() { for i in [1, 2, 3] { i * 2 } }";
+      "pub fun test() { if true { :ok } else { :error } }";
+      "pub fun test() { case x { 1 -> :one _ -> :other } }";
+      "pub fun test() { receive { :msg -> :received } }";
+      "pub fun test() { for i in [1, 2, 3] { i * 2 } }";
     ]
   in
   List.iter

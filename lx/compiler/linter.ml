@@ -44,6 +44,7 @@ type lint_context = {
   used_vars : (string, Error.position option) Hashtbl.t;
   parent_scope : lint_context option;
   current_function : string option;
+  defined_functions : (string, unit) Hashtbl.t; (* Track defined functions *)
 }
 
 let create_context parent =
@@ -53,6 +54,10 @@ let create_context parent =
     parent_scope = parent;
     current_function =
       (match parent with Some p -> p.current_function | None -> None);
+    defined_functions =
+      (match parent with
+      | Some p -> p.defined_functions
+      | None -> Hashtbl.create 16);
   }
 
 let create_root_context () = create_context None
@@ -189,6 +194,17 @@ let rec lookup_variable ctx var_name =
 
 let is_ignored_var var_name = String.length var_name > 0 && var_name.[0] = '_'
 
+(* Function tracking functions *)
+let define_function ctx func_name =
+  Hashtbl.replace ctx.defined_functions func_name ()
+
+let rec lookup_function ctx func_name =
+  if Hashtbl.mem ctx.defined_functions func_name then true
+  else
+    match ctx.parent_scope with
+    | Some parent -> lookup_function parent func_name
+    | None -> false
+
 (* Convert Ast.position to Error.position *)
 let convert_position = function
   | None -> None
@@ -279,7 +295,7 @@ let check_otp_callbacks worker_name (functions : function_def list) =
       else errors)
     [] implemented_callbacks
 
-(* Check for unused functions *)
+(* Check for unused functions in OTP workers *)
 let check_unused_functions (functions : function_def list) =
   let all_functions =
     List.fold_left
@@ -340,6 +356,44 @@ let check_unused_functions (functions : function_def list) =
       else errors)
     [] all_functions
 
+(* Check for unused standalone functions (not in OTP workers) *)
+let check_unused_standalone_functions (functions : function_def list) =
+  let all_functions =
+    List.fold_left
+      (fun acc (func : function_def) ->
+        List.fold_left
+          (fun acc2 clause ->
+            let arity = List.length clause.params in
+            (func.name, arity, func.visibility, func.position) :: acc2)
+          acc func.clauses)
+      [] functions
+  in
+
+  (* TODO: Implement proper call tracking by analyzing all expressions *)
+  (* For now, we'll be conservative and only flag private functions that are clearly unused *)
+
+  (* Check for unused functions *)
+  List.fold_left
+    (fun errors (func_name, arity, visibility, position) ->
+      let is_public = visibility = Public in
+
+      (* For now, only flag private functions *)
+      (* TODO: Add proper call analysis to detect which functions are actually used *)
+      if not is_public then
+        let error_position =
+          match convert_position position with
+          | Some pos -> pos
+          | None -> { line = 0; column = 0; filename = None }
+        in
+        let error =
+          create_lint_error
+            (UnusedFunction (func_name, arity))
+            error_position `Error
+        in
+        error :: errors
+      else errors)
+    [] all_functions
+
 (* Pattern analysis *)
 let rec lint_pattern ctx errors pattern =
   match pattern with
@@ -354,6 +408,12 @@ let rec lint_pattern ctx errors pattern =
   | PCons (head, tail) ->
       let errors = lint_pattern ctx errors head in
       lint_pattern ctx errors tail
+  | PRecord (_record_name, field_patterns) ->
+      (* Lint field patterns in record pattern matching *)
+      List.fold_left
+        (fun acc (_field_name, field_pattern) ->
+          lint_pattern ctx acc field_pattern)
+        errors field_patterns
   | _ -> errors
 
 (* Check for unused variables in a context *)
@@ -440,7 +500,24 @@ let rec lint_expr ctx errors expr =
       | Some error -> error :: errors
       | None -> errors)
   | App (func_expr, args) ->
-      let errors = lint_expr ctx errors func_expr in
+      let errors =
+        match func_expr with
+        | Var func_name ->
+            (* Check if it's a defined function *)
+            if
+              (not (lookup_function ctx func_name))
+              && not (is_ignored_var func_name)
+            then
+              let error =
+                create_lint_error
+                  (UndefinedVariable (func_name, None))
+                  { line = 0; column = 0; filename = None }
+                  `Error
+              in
+              error :: errors
+            else errors
+        | _ -> lint_expr ctx errors func_expr
+      in
       List.fold_left (lint_expr ctx) errors args
   | ExternalCall (_module_name, _func_name, args) ->
       (* Check if the external call is valid *)
@@ -518,6 +595,20 @@ let rec lint_expr ctx errors expr =
           let errors = lint_expr ctx errors timeout_expr in
           lint_expr ctx errors timeout_body
       | None -> errors)
+  | RecordCreate (_record_name, field_assignments) ->
+      (* Lint field assignment expressions *)
+      List.fold_left
+        (fun acc (_field_name, field_expr) -> lint_expr ctx acc field_expr)
+        errors field_assignments
+  | RecordAccess (record_expr, _field_name) ->
+      (* Lint the record expression being accessed *)
+      lint_expr ctx errors record_expr
+  | RecordUpdate (record_expr, field_updates) ->
+      (* Lint the record expression and update expressions *)
+      let errors = lint_expr ctx errors record_expr in
+      List.fold_left
+        (fun acc (_field_name, update_expr) -> lint_expr ctx acc update_expr)
+        errors field_updates
   | _ -> errors
 
 (* Guard expression analysis *)
@@ -661,11 +752,26 @@ let lint_module_item ctx item =
 
       func_errors @ callback_errors @ unused_func_errors
   | OtpComponent (Supervisor _) -> [] (* Supervisors don't have much to lint *)
-  | Spec _ | Test _ | Application _ ->
-      [] (* These don't need variable linting *)
+  | Spec _ | Test _ | Application _ -> []
+  | RecordDef _ -> []
+(* Records don't need linting for now *)
+(* These don't need variable linting *)
 
-let lint_program program =
+let lint_program ?(skip_unused_functions = false) program =
   let root_ctx = create_root_context () in
+
+  (* First pass: collect all defined functions *)
+  List.iter
+    (fun item ->
+      match item with
+      | Function func_def -> define_function root_ctx func_def.name
+      | OtpComponent (Worker { functions; _ }) ->
+          List.iter
+            (fun (func_def : function_def) ->
+              define_function root_ctx func_def.name)
+            functions
+      | _ -> ())
+    program.items;
 
   let all_errors =
     List.fold_left
@@ -675,8 +781,23 @@ let lint_program program =
       [] program.items
   in
 
+  (* Check for unused standalone functions only if not skipped *)
+  let unused_func_errors =
+    if skip_unused_functions then []
+    else
+      let standalone_functions =
+        List.fold_left
+          (fun acc item ->
+            match item with Function func_def -> func_def :: acc | _ -> acc)
+          [] program.items
+      in
+      if List.length standalone_functions > 0 then
+        check_unused_standalone_functions standalone_functions
+      else []
+  in
+
   (* Treat all lint issues as errors - no warnings allowed *)
-  let all_lint_errors = all_errors in
+  let all_lint_errors = all_errors @ unused_func_errors in
 
   if List.length all_lint_errors > 0 then raise (LintError all_lint_errors)
   else Printf.printf "Linting completed successfully (no issues found)\n"

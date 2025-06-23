@@ -73,6 +73,7 @@ Lx has several categories of keywords:
 - `_` - Wildcard pattern
 - `::` - List cons operator
 - `.` - Module access
+- `++` - String concatenation
 - `+` - Addition
 - `-` - Subtraction
 - `*` - Multiplication
@@ -394,6 +395,35 @@ w = 15 / 3    # Division: 5
 # Complex expressions with precedence
 result = 2 + 3 * 4    # Result: 14 (multiplication has higher precedence)
 total = (10 + 5) * 2  # Result: 30 (parentheses override precedence)
+```
+
+### String Concatenation Expressions
+```lx
+# Basic string concatenation
+greeting = "Hello, " ++ "world!"    # Result: "Hello, world!"
+name = "John"
+message = "Welcome, " ++ name       # Result: "Welcome, John"
+
+# Chained concatenation (right associative)
+full_message = "Hello, " ++ name ++ "!"    # Result: "Hello, John!"
+path = base_dir ++ "/" ++ filename ++ ".txt"
+
+# String concatenation with function calls
+fun build_greeting(first, last) {
+    "Hello, " ++ first ++ " " ++ last
+}
+
+# In OTP workers
+worker message_worker {
+    fun handle_call(.{:format, name, age}, _from, state) {
+        response = "User: " ++ name ++ " (age: " ++ integer_to_string(age) ++ ")"
+        .{:reply, response, state}
+    }
+}
+
+# Type safety - these would cause compile errors:
+# result = "hello" ++ 42        # Error: Cannot concatenate string with integer
+# result = 123 ++ "world"       # Error: Cannot concatenate integer with string
 ```
 
 ### Comparison Expressions
@@ -1493,9 +1523,11 @@ This comprehensive guard system enables sophisticated pattern matching and condi
 
 ## OTP Components
 
+**Important Note**: OTP component names (workers and supervisors) use standard Erlang naming conventions with lowercase letters and underscores, such as `cart_worker`, `user_manager`, `payment_supervisor`. This differs from some other languages that require uppercase names for components.
+
 ### Worker Definition
 ```lx
-worker my_worker {
+worker cart_worker {
   # Required init function
   fun init(args) {
     initial_state = setup_state(args)
@@ -1509,7 +1541,8 @@ worker my_worker {
 
   fun handle_call(.{:set_value, value}, _from, state) {
     new_state = update_state(state, value)
-    .{:reply, :ok, new_state}
+    response_msg = "Value set to: " ++ format_value(value)
+    .{:reply, response_msg, new_state}
   }
 
   fun handle_call(:reset, _from, _state) {
@@ -1600,9 +1633,9 @@ worker my_worker {
 Supervisors must use bracket syntax for defining children lists to maintain consistency with list notation throughout the language:
 
 ```lx
-supervisor my_supervisor {
+supervisor cart_supervisor {
   strategy one_for_one
-  children [worker1, worker2, worker3]
+  children [cart_worker, inventory_worker, payment_worker]
 }
 
 # Empty children list
@@ -1622,15 +1655,15 @@ Lx supports an advanced typed children syntax to resolve ambiguity when workers 
 # Simple syntax (works when no name conflicts)
 supervisor simple_sup {
   strategy one_for_one
-  children [cart, payment]
+  children [cart_worker, payment_worker]
 }
 
 # Typed syntax (recommended when there are name conflicts)
 supervisor advanced_sup {
   strategy one_for_one
   children {
-    worker [cart, payment]
-    supervisor [cart_manager, payment_manager]
+    worker [cart_worker, payment_worker]
+    supervisor [cart_supervisor, payment_supervisor]
   }
 }
 
@@ -1638,8 +1671,8 @@ supervisor advanced_sup {
 supervisor mixed_sup {
   strategy one_for_all
   children {
-    worker [cart]
-    supervisor [payment_manager]
+    worker [cart_worker]
+    supervisor [payment_supervisor]
   }
 }
 ```
@@ -1649,38 +1682,38 @@ supervisor mixed_sup {
 The Lx compiler automatically detects when the same name is used for both a worker and supervisor, preventing ambiguous references:
 
 ```lx
-worker cart {
+worker cart_component {
   fun init(_) { .{:ok, []} }
 }
 
-supervisor cart {
+supervisor cart_component {
   strategy one_for_one
-  children { worker [cart] }
+  children { worker [cart_component] }
 }
 
 # This will cause a compilation error:
 supervisor main_supervisor {
   strategy one_for_one
-  children [cart]  # ERROR: Ambiguous - cart worker or cart supervisor?
+  children [cart_component]  # ERROR: Ambiguous - cart_component worker or supervisor?
 }
 
 # Correct solution using typed syntax:
 supervisor main_supervisor {
   strategy one_for_one
   children {
-    supervisor [cart]  # Explicitly specify the supervisor
+    supervisor [cart_component]  # Explicitly specify the supervisor
   }
 }
 ```
 
 **Error Message Example:**
 ```
-myapp.lx:15:1: OTP Error: Ambiguous reference 'cart' in supervisor 'main supervisor'
-  Problem: 'cart' is used for both worker and supervisor components
+myapp.lx:15:1: OTP Error: Ambiguous reference 'cart_component' in supervisor 'main supervisor'
+  Problem: 'cart_component' is used for both worker and supervisor components
   Solution: Use typed children syntax to specify the component type:
     children {
-      worker [cart]     # if referring to the worker
-      supervisor [cart] # if referring to the supervisor
+      worker [cart_component]     # if referring to the worker
+      supervisor [cart_component] # if referring to the supervisor
     }
 ```
 
@@ -2057,7 +2090,7 @@ fun calculate_total(items) {
 }
 ```
 
-### Complex Worker with Special Syntax Features
+### Complex Worker with Special Syntax Features and String Operations
 ```lx
 worker shopping_cart {
   fun init(_args) {
@@ -2071,6 +2104,12 @@ worker shopping_cart {
     case request {
       :get_cart -> .{:reply, state, state}
       :get_module -> .{:reply, __MODULE__, state}  # Use __MODULE__ macro
+      .{:format_cart, user_name} -> {
+        # String concatenation for response formatting
+        cart_info = "Cart for user: " ++ user_name ++ " has " ++
+                   integer_to_string(length(state.items)) ++ " items"
+        .{:reply, cart_info, state}
+      }
       _ -> .{:reply, :unknown_request, state}
     }
   }
@@ -2098,10 +2137,17 @@ worker shopping_cart {
     .{:ok, state}
   }
 
-  # Helper function demonstrating external calls
-  fun notify_external_service(data) {
+  # Helper function demonstrating external calls and string concatenation
+  fun notify_external_service(user_id, action) {
+    # Build URL with string concatenation
+    url = "http://api.example.com/users/" ++ integer_to_string(user_id) ++ "/actions"
+
+    # Build message payload
+    message = "User " ++ integer_to_string(user_id) ++ " performed: " ++ action
+    payload = .{message: message, timestamp: get_timestamp()}
+
     # Use dot notation for external module calls
-    http_client.post("http://api.example.com", data)
+    http_client.post(url, payload)
   }
 
   # Helper function with arithmetic

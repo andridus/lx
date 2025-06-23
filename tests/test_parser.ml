@@ -2,7 +2,7 @@ open Alcotest
 open Compiler.Ast
 
 let test_simple_function () =
-  let result = Compiler.parse_string "fun num() { 42 }" in
+  let result = Compiler.parse_string "pub fun num() { 42 }" in
   match result.items with
   | [
    Function
@@ -10,7 +10,7 @@ let test_simple_function () =
        name = "num";
        clauses =
          [ { params = []; body = Literal (LInt 42); position = _; guard = _ } ];
-       visibility = Private;
+       visibility = Public;
        position = _;
      };
   ] ->
@@ -18,7 +18,7 @@ let test_simple_function () =
   | _ -> fail "Expected single function with correct structure"
 
 let test_function_with_params () =
-  let result = Compiler.parse_string "fun add(x, y) { x }" in
+  let result = Compiler.parse_string "pub fun add(x, y) { x }" in
   match result.items with
   | [
    Function
@@ -33,7 +33,7 @@ let test_function_with_params () =
              guard = _;
            };
          ];
-       visibility = Private;
+       visibility = Public;
        position = _;
      };
   ] ->
@@ -41,7 +41,9 @@ let test_function_with_params () =
   | _ -> fail "Expected function with parameters"
 
 let test_multiple_functions () =
-  let result = Compiler.parse_string "fun first() { 1 } fun second() { 2 }" in
+  let result =
+    Compiler.parse_string "pub fun first() { 1 } fun second() { 2 }"
+  in
   match result.items with
   | [
    Function
@@ -49,7 +51,7 @@ let test_multiple_functions () =
        name = "first";
        clauses =
          [ { params = []; body = Literal (LInt 1); position = _; guard = _ } ];
-       visibility = Private;
+       visibility = Public;
        position = _;
      };
    Function
@@ -101,7 +103,7 @@ let test_comparison_operators () =
   in
   List.iter
     (fun (expr_str, op) ->
-      let code = "fun test() { " ^ expr_str ^ " }" in
+      let code = "pub fun test() { " ^ expr_str ^ " }" in
       let result = Compiler.parse_string code in
       match result.items with
       | [
@@ -117,7 +119,7 @@ let test_comparison_operators () =
                  guard = _;
                };
              ];
-           visibility = Private;
+           visibility = Public;
            position = _;
          };
       ] ->
@@ -128,7 +130,7 @@ let test_comparison_operators () =
 (* Test parsing of if condition with comparison *)
 let test_if_with_comparison () =
   let result =
-    Compiler.parse_string "fun test() { if x == 1 { :ok } else { :error } }"
+    Compiler.parse_string "pub fun test() { if x == 1 { :ok } else { :error } }"
   in
   match result.items with
   | [
@@ -148,7 +150,7 @@ let test_if_with_comparison () =
              guard = _;
            };
          ];
-       visibility = Private;
+       visibility = Public;
        position = _;
      };
   ] ->
@@ -157,7 +159,7 @@ let test_if_with_comparison () =
 
 (* Test parsing of complex comparison expressions *)
 let test_complex_comparison_parsing () =
-  let result = Compiler.parse_string "fun test(x, y) { x >= y }" in
+  let result = Compiler.parse_string "pub fun test(x, y) { x >= y }" in
   match result.items with
   | [
    Function
@@ -172,7 +174,7 @@ let test_complex_comparison_parsing () =
              guard = _;
            };
          ];
-       visibility = Private;
+       visibility = Public;
        position = _;
      };
   ] ->
@@ -181,7 +183,7 @@ let test_complex_comparison_parsing () =
 
 (* Test parsing precedence of comparison operators *)
 let test_comparison_precedence () =
-  let result = Compiler.parse_string "fun test() { x + 1 == y * 2 }" in
+  let result = Compiler.parse_string "pub fun test() { x + 1 == y * 2 }" in
   match result.items with
   | [
    Function
@@ -200,7 +202,7 @@ let test_comparison_precedence () =
              guard = _;
            };
          ];
-       visibility = Private;
+       visibility = Public;
        position = _;
      };
   ] ->

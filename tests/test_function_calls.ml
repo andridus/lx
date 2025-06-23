@@ -21,7 +21,7 @@ let string_matches_pattern s pattern =
 
 let test_function_call_parsing () =
   let program =
-    Compiler.parse_string "fun validation() { io.format(\"hello\") }"
+    Compiler.parse_string "pub fun validation() { io.format(\"hello\") }"
   in
   match program.items with
   | [
@@ -51,7 +51,7 @@ let test_function_call_parsing () =
 
 let test_external_function_call_parsing () =
   let program =
-    Compiler.parse_string "fun validation() { io.format(\"hello\") }"
+    Compiler.parse_string "pub fun validation() { io.format(\"hello\") }"
   in
   match program.items with
   | [
@@ -117,7 +117,7 @@ let test_multiple_arities_parsing () =
 let test_sequence_parsing () =
   let program =
     Compiler.parse_string
-      "fun validation() { io.format(\"hello\"); io.format(\"world\") }"
+      "pub fun validation() { io.format(\"hello\"); io.format(\"world\") }"
   in
   match program.items with
   | [
@@ -162,9 +162,9 @@ let test_sequence_parsing () =
 
 let test_external_function_call_compilation () =
   let program =
-    Compiler.parse_string "fun validation() { io.format(\"hello\") }"
+    Compiler.parse_string "pub fun validation() { io.format(\"hello\") }"
   in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
   let expected_parts = [ "validation() ->"; "io:format(\"hello\")" ] in
   List.iter
     (fun part ->
@@ -183,7 +183,7 @@ let test_multiple_arities_compilation () =
   |}
   in
   let program = Compiler.parse_string input in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
   let expected_parts =
     [
       "a() ->";
@@ -205,9 +205,9 @@ let test_multiple_arities_compilation () =
 
 let test_function_call_compilation () =
   let program =
-    Compiler.parse_string "fun validation() { io.format(\"hello\") }"
+    Compiler.parse_string "pub fun validation() { io.format(\"hello\") }"
   in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
   let expected_parts = [ "validation() ->"; "io:format(\"hello\")" ] in
   List.iter
     (fun part ->
@@ -218,9 +218,9 @@ let test_function_call_compilation () =
 let test_sequence_compilation () =
   let program =
     Compiler.parse_string
-      "fun validation() { io.format(\"hello\"); io.format(\"world\") }"
+      "pub fun validation() { io.format(\"hello\"); io.format(\"world\") }"
   in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
   let expected_parts =
     [ "validation() ->"; "io:format(\"hello\"),"; "io:format(\"world\")" ]
   in
@@ -232,9 +232,9 @@ let test_sequence_compilation () =
 
 let test_function_with_args () =
   let program =
-    Compiler.parse_string "fun validation(x) { io.format(\"hello\", [x]) }"
+    Compiler.parse_string "pub fun validation(x) { io.format(\"hello\", [x]) }"
   in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
   let expected_parts =
     [ "validation(X_[a-z0-9]+) ->"; "io:format(\"hello\", \\[X_[a-z0-9]+\\])" ]
   in
@@ -257,7 +257,7 @@ let test_multiple_expressions_example () =
   |}
   in
   let program = Compiler.parse_string input in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
   let expected_parts =
     [
       "b(X_[a-z0-9]+) ->";
@@ -276,8 +276,8 @@ let test_multiple_expressions_example () =
 
 let test_backward_compatibility () =
   (* Test that old syntax still works *)
-  let program = Compiler.parse_string "fun old_style(x, y) { x + y }" in
-  let result = Compiler.compile_to_string program in
+  let program = Compiler.parse_string "pub fun old_style(x, y) { x + y }" in
+  let result = Compiler.compile_to_string_for_tests program in
   let expected_parts =
     [
       "old_style(X_[a-z0-9]+, Y_[a-z0-9]+) ->"; "X_[a-z0-9]+ \\+ Y_[a-z0-9]+\\.";
@@ -312,7 +312,7 @@ let test_simple_function_call () =
         ];
     }
   in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
   check bool "contains function definition" true
     (String.contains result 'h' && String.contains result 'e')
 
@@ -339,7 +339,7 @@ let test_function_with_parameters () =
         ];
     }
   in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
   check bool "function compiles" true (String.length result > 0)
 
 let test_multiple_clauses () =
@@ -377,7 +377,7 @@ let test_multiple_clauses () =
         ];
     }
   in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
   check bool "multiple clauses compile" true (String.length result > 0)
 
 let test_external_call () =
@@ -407,7 +407,7 @@ let test_external_call () =
         ];
     }
   in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
   check bool "external call compiles" true (String.contains result 'l')
 
 let tests =

@@ -41,6 +41,8 @@ type pattern =
   | PTuple of pattern list
   | PList of pattern list
   | PCons of pattern * pattern
+  | PRecord of
+      string * (string * pattern) list (* record_name, field_patterns *)
 
 (* OTP strategies for supervisors *)
 type otp_strategy = OneForOne | OneForAll | RestForOne
@@ -82,10 +84,34 @@ type expr =
   | Receive of
       receive_clause list
       * (expr * expr) option (* clauses, optional (timeout, timeout_body) *)
+  | RecordCreate of
+      string * (string * expr) list (* record_name, field_assignments *)
+  | RecordAccess of expr * string (* record_expr, field_name *)
+  | RecordUpdate of expr * (string * expr) list (* record_expr, field_updates *)
 
 (* Receive clause definition *)
 and receive_clause =
   pattern * guard_expr option * expr (* pattern, optional guard, body *)
+
+(* Type expressions for record field types *)
+type type_expr =
+  | TypeName of string
+  | TypeUnion of type_expr * type_expr
+  | TypeList of type_expr
+  | TypeTuple of type_expr list
+
+(* Record definitions *)
+type record_def = {
+  record_name : string;
+  fields : record_field list;
+  position : position option;
+}
+
+and record_field = {
+  field_name : string;
+  field_type : type_expr;
+  default_value : expr option;
+}
 
 (* Application definition for .app.src generation *)
 type application_def = {
@@ -162,6 +188,7 @@ type module_item =
   | Spec of spec
   | Test of describe_block
   | Application of application_def
+  | RecordDef of record_def
 
 (* Complete program *)
 type program = { items : module_item list }

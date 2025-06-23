@@ -95,8 +95,40 @@ let rec emit_pattern ctx (p : pattern) : string =
   | PList ps -> "[" ^ String.concat ", " (List.map (emit_pattern ctx) ps) ^ "]"
   | PCons (head, tail) ->
       "[" ^ emit_pattern ctx head ^ " | " ^ emit_pattern ctx tail ^ "]"
+  | PRecord (record_name, field_patterns) ->
+      let record_name_lower = String.lowercase_ascii record_name in
+      let fields_str =
+        String.concat ", "
+          (List.map
+             (fun (field_name, field_pattern) ->
+               field_name ^ " = " ^ emit_pattern ctx field_pattern)
+             field_patterns)
+      in
+      "#" ^ record_name_lower ^ "{" ^ fields_str ^ "}"
 
-let rec emit_expr ctx (e : expr) : string =
+(* Helper function to determine the record type name from an expression *)
+let rec get_record_type_name ctx (expr : expr) : string =
+  match expr with
+  | Var var_name -> (
+      (* Get the renamed variable to analyze the pattern *)
+      let renamed_var = get_renamed_var ctx var_name in
+      (* Try to extract record type from variable name pattern *)
+      (* Variables created from records often have the pattern RecordName_hash *)
+      let parts = String.split_on_char '_' renamed_var in
+      match parts with
+      | record_name :: _
+        when String.length record_name > 0
+             && String.get record_name 0 >= 'A'
+             && String.get record_name 0 <= 'Z' ->
+          String.lowercase_ascii record_name
+      | _ -> "record"
+      (* fallback *))
+  | RecordCreate (record_name, _) -> String.lowercase_ascii record_name
+  | RecordAccess (inner_expr, _) -> get_record_type_name ctx inner_expr
+  | RecordUpdate (inner_expr, _) -> get_record_type_name ctx inner_expr
+  | _ -> "record" (* fallback for unknown expressions *)
+
+and emit_expr ctx (e : expr) : string =
   match e with
   | Literal l -> emit_literal l
   | Var id -> get_renamed_var ctx id
@@ -151,6 +183,31 @@ let rec emit_expr ctx (e : expr) : string =
       emit_expr ctx left ^ " " ^ op ^ " " ^ emit_expr ctx right
   | Send (target, message) ->
       emit_expr ctx target ^ " ! " ^ emit_expr ctx message
+  | RecordCreate (record_name, field_inits) ->
+      let record_name_lower = String.lowercase_ascii record_name in
+      let fields_str =
+        String.concat ", "
+          (List.map
+             (fun (field_name, field_expr) ->
+               field_name ^ " = " ^ emit_expr ctx field_expr)
+             field_inits)
+      in
+      "#" ^ record_name_lower ^ "{" ^ fields_str ^ "}"
+  | RecordAccess (record_expr, field_name) ->
+      (* Try to infer the record type from the expression *)
+      let record_type_name = get_record_type_name ctx record_expr in
+      emit_expr ctx record_expr ^ "#" ^ record_type_name ^ "." ^ field_name
+  | RecordUpdate (record_expr, field_updates) ->
+      let updates_str =
+        String.concat ", "
+          (List.map
+             (fun (field_name, update_expr) ->
+               field_name ^ " = " ^ emit_expr ctx update_expr)
+             field_updates)
+      in
+      let record_type_name = get_record_type_name ctx record_expr in
+      emit_expr ctx record_expr ^ "#" ^ record_type_name ^ "{" ^ updates_str
+      ^ "}"
   | Receive (clauses, timeout_opt) -> (
       let clauses_str =
         String.concat ";\n    " (List.map (emit_receive_clause ctx) clauses)
@@ -467,9 +524,44 @@ let generate_test_suite app_name =
     \    ok.\n"
     app_name
 
+(* Generate record definitions *)
+let generate_record_definitions program =
+  let record_defs =
+    List.fold_left
+      (fun acc item ->
+        match item with RecordDef record_def -> record_def :: acc | _ -> acc)
+      [] program.items
+  in
+
+  String.concat "\n"
+    (List.map
+       (fun record_def ->
+         let record_name_lower =
+           String.lowercase_ascii record_def.record_name
+         in
+         let fields_str =
+           String.concat ", "
+             (List.map
+                (fun field ->
+                  let default_str =
+                    match field.default_value with
+                    | Some expr ->
+                        let ctx = create_scope None in
+                        " = " ^ emit_expr ctx expr
+                    | None -> ""
+                  in
+                  field.field_name ^ default_str)
+                record_def.fields)
+         in
+         "-record(" ^ record_name_lower ^ ", {" ^ fields_str ^ "}).")
+       record_defs)
+
 (* Generate worker module content *)
-let generate_worker_module app_name worker_name functions =
+let generate_worker_module app_name worker_name functions program =
   let module_name = app_name ^ "_" ^ worker_name ^ "_worker" in
+
+  (* Generate record definitions for this module *)
+  let record_definitions = generate_record_definitions program in
 
   (* Collect OTP callback functions and public functions *)
   let otp_callbacks = ref [] in
@@ -532,13 +624,16 @@ let generate_worker_module app_name worker_name functions =
   let exports_str = String.concat ", " unique_exports in
 
   let header =
+    let record_section =
+      if record_definitions = "" then "" else record_definitions ^ "\n\n"
+    in
     Printf.sprintf
       "-module(%s).\n\
        -behaviour(gen_server).\n\
        -export([%s]).\n\n\
-       start_link() ->\n\
+       %sstart_link() ->\n\
       \    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).\n"
-      module_name exports_str
+      module_name exports_str record_section
   in
 
   (* Group functions by name to handle multiple clauses *)
@@ -734,6 +829,16 @@ let generate_application_files ?(skip_rebar = false) output_dir filename program
      Printf.eprintf "Lint Errors:\n%s\n" (Linter.string_of_lint_errors errors);
      failwith "Linting failed - application generation aborted");
 
+  (* Type checking phase - must pass before any generation *)
+  (try
+     let _ = Typechecker.type_check_program program in
+     ()
+   with
+  | Typechecker.TypeError error ->
+      Printf.eprintf "Type Error: %s\n" (Typechecker.string_of_type_error error);
+      failwith "Type checking failed"
+  | Error.CompilationError _ as e -> raise e);
+
   let app_name = extract_app_name filename in
 
   (* Clean up old files before generating new ones *)
@@ -784,7 +889,9 @@ let generate_application_files ?(skip_rebar = false) output_dir filename program
     (function
       | OtpComponent (Worker { name; functions; _ }) ->
           let module_name = app_name ^ "_" ^ name ^ "_worker" in
-          let worker_content = generate_worker_module app_name name functions in
+          let worker_content =
+            generate_worker_module app_name name functions program
+          in
           let dest_file = Filename.concat src_dir (module_name ^ ".erl") in
           let oc = open_out dest_file in
           output_string oc worker_content;

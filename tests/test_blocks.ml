@@ -39,7 +39,7 @@ let test_simple_block_assignment () =
     }
   in
   try
-    let _ = Compiler.compile_to_string program in
+    let _ = Compiler.compile_to_string_for_tests program in
     check bool "simple block assignment compiles" true true
   with exn ->
     Printf.printf "Error: %s\n" (Printexc.to_string exn);
@@ -74,7 +74,7 @@ let test_nested_block_assignment () =
     }
   in
   try
-    let _ = Compiler.compile_to_string program in
+    let _ = Compiler.compile_to_string_for_tests program in
     check bool "nested block assignment compiles" true true
   with exn ->
     Printf.printf "Error: %s\n" (Printexc.to_string exn);
@@ -116,7 +116,7 @@ let test_multiple_assignments_in_block () =
     }
   in
   try
-    let _ = Compiler.compile_to_string program in
+    let _ = Compiler.compile_to_string_for_tests program in
     check bool "multiple assignments in block compile" true true
   with exn ->
     Printf.printf "Error: %s\n" (Printexc.to_string exn);
@@ -137,7 +137,7 @@ let test_block_with_sequence () =
   in
   let func = make_single_clause_function "test" [] sequence_expr in
   let program = { items = [ Function func ] } in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
   (* Should contain block structure with proper scoping *)
   let contains_block_start = string_contains_substring result "% start block" in
   let contains_block_end = string_contains_substring result "% end block" in

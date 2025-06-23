@@ -24,7 +24,7 @@ let test_variable_scoping () =
   in
   let func = make_single_clause_function "test" [] sequence_expr in
   let program = { items = [ Function func ] } in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
 
   (* Should contain variable names *)
   let has_x_var = string_contains_substring result "X_" in
@@ -48,7 +48,7 @@ let test_ignored_variables () =
     }
   in
   let program = { items = [ Function func ] } in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
   (* Should contain variable assignments for used variables *)
   let has_used_var = string_contains_substring result "Used_var" in
   check bool "used variables are assigned" true has_used_var

@@ -40,6 +40,7 @@ rule read = parse
   | "::"            { CONS }
   | ":"             { COLON }
   | "."             { DOT }
+  | "++"            { CONCAT }
   | "+"             { PLUS }
   | "-"             { MINUS }
   | "*"             { MULT }
@@ -65,6 +66,7 @@ rule read = parse
       | "assert" -> ASSERT
       | "application" -> APPLICATION | "description" -> DESCRIPTION | "vsn" -> VSN
       | "applications" -> APPLICATIONS | "registered" -> REGISTERED | "env" -> ENV
+      | "record" -> RECORD
       | word when List.mem word ["spec"; "worker"; "supervisor"] ->
           (* Other commonly misused reserved words *)
           Error.reserved_word_error ~filename:(!filename_ref) lexbuf word

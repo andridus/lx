@@ -38,7 +38,7 @@ type lint_error = {
 exception LintError of lint_error list
 
 (* Main linting function *)
-val lint_program : program -> unit
+val lint_program : ?skip_unused_functions:bool -> program -> unit
 
 (* Error formatting *)
 val string_of_lint_error : lint_error -> string

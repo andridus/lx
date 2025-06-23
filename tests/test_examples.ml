@@ -19,8 +19,8 @@ let string_matches_pattern s pattern =
   with Not_found -> false
 
 let test_simple_function_example () =
-  let program = Compiler.parse_string "fun hello() { \"world\" }" in
-  let result = Compiler.compile_to_string program in
+  let program = Compiler.parse_string "pub fun hello() { \"world\" }" in
+  let result = Compiler.compile_to_string_for_tests program in
   let expected_parts = [ "-module(generated)"; "hello() ->"; "\"world\"." ] in
   List.iter
     (fun part ->
@@ -29,8 +29,8 @@ let test_simple_function_example () =
     expected_parts
 
 let test_function_with_parameters () =
-  let program = Compiler.parse_string "fun add(x, y) { x + y }" in
-  let result = Compiler.compile_to_string program in
+  let program = Compiler.parse_string "pub fun add(x, y) { x + y }" in
+  let result = Compiler.compile_to_string_for_tests program in
   let expected_parts =
     [ "add(X_[a-z0-9]+, Y_[a-z0-9]+) ->"; "X_[a-z0-9]+ \\+ Y_[a-z0-9]+\\." ]
   in
@@ -41,9 +41,9 @@ let test_function_with_parameters () =
     expected_parts
 
 let test_multiple_functions () =
-  let input = "fun first() { 1 } fun second() { 2 }" in
+  let input = "pub fun first() { 1 } fun second() { 2 }" in
   let program = Compiler.parse_string input in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
   let expected_parts = [ "first() ->"; "1."; "second() ->"; "2." ] in
   List.iter
     (fun part ->
@@ -54,18 +54,18 @@ let test_multiple_functions () =
 let test_various_literals () =
   let test_cases =
     [
-      ("fun test_int() { 42 }", [ "42" ]);
-      ("fun test_float() { 3.14 }", [ "3.14" ]);
-      ("fun test_bool() { true }", [ "true" ]);
-      ("fun test_atom() { :hello }", [ "hello" ]);
-      ("fun test_string() { \"world\" }", [ "\"world\"" ]);
+      ("pub fun test_int() { 42 }", [ "42" ]);
+      ("pub fun test_float() { 3.14 }", [ "3.14" ]);
+      ("pub fun test_bool() { true }", [ "true" ]);
+      ("pub fun test_atom() { :hello }", [ "hello" ]);
+      ("pub fun test_string() { \"world\" }", [ "\"world\"" ]);
     ]
   in
 
   List.iter
     (fun (input, expected_parts) ->
       let program = Compiler.parse_string input in
-      let result = Compiler.compile_to_string program in
+      let result = Compiler.compile_to_string_for_tests program in
       List.iter
         (fun part ->
           let contains = string_contains_substring result part in
@@ -77,7 +77,7 @@ let test_various_literals () =
 
 let test_empty_program () =
   let program = Compiler.parse_string "" in
-  let result = Compiler.compile_to_string program in
+  let result = Compiler.compile_to_string_for_tests program in
   let expected_parts = [ "-module(generated)" ] in
   let unexpected_parts = [ "-compile(export_all)" ] in
   List.iter

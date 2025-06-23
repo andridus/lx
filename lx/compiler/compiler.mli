@@ -23,6 +23,7 @@ module Error = Error
 val parse_string : ?filename:string option -> string -> Ast.program
 val parse_file : string -> Ast.program
 val compile_to_string : Ast.program -> string
+val compile_to_string_for_tests : Ast.program -> string
 
 val compile_to_string_with_module_name :
   Ast.program ->

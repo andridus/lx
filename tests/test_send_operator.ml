@@ -7,19 +7,20 @@ let parse_program_string input =
     failwith ("Parse error in: " ^ input ^ " - " ^ Printexc.to_string exn)
 
 (* Helper function to compile programs *)
-let compile_program program = Compiler.compile_to_string program
+let compile_program program = Compiler.compile_to_string_for_tests program
 
 (* Test parsing of send expressions *)
 let test_send_parsing () =
   let test_cases =
     [
-      ("fun test(pid, message) { pid ! message }", "Basic send operation");
-      ("fun test(pid) { pid ! :wake_up }", "Send to self with atom");
-      ( "fun test(worker_pid, data) { worker_pid ! (:request, data) }",
+      ("pub fun test(pid, message) { pid ! message }", "Basic send operation");
+      ("pub fun test(pid) { pid ! :wake_up }", "Send to self with atom");
+      ( "pub fun test(worker_pid, data) { worker_pid ! (:request, data) }",
         "Send tuple message" );
-      ( "fun test(a, b, c) { a ! b ! c }",
+      ( "pub fun test(a, b, c) { a ! b ! c }",
         "Chained send operations (right associative)" );
-      ("fun test(pid, message) { result = pid ! message }", "Send in assignment");
+      ( "pub fun test(pid, message) { result = pid ! message }",
+        "Send in assignment" );
     ]
   in
 
@@ -38,8 +39,8 @@ let test_send_parsing () =
 let test_send_compilation () =
   let test_cases =
     [
-      ("fun test(pid, message) { pid ! message }", "Basic send compilation");
-      ("fun test(pid) { pid ! :wake_up }", "Send to self compilation");
+      ("pub fun test(pid, message) { pid ! message }", "Basic send compilation");
+      ("pub fun test(pid) { pid ! :wake_up }", "Send to self compilation");
     ]
   in
 
@@ -63,9 +64,9 @@ let test_send_compilation () =
 let test_send_precedence () =
   let test_cases =
     [
-      ("fun test(a, b, c) { a + b ! c }", "Arithmetic before send");
-      ("fun test(a, b, c) { a ! b + c }", "Send has appropriate precedence");
-      ("fun test(a, b, c) { a ! b ! c }", "Right associative chaining");
+      ("pub fun test(a, b, c) { a + b ! c }", "Arithmetic before send");
+      ("pub fun test(a, b, c) { a ! b + c }", "Send has appropriate precedence");
+      ("pub fun test(a, b, c) { a ! b ! c }", "Right associative chaining");
     ]
   in
 
@@ -82,7 +83,7 @@ let test_send_precedence () =
 
 (* Test send operator AST structure *)
 let test_send_ast_structure () =
-  let input = "fun test(pid, message) { pid ! message }" in
+  let input = "pub fun test(pid, message) { pid ! message }" in
   try
     let program = parse_program_string input in
     match program.items with
@@ -104,7 +105,7 @@ let test_send_ast_structure () =
 
 (* Test send operator in OTP context *)
 let test_send_in_otp () =
-  let input = "fun test_send(pid, msg) { pid ! msg }" in
+  let input = "pub fun test_send(pid, msg) { pid ! msg }" in
   try
     let program = parse_program_string input in
     let compiled = compile_program program in
@@ -123,7 +124,7 @@ let test_send_in_otp () =
 let test_send_return_value () =
   let input =
     "\n\
-    \    fun send_and_return(pid, message) {\n\
+    \    pub fun send_and_return(pid, message) {\n\
     \      result = pid ! message\n\
     \      result\n\
     \    }"
@@ -147,8 +148,8 @@ let test_send_return_value () =
 let test_send_errors () =
   let invalid_cases =
     [
-      ("fun test() { ! message }", "Missing target should fail");
-      ("fun test() { pid ! }", "Missing message should fail");
+      ("pub fun test() { ! message }", "Missing target should fail");
+      ("pub fun test() { pid ! }", "Missing message should fail");
     ]
   in
 

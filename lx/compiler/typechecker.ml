@@ -20,6 +20,7 @@ type lx_type =
   | TTuple of lx_type list
   | TList of lx_type
   | TRecord of (string * lx_type) list
+  | TNamedRecord of string (* Named record type *)
   | TOtpState
   | TOtpReply of lx_type
   | TOtpCast
@@ -27,6 +28,14 @@ type lx_type =
 
 (* Type environment *)
 type type_env = (ident * lx_type) list
+
+(* Record environment *)
+type record_env = (string * record_def) list
+
+let record_env = ref []
+
+let add_record_def (def : record_def) =
+  record_env := (def.record_name, def) :: !record_env
 
 (* Symbol table context for managing variable scopes *)
 type symbol_context = {
@@ -144,6 +153,10 @@ type type_error =
   | RecordFieldMismatch of string * string * string list
   | ArityMismatch of string * int * int
   | ContextualTypeError of string * string * string option
+  | UndefinedRecord of string
+  | MissingRecordField of string * string
+  | InvalidRecordAccess of lx_type * string
+  | InvalidRecordUpdate of lx_type
 
 exception TypeError of type_error
 
@@ -156,6 +169,11 @@ type guard_error =
 
 exception GuardError of guard_error
 
+(* Find record definition function - moved here after TypeError is declared *)
+let find_record_def (name : string) : record_def =
+  try List.assoc name !record_env
+  with Not_found -> raise (TypeError (UndefinedRecord name))
+
 (* Global type variable counter *)
 let type_var_counter = ref 0
 
@@ -164,6 +182,24 @@ let fresh_type_var () =
   TVar !type_var_counter
 
 let reset_type_vars () = type_var_counter := 0
+
+(* Convert type expressions to internal types *)
+let rec convert_type_expr (type_expr : type_expr) : lx_type =
+  match type_expr with
+  | TypeName "string" -> TString
+  | TypeName "integer" -> TInteger
+  | TypeName "float" -> TFloat
+  | TypeName "boolean" -> TBool
+  | TypeName "atom" -> TAtom
+  | TypeName "pid" -> TPid
+  | TypeName "nil" -> TNil
+  | TypeName name ->
+      TRecord [ (name, fresh_type_var ()) ]
+      (* For now, treat unknown types as records *)
+  | TypeList inner -> TList (convert_type_expr inner)
+  | TypeTuple types -> TTuple (List.map convert_type_expr types)
+  | TypeUnion (t1, _t2) -> TOption (convert_type_expr t1)
+(* Simplified union handling *)
 
 (* Pretty printing for types *)
 let rec string_of_type = function
@@ -184,6 +220,7 @@ let rec string_of_type = function
       ^ String.concat ", "
           (List.map (fun (k, v) -> k ^ ": " ^ string_of_type v) fields)
       ^ "}"
+  | TNamedRecord name -> name
   | TOtpState -> "otp_state"
   | TOtpReply t -> "otp_reply(" ^ string_of_type t ^ ")"
   | TOtpCast -> "otp_cast"
@@ -223,6 +260,21 @@ let string_of_type_error = function
         match suggestion with Some s -> " Suggestion: " ^ s | None -> ""
       in
       Printf.sprintf "%s in %s.%s" msg context suggestion_part
+  | UndefinedRecord name ->
+      Printf.sprintf
+        "Undefined record: %s\n\
+        \  Suggestion: Make sure the record is defined with 'record %s { ... \
+         }' before using it in functions\n\
+        \  Context: Record definitions must appear at the module level, not \
+         inside functions"
+        name name
+  | MissingRecordField (field, record) ->
+      Printf.sprintf "Missing required field '%s' in record '%s'" field record
+  | InvalidRecordAccess (typ, field) ->
+      Printf.sprintf "Cannot access field '%s' on non-record type: %s" field
+        (string_of_type typ)
+  | InvalidRecordUpdate typ ->
+      Printf.sprintf "Cannot update non-record type: %s" (string_of_type typ)
 
 (* Helper function to get variable names from environment *)
 let get_env_var_names env = List.map fst env
@@ -242,6 +294,8 @@ let rec apply_subst (subst : substitution) (typ : lx_type) : lx_type =
   | TOption t -> TOption (apply_subst subst t)
   | TRecord fields ->
       TRecord (List.map (fun (k, v) -> (k, apply_subst subst v)) fields)
+  | TNamedRecord name ->
+      TNamedRecord name (* Named records don't need substitution *)
   | TOtpReply t -> TOtpReply (apply_subst subst t)
   | _ -> typ
 
@@ -371,6 +425,7 @@ let rec occurs_check (var : type_var) (typ : lx_type) : bool =
   | TList t -> occurs_check var t
   | TOption t -> occurs_check var t
   | TRecord fields -> List.exists (fun (_, t) -> occurs_check var t) fields
+  | TNamedRecord _ -> false (* Named records don't contain type variables *)
   | TOtpReply t -> occurs_check var t
   | _ -> false
 
@@ -404,6 +459,7 @@ let rec unify (t1 : lx_type) (t2 : lx_type) : substitution =
         [] ts1 ts2
   | TList t1, TList t2 -> unify t1 t2
   | TOption t1, TOption t2 -> unify t1 t2
+  | TNamedRecord name1, TNamedRecord name2 when name1 = name2 -> []
   | TOtpReply t1, TOtpReply t2 -> unify t1 t2
   | _ -> raise (TypeError (UnificationError (t1, t2, None)))
 
@@ -448,6 +504,38 @@ let rec infer_pattern (env : type_env) (pattern : pattern) :
         compose_subst (compose_subst subst1 subst2) unify_subst
       in
       (list_type, env2, final_subst)
+  | PRecord (record_name, field_patterns) ->
+      let record_def = find_record_def record_name in
+      let record_fields =
+        List.map
+          (fun field -> (field.field_name, convert_type_expr field.field_type))
+          record_def.fields
+      in
+      let record_type = TNamedRecord record_name in
+
+      (* Type check each field pattern *)
+      let final_env, final_subst =
+        List.fold_left
+          (fun (env_acc, subst_acc) (field_name, field_pattern) ->
+            let field_type =
+              try List.assoc field_name record_fields
+              with Not_found ->
+                raise
+                  (TypeError
+                     (RecordFieldMismatch
+                        (field_name, record_name, List.map fst record_fields)))
+            in
+            let pattern_type, new_env, pattern_subst =
+              infer_pattern env_acc field_pattern
+            in
+            let unify_subst = unify pattern_type field_type in
+            ( new_env,
+              compose_subst (compose_subst subst_acc pattern_subst) unify_subst
+            ))
+          (env, []) field_patterns
+      in
+
+      (record_type, final_env, final_subst)
 
 (* Type inference for expressions with symbol context *)
 let rec infer_expr_with_context (context : symbol_context) (expr : expr) :
@@ -748,6 +836,20 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
       let combined_subst = compose_subst subst1 subst2 in
       (* For arithmetic operations, both operands should be numbers *)
       match op with
+      | "++" ->
+          (* String concatenation requires string operands and returns string *)
+          let string_unify1 =
+            unify (apply_subst combined_subst left_type) TString
+          in
+          let string_unify2 =
+            unify (apply_subst combined_subst right_type) TString
+          in
+          let final_subst =
+            compose_subst
+              (compose_subst combined_subst string_unify1)
+              string_unify2
+          in
+          (TString, final_subst)
       | "+" | "-" | "*" | "/" ->
           let int_unify1 =
             unify (apply_subst combined_subst left_type) TInteger
@@ -795,6 +897,139 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
 
       (* Send operation returns the message *)
       (apply_subst combined_subst message_type, combined_subst)
+  | RecordCreate (record_name, field_inits) ->
+      let record_def = find_record_def record_name in
+      let record_fields =
+        List.map
+          (fun field -> (field.field_name, convert_type_expr field.field_type))
+          record_def.fields
+      in
+
+      (* Check all required fields are provided *)
+      let provided_fields = List.map fst field_inits in
+      let required_fields =
+        List.filter (fun f -> f.default_value = None) record_def.fields
+      in
+      List.iter
+        (fun field ->
+          if not (List.mem field.field_name provided_fields) then
+            raise
+              (TypeError
+                 (RecordFieldMismatch
+                    (field.field_name, record_name, provided_fields))))
+        required_fields;
+
+      (* Type check each field initialization *)
+      let subst =
+        List.fold_left
+          (fun subst_acc (field_name, field_expr) ->
+            let field_type =
+              try List.assoc field_name record_fields
+              with Not_found ->
+                raise
+                  (TypeError
+                     (RecordFieldMismatch
+                        (field_name, record_name, List.map fst record_fields)))
+            in
+            let actual_type, expr_subst =
+              infer_expr (apply_subst_env subst_acc env) field_expr
+            in
+            let unify_subst = unify actual_type field_type in
+            compose_subst (compose_subst subst_acc expr_subst) unify_subst)
+          [] field_inits
+      in
+
+      (TNamedRecord record_name, subst)
+  | RecordAccess (record_expr, field_name) -> (
+      let record_type, subst = infer_expr env record_expr in
+      match record_type with
+      | TNamedRecord record_name ->
+          let record_def = find_record_def record_name in
+          let record_fields =
+            List.map
+              (fun field ->
+                (field.field_name, convert_type_expr field.field_type))
+              record_def.fields
+          in
+          let field_type =
+            try List.assoc field_name record_fields
+            with Not_found ->
+              raise
+                (TypeError
+                   (RecordFieldMismatch
+                      (field_name, record_name, List.map fst record_fields)))
+          in
+          (field_type, subst)
+      | TRecord fields ->
+          let field_type =
+            try List.assoc field_name fields
+            with Not_found ->
+              raise
+                (TypeError
+                   (RecordFieldMismatch
+                      (field_name, "record", List.map fst fields)))
+          in
+          (field_type, subst)
+      | _ ->
+          raise
+            (TypeError
+               (UnificationError (record_type, TRecord [], Some "record access")))
+      )
+  | RecordUpdate (record_expr, field_updates) -> (
+      let record_type, subst1 = infer_expr env record_expr in
+      match record_type with
+      | TNamedRecord record_name ->
+          let record_def = find_record_def record_name in
+          let record_fields =
+            List.map
+              (fun field ->
+                (field.field_name, convert_type_expr field.field_type))
+              record_def.fields
+          in
+          let subst2 =
+            List.fold_left
+              (fun subst_acc (field_name, update_expr) ->
+                let field_type =
+                  try List.assoc field_name record_fields
+                  with Not_found ->
+                    raise
+                      (TypeError
+                         (RecordFieldMismatch
+                            (field_name, record_name, List.map fst record_fields)))
+                in
+                let actual_type, expr_subst =
+                  infer_expr (apply_subst_env subst_acc env) update_expr
+                in
+                let unify_subst = unify actual_type field_type in
+                compose_subst (compose_subst subst_acc expr_subst) unify_subst)
+              subst1 field_updates
+          in
+          (record_type, subst2)
+      | TRecord fields ->
+          let subst2 =
+            List.fold_left
+              (fun subst_acc (field_name, update_expr) ->
+                let field_type =
+                  try List.assoc field_name fields
+                  with Not_found ->
+                    raise
+                      (TypeError
+                         (RecordFieldMismatch
+                            (field_name, "record", List.map fst fields)))
+                in
+                let actual_type, expr_subst =
+                  infer_expr (apply_subst_env subst_acc env) update_expr
+                in
+                let unify_subst = unify actual_type field_type in
+                compose_subst (compose_subst subst_acc expr_subst) unify_subst)
+              subst1 field_updates
+          in
+          (record_type, subst2)
+      | _ ->
+          raise
+            (TypeError
+               (UnificationError (record_type, TRecord [], Some "record update")))
+      )
   | Receive (clauses, timeout_opt) ->
       (* Receive expressions can receive any type of message *)
       let result_type = fresh_type_var () in
@@ -876,18 +1111,38 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
       let complete_subst = compose_subst final_subst timeout_subst in
       (apply_subst complete_subst result_type, complete_subst)
 
+(* Extract all variables from a pattern *)
+let rec extract_pattern_vars (pattern : pattern) : string list =
+  match pattern with
+  | PVar name -> [ name ]
+  | PWildcard -> []
+  | PAtom _ -> []
+  | PLiteral _ -> []
+  | PTuple patterns -> List.concat (List.map extract_pattern_vars patterns)
+  | PList patterns -> List.concat (List.map extract_pattern_vars patterns)
+  | PCons (head, tail) -> extract_pattern_vars head @ extract_pattern_vars tail
+  | PRecord (_, field_patterns) ->
+      List.concat
+        (List.map
+           (fun (_, pattern) -> extract_pattern_vars pattern)
+           field_patterns)
+
 (* Type inference for function clauses *)
 let infer_function_clause (env : type_env) (clause : function_clause) :
     lx_type * substitution =
   let param_types = List.map (fun _ -> fresh_type_var ()) clause.params in
-  (* Extract variable bindings from patterns and create environment *)
-  let param_env =
+
+  (* Type check each parameter pattern and extract variables *)
+  let param_env, pattern_substs =
     List.fold_left2
-      (fun acc pattern param_type ->
-        match pattern with
-        | PVar name -> (name, param_type) :: acc
-        | _ -> acc (* Literals and other patterns don't add to environment *))
-      [] clause.params param_types
+      (fun (env_acc, subst_acc) pattern param_type ->
+        let pattern_type, pattern_env, pattern_subst =
+          infer_pattern env pattern
+        in
+        let unify_subst = unify pattern_type param_type in
+        let combined_subst = compose_subst pattern_subst unify_subst in
+        (pattern_env @ env_acc, compose_subst subst_acc combined_subst))
+      ([], []) clause.params param_types
   in
   let new_env = param_env @ env in
   (* Type check guard if present *)
@@ -898,7 +1153,9 @@ let infer_function_clause (env : type_env) (clause : function_clause) :
   in
   let env_with_guard = apply_subst_env guard_subst new_env in
   let body_type, subst = infer_expr env_with_guard clause.body in
-  let combined_subst = compose_subst guard_subst subst in
+  let combined_subst =
+    compose_subst (compose_subst pattern_substs guard_subst) subst
+  in
   let fun_type =
     List.fold_right
       (fun param_type acc -> TFun (param_type, acc))
@@ -979,7 +1236,15 @@ let type_check_program (program : program) : type_env =
     ("io.format", TFun (TString, TFun (TList tv, TNil))) :: env
   in
 
-  (* First pass: collect function signatures *)
+  (* First pass: collect record definitions and function signatures *)
+  (* Process records first so they're available when type checking functions *)
+  List.iter
+    (fun item ->
+      match item with
+      | RecordDef record_def -> add_record_def record_def
+      | _ -> ())
+    program.items;
+
   let env_with_functions =
     List.fold_left
       (fun env_acc item ->
@@ -1013,5 +1278,8 @@ let type_check_program (program : program) : type_env =
             env_acc desc.tests
       | Application _ ->
           (* Application definitions don't affect type checking *)
+          env_acc
+      | RecordDef _ ->
+          (* Record definitions already processed in first pass *)
           env_acc)
     env_with_functions program.items
