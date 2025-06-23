@@ -57,6 +57,7 @@ rule read = parse
       | "if" -> IF | "else" -> ELSE | "for" -> FOR | "when" -> WHEN | "in" -> IN
       | "and" -> AND | "or" -> OR | "not" -> NOT
       | "andalso" -> ANDALSO | "orelse" -> ORELSE
+      | "receive" -> RECEIVE | "after" -> AFTER
       | "true" -> BOOL true | "false" -> BOOL false | "nil" -> NIL
       | "worker" -> WORKER | "supervisor" -> SUPERVISOR | "strategy" -> STRATEGY | "children" -> CHILDREN
       | "one_for_one" -> ONE_FOR_ONE | "one_for_all" -> ONE_FOR_ALL | "rest_for_one" -> REST_FOR_ONE

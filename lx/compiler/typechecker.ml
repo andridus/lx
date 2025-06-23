@@ -150,7 +150,8 @@ exception TypeError of type_error
 (* Guard type checking error *)
 type guard_error =
   | InvalidGuardFunction of string
-  | InvalidGuardCall of string * int * int (* function, given arity, expected arity *)
+  | InvalidGuardCall of
+      string * int * int (* function, given arity, expected arity *)
   | UndefinedGuardVariable of string
 
 exception GuardError of guard_error
@@ -263,17 +264,19 @@ let infer_literal = function
 (* Guard type checking functions *)
 let rec infer_guard_expr (env : type_env) (guard : guard_expr) : substitution =
   match guard with
-  | GuardAnd (g1, g2) | GuardOr (g1, g2) | GuardAndalso (g1, g2) | GuardOrelse (g1, g2) ->
+  | GuardAnd (g1, g2)
+  | GuardOr (g1, g2)
+  | GuardAndalso (g1, g2)
+  | GuardOrelse (g1, g2) ->
       let s1 = infer_guard_expr env g1 in
       let s2 = infer_guard_expr (apply_subst_env s1 env) g2 in
       compose_subst s1 s2
-  | GuardNot g ->
-      infer_guard_expr env g
+  | GuardNot g -> infer_guard_expr env g
   | GuardBinOp (left, _op, right) ->
       (* Type check operands and ensure comparison returns boolean *)
       let _ = infer_guard_value env left in
       let _ = infer_guard_value env right in
-      []  (* Comparisons always return boolean *)
+      [] (* Comparisons always return boolean *)
   | GuardCall (func, args) ->
       (* Validate built-in guard functions *)
       validate_guard_call_values func args;
@@ -285,12 +288,11 @@ let rec infer_guard_expr (env : type_env) (guard : guard_expr) : substitution =
 
 and infer_guard_atom (env : type_env) (atom : guard_atom) : lx_type =
   match atom with
-  | GuardVar var ->
-      (try List.assoc var env
-       with Not_found -> raise (GuardError (UndefinedGuardVariable var)))
-  | GuardLiteral lit ->
-      infer_literal lit
-  | GuardCallAtom (func, args) ->
+  | GuardVar var -> (
+      try List.assoc var env
+      with Not_found -> raise (GuardError (UndefinedGuardVariable var)))
+  | GuardLiteral lit -> infer_literal lit
+  | GuardCallAtom (func, args) -> (
       validate_guard_call func args;
       (* Return appropriate type based on guard function *)
       match func with
@@ -301,17 +303,18 @@ and infer_guard_atom (env : type_env) (atom : guard_atom) : lx_type =
       | "element" ->
           incr type_var_counter;
           TVar !type_var_counter (* Generic type for element *)
-      | "is_atom" | "is_integer" | "is_float" | "is_number"
-      | "is_boolean" | "is_list" | "is_tuple" -> TBool
+      | "is_atom" | "is_integer" | "is_float" | "is_number" | "is_boolean"
+      | "is_list" | "is_tuple" ->
+          TBool
       | "abs" | "round" | "trunc" -> TInteger
       | _ ->
           incr type_var_counter;
-          TVar !type_var_counter (* Generic type for unknown functions *)
+          TVar !type_var_counter (* Generic type for unknown functions *))
 
 and validate_guard_call (func : string) (args : guard_atom list) : unit =
   match func with
-  | "is_atom" | "is_integer" | "is_float" | "is_number"
-  | "is_boolean" | "is_list" | "is_tuple" ->
+  | "is_atom" | "is_integer" | "is_float" | "is_number" | "is_boolean"
+  | "is_list" | "is_tuple" ->
       if List.length args != 1 then
         raise (GuardError (InvalidGuardCall (func, List.length args, 1)))
   | "abs" | "round" | "trunc" | "hd" | "tl" | "length" ->
@@ -320,13 +323,13 @@ and validate_guard_call (func : string) (args : guard_atom list) : unit =
   | "element" ->
       if List.length args != 2 then
         raise (GuardError (InvalidGuardCall (func, List.length args, 2)))
-  | _ ->
-      raise (GuardError (InvalidGuardFunction func))
+  | _ -> raise (GuardError (InvalidGuardFunction func))
 
-and validate_guard_call_values (func : string) (args : guard_value list) : unit =
+and validate_guard_call_values (func : string) (args : guard_value list) : unit
+    =
   match func with
-  | "is_atom" | "is_integer" | "is_float" | "is_number"
-  | "is_boolean" | "is_list" | "is_tuple" ->
+  | "is_atom" | "is_integer" | "is_float" | "is_number" | "is_boolean"
+  | "is_list" | "is_tuple" ->
       if List.length args != 1 then
         raise (GuardError (InvalidGuardCall (func, List.length args, 1)))
   | "abs" | "round" | "trunc" | "hd" | "tl" | "length" ->
@@ -335,13 +338,12 @@ and validate_guard_call_values (func : string) (args : guard_value list) : unit 
   | "element" ->
       if List.length args != 2 then
         raise (GuardError (InvalidGuardCall (func, List.length args, 2)))
-  | _ ->
-      raise (GuardError (InvalidGuardFunction func))
+  | _ -> raise (GuardError (InvalidGuardFunction func))
 
 and infer_guard_value (env : type_env) (value : guard_value) : lx_type =
   match value with
   | GuardAtomValue atom -> infer_guard_atom env atom
-  | GuardCallValue (func, args) ->
+  | GuardCallValue (func, args) -> (
       validate_guard_call_values func args;
       (* Return appropriate type based on guard function *)
       match func with
@@ -352,12 +354,13 @@ and infer_guard_value (env : type_env) (value : guard_value) : lx_type =
       | "element" ->
           incr type_var_counter;
           TVar !type_var_counter (* Generic type for element *)
-      | "is_atom" | "is_integer" | "is_float" | "is_number"
-      | "is_boolean" | "is_list" | "is_tuple" -> TBool
+      | "is_atom" | "is_integer" | "is_float" | "is_number" | "is_boolean"
+      | "is_list" | "is_tuple" ->
+          TBool
       | "abs" | "round" | "trunc" -> TInteger
       | _ ->
           incr type_var_counter;
-          TVar !type_var_counter (* Generic type for unknown functions *)
+          TVar !type_var_counter (* Generic type for unknown functions *))
 
 (* Occurs check for infinite types *)
 let rec occurs_check (var : type_var) (typ : lx_type) : bool =
@@ -649,13 +652,17 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
               | None -> []
             in
             let case_env_with_guard = apply_subst_env guard_subst case_env in
-            let case_type, case_subst = infer_expr case_env_with_guard case_expr in
+            let case_type, case_subst =
+              infer_expr case_env_with_guard case_expr
+            in
             let unify_subst2 =
               unify (apply_subst case_subst result_type) case_type
             in
             let final_subst =
               compose_subst
-                (compose_subst (compose_subst combined_subst guard_subst) case_subst)
+                (compose_subst
+                   (compose_subst combined_subst guard_subst)
+                   case_subst)
                 unify_subst2
             in
             (final_subst, apply_subst_env final_subst env_acc))
@@ -758,9 +765,15 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
           (TBool, combined_subst)
       (* Logical operations require boolean operands and return boolean *)
       | "and" | "or" | "andalso" | "orelse" ->
-          let bool_unify1 = unify (apply_subst combined_subst left_type) TBool in
-          let bool_unify2 = unify (apply_subst combined_subst right_type) TBool in
-          let final_subst = compose_subst (compose_subst combined_subst bool_unify1) bool_unify2 in
+          let bool_unify1 =
+            unify (apply_subst combined_subst left_type) TBool
+          in
+          let bool_unify2 =
+            unify (apply_subst combined_subst right_type) TBool
+          in
+          let final_subst =
+            compose_subst (compose_subst combined_subst bool_unify1) bool_unify2
+          in
           (TBool, final_subst)
       | _ -> failwith ("Unknown binary operator: " ^ op))
   | Send (target_expr, message_expr) ->
@@ -772,14 +785,96 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
       (* Validate target type - should be pid, atom (registered name), or tuple *)
       let target_type_applied = apply_subst combined_subst target_type in
       (match target_type_applied with
-       | TPid | TAtom | TTuple _ -> ()  (* Valid target types *)
-       | TVar _ -> ()  (* Allow type variables for flexibility *)
-       | _ ->
-           let context = "send operation target" in
-           raise (TypeError (UnificationError (target_type_applied, TPid, Some context))));
+      | TPid | TAtom | TTuple _ -> () (* Valid target types *)
+      | TVar _ -> () (* Allow type variables for flexibility *)
+      | _ ->
+          let context = "send operation target" in
+          raise
+            (TypeError
+               (UnificationError (target_type_applied, TPid, Some context))));
 
       (* Send operation returns the message *)
       (apply_subst combined_subst message_type, combined_subst)
+  | Receive (clauses, timeout_opt) ->
+      (* Receive expressions can receive any type of message *)
+      let result_type = fresh_type_var () in
+
+      (* Type check all receive clauses *)
+      let final_subst, _ =
+        List.fold_left
+          (fun (subst_acc, env_acc) (pattern, guard_opt, clause_expr) ->
+            let _pattern_type, pattern_env, pattern_subst =
+              infer_pattern env_acc pattern
+            in
+            let combined_subst = compose_subst subst_acc pattern_subst in
+            let clause_env =
+              pattern_env @ apply_subst_env combined_subst env_acc
+            in
+
+            (* Type check guard if present *)
+            let guard_subst =
+              match guard_opt with
+              | Some guard -> infer_guard_expr clause_env guard
+              | None -> []
+            in
+            let clause_env_with_guard =
+              apply_subst_env guard_subst clause_env
+            in
+
+            (* Type check clause body *)
+            let clause_type, clause_subst =
+              infer_expr clause_env_with_guard clause_expr
+            in
+
+            (* Unify clause result with overall result type *)
+            let unify_subst =
+              unify (apply_subst clause_subst result_type) clause_type
+            in
+
+            let final_subst =
+              compose_subst
+                (compose_subst
+                   (compose_subst combined_subst guard_subst)
+                   clause_subst)
+                unify_subst
+            in
+            (final_subst, apply_subst_env final_subst env_acc))
+          ([], env) clauses
+      in
+
+      (* Type check timeout clause if present *)
+      let timeout_subst =
+        match timeout_opt with
+        | Some (timeout_expr, timeout_body) ->
+            (* Timeout expression should be integer (milliseconds) *)
+            let timeout_type, timeout_s =
+              infer_expr (apply_subst_env final_subst env) timeout_expr
+            in
+            let timeout_unify =
+              unify (apply_subst timeout_s timeout_type) TInteger
+            in
+            let timeout_combined = compose_subst timeout_s timeout_unify in
+
+            (* Timeout body should have same type as receive clauses *)
+            let timeout_body_type, timeout_body_s =
+              infer_expr
+                (apply_subst_env
+                   (compose_subst final_subst timeout_combined)
+                   env)
+                timeout_body
+            in
+            let timeout_body_unify =
+              unify (apply_subst timeout_body_s result_type) timeout_body_type
+            in
+
+            compose_subst
+              (compose_subst timeout_combined timeout_body_s)
+              timeout_body_unify
+        | None -> []
+      in
+
+      let complete_subst = compose_subst final_subst timeout_subst in
+      (apply_subst complete_subst result_type, complete_subst)
 
 (* Type inference for function clauses *)
 let infer_function_clause (env : type_env) (clause : function_clause) :

@@ -135,7 +135,8 @@ let rec emit_expr ctx (e : expr) : string =
       "case " ^ emit_expr ctx value ^ " of "
       ^ String.concat "; "
           (List.map
-             (fun (p, _guard_opt, e) -> emit_pattern ctx p ^ " -> " ^ emit_expr ctx e)
+             (fun (p, _guard_opt, e) ->
+               emit_pattern ctx p ^ " -> " ^ emit_expr ctx e)
              cases)
       ^ " end"
   | For (_, _, _) -> "% For expressions not yet implemented"
@@ -145,12 +146,93 @@ let rec emit_expr ctx (e : expr) : string =
   | Block exprs ->
       let block_ctx = create_scope (Some ctx) in
       String.concat ",\n    " (List.map (emit_expr block_ctx) exprs)
-  | UnaryOp (op, operand) ->
-      op ^ " " ^ emit_expr ctx operand
+  | UnaryOp (op, operand) -> op ^ " " ^ emit_expr ctx operand
   | BinOp (left, op, right) ->
       emit_expr ctx left ^ " " ^ op ^ " " ^ emit_expr ctx right
   | Send (target, message) ->
       emit_expr ctx target ^ " ! " ^ emit_expr ctx message
+  | Receive (clauses, timeout_opt) -> (
+      let clauses_str =
+        String.concat ";\n    " (List.map (emit_receive_clause ctx) clauses)
+      in
+      let receive_body = "receive\n    " ^ clauses_str in
+      match timeout_opt with
+      | Some (timeout_expr, timeout_body) ->
+          receive_body ^ "\nafter\n    " ^ emit_expr ctx timeout_expr
+          ^ " ->\n        " ^ emit_expr ctx timeout_body ^ "\nend"
+      | None -> receive_body ^ "\nend")
+
+(* Helper function to emit receive clauses *)
+and emit_receive_clause ctx (pattern, guard_opt, body) =
+  let pattern_str = emit_pattern ctx pattern in
+  let guard_str =
+    match guard_opt with
+    | Some guard -> " when " ^ emit_guard_expr ctx guard
+    | None -> ""
+  in
+  let body_str = emit_expr ctx body in
+  pattern_str ^ guard_str ^ " -> " ^ body_str
+
+(* Guard expression emission *)
+and emit_guard_expr ctx (guard : guard_expr) : string =
+  match guard with
+  | GuardAnd (g1, g2) -> emit_guard_expr ctx g1 ^ ", " ^ emit_guard_expr ctx g2
+  | GuardOr (g1, g2) -> emit_guard_expr ctx g1 ^ "; " ^ emit_guard_expr ctx g2
+  | GuardAndalso (g1, g2) ->
+      emit_guard_expr ctx g1 ^ " andalso " ^ emit_guard_expr ctx g2
+  | GuardOrelse (g1, g2) ->
+      emit_guard_expr ctx g1 ^ " orelse " ^ emit_guard_expr ctx g2
+  | GuardNot g -> "not " ^ emit_guard_expr ctx g
+  | GuardBinOp (left, op, right) ->
+      let erlang_op =
+        match op with "!=" -> "/=" | "<=" -> "=<" | other -> other
+      in
+      emit_guard_value ctx left ^ " " ^ erlang_op ^ " "
+      ^ emit_guard_value ctx right
+  | GuardCall (func, args) ->
+      let erlang_func =
+        match func with
+        | "is_atom" -> "is_atom"
+        | "is_integer" -> "is_integer"
+        | "is_float" -> "is_float"
+        | "is_number" -> "is_number"
+        | "is_boolean" -> "is_boolean"
+        | "is_list" -> "is_list"
+        | "is_tuple" -> "is_tuple"
+        | other -> other
+      in
+      erlang_func ^ "("
+      ^ String.concat ", " (List.map (emit_guard_value ctx) args)
+      ^ ")"
+  | GuardAtom atom -> emit_guard_atom ctx atom
+
+and emit_guard_atom ctx (atom : guard_atom) : string =
+  match atom with
+  | GuardVar var -> get_renamed_var ctx var
+  | GuardLiteral lit -> emit_literal lit
+  | GuardCallAtom (func, args) ->
+      func ^ "("
+      ^ String.concat ", " (List.map (emit_guard_atom ctx) args)
+      ^ ")"
+
+and emit_guard_value ctx (value : guard_value) : string =
+  match value with
+  | GuardAtomValue atom -> emit_guard_atom ctx atom
+  | GuardCallValue (func, args) ->
+      let erlang_func =
+        match func with
+        | "is_atom" -> "is_atom"
+        | "is_integer" -> "is_integer"
+        | "is_float" -> "is_float"
+        | "is_number" -> "is_number"
+        | "is_boolean" -> "is_boolean"
+        | "is_list" -> "is_list"
+        | "is_tuple" -> "is_tuple"
+        | other -> other
+      in
+      erlang_func ^ "("
+      ^ String.concat ", " (List.map (emit_guard_value ctx) args)
+      ^ ")"
 
 (* Helper function to extract application name from filename *)
 let extract_app_name filename =

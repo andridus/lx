@@ -79,6 +79,13 @@ type expr =
   | BinOp of expr * string * expr (* Binary operations *)
   | UnaryOp of string * expr (* Unary operations *)
   | Send of expr * expr (* Send operator: target ! message *)
+  | Receive of
+      receive_clause list
+      * (expr * expr) option (* clauses, optional (timeout, timeout_body) *)
+
+(* Receive clause definition *)
+and receive_clause =
+  pattern * guard_expr option * expr (* pattern, optional guard, body *)
 
 (* Application definition for .app.src generation *)
 type application_def = {
@@ -114,7 +121,14 @@ let make_single_clause_function name params body =
   {
     name;
     clauses =
-      [ { params = List.map (fun p -> PVar p) params; body; position = None; guard = None } ];
+      [
+        {
+          params = List.map (fun p -> PVar p) params;
+          body;
+          position = None;
+          guard = None;
+        };
+      ];
     visibility = Private;
     position = None;
   }

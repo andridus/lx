@@ -41,7 +41,8 @@ let test_ignored_variables () =
   let func =
     {
       name = "test";
-      clauses = [ { params = []; body = sequence_expr; position = None; guard = None } ];
+      clauses =
+        [ { params = []; body = sequence_expr; position = None; guard = None } ];
       visibility = Private;
       position = None;
     }

@@ -18,8 +18,7 @@ let test_simple_guard_parsing () =
   match program.items with
   | [ Function { clauses = [ { guard = Some _; _ } ]; _ } ] ->
       check bool "simple guard parsed" true true
-  | _ ->
-      Alcotest.fail "Expected function with guard"
+  | _ -> Alcotest.fail "Expected function with guard"
 
 (* Test guard compilation *)
 let test_guard_compilation () =
@@ -65,7 +64,9 @@ let test_guard_with_not () =
 
 (* Test case guard *)
 let test_case_guard () =
-  let input = "fun test(x) { case x { n when n > 0 -> :positive _ -> :other } }" in
+  let input =
+    "fun test(x) { case x { n when n > 0 -> :positive _ -> :other } }"
+  in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string program in
   let contains_when = string_contains_substring result " when " in
@@ -96,7 +97,9 @@ let test_guard_orelse () =
   check bool "guard with orelse" true contains_orelse
 
 let test_guard_mixed_operators () =
-  let input = "fun test(x, y, z) when x > 0 and (y < 10 orelse z > 100) { :valid }" in
+  let input =
+    "fun test(x, y, z) when x > 0 and (y < 10 orelse z > 100) { :valid }"
+  in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string program in
   let contains_and = string_contains_substring result "," in

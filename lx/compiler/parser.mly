@@ -15,7 +15,7 @@ let make_position pos =
 %token MODULE_MACRO
 
 (* Keywords *)
-%token PUB FUN CASE IF ELSE FOR WHEN IN AND OR NOT ANDALSO ORELSE
+%token PUB FUN CASE IF ELSE FOR WHEN IN AND OR NOT ANDALSO ORELSE RECEIVE AFTER
 
 (* OTP Keywords *)
 %token WORKER SUPERVISOR STRATEGY CHILDREN
@@ -277,6 +277,10 @@ expr:
     { Match (value, cases) }
   | FOR var = IDENT IN iterable = expr LBRACE body = expr RBRACE
     { For (var, iterable, body) }
+  | RECEIVE LBRACE clauses = nonempty_list(receive_clause) RBRACE
+    { Receive (clauses, None) }
+  | RECEIVE LBRACE clauses = nonempty_list(receive_clause) RBRACE AFTER timeout = expr LBRACE timeout_body = expr RBRACE
+    { Receive (clauses, Some (timeout, timeout_body)) }
 
 simple_expr:
   | l = literal { Literal l }
@@ -314,6 +318,12 @@ case_branch:
   | pattern = pattern ARROW body = expr
     { (pattern, None, body) }
 
+receive_clause:
+  | pattern = pattern WHEN guard = guard_expr ARROW body = expr
+    { (pattern, Some guard, body) }
+  | pattern = pattern ARROW body = expr
+    { (pattern, None, body) }
+
 pattern:
   | p = simple_pattern { p }
   | head = pattern CONS tail = pattern { PCons (head, tail) }
@@ -333,6 +343,10 @@ simple_pattern:
     { PTuple patterns }
   | LBRACKET patterns = separated_list(COMMA, pattern) RBRACKET
     { PList patterns }
+  | LBRACKET head = pattern PIPE tail = pattern RBRACKET
+    { PCons (head, tail) }
+  | LBRACKET first = pattern COMMA rest = separated_nonempty_list(COMMA, pattern) PIPE tail = pattern RBRACKET
+    { List.fold_right (fun elem acc -> PCons (elem, acc)) (first :: rest) tail }
 
 literal:
   | s = STRING { LString s }

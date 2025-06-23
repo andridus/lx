@@ -2,7 +2,208 @@
 
 This document tracks major improvements and features added to the Lx language compiler and toolchain.
 
-## [Latest] Send Operator Implementation
+## [Latest] List Pattern Optimization & Code Quality Improvements
+
+### Overview
+Implemented significant optimizations for list pattern matching in receive expressions and throughout the codebase, improving the readability and maintainability of generated Erlang code. Enhanced the pattern matching system to generate cleaner, more intuitive Erlang patterns while maintaining full semantic correctness.
+
+### Key Changes
+
+#### 1. Optimized List Cons Pattern Generation
+- **Enhanced readability**: List patterns like `[a, b|tail]` now generate `[A, B | Tail]` instead of nested `[A | [B | Tail]]`
+- **Smart pattern detection**: Automatically detects and optimizes complex cons patterns
+- **Semantic preservation**: Maintains exact pattern matching behavior while improving code clarity
+- **Performance neutral**: No runtime performance impact, purely cosmetic improvement
+
+#### 2. Advanced Pattern Optimization Algorithm
+- **Pattern collection**: New `collect_cons_elements` function intelligently flattens nested cons patterns
+- **Tail optimization**: Recognizes when tail patterns can be simplified (e.g., empty lists)
+- **Context-aware generation**: Generates optimal Erlang syntax based on pattern structure
+- **Backward compatibility**: All existing patterns continue to work without changes
+
+#### 3. Comprehensive Code Formatting
+- **Consistent style**: Applied OCaml formatting standards throughout the codebase
+- **Improved readability**: Better line breaks and indentation in complex expressions
+- **Maintainability**: Easier to read and maintain compiler source code
+- **Professional quality**: Code style matches industry standards
+
+### Technical Implementation
+
+#### Pattern Optimization Engine
+```ocaml
+(* Helper function to optimize cons pattern generation *)
+let rec collect_cons_elements pattern =
+  match pattern with
+  | PCons (head, tail) ->
+      let elements, final_tail = collect_cons_elements tail in
+      (head :: elements, final_tail)
+  | other -> ([], other)
+```
+
+#### Smart Erlang Generation
+```ocaml
+| PCons (_, _) -> (
+    (* Optimize cons patterns to generate more readable Erlang *)
+    let elements, final_tail = collect_cons_elements p in
+    let elements_str = String.concat ", " (List.map (emit_pattern ctx) elements) in
+    match final_tail with
+    | PList [] -> "[" ^ elements_str ^ "]"  (* [a, b, c] instead of [a | [b | [c | []]]] *)
+    | _ -> "[" ^ elements_str ^ " | " ^ emit_pattern ctx final_tail ^ "]")
+```
+
+### Pattern Optimization Examples
+
+#### Basic List Patterns
+```lx
+# Lx source
+receive {
+    [a, b] -> :list_pattern
+#### 1. Receive Expression Syntax
+- **Basic receive**: `receive { pattern -> expression }`
+- **Receive with timeout**: `receive { pattern -> expression } after timeout { timeout_expression }`
+- **Pattern matching**: Full support for all pattern types (literals, tuples, lists, variables)
+- **Guards**: Support for guard expressions in receive clauses
+- **Selective reception**: Messages matched in clause order, not queue order
+
+#### 2. Compiler Components Updated
+- **Lexer**: Added `RECEIVE` and `AFTER` tokens
+- **Parser**: Added grammar rules for receive expressions and receive clauses
+- **AST**: Added `Receive of receive_clause list * (expr * expr) option` variant
+- **Type checker**: Complete type inference for receive expressions and timeout validation
+- **Code generation**: Generates correct Erlang `receive...end` and `receive...after...end` syntax
+
+#### 3. Advanced Features
+- **Timeout handling**: Support for millisecond timeouts, `:infinity`, and zero timeouts
+- **Guard expressions**: Full guard support with type checking and function validation
+- **Nested receives**: Support for nested receive expressions
+- **OTP integration**: Seamless integration with OTP worker callbacks
+- **Send/receive combination**: Perfect integration with send operator for complete message passing
+
+### Syntax and Usage
+
+#### Basic Receive Operations
+```lx
+# Simple message reception
+receive {
+    :ping -> :pong
+    :stop -> :shutdown
+    _ -> :unknown
+}
+
+# Receive with pattern matching
+receive {
+    .{:data, value} -> process_data(value)
+    .{:error, reason} -> handle_error(reason)
+    message -> handle_generic(message)
+}
+```
+
+#### Receive with Timeout
+```lx
+# Timeout after 5 seconds
+receive {
+    :response -> :got_response
+} after 5000 {
+    :timeout
+}
+
+# Non-blocking receive (immediate timeout)
+receive {
+    :immediate -> :found
+} after 0 {
+    :no_message
+}
+```
+
+#### Guards in Receive
+```lx
+receive {
+    x when is_integer(x) -> x * 2
+    x when is_atom(x) -> :atom_received
+    .{y, z} when is_list(y) -> length(y) + z
+    _ -> :no_match
+}
+```
+
+#### OTP Integration
+```lx
+worker message_processor {
+    fun handle_info(:check_queue, state) {
+        result = receive {
+            .{:task, id, data} when is_integer(id) -> process_task(id, data)
+            :flush -> :queue_flushed
+        } after 1000 {
+            :no_messages
+        }
+        .{:noreply, update_state(state, result)}
+    }
+}
+```
+
+### Generated Erlang Code
+
+Receive expressions compile directly to Erlang's native receive syntax:
+
+```lx
+# Lx source
+fun wait_for_message() {
+    receive {
+        .{:ok, data} -> data
+        :error -> nil
+    } after 5000 {
+        :timeout
+    }
+}
+```
+
+```erlang
+% Generated Erlang
+wait_for_message() ->
+    receive
+    {ok, Data} -> Data;
+    error -> nil
+after
+    5000 ->
+        timeout
+end.
+```
+
+### Benefits
+
+#### 1. Complete Actor Model Support
+- **Message reception**: Core functionality for actor-based programming
+- **Selective receive**: Efficient message queue processing
+- **Pattern matching**: Powerful message filtering and data extraction
+- **Timeout handling**: Non-blocking and timed operations
+
+#### 2. OTP Compatibility
+- **Native integration**: Works seamlessly with OTP behaviors
+- **Process communication**: Enables proper inter-process messaging
+- **Fault tolerance**: Timeout mechanisms for robust error handling
+- **Performance**: Zero overhead compilation to BEAM instructions
+
+#### 3. Type Safety and Validation
+- **Compile-time checking**: Pattern and guard validation
+- **Timeout validation**: Ensures timeout expressions are integers
+- **Type inference**: Proper type checking for all receive clauses
+- **Error reporting**: Clear error messages for invalid syntax
+
+### Testing Coverage
+
+Comprehensive test suite covering:
+- Basic receive expression parsing and compilation
+- Receive with timeout functionality
+- Guard expressions in receive clauses
+- Pattern matching (tuples, lists, literals, variables)
+- OTP context integration
+- Nested receive expressions
+- Send/receive operator integration
+- Selective message reception patterns
+- Type checking and error handling
+
+This implementation provides complete message reception capabilities, enabling full actor model programming and robust OTP application development in Lx.
+
+## [Previous] Send Operator Implementation
 
 ### Overview
 Implemented the send operator (`!`) for message passing between processes, enabling essential OTP functionality. This operator allows sending messages to process identifiers (PIDs), atoms, and tuples, following Erlang's message passing semantics.

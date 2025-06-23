@@ -11,15 +11,16 @@ This document provides a comprehensive reference for the Lx programming language
 5. [Identifiers](#identifiers)
 6. [Comments](#comments)
 7. [Expressions](#expressions)
-8. [Function Definitions](#function-definitions)
-9. [Pattern Matching](#pattern-matching)
-10. [OTP Components](#otp-components)
-11. [Specifications](#specifications)
-12. [Testing](#testing)
-13. [Application Definition](#application-definition)
-14. [Build System & Compilation](#build-system--compilation)
-15. [Static Analysis & Linting System](#static-analysis--linting-system)
-16. [Examples](#examples)
+8. [Message Passing](#message-passing)
+9. [Function Definitions](#function-definitions)
+10. [Pattern Matching](#pattern-matching)
+11. [OTP Components](#otp-components)
+12. [Specifications](#specifications)
+13. [Testing](#testing)
+14. [Application Definition](#application-definition)
+15. [Build System & Compilation](#build-system--compilation)
+16. [Static Analysis & Linting System](#static-analysis--linting-system)
+17. [Examples](#examples)
 
 ## Lexical Elements
 
@@ -35,6 +36,8 @@ Lx has several categories of keywords:
 - `else` - Used with `if` expressions
 - `for` - Loop iteration
 - `when` - Guard expressions (supports function calls like `hd/1`, `length/1`, `is_list/1`)
+- `receive` - Message reception expressions
+- `after` - Timeout clause in receive expressions
 - `true` - Boolean literal
 - `false` - Boolean literal
 - `nil` - Null/empty value
@@ -662,6 +665,212 @@ notify(Pid, Message) ->
 
 **Performance**: Send operations have zero overhead as they compile directly to BEAM VM's optimized message passing instructions.
 
+### Receive Expressions
+
+Receive expressions enable message reception and pattern matching, forming the core of Erlang's actor model. They allow processes to selectively receive messages from their message queue based on pattern matching.
+
+#### Basic Syntax
+```lx
+# Basic receive without timeout
+receive {
+    :ping -> :pong
+    :stop -> :shutdown
+    _ -> :unknown
+}
+
+# Receive with timeout
+receive {
+    .{:data, value} -> .{:ok, value}
+    :error -> :failed
+} after 5000 {
+    :timeout
+}
+```
+
+#### Pattern Matching in Receive
+Receive expressions support all pattern matching features:
+
+```lx
+# Literal patterns
+receive {
+    :ok -> :success
+    :error -> :failure
+    42 -> :the_answer
+}
+
+# Tuple patterns
+receive {
+    .{:ping, from} -> from ! :pong
+    .{:data, value} -> process_data(value)
+    .{:error, reason} -> handle_error(reason)
+}
+
+# List patterns
+receive {
+    [] -> :empty_list
+    [head | tail] -> process_list(head, tail)
+    [single] -> process_single(single)
+}
+
+# Variable patterns
+receive {
+    message -> handle_any_message(message)
+    _ -> :ignored
+}
+```
+
+#### Guards in Receive Clauses
+Receive expressions support guard expressions for conditional matching:
+
+```lx
+receive {
+    x when is_integer(x) -> x * 2
+    x when is_atom(x) -> :atom_received
+    .{y, z} when is_list(y) -> length(y) + z
+    msg when is_tuple(msg) -> handle_tuple(msg)
+    _ -> :no_match
+}
+```
+
+#### Timeout Handling
+The `after` clause specifies a timeout for receive operations:
+
+```lx
+# Timeout with specific duration (milliseconds)
+receive {
+    :response -> :got_response
+} after 1000 {
+    :timeout_after_1_second
+}
+
+# Infinity timeout (wait forever)
+receive {
+    :message -> :received
+} after :infinity {
+    :never_reached
+}
+
+# Zero timeout (non-blocking receive)
+receive {
+    :immediate -> :found
+} after 0 {
+    :no_message_available
+}
+```
+
+#### Selective Message Reception
+Receive expressions search the message queue in order and select the first matching message:
+
+```lx
+# Priority-based message handling
+receive {
+    .{:high_priority, msg} -> handle_urgent(msg)
+    .{:medium_priority, msg} -> handle_normal(msg)
+    .{:low_priority, msg} -> queue_for_later(msg)
+    _ -> :ignored
+}
+```
+
+#### Integration with Send Operator
+Receive expressions work seamlessly with the send operator for full message passing:
+
+```lx
+# Ping-pong server
+fun ping_pong_server() {
+    receive {
+        .{:ping, from} -> from ! :pong
+        .{:echo, from, msg} -> from ! msg
+        :stop -> exit(:normal)
+        _ -> ping_pong_server()  # Continue receiving
+    }
+}
+```
+
+#### OTP Integration
+Receive expressions are commonly used in OTP callbacks:
+
+```lx
+worker message_processor {
+    fun handle_info(:process_messages, state) {
+        result = receive {
+            .{:task, id, data} when is_integer(id) -> process_task(id, data)
+            .{:priority, task} -> handle_priority(task)
+            :flush -> :flushed
+        } after 1000 {
+            :no_messages
+        }
+
+        new_state = update_processing_state(state, result)
+        .{:noreply, new_state}
+    }
+
+    fun handle_cast(.{:forward, pid, message}, state) {
+        pid ! message
+        response = receive {
+            :ack -> :confirmed
+            :nack -> :failed
+        } after 2000 {
+            :timeout
+        }
+        .{:noreply, state.{last_response: response}}
+    }
+}
+```
+
+#### Nested Receive Expressions
+Receive expressions can be nested for complex message handling patterns:
+
+```lx
+fun session_handler() {
+    receive {
+        :start_session -> receive {
+            .{:auth, user, pass} -> authenticate(user, pass)
+            :cancel -> :session_cancelled
+        } after 10000 {
+            :auth_timeout
+        }
+        :direct_message -> :handled
+    }
+}
+```
+
+#### Generated Erlang Code
+Receive expressions compile directly to Erlang's native receive syntax:
+
+```lx
+# Lx source
+fun wait_for_response() {
+    receive {
+        :ok -> :success
+        .{:error, reason} -> .{:failure, reason}
+    } after 5000 {
+        :timeout
+    }
+}
+```
+
+```erlang
+% Generated Erlang
+wait_for_response() ->
+    receive
+    ok -> success;
+    {error, Reason} -> {failure, Reason}
+after
+    5000 ->
+        timeout
+end.
+```
+
+#### Receive Expression Properties
+- **Blocking**: Receive expressions block the process until a message matches or timeout occurs
+- **Selective**: Messages are matched in the order they appear in clauses, not in message queue order
+- **Pattern matching**: Full pattern matching support including guards
+- **Return value**: Returns the value of the matched clause
+- **Message queue**: Unmatched messages remain in the queue for future receive operations
+- **Timeout**: Optional timeout with `after` clause for non-blocking behavior
+
+**Performance**: Receive expressions compile to BEAM VM's optimized message reception instructions, providing efficient selective message processing essential for actor model programming.
+
 ### For Loops
 ```lx
 for item in list {
@@ -683,6 +892,133 @@ for item in list {
 [1, 2, 3]       # List with elements
 [head | tail]   # Cons pattern
 ```
+
+## Message Passing
+
+Lx provides comprehensive message passing capabilities through send and receive expressions, enabling full actor model programming and OTP application development.
+
+### Send Expressions
+
+Send expressions use the `!` operator to send messages to processes, registered names, or remote nodes.
+
+#### Basic Send Syntax
+```lx
+target ! message
+```
+
+#### Supported Target Types
+- **Process ID (PID)**: Direct message to a specific process
+- **Atom**: Message to a registered process name
+- **Tuple**: For distributed messaging (e.g., `{node, process}`)
+
+#### Basic Examples
+```lx
+# Send to PID
+pid ! :hello
+
+# Send to registered process
+:my_process ! .{:request, data}
+
+# Send to remote node
+.{:node@host, :worker} ! :start
+
+# Send complex data
+worker_pid ! .{:update, "new_value", 42}
+```
+
+#### Operator Precedence and Associativity
+The send operator is **right associative** with **lower precedence** than arithmetic operators:
+
+```lx
+# Right associative - equivalent to: pid1 ! (pid2 ! message)
+pid1 ! pid2 ! message
+
+# Precedence - equivalent to: pid ! (x + y)
+pid ! x + y
+
+# Use parentheses for different grouping
+(pid ! x) + y
+```
+
+#### Return Value
+Send expressions return the sent message:
+
+```lx
+# The send operation returns the message
+result = pid ! :hello    # result is :hello
+status = worker ! data   # status is data
+
+# Useful for chaining or logging
+log("Sent: " + (pid ! message))
+```
+
+#### Type Safety
+The type checker validates send targets at compile time:
+
+```lx
+# Valid send targets
+pid ! message           # pid type
+:registered ! data      # atom type
+.{node, proc} ! msg     # tuple type
+
+# Invalid send targets (compile errors)
+42 ! message           # Error: Cannot send to integer
+"string" ! message     # Error: Cannot send to string
+[1, 2, 3] ! message    # Error: Cannot send to list
+```
+
+#### OTP Integration
+Send expressions work seamlessly in OTP contexts:
+
+```lx
+worker my_worker {
+  handle_call(.{:forward, target_pid, message}, _from, state) {
+    # Forward message to another process
+    target_pid ! message
+    .{:reply, :ok, state}
+  }
+
+  handle_cast(.{:broadcast, pids, message}, state) {
+    # Send to multiple processes
+    for pid in pids {
+      pid ! message
+    }
+    .{:noreply, state}
+  }
+}
+```
+
+#### Pattern Matching with Send
+```lx
+fun notify_process {
+  (:urgent, pid, message) {
+    # Send urgent message
+    pid ! .{:urgent, message}
+  }
+  (:normal, pid, message) {
+    # Send normal message
+    pid ! message
+  }
+}
+```
+
+#### Generated Erlang Code
+Send expressions compile directly to Erlang's native message passing:
+
+```lx
+# Lx source
+fun notify(pid, message) {
+  pid ! .{:notification, message}
+}
+```
+
+```erlang
+% Generated Erlang
+notify(Pid, Message) ->
+    Pid ! {notification, Message}.
+```
+
+**Performance**: Send operations have zero overhead as they compile directly to BEAM VM's optimized message passing instructions.
 
 ## Function Definitions
 
@@ -871,6 +1207,10 @@ case tuple {
 ```
 
 ### List Patterns
+
+Lx provides comprehensive list pattern matching with optimized Erlang code generation for maximum readability and performance.
+
+#### Basic List Patterns
 ```lx
 case list {
   [] -> "empty"
@@ -879,6 +1219,111 @@ case list {
   [head | tail] -> "cons pattern"
 }
 ```
+
+#### Advanced List Cons Patterns
+Lx supports complex list patterns with multiple elements before the tail, generating clean, readable Erlang code:
+
+```lx
+# Multiple elements with tail
+case list {
+  [first, second | rest] -> process_pair(first, second, rest)
+  [a, b, c | tail] -> process_triple(a, b, c, tail)
+  [single | []] -> process_single(single)
+}
+
+# In receive expressions
+receive {
+  .{:batch, [item1, item2 | remaining]} -> process_batch(item1, item2, remaining)
+  .{:pair, [a, b]} -> process_pair(a, b)
+  .{:single, [item]} -> process_single(item)
+  .{:empty, []} -> :no_items
+}
+
+# In function parameters
+fun process_list {
+  ([]) { :empty }
+  ([single]) { process_one(single) }
+  ([first, second | rest]) {
+    result = combine(first, second)
+    [result | process_list(rest)]
+  }
+}
+```
+
+#### Pattern Optimization
+
+The Lx compiler automatically optimizes list cons patterns for better readability in the generated Erlang code:
+
+**Before Optimization (Internal Representation):**
+```erlang
+% Nested cons patterns were hard to read
+[Head | [Head2 | Tail]]
+```
+
+**After Optimization (Generated Code):**
+```erlang
+% Clean, intuitive patterns
+[Head, Head2 | Tail]
+```
+
+**Examples of Optimized Output:**
+
+```lx
+# Lx source
+fun pattern_examples {
+  ([a, b]) { :two_elements }
+  ([x | y]) { :cons_simple }
+  ([first, second | rest]) { :cons_multiple }
+}
+```
+
+```erlang
+% Generated Erlang (optimized)
+pattern_examples([A, B]) ->
+    two_elements;
+pattern_examples([X | Y]) ->
+    cons_simple;
+pattern_examples([First, Second | Rest]) ->
+    cons_multiple.
+```
+
+#### Complex Pattern Matching Scenarios
+
+```lx
+# Nested patterns with optimization
+case complex_data {
+  .{:ok, [first, second | remaining]} -> {
+    processed = process_pair(first, second)
+    .{:success, processed, remaining}
+  }
+  .{:error, []} -> :empty_error
+  .{:partial, [single]} -> process_single(single)
+  _ -> :unknown_format
+}
+
+# List patterns with guards
+fun validate_list {
+  (list) when length(list) >= 2 {
+    case list {
+      [a, b | _] when a > b -> :descending
+      [a, b | _] when a < b -> :ascending
+      [a, a | _] -> :equal_start
+    }
+  }
+  ([single]) { :single_element }
+  ([]) { :empty }
+}
+```
+
+#### Benefits of Pattern Optimization
+
+1. **Enhanced Readability**: Generated Erlang code looks hand-written and professional
+2. **Debugging Friendly**: Easier to understand patterns when debugging generated code
+3. **Semantic Preservation**: Identical pattern matching behavior with improved presentation
+4. **Performance Neutral**: No runtime performance impact, purely cosmetic improvement
+5. **Erlang Compatibility**: Generated patterns follow standard Erlang conventions
+
+This optimization makes Lx-generated code indistinguishable from hand-written Erlang in terms of pattern clarity and maintainability.
 
 ### Guard Expressions with Function Calls
 
@@ -2150,6 +2595,75 @@ check:
 ```
 
 This enhanced build system provides developers with flexible, efficient compilation options while maintaining the robustness and reliability of the LX toolchain.
+
+### Code Quality & Generated Code Improvements
+
+#### Enhanced Erlang Code Generation
+
+Lx continuously improves the quality of generated Erlang code to ensure it matches hand-written code standards:
+
+##### Pattern Optimization
+- **List patterns**: Automatically optimizes complex cons patterns for better readability
+- **Clean output**: Generated patterns like `[A, B | Tail]` instead of nested `[A | [B | Tail]]`
+- **Professional quality**: Generated code looks hand-written and maintainable
+
+##### Code Formatting Standards
+- **Consistent style**: All generated Erlang code follows consistent formatting rules
+- **Proper indentation**: Clean, readable code structure with appropriate line breaks
+- **Industry standards**: Matches Erlang/OTP community conventions
+
+##### Examples of Quality Improvements
+
+**List Pattern Optimization:**
+```lx
+# Lx source
+receive {
+    [first, second|rest] -> process_pair(first, second, rest)
+}
+```
+
+```erlang
+% Generated Erlang (optimized)
+receive
+    [First, Second | Rest] -> process_pair(First, Second, Rest)
+end.
+```
+
+**Before optimization, this would generate:**
+```erlang
+% Old output (hard to read)
+receive
+    [First | [Second | Rest]] -> process_pair(First, Second, Rest)
+end.
+```
+
+#### Compiler Code Quality
+
+The Lx compiler itself maintains high code quality standards:
+
+##### OCaml Best Practices
+- **Functional programming**: Immutable data structures and pure functions
+- **Type safety**: Comprehensive type annotations and error handling
+- **Consistent formatting**: Professional code style throughout the codebase
+
+##### Maintainability Features
+- **Clear documentation**: Well-documented functions and modules
+- **Modular design**: Clean separation of concerns between compiler phases
+- **Error handling**: Comprehensive error reporting with helpful suggestions
+
+#### Performance Optimizations
+
+##### Generated Code Performance
+- **Zero overhead**: Direct compilation to efficient Erlang constructs
+- **Pattern matching**: Optimized pattern compilation for BEAM VM
+- **Memory efficiency**: Clean, minimal generated code without unnecessary constructs
+
+##### Compiler Performance
+- **Fast compilation**: Efficient parsing and code generation algorithms
+- **Parallel processing**: Support for concurrent compilation where possible
+- **Incremental improvements**: Continuous optimization of compilation speed
+
+This focus on code quality ensures that both the Lx compiler and the generated Erlang code meet professional standards for production use.
 
 ## Static Analysis & Linting System
 

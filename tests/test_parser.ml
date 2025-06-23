@@ -8,7 +8,8 @@ let test_simple_function () =
    Function
      {
        name = "num";
-               clauses = [ { params = []; body = Literal (LInt 42); position = _; guard = _ } ];
+       clauses =
+         [ { params = []; body = Literal (LInt 42); position = _; guard = _ } ];
        visibility = Private;
        position = _;
      };
@@ -24,7 +25,14 @@ let test_function_with_params () =
      {
        name = "add";
        clauses =
-                   [ { params = [ PVar "x"; PVar "y" ]; body = Var "x"; position = _; guard = _ } ];
+         [
+           {
+             params = [ PVar "x"; PVar "y" ];
+             body = Var "x";
+             position = _;
+             guard = _;
+           };
+         ];
        visibility = Private;
        position = _;
      };
@@ -39,14 +47,16 @@ let test_multiple_functions () =
    Function
      {
        name = "first";
-       clauses = [ { params = []; body = Literal (LInt 1); position = _; guard = _ } ];
+       clauses =
+         [ { params = []; body = Literal (LInt 1); position = _; guard = _ } ];
        visibility = Private;
        position = _;
      };
    Function
      {
        name = "second";
-       clauses = [ { params = []; body = Literal (LInt 2); position = _; guard = _ } ];
+       clauses =
+         [ { params = []; body = Literal (LInt 2); position = _; guard = _ } ];
        visibility = Private;
        position = _;
      };
@@ -62,7 +72,14 @@ let test_public_function () =
      {
        name = "hello";
        clauses =
-         [ { params = []; body = Literal (LString "world"); position = _; guard = _ } ];
+         [
+           {
+             params = [];
+             body = Literal (LString "world");
+             position = _;
+             guard = _;
+           };
+         ];
        visibility = Public;
        position = _;
      };
@@ -92,7 +109,14 @@ let test_comparison_operators () =
          {
            name = "test";
            clauses =
-             [ { params = []; body = BinOp (_, actual_op, _); position = _; guard = _ } ];
+             [
+               {
+                 params = [];
+                 body = BinOp (_, actual_op, _);
+                 position = _;
+                 guard = _;
+               };
+             ];
            visibility = Private;
            position = _;
          };
