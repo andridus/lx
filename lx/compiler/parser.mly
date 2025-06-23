@@ -290,10 +290,22 @@ expr:
     { Send (left, right) }
   | NOT right = expr
     { UnaryOp ("not", right) }
-  | IF cond = expr LBRACE then_expr = expr RBRACE ELSE LBRACE else_expr = expr RBRACE
-    { If (cond, then_expr, Some else_expr) }
-  | IF cond = expr LBRACE then_expr = expr RBRACE
-    { If (cond, then_expr, None) }
+  | IF cond = expr LBRACE then_statements = statement_list RBRACE ELSE LBRACE else_statements = statement_list RBRACE
+    { let then_expr = match then_statements with
+        | [e] -> e
+        | es -> Block es
+      in
+      let else_expr = match else_statements with
+        | [e] -> e
+        | es -> Block es
+      in
+      If (cond, then_expr, Some else_expr) }
+  | IF cond = expr LBRACE then_statements = statement_list RBRACE
+    { let then_expr = match then_statements with
+        | [e] -> e
+        | es -> Block es
+      in
+      If (cond, then_expr, None) }
   | IF _cond = expr LBRACE error
     { failwith "Enhanced:Missing expression in if block|Suggestion:Add an expression inside the braces|Context:if statement" }
   | IF _cond = expr error

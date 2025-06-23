@@ -48,8 +48,10 @@ type lint_context = {
   parent_scope : lint_context option;
   current_function : string option;
   defined_functions : (string, unit) Hashtbl.t; (* Track defined functions *)
-  defined_records : (string, Error.position option) Hashtbl.t; (* Track defined records *)
-  used_records : (string, Error.position option) Hashtbl.t; (* Track used records *)
+  defined_records : (string, Error.position option) Hashtbl.t;
+      (* Track defined records *)
+  used_records : (string, Error.position option) Hashtbl.t;
+      (* Track used records *)
 }
 
 let create_context parent =
@@ -68,9 +70,7 @@ let create_context parent =
       | Some p -> p.defined_records
       | None -> Hashtbl.create 16);
     used_records =
-      (match parent with
-      | Some p -> p.used_records
-      | None -> Hashtbl.create 16);
+      (match parent with Some p -> p.used_records | None -> Hashtbl.create 16);
   }
 
 let create_root_context () = create_context None
@@ -238,8 +238,6 @@ let define_record ctx record_name position =
 
 let use_record ctx record_name position =
   Hashtbl.replace ctx.used_records record_name position
-
-
 
 (* Convert Ast.position to Error.position *)
 let convert_position = function
@@ -559,7 +557,8 @@ let rec lint_expr ctx errors expr =
               in
               let error =
                 create_lint_error
-                  (UnusedComplexStructure (structure_desc, convert_position position))
+                  (UnusedComplexStructure
+                     (structure_desc, convert_position position))
                   (match convert_position position with
                   | Some p -> p
                   | None -> { line = 0; column = 0; filename = None })
@@ -572,7 +571,8 @@ let rec lint_expr ctx errors expr =
               in
               let error =
                 create_lint_error
-                  (UnusedComplexStructure (structure_desc, convert_position position))
+                  (UnusedComplexStructure
+                     (structure_desc, convert_position position))
                   (match convert_position position with
                   | Some p -> p
                   | None -> { line = 0; column = 0; filename = None })
@@ -585,7 +585,8 @@ let rec lint_expr ctx errors expr =
               in
               let error =
                 create_lint_error
-                  (UnusedComplexStructure (structure_desc, convert_position position))
+                  (UnusedComplexStructure
+                     (structure_desc, convert_position position))
                   (match convert_position position with
                   | Some p -> p
                   | None -> { line = 0; column = 0; filename = None })
@@ -856,7 +857,8 @@ let lint_module_item ctx item =
   | Spec _ | Test _ | Application _ -> []
   | RecordDef record_def ->
       (* Define the record in the context *)
-      define_record ctx record_def.record_name (convert_position record_def.position);
+      define_record ctx record_def.record_name
+        (convert_position record_def.position);
       [] (* No immediate errors from record definition *)
 
 let lint_program ?(skip_unused_functions = false) program =
@@ -873,7 +875,8 @@ let lint_program ?(skip_unused_functions = false) program =
               define_function root_ctx func_def.name)
             functions
       | RecordDef record_def ->
-          define_record root_ctx record_def.record_name (convert_position record_def.position)
+          define_record root_ctx record_def.record_name
+            (convert_position record_def.position)
       | _ -> ())
     program.items;
 
@@ -904,7 +907,9 @@ let lint_program ?(skip_unused_functions = false) program =
   let unused_record_errors = check_unused_records root_ctx in
 
   (* Treat all lint issues as errors - no warnings allowed *)
-  let all_lint_errors = all_errors @ unused_func_errors @ unused_record_errors in
+  let all_lint_errors =
+    all_errors @ unused_func_errors @ unused_record_errors
+  in
 
   if List.length all_lint_errors > 0 then raise (LintError all_lint_errors)
   else Printf.printf "Linting completed successfully (no issues found)\n"

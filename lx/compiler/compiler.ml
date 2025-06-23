@@ -207,8 +207,10 @@ let rec get_record_type_name ctx (expr : expr) : string =
       match get_var_record_type ctx var_name with
       | Some record_type -> String.lowercase_ascii record_type
       | None -> (
-          (* Special case: if the variable is "record", it's a keyword used as variable *)
-          if var_name = "record" then
+          if
+            (* Special case: if the variable is "record", it's a keyword used as variable *)
+            var_name = "record"
+          then
             (* For the keyword "record" used as variable, we can't infer the type from the name *)
             (* This should have been tracked when the variable was assigned *)
             "record" (* fallback - this indicates the tracking failed *)
@@ -222,8 +224,7 @@ let rec get_record_type_name ctx (expr : expr) : string =
                    && String.get record_name 0 >= 'A'
                    && String.get record_name 0 <= 'Z' ->
                 String.lowercase_ascii record_name
-            | _ -> "record"
-            (* fallback *)))
+            | _ -> "record" (* fallback *)))
   | RecordCreate (record_name, _) -> String.lowercase_ascii record_name
   | RecordAccess (inner_expr, _) -> get_record_type_name ctx inner_expr
   | RecordUpdate (inner_expr, _) -> get_record_type_name ctx inner_expr
@@ -359,7 +360,7 @@ and emit_expr ctx (e : expr) : string =
       then
         (* For ignored variables, just evaluate the right side for side effects *)
         emit_expr ctx value
-      else (
+      else
         (* Normal assignment handling *)
         let renamed = add_var_to_scope ctx id in
         (* Track record type if the value is a record *)
@@ -379,7 +380,7 @@ and emit_expr ctx (e : expr) : string =
         | Assign (_, inner_value, _) ->
             (* For single assignment in block, use the inner value directly *)
             renamed ^ " = " ^ emit_expr ctx inner_value
-        | _ -> renamed ^ " = " ^ emit_expr ctx value))
+        | _ -> renamed ^ " = " ^ emit_expr ctx value)
   | Fun (params, body) ->
       let fun_ctx = create_scope (Some ctx) in
       let renamed_params = List.map (add_var_to_scope fun_ctx) params in
