@@ -24,6 +24,8 @@ type lx_type =
   | TMap of lx_type * lx_type (* TMap(key_type, value_type) *)
   | TConcreteMap of
       (string * lx_type) list (* Concrete map with specific atom keys *)
+  | TBinary
+  | TBitstring
   | TOtpState
   | TOtpReply of lx_type
   | TOtpCast
@@ -240,6 +242,8 @@ let rec string_of_type = function
       ^ String.concat ", "
           (List.map (fun (k, v) -> k ^ ": " ^ string_of_type v) fields)
       ^ "}"
+  | TBinary -> "binary"
+  | TBitstring -> "bitstring"
   | TOtpState -> "otp_state"
   | TOtpReply t -> "otp_reply(" ^ string_of_type t ^ ")"
   | TOtpCast -> "otp_cast"
@@ -414,6 +418,23 @@ let infer_literal = function
   | LAtom _ -> TAtom
   | LNil -> TNil
 
+(* Validate binary specifications *)
+let validate_binary_spec = function
+  | BinaryType typ -> (
+      match typ with
+      | "integer" | "float" | "binary" | "utf8" | "utf16" | "utf32" | "bytes"
+      | "bits" | "bitstring" | "signed" | "unsigned" ->
+          ()
+      | _ -> failwith ("Unknown binary type specifier: " ^ typ))
+  | BinaryTypeWithEndian (typ, endian) -> (
+      (match typ with
+      | "integer" | "float" -> ()
+      | _ ->
+          failwith ("Type specifier '" ^ typ ^ "' does not support endianness"));
+      match endian with
+      | "big" | "little" | "native" -> ()
+      | _ -> failwith ("Unknown endianness: " ^ endian))
+
 (* Guard type checking functions *)
 let rec infer_guard_expr (env : type_env) (guard : guard_expr) : substitution =
   match guard with
@@ -544,6 +565,8 @@ let rec unify (t1 : lx_type) (t2 : lx_type) : substitution =
   | TBool, TBool
   | TAtom, TAtom
   | TNil, TNil
+  | TBinary, TBinary
+  | TBitstring, TBitstring
   | TOtpState, TOtpState
   | TOtpCast, TOtpCast
   | TOtpInfo, TOtpInfo ->
@@ -752,6 +775,36 @@ let rec infer_pattern (env : type_env) (pattern : pattern) :
         let key_type = fresh_type_var () in
         let value_type = fresh_type_var () in
         (TMap (key_type, value_type), final_env, final_subst)
+  | PBinary pattern_elements ->
+      (* Binary pattern matching - validate each element and return binary type *)
+      let final_env, final_subst =
+        List.fold_left
+          (fun (env_acc, subst_acc) element ->
+            match element with
+            | SimpleBinaryPattern pattern ->
+                let _pattern_type, pattern_env, pattern_subst =
+                  infer_pattern env_acc pattern
+                in
+                (pattern_env, compose_subst subst_acc pattern_subst)
+            | SizedBinaryPattern (pattern, _size_expr, spec_opt) ->
+                let _pattern_type, pattern_env, pattern_subst =
+                  infer_pattern env_acc pattern
+                in
+                (* Validate binary specification if present *)
+                (match spec_opt with
+                | Some spec -> validate_binary_spec spec
+                | None -> ());
+                (pattern_env, compose_subst subst_acc pattern_subst)
+            | TypedBinaryPattern (pattern, spec) ->
+                let _pattern_type, pattern_env, pattern_subst =
+                  infer_pattern env_acc pattern
+                in
+                (* Validate binary specification *)
+                validate_binary_spec spec;
+                (pattern_env, compose_subst subst_acc pattern_subst))
+          (env, []) pattern_elements
+      in
+      (TBinary, final_env, final_subst)
 
 (* Helper function to extract atom key names from map pattern *)
 let rec extract_atom_keys_from_pattern (pattern_fields : map_pattern_field list)
@@ -1483,6 +1536,44 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
       in
 
       (apply_subst combined_subst value_type, combined_subst)
+  | BinaryCreate elements ->
+      (* Binary construction - validate each element and return binary type *)
+      let subst =
+        List.fold_left
+          (fun subst_acc element ->
+            match element with
+            | SimpleBinaryElement expr ->
+                let _expr_type, expr_subst =
+                  infer_expr (apply_subst_env subst_acc env) expr
+                in
+                (* TODO: Validate that expr can be converted to binary *)
+                compose_subst subst_acc expr_subst
+            | SizedBinaryElement (expr, size_expr, spec_opt) ->
+                let _expr_type, expr_subst =
+                  infer_expr (apply_subst_env subst_acc env) expr
+                in
+                let size_type, size_subst =
+                  infer_expr (apply_subst_env expr_subst env) size_expr
+                in
+                (* Size must be integer *)
+                let size_unify = unify size_type TInteger in
+                (* Validate binary specification if present *)
+                (match spec_opt with
+                | Some spec -> validate_binary_spec spec
+                | None -> ());
+                compose_subst
+                  (compose_subst subst_acc expr_subst)
+                  (compose_subst size_subst size_unify)
+            | TypedBinaryElement (expr, spec) ->
+                let _expr_type, expr_subst =
+                  infer_expr (apply_subst_env subst_acc env) expr
+                in
+                (* Validate binary specification *)
+                validate_binary_spec spec;
+                compose_subst subst_acc expr_subst)
+          [] elements
+      in
+      (TBinary, subst)
   | Receive (clauses, timeout_opt) ->
       (* Receive expressions can receive any type of message *)
       let result_type = fresh_type_var () in
@@ -1587,6 +1678,16 @@ let rec extract_pattern_vars (pattern : pattern) : string list =
              | AtomKeyPattern (_, pattern) -> extract_pattern_vars pattern
              | GeneralKeyPattern (_, pattern) -> extract_pattern_vars pattern)
            pattern_fields)
+  | PBinary pattern_elements ->
+      List.concat
+        (List.map
+           (fun element ->
+             match element with
+             | SimpleBinaryPattern pattern -> extract_pattern_vars pattern
+             | SizedBinaryPattern (pattern, _, _) ->
+                 extract_pattern_vars pattern
+             | TypedBinaryPattern (pattern, _) -> extract_pattern_vars pattern)
+           pattern_elements)
 
 (* Type inference for function clauses *)
 let infer_function_clause (env : type_env) (clause : function_clause) :

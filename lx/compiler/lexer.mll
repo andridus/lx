@@ -52,6 +52,8 @@ rule read = parse
   | "*"             { MULT }
   | "/"             { DIV }
   | "!"             { SEND }
+  | "<<"            { LBINARY }
+  | ">>"            { RBINARY }
 
   (* Special tokens *)
   | "__MODULE__"    { MODULE_MACRO }

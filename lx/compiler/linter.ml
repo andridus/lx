@@ -458,6 +458,15 @@ let rec lint_pattern ctx errors pattern =
           | AtomKeyPattern (_, pattern) -> lint_pattern ctx acc pattern
           | GeneralKeyPattern (_, pattern) -> lint_pattern ctx acc pattern)
         errors pattern_fields
+  | PBinary pattern_elements ->
+      (* Lint binary pattern elements *)
+      List.fold_left
+        (fun acc element ->
+          match element with
+          | SimpleBinaryPattern pattern -> lint_pattern ctx acc pattern
+          | SizedBinaryPattern (pattern, _, _) -> lint_pattern ctx acc pattern
+          | TypedBinaryPattern (pattern, _) -> lint_pattern ctx acc pattern)
+        errors pattern_elements
   | _ -> errors
 
 (* Check for unused variables in a context *)

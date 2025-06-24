@@ -294,6 +294,11 @@ and emit_guard_value ctx (value : guard_value) : string =
       ^ String.concat ", " (List.map (emit_guard_value ctx) args)
       ^ ")"
 
+(* Helper function to emit binary specifications *)
+and emit_binary_spec = function
+  | BinaryType typ -> typ
+  | BinaryTypeWithEndian (typ, endian) -> typ ^ "-" ^ endian
+
 and emit_expr ctx (e : expr) : string =
   (* Check for invalid colon syntax patterns in any expression *)
   (match e with
@@ -455,6 +460,24 @@ and emit_expr ctx (e : expr) : string =
       "#{" ^ fields_str ^ "}"
   | MapAccess (map_expr, key_expr) ->
       "maps:get(" ^ emit_expr ctx key_expr ^ ", " ^ emit_expr ctx map_expr ^ ")"
+  | BinaryCreate elements ->
+      let emit_binary_element ctx = function
+        | SimpleBinaryElement expr -> emit_expr ctx expr
+        | SizedBinaryElement (expr, size_expr, spec_opt) ->
+            let size_str = emit_expr ctx size_expr in
+            let spec_str =
+              match spec_opt with
+              | Some spec -> "/" ^ emit_binary_spec spec
+              | None -> ""
+            in
+            emit_expr ctx expr ^ ":" ^ size_str ^ spec_str
+        | TypedBinaryElement (expr, spec) ->
+            emit_expr ctx expr ^ "/" ^ emit_binary_spec spec
+      in
+      let elements_str =
+        String.concat ", " (List.map (emit_binary_element ctx) elements)
+      in
+      "<<" ^ elements_str ^ ">>"
   | Receive (clauses, timeout_opt) -> (
       let clauses_str =
         String.concat ";\n        " (List.map (emit_receive_clause ctx) clauses)
@@ -544,6 +567,25 @@ and emit_pattern ctx (p : pattern) : string =
           (List.map (emit_map_pattern_field_local ctx) pattern_fields)
       in
       "#{" ^ fields_str ^ "}"
+  | PBinary pattern_elements ->
+      let emit_binary_pattern_element ctx = function
+        | SimpleBinaryPattern pattern -> emit_pattern ctx pattern
+        | SizedBinaryPattern (pattern, size_expr, spec_opt) ->
+            let size_str = emit_expr ctx size_expr in
+            let spec_str =
+              match spec_opt with
+              | Some spec -> "/" ^ emit_binary_spec spec
+              | None -> ""
+            in
+            emit_pattern ctx pattern ^ ":" ^ size_str ^ spec_str
+        | TypedBinaryPattern (pattern, spec) ->
+            emit_pattern ctx pattern ^ "/" ^ emit_binary_spec spec
+      in
+      let elements_str =
+        String.concat ", "
+          (List.map (emit_binary_pattern_element ctx) pattern_elements)
+      in
+      "<<" ^ elements_str ^ ">>"
 
 let emit_function_clause (func_name : string) (clause : function_clause) :
     string =

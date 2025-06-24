@@ -64,6 +64,7 @@ type expr =
   | RecordUpdate of expr * (string * expr) list (* record_expr, field_updates *)
   | MapCreate of map_field list
   | MapAccess of expr * expr (* map[key] syntax if needed *)
+  | BinaryCreate of binary_element list (* Binary construction *)
 
 (* Pattern matching *)
 and pattern =
@@ -77,6 +78,7 @@ and pattern =
   | PRecord of
       string * (string * pattern) list (* record_name, field_patterns *)
   | PMap of map_pattern_field list
+  | PBinary of binary_pattern_element list (* Binary pattern matching *)
 
 (* Receive clause definition *)
 and receive_clause =
@@ -90,6 +92,23 @@ and map_field =
 and map_pattern_field =
   | AtomKeyPattern of string * pattern (* atom: pattern *)
   | GeneralKeyPattern of expr * pattern (* key := pattern *)
+
+(* Binary specifications *)
+and binary_spec =
+  | BinaryType of string (* integer, binary, float, etc. *)
+  | BinaryTypeWithEndian of string * string (* integer-little, etc. *)
+
+(* Binary elements *)
+and binary_element =
+  | SimpleBinaryElement of expr
+  | SizedBinaryElement of
+      expr * expr * binary_spec option (* value, size, optional spec *)
+  | TypedBinaryElement of expr * binary_spec
+
+and binary_pattern_element =
+  | SimpleBinaryPattern of pattern
+  | SizedBinaryPattern of pattern * expr * binary_spec option
+  | TypedBinaryPattern of pattern * binary_spec
 
 (* OTP strategies for supervisors *)
 type otp_strategy = OneForOne | OneForAll | RestForOne

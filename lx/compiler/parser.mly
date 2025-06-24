@@ -20,6 +20,13 @@ let rec expr_to_pattern = function
   | RecordCreate (name, fields) ->
     let convert_field (field_name, expr) = (field_name, expr_to_pattern expr) in
     PRecord (name, List.map convert_field fields)
+  | BinaryCreate elements ->
+    let convert_element = function
+      | SimpleBinaryElement expr -> SimpleBinaryPattern (expr_to_pattern expr)
+      | SizedBinaryElement (expr, size, spec) -> SizedBinaryPattern (expr_to_pattern expr, size, spec)
+      | TypedBinaryElement (expr, spec) -> TypedBinaryPattern (expr_to_pattern expr, spec)
+    in
+    PBinary (List.map convert_element elements)
   | _ -> failwith "Enhanced:Invalid pattern in assignment|Suggestion:Use valid pattern syntax for destructuring|Context:pattern matching assignment"
 
 (* Helper types and functions for tuple detection *)
@@ -76,6 +83,7 @@ let string_of_simple_tuple_element = function
 %token COMMA SEMICOLON CONS COLON DOT
 %token CONCAT PLUS MINUS MULT DIV SEND
 %token ARROW_DOUBLE MATCH_ASSIGN PATTERN_MATCH
+%token LBINARY RBINARY
 
 %token EOF
 
@@ -375,6 +383,9 @@ expr:
   (* Map expressions *)
   | PERCENT_LBRACE fields = separated_list(COMMA, map_field) RBRACE
     { MapCreate fields }
+  (* Binary expressions *)
+  | LBINARY elements = separated_list(COMMA, binary_element) RBINARY
+    { BinaryCreate elements }
   | LBRACE expr = expr PIPE updates = separated_list(COMMA, record_field_update) RBRACE
     { RecordUpdate (expr, updates) }
 
@@ -474,6 +485,9 @@ simple_pattern:
   (* Map patterns *)
   | PERCENT_LBRACE fields = separated_list(COMMA, map_pattern_field) RBRACE
     { PMap fields }
+  (* Binary patterns *)
+  | LBINARY elements = separated_list(COMMA, binary_pattern_element) RBINARY
+    { PBinary elements }
 
 
 literal:
@@ -645,3 +659,30 @@ type_expr:
   | type_expr PIPE type_expr { TypeUnion ($1, $3) }
   | LBRACKET type_expr RBRACKET { TypeList $2 }
   | LPAREN types = separated_list(COMMA, type_expr) RPAREN { TypeTuple types }
+
+(* Binary element rules for construction *)
+binary_element:
+  | expr = simple_expr
+    { SimpleBinaryElement expr }
+  | expr = simple_expr COLON size = simple_expr
+    { SizedBinaryElement (expr, size, None) }
+  | expr = simple_expr COLON size = simple_expr DIV spec = binary_spec
+    { SizedBinaryElement (expr, size, Some spec) }
+  | expr = simple_expr DIV spec = binary_spec
+    { TypedBinaryElement (expr, spec) }
+
+(* Binary pattern element rules for pattern matching *)
+binary_pattern_element:
+  | pattern = simple_pattern
+    { SimpleBinaryPattern pattern }
+  | pattern = simple_pattern COLON size = simple_expr
+    { SizedBinaryPattern (pattern, size, None) }
+  | pattern = simple_pattern COLON size = simple_expr DIV spec = binary_spec
+    { SizedBinaryPattern (pattern, size, Some spec) }
+  | pattern = simple_pattern DIV spec = binary_spec
+    { TypedBinaryPattern (pattern, spec) }
+
+(* Binary specifications *)
+binary_spec:
+  | IDENT { BinaryType $1 }
+  | IDENT MINUS IDENT { BinaryTypeWithEndian ($1, $3) }

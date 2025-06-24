@@ -32,7 +32,7 @@ Lx is a statically scoped, expression-based functional language designed for bui
 
 These reserved words define control flow, type contracts, concurrency, and OTP structure. They cannot be redefined.
 
-- **Core**: `fun`, `pub`, `case`, `if`, `else`, `for`, `when`, `receive`, `after`, `true`, `false`, `nil`
+- **Core**: `fun`, `pub`, `case`, `if`, `else`, `for`, `when`, `receive`, `after`, `true`, `false`, `nil`, `unsafe`
 - **Data**: `record` — structured data type definitions
 - **OTP**: `worker`, `supervisor`, `strategy`, `children`, `one_for_one`, `one_for_all`, `rest_for_one`
 - **Specification**: `spec`, `requires`, `ensures`, `matches`
@@ -46,6 +46,7 @@ Syntax symbols used for operations, declarations, and structure:
 
 - **Assignment**: `=` — bind a value to a variable once
 - **Pattern matching**: `<-` — explicit pattern matching operator (recommended for maps)
+- **Unsafe pattern matching**: `unsafe` — bypass all type checking and validation
 - **Pattern branching**: `->` — used in `case` and `receive`
 - **Message send**: `!` — send messages between processes
 - **Type annotation / list cons**: `::` — optional type hints and list construction
@@ -331,6 +332,10 @@ value = config[key]
 # Partial pattern matching (extract subset of fields)
 %{ name: user_name } <- user
 
+# Unsafe pattern matching - bypasses all type checking and validation
+unsafe %{ name: user_name, unknown_field: value } = user
+unsafe %{ "dynamic_key" => data } <- response
+
 # Pattern matching in function parameters
 pub fun process_user(%{ name: user_name, age: user_age }) {
   if user_age >= 18 {
@@ -370,6 +375,31 @@ pub fun validate_user(user) {
 - **Integer keys**: Use arrow syntax `1 =>` in creation and patterns
 - **Mixed keys**: Can combine different key types in the same map
 
+##### Pattern Matching Safety:
+
+- **Default behavior**: Both `=` and `<-` operators allow mixed key types by default
+- **Field validation**: Compiler validates that pattern fields exist in the map
+- **Missing field errors**: Clear error messages when trying to match non-existent fields
+- **Unsafe escape valve**: Use `unsafe` keyword to bypass all validations when needed
+
+##### Unsafe Pattern Matching:
+
+The `unsafe` keyword provides a complete escape valve for map pattern matching when you need to bypass all type checking and validation:
+
+```lx
+# When you're certain about the map structure but compiler can't verify it
+unsafe %{ dynamic_field: value } = runtime_generated_map
+
+# When working with external data that may have unknown fields
+unsafe %{ required_field: data, optional_field: maybe_value } <- external_data
+
+# When you need to handle maps with computed or variable keys
+key = "computed_" ++ suffix
+unsafe %{ key => value } <- dynamic_map
+```
+
+**Important**: `unsafe` completely disables type checking for that pattern match. Use it only when you're certain about the data structure and accept full responsibility for type correctness.
+
 ##### Generated Erlang Code:
 
 ```lx
@@ -382,6 +412,165 @@ user = %{ name: "Alice", age: 30 }
 % Generated Erlang
 User = #{name => "Alice", age => 30},
 #{name := User_name, age := _} = User
+```
+
+#### Binary/Bitstring Data:
+
+Binaries are efficient data structures for handling raw binary data, protocol parsing, and network communication.
+
+##### Binary Creation:
+
+```lx
+# Simple binary literals
+empty = <<>>
+bytes = <<1, 2, 3, 4>>
+string_binary = <<"Hello World">>
+
+# Binary with type specifiers
+integer_bin = <<42/integer>>
+float_bin = <<3.14159/float>>
+binary_spec = <<"data"/binary>>
+utf8_text = <<"Hello"/utf8>>
+signed_int = <<42/signed>>
+unsigned_int = <<42/unsigned>>
+
+# Binary with size specifications
+byte_value = <<255:8>>
+word_value = <<1024:16>>
+dword_value = <<16777216:32>>
+
+# Combined size and type
+sized_int = <<42:16/integer>>
+sized_binary = <<"test":32/binary>>
+
+# Complex binary construction
+header = <<version:8, length:16, flags:8>>
+packet = <<header/binary, "payload"/binary>>
+```
+
+##### Binary Pattern Matching:
+
+```lx
+# Basic binary pattern matching
+data = <<42, 255:8, 1024:16, "hello"/binary>>
+
+case data {
+    <<first, second:8, third:16, rest/binary>> ->
+        .{first, second, third, rest}
+    _ ->
+        :error
+}
+
+# Advanced patterns with guards
+case binary_data {
+    <<first, second, rest/binary>> when first > 0 ->
+        .{:valid, first, second, rest}
+    <<first/integer, _rest/binary>> ->
+        .{:invalid, first}
+    _ ->
+        :unknown
+}
+
+# Protocol parsing examples
+case packet {
+    <<"HTTP/", version:2/binary, " ", status:3/binary, rest/binary>> ->
+        .{:http, version, status, rest}
+    <<"GET ", path/binary>> ->
+        .{:get, path}
+    _ ->
+        :unknown
+}
+
+# Binary patterns in function parameters
+pub fun parse_header(<<version:8, length:16, data:length/binary>>) {
+    .{:ok, version, length, data}
+}
+
+pub fun parse_header(_) {
+    :error
+}
+
+# Binary pattern matching in assignments
+pub fun extract_header(packet) {
+    <<version:8, length:16, flags:8>> = packet
+    .{version, length, flags}
+}
+```
+
+##### Binary Type Specifiers:
+
+- **integer**: Signed integer (default size: 8 bits)
+- **float**: Floating point number
+- **binary**: Raw binary data
+- **utf8**: UTF-8 encoded text
+- **utf16**: UTF-16 encoded text
+- **utf32**: UTF-32 encoded text
+- **signed**: Signed integer
+- **unsigned**: Unsigned integer
+- **bits**: Bit-level data
+- **bitstring**: Variable-length bit data
+
+##### Size Specifications:
+
+```lx
+# Fixed sizes
+<<value:8>>    # 8 bits
+<<value:16>>   # 16 bits
+<<value:32>>   # 32 bits
+
+# Variable sizes
+length = 10
+<<data:length/binary>>
+
+# Combined with types
+<<number:32/integer>>
+<<text:16/utf8>>
+```
+
+##### Practical Applications:
+
+```lx
+# Network protocol parsing
+pub fun parse_tcp_header(<<src_port:16, dst_port:16, seq:32, ack:32, rest/binary>>) {
+    .{:tcp_header, src_port, dst_port, seq, ack, rest}
+}
+
+# Message encoding
+pub fun encode_message(type_id, message) {
+    case type_id {
+        :text -> <<"TEXT"/binary, message/binary>>
+        :data -> <<"DATA"/binary, message/binary>>
+        :error -> <<"ERRO"/binary, message/binary>>
+        _ -> <<"UNKN"/binary, message/binary>>
+    }
+}
+
+# File format handling
+pub fun parse_png_chunk(<<length:32, type:4/binary, data:length/binary, crc:32>>) {
+    .{:png_chunk, type, data, crc}
+}
+
+# Binary assignment pattern matching
+pub fun process_packet(raw_data) {
+    # Extract header information using binary patterns
+    <<version:8, length:16, flags:8>> = raw_data
+
+    # Use extracted variables
+    if version == 1 {
+        .{:v1, length, flags}
+    } else {
+        .{:unsupported, version}
+    }
+}
+
+# Complex binary pattern extraction
+pub fun parse_network_frame(frame) {
+    # Extract multiple fields in one pattern match
+    <<preamble:32, header:64/binary, payload_size:16, payload:payload_size/binary, checksum:32>> = frame
+
+    # All variables are now available for use
+    .{preamble, header, payload_size, payload, checksum}
+}
 ```
 
 ---
