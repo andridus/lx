@@ -450,6 +450,14 @@ let rec lint_pattern ctx errors pattern =
         (fun acc (_field_name, field_pattern) ->
           lint_pattern ctx acc field_pattern)
         errors field_patterns
+  | PMap pattern_fields ->
+      (* Lint field patterns in map pattern matching *)
+      List.fold_left
+        (fun acc field ->
+          match field with
+          | AtomKeyPattern (_, pattern) -> lint_pattern ctx acc pattern
+          | GeneralKeyPattern (_, pattern) -> lint_pattern ctx acc pattern)
+        errors pattern_fields
   | _ -> errors
 
 (* Check for unused variables in a context *)
@@ -599,6 +607,10 @@ let rec lint_expr ctx errors expr =
       match define_variable ctx var_name (convert_position position) with
       | Some error -> error :: errors
       | None -> errors)
+  | PatternMatch (pattern, value_expr, _position) ->
+      let errors = lint_expr ctx errors value_expr in
+      (* Lint the pattern and define variables from it in the current context *)
+      lint_pattern ctx errors pattern
   | App (func_expr, args) ->
       let errors =
         match func_expr with
@@ -711,6 +723,16 @@ let rec lint_expr ctx errors expr =
       List.fold_left
         (fun acc (_field_name, update_expr) -> lint_expr ctx acc update_expr)
         errors field_updates
+  | MapCreate fields ->
+      (* Lint field expressions in map creation *)
+      List.fold_left
+        (fun acc field ->
+          match field with
+          | AtomKeyField (_, value_expr) -> lint_expr ctx acc value_expr
+          | GeneralKeyField (key_expr, value_expr) ->
+              let acc = lint_expr ctx acc key_expr in
+              lint_expr ctx acc value_expr)
+        errors fields
   | _ -> errors
 
 (* Guard expression analysis *)

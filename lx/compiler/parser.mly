@@ -5,6 +5,23 @@ open Ast
 let make_position pos =
   { line = pos.Lexing.pos_lnum; column = pos.Lexing.pos_cnum - pos.Lexing.pos_bol + 1; filename = None }
 
+(* Helper function to convert expressions to patterns for semantic pattern matching *)
+let rec expr_to_pattern = function
+  | Var name -> PVar name
+  | Literal lit -> PLiteral lit
+  | Tuple exprs -> PTuple (List.map expr_to_pattern exprs)
+  | List exprs -> PList (List.map expr_to_pattern exprs)
+  | MapCreate fields ->
+    let convert_field = function
+      | AtomKeyField (key, expr) -> AtomKeyPattern (key, expr_to_pattern expr)
+      | GeneralKeyField (key_expr, expr) -> GeneralKeyPattern (key_expr, expr_to_pattern expr)
+    in
+    PMap (List.map convert_field fields)
+  | RecordCreate (name, fields) ->
+    let convert_field (field_name, expr) = (field_name, expr_to_pattern expr) in
+    PRecord (name, List.map convert_field fields)
+  | _ -> failwith "Enhanced:Invalid pattern in assignment|Suggestion:Use valid pattern syntax for destructuring|Context:pattern matching assignment"
+
 (* Helper types and functions for tuple detection *)
 type simple_tuple_element =
   | STEIdent of string
@@ -35,7 +52,7 @@ let string_of_simple_tuple_element = function
 %token MODULE_MACRO
 
 (* Keywords *)
-%token PUB FUN CASE IF ELSE FOR WHEN IN AND OR NOT ANDALSO ORELSE RECEIVE AFTER
+%token PUB FUN CASE IF ELSE FOR WHEN IN AND OR NOT ANDALSO ORELSE RECEIVE AFTER MATCH_KEYWORD
 %token RECORD
 
 (* OTP Keywords *)
@@ -55,9 +72,10 @@ let string_of_simple_tuple_element = function
 %token EQ ARROW PIPE WILDCARD
 %token EQEQ NEQ LT GT LEQ GEQ
 %token LPAREN RPAREN LBRACE RBRACE LBRACKET RBRACKET
-%token DOT_LBRACE
+%token DOT_LBRACE PERCENT_LBRACE PERCENT_LT PERCENT
 %token COMMA SEMICOLON CONS COLON DOT
 %token CONCAT PLUS MINUS MULT DIV SEND
+%token ARROW_DOUBLE MATCH_ASSIGN PATTERN_MATCH
 
 %token EOF
 
@@ -77,12 +95,17 @@ let string_of_simple_tuple_element = function
 %left PLUS MINUS
 %left MULT DIV
 %left DOT COLON (* Highest precedence for module calls *)
+%left ARROW_DOUBLE (* Map arrow syntax *)
+%right EQ (* Assignment has low precedence *)
+%right PATTERN_MATCH (* Pattern matching assignment *)
 
 %start <program> main
 
 %on_error_reduce expr
 %on_error_reduce simple_expr
 %on_error_reduce function_def
+%on_error_reduce map_pattern_field
+%on_error_reduce map_field
 
 %%
 
@@ -247,10 +270,22 @@ test_def:
 
 expr:
   | e = simple_expr { e }
-  | name = IDENT EQ value = expr
-    { let pos = make_position $startpos in Assign (name, value, Some pos) }
-  | RECORD EQ value = expr
-    { let pos = make_position $startpos in Assign ("record", value, Some pos) }
+    (* Universal pattern matching/binding operator - semantic analysis determines the type *)
+  | left = expr EQ right = expr
+    { let pos = make_position $startpos in
+      match left with
+      | Var name -> Assign (name, right, Some pos)  (* Simple variable binding *)
+      | _ ->
+        (* Convert expression to pattern for pattern matching *)
+        let pattern = expr_to_pattern left in
+        PatternMatch (pattern, right, Some pos)
+    }
+  (* Pattern matching operator using <- (always pattern matching, never binding) *)
+  | left = expr PATTERN_MATCH right = expr
+    { let pos = make_position $startpos in
+      let pattern = expr_to_pattern left in
+      PatternMatch (pattern, right, Some pos)
+    }
   | func = expr LPAREN args = separated_list(COMMA, expr) RPAREN
     { App (func, args) }
   (* Error case: detect incorrect colon syntax and provide helpful error *)
@@ -323,6 +358,9 @@ expr:
   (* Record expressions *)
   | record_name = UPPER_IDENT LBRACE fields = separated_list(COMMA, record_field_init) RBRACE
     { RecordCreate (record_name, fields) }
+  (* Map expressions *)
+  | PERCENT_LBRACE fields = separated_list(COMMA, map_field) RBRACE
+    { MapCreate fields }
   | LBRACE expr = expr PIPE updates = separated_list(COMMA, record_field_update) RBRACE
     { RecordUpdate (expr, updates) }
 
@@ -419,6 +457,10 @@ simple_pattern:
   (* Record patterns *)
   | record_name = UPPER_IDENT LBRACE fields = separated_list(COMMA, record_pattern_field) RBRACE
     { PRecord (record_name, fields) }
+  (* Map patterns *)
+  | PERCENT_LBRACE fields = separated_list(COMMA, map_pattern_field) RBRACE
+    { PMap fields }
+
 
 literal:
   | s = STRING { LString s }
@@ -495,6 +537,19 @@ record_pattern_field:
     { (field_name, pattern) }
   | field_name = IDENT
     { (field_name, PVar field_name) }  (* Shorthand: {name} = {name: name} *)
+
+(* Unified map field rules for both creation and pattern matching *)
+map_field:
+  | key = IDENT COLON value = expr
+    { AtomKeyField (key, value) }  (* atom key shorthand *)
+  | key = expr ARROW_DOUBLE value = expr
+    { GeneralKeyField (key, value) }  (* general key syntax *)
+
+map_pattern_field:
+  | key = IDENT COLON pattern = pattern
+    { AtomKeyPattern (key, pattern) }
+  | key = expr ARROW_DOUBLE pattern = pattern
+    { GeneralKeyPattern (key, pattern) }
 
 (* Guard expressions *)
 guard_expr:

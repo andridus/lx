@@ -105,27 +105,6 @@ let emit_literal (l : literal) : string =
   | LAtom a -> a
   | LNil -> "nil"
 
-let rec emit_pattern ctx (p : pattern) : string =
-  match p with
-  | PWildcard -> "_"
-  | PVar id -> if is_ignored_var id then "_" else get_renamed_var ctx id
-  | PAtom a -> a
-  | PLiteral l -> emit_literal l
-  | PTuple ps -> "{" ^ String.concat ", " (List.map (emit_pattern ctx) ps) ^ "}"
-  | PList ps -> "[" ^ String.concat ", " (List.map (emit_pattern ctx) ps) ^ "]"
-  | PCons (head, tail) ->
-      "[" ^ emit_pattern ctx head ^ " | " ^ emit_pattern ctx tail ^ "]"
-  | PRecord (record_name, field_patterns) ->
-      let record_name_lower = String.lowercase_ascii record_name in
-      let fields_str =
-        String.concat ", "
-          (List.map
-             (fun (field_name, field_pattern) ->
-               field_name ^ " = " ^ emit_pattern ctx field_pattern)
-             field_patterns)
-      in
-      "#" ^ record_name_lower ^ "{" ^ fields_str ^ "}"
-
 (* Helper function to determine the record type name from an expression *)
 let rec get_record_type_name ctx (expr : expr) : string =
   match expr with
@@ -157,6 +136,39 @@ let rec get_record_type_name ctx (expr : expr) : string =
   | RecordUpdate (inner_expr, _) -> get_record_type_name ctx inner_expr
   | _ -> "record" (* fallback for unknown expressions *)
 
+and emit_pattern ctx (p : pattern) : string =
+  match p with
+  | PWildcard -> "_"
+  | PVar id -> if is_ignored_var id then "_" else get_renamed_var ctx id
+  | PAtom a -> a
+  | PLiteral l -> emit_literal l
+  | PTuple ps -> "{" ^ String.concat ", " (List.map (emit_pattern ctx) ps) ^ "}"
+  | PList ps -> "[" ^ String.concat ", " (List.map (emit_pattern ctx) ps) ^ "]"
+  | PCons (head, tail) ->
+      "[" ^ emit_pattern ctx head ^ " | " ^ emit_pattern ctx tail ^ "]"
+  | PRecord (record_name, field_patterns) ->
+      let record_name_lower = String.lowercase_ascii record_name in
+      let fields_str =
+        String.concat ", "
+          (List.map
+             (fun (field_name, field_pattern) ->
+               field_name ^ " = " ^ emit_pattern ctx field_pattern)
+             field_patterns)
+      in
+      "#" ^ record_name_lower ^ "{" ^ fields_str ^ "}"
+  | PMap pattern_fields ->
+      let emit_map_pattern_field_local ctx = function
+        | AtomKeyPattern (key, pattern) ->
+            key ^ " := " ^ emit_pattern ctx pattern
+        | GeneralKeyPattern (key_expr, pattern) ->
+            emit_expr ctx key_expr ^ " := " ^ emit_pattern ctx pattern
+      in
+      let fields_str =
+        String.concat ", "
+          (List.map (emit_map_pattern_field_local ctx) pattern_fields)
+      in
+      "#{" ^ fields_str ^ "}"
+
 and emit_expr ctx (e : expr) : string =
   match e with
   | Literal l -> emit_literal l
@@ -176,6 +188,9 @@ and emit_expr ctx (e : expr) : string =
               track_var_record_type ctx id source_type
         | _ -> ());
         renamed ^ " = " ^ emit_expr ctx value
+  | PatternMatch (pattern, value, _pos) ->
+      (* Generate Erlang pattern matching: pattern = value *)
+      emit_pattern ctx pattern ^ " = " ^ emit_expr ctx value
   | Fun (params, body) ->
       let fun_ctx = create_scope (Some ctx) in
       let renamed_params = List.map (add_var_to_scope fun_ctx) params in
@@ -247,6 +262,18 @@ and emit_expr ctx (e : expr) : string =
       let record_type_name = get_record_type_name ctx record_expr in
       emit_expr ctx record_expr ^ "#" ^ record_type_name ^ "{" ^ updates_str
       ^ "}"
+  | MapCreate fields ->
+      let emit_map_field_local ctx = function
+        | AtomKeyField (key, value) -> key ^ " => " ^ emit_expr ctx value
+        | GeneralKeyField (key, value) ->
+            emit_expr ctx key ^ " => " ^ emit_expr ctx value
+      in
+      let fields_str =
+        String.concat ", " (List.map (emit_map_field_local ctx) fields)
+      in
+      "#{" ^ fields_str ^ "}"
+  | MapAccess (map_expr, key_expr) ->
+      "maps:get(" ^ emit_expr ctx key_expr ^ ", " ^ emit_expr ctx map_expr ^ ")"
   | Receive (clauses, timeout_opt) -> (
       let clauses_str =
         String.concat ";\n    " (List.map (emit_receive_clause ctx) clauses)

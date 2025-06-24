@@ -21,6 +21,7 @@ type lx_type =
   | TList of lx_type
   | TRecord of (string * lx_type) list
   | TNamedRecord of string (* Named record type *)
+  | TMap of lx_type * lx_type (* TMap(key_type, value_type) *)
   | TOtpState
   | TOtpReply of lx_type
   | TOtpCast
@@ -221,6 +222,8 @@ let rec string_of_type = function
           (List.map (fun (k, v) -> k ^ ": " ^ string_of_type v) fields)
       ^ "}"
   | TNamedRecord name -> name
+  | TMap (key_type, value_type) ->
+      "%{" ^ string_of_type key_type ^ " => " ^ string_of_type value_type ^ "}"
   | TOtpState -> "otp_state"
   | TOtpReply t -> "otp_reply(" ^ string_of_type t ^ ")"
   | TOtpCast -> "otp_cast"
@@ -296,6 +299,8 @@ let rec apply_subst (subst : substitution) (typ : lx_type) : lx_type =
       TRecord (List.map (fun (k, v) -> (k, apply_subst subst v)) fields)
   | TNamedRecord name ->
       TNamedRecord name (* Named records don't need substitution *)
+  | TMap (key_type, value_type) ->
+      TMap (apply_subst subst key_type, apply_subst subst value_type)
   | TOtpReply t -> TOtpReply (apply_subst subst t)
   | _ -> typ
 
@@ -461,6 +466,10 @@ let rec unify (t1 : lx_type) (t2 : lx_type) : substitution =
   | TOption t1, TOption t2 -> unify t1 t2
   | TNamedRecord name1, TNamedRecord name2 when name1 = name2 -> []
   | TOtpReply t1, TOtpReply t2 -> unify t1 t2
+  | TMap (k1, v1), TMap (k2, v2) ->
+      let s1 = unify k1 k2 in
+      let s2 = unify (apply_subst s1 v1) (apply_subst s1 v2) in
+      compose_subst s1 s2
   | _ -> raise (TypeError (UnificationError (t1, t2, None)))
 
 (* Type inference for patterns *)
@@ -536,6 +545,32 @@ let rec infer_pattern (env : type_env) (pattern : pattern) :
       in
 
       (record_type, final_env, final_subst)
+  | PMap pattern_fields ->
+      (* For map patterns, we need to be more flexible with types *)
+      (* Extract the pattern variables and let the unification handle the types *)
+      let final_env, final_subst =
+        List.fold_left
+          (fun (env_acc, subst_acc) field ->
+            match field with
+            | AtomKeyPattern (_, field_pattern) ->
+                let _field_type, field_env, field_subst =
+                  infer_pattern env_acc field_pattern
+                in
+                (field_env, compose_subst subst_acc field_subst)
+            | GeneralKeyPattern (_key_expr, field_pattern) ->
+                (* For general patterns, we need to infer the key type too *)
+                let _field_type, field_env, field_subst =
+                  infer_pattern env_acc field_pattern
+                in
+                (field_env, compose_subst subst_acc field_subst))
+          (env, []) pattern_fields
+      in
+
+      (* For map patterns, we create a generic map type that can be unified later *)
+      (* The key insight is that the pattern should be flexible enough to match any map *)
+      let key_type = fresh_type_var () in
+      let value_type = fresh_type_var () in
+      (TMap (key_type, value_type), final_env, final_subst)
 
 (* Type inference for expressions with symbol context *)
 let rec infer_expr_with_context (context : symbol_context) (expr : expr) :
@@ -568,6 +603,33 @@ let rec infer_expr_with_context (context : symbol_context) (expr : expr) :
         add_variable_to_context id value_type ?pos:error_position new_context
       in
       (value_type, subst, updated_context)
+  | PatternMatch (pattern, value, _pos) ->
+      let value_type, subst, new_context =
+        infer_expr_with_context context value
+      in
+      let pattern_type, pattern_env, pattern_subst =
+        infer_pattern (context_to_env new_context) pattern
+      in
+      (* Unify the pattern type with the value type *)
+      let unify_subst = unify value_type pattern_type in
+      let final_subst =
+        compose_subst (compose_subst subst pattern_subst) unify_subst
+      in
+      (* Add pattern variables to the context *)
+      (* Extract only the new variables from pattern, not the entire environment *)
+      let original_env = context_to_env new_context in
+      let new_pattern_vars =
+        List.filter
+          (fun (name, _) -> not (List.mem_assoc name original_env))
+          pattern_env
+      in
+      let updated_context =
+        List.fold_left
+          (fun ctx_acc (var_name, var_type) ->
+            add_variable_to_context var_name var_type ctx_acc)
+          new_context new_pattern_vars
+      in
+      (apply_subst final_subst value_type, final_subst, updated_context)
   | Sequence exprs -> (
       (* Type of sequence is the type of the last expression *)
       match List.rev exprs with
@@ -615,6 +677,25 @@ let rec infer_expr_with_context (context : symbol_context) (expr : expr) :
       decr scope_depth;
       (* Exit nested scope *)
       result
+  | Send (target_expr, message_expr) ->
+      (* Type check target and message *)
+      let target_type, s1, ctx1 = infer_expr_with_context context target_expr in
+      let message_type, s2, ctx2 = infer_expr_with_context ctx1 message_expr in
+      let combined_subst = compose_subst s1 s2 in
+
+      (* Validate target type - should be pid, atom (registered name), or tuple *)
+      let target_type_applied = apply_subst combined_subst target_type in
+      (match target_type_applied with
+      | TPid | TAtom | TTuple _ -> () (* Valid target types *)
+      | TVar _ -> () (* Allow type variables for flexibility *)
+      | _ ->
+          let context_msg = "send operation target" in
+          raise
+            (TypeError
+               (UnificationError (target_type_applied, TPid, Some context_msg))));
+
+      (* Send operation returns the message *)
+      (apply_subst combined_subst message_type, combined_subst, ctx2)
   | _ ->
       (* For other expressions, convert context to env and use original function *)
       let env = context_to_env context in
@@ -646,6 +727,18 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
       let value_type, subst = infer_expr_original env value in
       (* Assignment returns the assigned value type *)
       (value_type, subst)
+  | PatternMatch (pattern, value, _pos) ->
+      let value_type, subst = infer_expr_original env value in
+      let pattern_type, _pattern_env, pattern_subst =
+        infer_pattern env pattern
+      in
+      (* Unify the pattern type with the value type *)
+      let unify_subst = unify value_type pattern_type in
+      let final_subst =
+        compose_subst (compose_subst subst pattern_subst) unify_subst
+      in
+      (* Pattern matching returns the value type *)
+      (apply_subst final_subst value_type, final_subst)
   | Fun (params, body) ->
       let param_types = List.map (fun _ -> fresh_type_var ()) params in
       let param_env = List.combine params param_types in
@@ -733,6 +826,7 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
             let case_env =
               pattern_env @ apply_subst_env combined_subst env_acc
             in
+
             (* Type check guard if present *)
             let guard_subst =
               match guard_opt with
@@ -1030,6 +1124,64 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
             (TypeError
                (UnificationError (record_type, TRecord [], Some "record update")))
       )
+  | MapCreate fields ->
+      let key_type = fresh_type_var () in
+      let value_type = fresh_type_var () in
+
+      let subst =
+        List.fold_left
+          (fun subst_acc field ->
+            match field with
+            | AtomKeyField (_, value_expr) ->
+                (* Atom keys are always atoms *)
+                let value_typ, value_subst =
+                  infer_expr (apply_subst_env subst_acc env) value_expr
+                in
+                let key_unify = unify (apply_subst subst_acc key_type) TAtom in
+                let value_unify =
+                  unify (apply_subst value_subst value_type) value_typ
+                in
+                compose_subst
+                  (compose_subst subst_acc value_subst)
+                  (compose_subst key_unify value_unify)
+            | GeneralKeyField (key_expr, value_expr) ->
+                let key_typ, key_subst =
+                  infer_expr (apply_subst_env subst_acc env) key_expr
+                in
+                let value_typ, value_subst =
+                  infer_expr (apply_subst_env key_subst env) value_expr
+                in
+                let key_unify =
+                  unify (apply_subst key_subst key_type) key_typ
+                in
+                let value_unify =
+                  unify (apply_subst value_subst value_type) value_typ
+                in
+                compose_subst
+                  (compose_subst subst_acc key_subst)
+                  (compose_subst value_subst
+                     (compose_subst key_unify value_unify)))
+          [] fields
+      in
+
+      (TMap (apply_subst subst key_type, apply_subst subst value_type), subst)
+  | MapAccess (map_expr, key_expr) ->
+      let map_type, map_subst = infer_expr env map_expr in
+      let key_type, key_subst =
+        infer_expr (apply_subst_env map_subst env) key_expr
+      in
+
+      (* Ensure it's a map type and key matches *)
+      let value_type = fresh_type_var () in
+      let expected_map_type = TMap (key_type, value_type) in
+      let unify_subst =
+        unify (apply_subst key_subst map_type) expected_map_type
+      in
+      let combined_subst =
+        compose_subst (compose_subst map_subst key_subst) unify_subst
+      in
+
+      (apply_subst combined_subst value_type, combined_subst)
   | Receive (clauses, timeout_opt) ->
       (* Receive expressions can receive any type of message *)
       let result_type = fresh_type_var () in
@@ -1126,6 +1278,14 @@ let rec extract_pattern_vars (pattern : pattern) : string list =
         (List.map
            (fun (_, pattern) -> extract_pattern_vars pattern)
            field_patterns)
+  | PMap pattern_fields ->
+      List.concat
+        (List.map
+           (fun field ->
+             match field with
+             | AtomKeyPattern (_, pattern) -> extract_pattern_vars pattern
+             | GeneralKeyPattern (_, pattern) -> extract_pattern_vars pattern)
+           pattern_fields)
 
 (* Type inference for function clauses *)
 let infer_function_clause (env : type_env) (clause : function_clause) :

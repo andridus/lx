@@ -32,42 +32,13 @@ and guard_atom =
   | GuardLiteral of literal
   | GuardCallAtom of string * guard_atom list
 
-(* Pattern matching *)
-type pattern =
-  | PWildcard
-  | PVar of ident
-  | PAtom of string
-  | PLiteral of literal
-  | PTuple of pattern list
-  | PList of pattern list
-  | PCons of pattern * pattern
-  | PRecord of
-      string * (string * pattern) list (* record_name, field_patterns *)
-
-(* OTP strategies for supervisors *)
-type otp_strategy = OneForOne | OneForAll | RestForOne
-
-(* Children specification for supervisors *)
-type children_spec =
-  | SimpleChildren of ident list (* children [worker1, worker2] *)
-  | TypedChildren of { workers : ident list; supervisors : ident list }
-(* children { worker [...], supervisor [...] } *)
-
-(* Special OTP callback function names *)
-type otp_callback =
-  | Init
-  | HandleCall
-  | HandleCast
-  | HandleInfo
-  | Terminate
-  | CodeChange
-  | FormatStatus
-
-(* Expressions *)
+(* Mutually recursive type definitions *)
 type expr =
   | Literal of literal
   | Var of ident
   | Assign of ident * expr * position option (* variable, value, position *)
+  | PatternMatch of
+      pattern * expr * position option (* pattern, value, position *)
   | Fun of ident list * expr
   | App of expr * expr list
   | ExternalCall of string * string * expr list (* module, function, args *)
@@ -88,10 +59,53 @@ type expr =
       string * (string * expr) list (* record_name, field_assignments *)
   | RecordAccess of expr * string (* record_expr, field_name *)
   | RecordUpdate of expr * (string * expr) list (* record_expr, field_updates *)
+  | MapCreate of map_field list
+  | MapAccess of expr * expr (* map[key] syntax if needed *)
+
+(* Pattern matching *)
+and pattern =
+  | PWildcard
+  | PVar of ident
+  | PAtom of string
+  | PLiteral of literal
+  | PTuple of pattern list
+  | PList of pattern list
+  | PCons of pattern * pattern
+  | PRecord of
+      string * (string * pattern) list (* record_name, field_patterns *)
+  | PMap of map_pattern_field list
 
 (* Receive clause definition *)
 and receive_clause =
   pattern * guard_expr option * expr (* pattern, optional guard, body *)
+
+(* Map field types *)
+and map_field =
+  | AtomKeyField of string * expr (* atom: value *)
+  | GeneralKeyField of expr * expr (* key => value *)
+
+and map_pattern_field =
+  | AtomKeyPattern of string * pattern (* atom: pattern *)
+  | GeneralKeyPattern of expr * pattern (* key := pattern *)
+
+(* OTP strategies for supervisors *)
+type otp_strategy = OneForOne | OneForAll | RestForOne
+
+(* Children specification for supervisors *)
+type children_spec =
+  | SimpleChildren of ident list (* children [worker1, worker2] *)
+  | TypedChildren of { workers : ident list; supervisors : ident list }
+(* children { worker [...], supervisor [...] } *)
+
+(* Special OTP callback function names *)
+type otp_callback =
+  | Init
+  | HandleCall
+  | HandleCast
+  | HandleInfo
+  | Terminate
+  | CodeChange
+  | FormatStatus
 
 (* Type expressions for record field types *)
 type type_expr =

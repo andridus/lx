@@ -25,6 +25,9 @@ rule read = parse
   | "<"             { LT }
   | ">"             { GT }
   | "="             { EQ }
+  | "=>"            { ARROW_DOUBLE }
+  | "=:"            { MATCH_ASSIGN }
+  | "<-"            { PATTERN_MATCH }
   | "->"            { ARROW }
   | "|"             { PIPE }
   | "_"             { WILDCARD }
@@ -33,6 +36,9 @@ rule read = parse
   | ".{"            { DOT_LBRACE }
   | "{"             { LBRACE }
   | "}"             { RBRACE }
+  | "%{"            { PERCENT_LBRACE }
+  | "%<"            { PERCENT_LT }
+  | "%"             { PERCENT }
   | "["             { LBRACKET }
   | "]"             { RBRACKET }
   | ","             { COMMA }
@@ -54,7 +60,7 @@ rule read = parse
   | ['a'-'z''_']['a'-'z''A'-'Z''0'-'9''_']* as id {
       (* Check if it's a reserved word first *)
       match id with
-      | "pub" -> PUB | "fun" -> FUN | "case" -> CASE
+      | "pub" -> PUB | "fun" -> FUN | "case" -> CASE | "match" -> MATCH_KEYWORD
       | "if" -> IF | "else" -> ELSE | "for" -> FOR | "when" -> WHEN | "in" -> IN
       | "and" -> AND | "or" -> OR | "not" -> NOT
       | "andalso" -> ANDALSO | "orelse" -> ORELSE

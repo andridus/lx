@@ -45,12 +45,15 @@ These reserved words define control flow, type contracts, concurrency, and OTP s
 Syntax symbols used for operations, declarations, and structure:
 
 - **Assignment**: `=` — bind a value to a variable once
+- **Pattern matching**: `<-` — explicit pattern matching operator (recommended for maps)
 - **Pattern branching**: `->` — used in `case` and `receive`
 - **Message send**: `!` — send messages between processes
 - **Type annotation / list cons**: `::` — optional type hints and list construction
 - **Module access**: `.` — call module functions
 - **String concatenation**: `++`
 - **Record update**: `|` — update record fields (used in `{record | field: value}`)
+- **Map creation**: `%{}` — create maps with `key: value` (atoms) or `key => value` (general)
+- **Map access**: `[]` — access map values with `map[key]` or `map[:atom_key]`
 - **Math**: `+`, `-`, `*`, `/`
 - **Comparison**: `==`, `!=`, `<`, `>`, `<=`, `>=`
 - **Logic**: `and`, `or`, `not`, `andalso`, `orelse`
@@ -135,8 +138,28 @@ case msg {
   :ok -> handle_ok()
   [head | tail] -> handle_list(head, tail)
   .{x, y} -> sum(x, y)
+  %{ name: user_name, age: user_age } -> process_user(user_name, user_age)
   _ -> :default
 }
+```
+
+#### Pattern Matching with Maps:
+
+```lx
+# Direct assignment with pattern matching
+%{ name: user_name, age: user_age } = user_data
+
+# Pattern matching operator (recommended for clarity)
+%{ name: user_name, age: _user_age } <- user_data
+
+# Partial pattern matching (extract only needed fields)
+%{ status: status } <- response
+
+# Mixed key types in patterns
+%{ :type => entity_type, "id" => entity_id } <- entity
+
+# Nested map pattern matching
+%{ user: %{ profile: %{ settings: %{ theme: theme } } } } <- app_state
 ```
 
 ---
@@ -252,6 +275,115 @@ for X in list when X > 0 {
 
 Used for iteration and recursion.
 
+#### Maps:
+
+Maps are key-value data structures that provide efficient access and pattern matching capabilities.
+
+##### Map Creation:
+
+```lx
+# Maps with atom keys (using colon syntax)
+user = %{ name: "Alice", age: 30, active: true }
+
+# Maps with general keys (using arrow syntax)
+config = %{ "database_url" => "localhost", "port" => 5432 }
+
+# Mixed key types
+metadata = %{ :type => "user", "created_at" => "2023-01-01", 1 => "first" }
+
+# Empty map
+empty = %{}
+
+# Complex maps with nested structures
+complex = %{
+  users: [%{ name: "Alice" }, %{ name: "Bob" }],
+  config: %{ timeout: 5000 },
+  metadata: .{:version, "1.0.0"}
+}
+```
+
+##### Map Access:
+
+```lx
+# Access with atom keys
+name = user[:name]
+age = user[:age]
+
+# Access with general keys
+url = config["database_url"]
+port = config["port"]
+
+# Access with variable keys
+key = "port"
+value = config[key]
+```
+
+##### Map Pattern Matching:
+
+```lx
+# Basic pattern matching with assignment operator (=) or pattern operator (<-)
+%{ name: user_name, age: user_age } = user
+%{ name: user_name, age: _user_age } <- user
+
+# Mixed key pattern matching
+%{ :status => status, "message" => message } <- response
+
+# Partial pattern matching (extract subset of fields)
+%{ name: user_name } <- user
+
+# Pattern matching in function parameters
+pub fun process_user(%{ name: user_name, age: user_age }) {
+  if user_age >= 18 {
+    %{ name: user_name, status: :adult }
+  } else {
+    %{ name: user_name, status: :minor }
+  }
+}
+
+# Pattern matching in case expressions
+pub fun handle_response(response) {
+  case response {
+    %{ status: :ok, data: data } -> data
+    %{ status: :error, message: msg } -> .{:error, msg}
+    _ -> :unknown
+  }
+}
+
+# Nested map patterns
+data = %{ user: %{ name: "Alice", profile: %{ age: 25 } } }
+%{ user: %{ name: user_name, profile: %{ age: user_age } } } <- data
+
+# Map patterns with guards
+pub fun validate_user(user) {
+  case user {
+    %{ age: age, name: name } when age >= 18 -> %{ name: name, status: :adult }
+    %{ age: age, name: name } when age < 18 -> %{ name: name, status: :minor }
+    _ -> :invalid
+  }
+}
+```
+
+##### Key Types and Syntax:
+
+- **Atom keys**: Use colon syntax `:key` or `key:` in patterns
+- **String keys**: Use arrow syntax `"key" =>` in creation and patterns
+- **Integer keys**: Use arrow syntax `1 =>` in creation and patterns
+- **Mixed keys**: Can combine different key types in the same map
+
+##### Generated Erlang Code:
+
+```lx
+# Lx source
+user = %{ name: "Alice", age: 30 }
+%{ name: user_name, age: _user_age } <- user
+```
+
+```erlang
+% Generated Erlang
+User = #{name => "Alice", age => 30},
+#{name := User_name, age := _} = User
+```
+
 ---
 
 ### 14. Records
@@ -335,6 +467,62 @@ worker user_manager {
 
   fun handle_call(:get_count, _from, state) {
     .{:reply, state.count, state}
+  }
+}
+```
+
+#### Maps in OTP Workers:
+
+```lx
+worker session_manager {
+  fun init(_) {
+    # Initialize state as a map
+    initial_state = %{ sessions: %{}, active_count: 0 }
+    .{:ok, initial_state}
+  }
+
+  fun handle_call(.{:create_session, user_id}, _from, state) {
+    # Extract current sessions and count using pattern matching
+    %{ sessions: current_sessions, active_count: count } <- state
+
+    # Create new session
+    session_id = generate_session_id()
+    session_data = %{ user_id: user_id, created_at: now(), active: true }
+
+    # Update state with new session
+    new_sessions = %{ session_id => session_data | current_sessions }
+    new_state = %{ sessions: new_sessions, active_count: count + 1 }
+
+    .{:reply, .{:ok, session_id}, new_state}
+  }
+
+  fun handle_call(.{:get_session, session_id}, _from, state) {
+    %{ sessions: sessions } <- state
+
+    case sessions[session_id] {
+      nil -> .{:reply, .{:error, :not_found}, state}
+      session_data -> .{:reply, .{:ok, session_data}, state}
+    }
+  }
+
+  fun handle_call(.{:update_session, session_id, updates}, _from, state) {
+    %{ sessions: sessions, active_count: count } <- state
+
+    case sessions[session_id] {
+      nil -> .{:reply, .{:error, :not_found}, state}
+      session_data ->
+        # Pattern match to extract session fields and apply updates
+        %{ user_id: user_id, created_at: created_at } <- session_data
+        updated_session = %{
+          user_id: user_id,
+          created_at: created_at,
+          active: updates[:active],
+          last_accessed: now()
+        }
+        new_sessions = %{ session_id => updated_session | sessions }
+        new_state = %{ sessions: new_sessions, active_count: count }
+        .{:reply, :ok, new_state}
+    }
   }
 }
 ```
