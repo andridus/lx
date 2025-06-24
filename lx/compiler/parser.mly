@@ -402,7 +402,11 @@ simple_expr:
     { RecordAccess (Var record_var, field_name) }
   | RECORD DOT field_name = IDENT
     { RecordAccess (Var "record", field_name) }
-
+  (* Fun expressions *)
+  | FUN LPAREN params = separated_list(COMMA, IDENT) RPAREN LBRACE body = expr RBRACE
+    { FunExpression (params, body) }
+  | FUN LBRACE clauses = fun_expression_clause+ RBRACE
+    { FunExpressionClauses clauses }
   | LPAREN e = expr RPAREN { e }
   | LPAREN elements = separated_list(COMMA, expr) RPAREN
     { match elements with
@@ -455,6 +459,12 @@ receive_clause:
     { (pattern, Some guard, body) }
   | pattern = pattern ARROW body = expr
     { (pattern, None, body) }
+
+fun_expression_clause:
+  | LPAREN params = separated_list(COMMA, IDENT) RPAREN WHEN guard = guard_expr LBRACE body = expr RBRACE
+    { (params, Some guard, body) }
+  | LPAREN params = separated_list(COMMA, IDENT) RPAREN LBRACE body = expr RBRACE
+    { (params, None, body) }
 
 pattern:
   | p = simple_pattern { p }

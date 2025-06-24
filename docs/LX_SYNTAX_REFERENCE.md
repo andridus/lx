@@ -14,6 +14,7 @@ Lx is a statically scoped, expression-based functional language designed for bui
 6. Expressions — fundamental program building blocks
 7. Pattern Matching — control flow via structural decomposition
 8. Function Definitions — single and multi-clause declarations
+8.1. Fun Expressions — anonymous functions with closures and higher-order support
 9. Guards — conditional clauses in pattern matching
 10. Message Passing — concurrent communication between processes
 11. Receive Expressions — selective message handling
@@ -182,6 +183,142 @@ fun factorial {
   (N) when N > 0 { N * factorial(N - 1) }
 }
 ```
+
+---
+
+### 8.1. Fun Expressions (Anonymous Functions)
+
+Fun expressions create anonymous functions that can be assigned to variables, passed as arguments, or returned from functions. They support closures, pattern matching, and guards.
+
+#### Simple Fun Expressions:
+
+```lx
+# Basic anonymous function
+add = fun(x, y) { x + y }
+result = add(3, 4)  # Returns 7
+
+# Fun expression as argument to higher-order function
+numbers = [1, 2, 3, 4, 5]
+doubled = map(numbers, fun(x) { x * 2 })
+
+# Fun expression with closure (captures variables from enclosing scope)
+multiplier = 3
+scale = fun(x) { x * multiplier }
+scaled_value = scale(10)  # Returns 30
+```
+
+#### Multi-Clause Fun Expressions:
+
+Fun expressions can have multiple clauses with pattern matching and optional guards:
+
+```lx
+# Pattern matching fun expression
+process = fun {
+  (:ok) { "Success" }
+  (:error) { "Failed" }
+  (_) { "Unknown" }
+}
+
+# Fun expression with guards
+validate = fun {
+  (x) when x > 0 { :positive }
+  (x) when x < 0 { :negative }
+  (0) { :zero }
+}
+
+# Complex pattern matching with destructuring
+handle_message = fun {
+  (.{:user, name, age}) when age >= 18 { "Adult: " ++ name }
+  (.{:user, name, age}) when age < 18 { "Minor: " ++ name }
+  (.{:system, msg}) { "System: " ++ msg }
+  (_) { "Unknown message" }
+}
+```
+
+#### Higher-Order Functions:
+
+Fun expressions enable powerful functional programming patterns:
+
+```lx
+# Function that returns a function
+make_adder = fun(n) {
+  fun(x) { x + n }
+}
+
+add5 = make_adder(5)
+result = add5(10)  # Returns 15
+
+# Function that takes a function as argument
+apply_twice = fun(f, x) {
+  f(f(x))
+}
+
+double = fun(x) { x * 2 }
+result = apply_twice(double, 3)  # Returns 12
+
+# Functional composition
+compose = fun(f, g) {
+  fun(x) { f(g(x)) }
+}
+
+add_one = fun(x) { x + 1 }
+multiply_two = fun(x) { x * 2 }
+add_then_multiply = compose(multiply_two, add_one)
+result = add_then_multiply(5)  # Returns 12 ((5 + 1) * 2)
+```
+
+#### Practical Applications:
+
+```lx
+# Event handler with state
+pub fun create_counter() {
+  count = 0
+  fun() {
+    count = count + 1
+    count
+  }
+}
+
+# List processing with fun expressions
+pub fun filter_map(list, predicate, mapper) {
+  list
+  |> filter(predicate)
+  |> map(mapper)
+}
+
+# Usage example
+numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+even_doubled = filter_map(
+  numbers,
+  fun(x) { x % 2 == 0 },  # Filter even numbers
+  fun(x) { x * 2 }        # Double them
+)
+# Result: [4, 8, 12, 16, 20]
+
+# Callback-style programming
+pub fun async_operation(data, callback) {
+  # Simulate async work
+  result = process_data(data)
+  callback(result)
+}
+
+# Usage with fun expression
+async_operation(my_data, fun(result) {
+  case result {
+    :ok -> log("Operation succeeded")
+    :error -> log("Operation failed")
+  }
+})
+```
+
+#### Fun Expression Properties:
+
+- **First-class values**: Can be assigned, passed as arguments, and returned
+- **Closures**: Capture variables from the enclosing scope
+- **Pattern matching**: Support multiple clauses with pattern destructuring
+- **Guards**: Optional guard expressions for conditional clause selection
+- **Type safe**: Full integration with Lx's type system
+- **Erlang compatible**: Compile to standard Erlang fun expressions
 
 ---
 

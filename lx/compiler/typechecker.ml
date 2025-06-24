@@ -1006,6 +1006,176 @@ and infer_expr_with_context (context : symbol_context) (expr : expr) :
 
       (* Send operation returns the message *)
       (apply_subst combined_subst message_type, combined_subst, ctx2)
+  (* Fun expression types *)
+  | FunExpression (params, body) ->
+      (* Create fresh type variables for parameters *)
+      let param_types = List.map (fun _ -> fresh_type_var ()) params in
+      let param_vars =
+        List.map2
+          (fun param param_type -> (param, param_type, None))
+          params param_types
+      in
+      let fun_context =
+        { variables = param_vars @ context.variables; parent = Some context }
+      in
+
+      (* Infer body type *)
+      let body_type, body_subst, _ = infer_expr_with_context fun_context body in
+
+      (* Create function type *)
+      let param_types_subst = List.map (apply_subst body_subst) param_types in
+      let fun_type =
+        List.fold_right
+          (fun param_type acc -> TFun (param_type, acc))
+          param_types_subst body_type
+      in
+      (fun_type, body_subst, context)
+  | FunExpressionClauses clauses ->
+      (* Infer types for all clauses *)
+      let result_type = fresh_type_var () in
+
+      let final_subst, clause_types =
+        List.fold_left
+          (fun (subst_acc, types_acc) (params, guard_opt, body) ->
+            (* Create fresh type variables for parameters *)
+            let param_types = List.map (fun _ -> fresh_type_var ()) params in
+            let param_vars =
+              List.map2
+                (fun param param_type -> (param, param_type, None))
+                params param_types
+            in
+            let clause_context =
+              {
+                variables = param_vars @ context.variables;
+                parent = Some context;
+              }
+            in
+
+            (* Type check guard if present *)
+            let guard_subst =
+              match guard_opt with
+              | Some guard ->
+                  let env = context_to_env clause_context in
+                  infer_guard_expr env guard
+              | None -> []
+            in
+            let env_with_guard =
+              apply_subst_env guard_subst (context_to_env clause_context)
+            in
+            let updated_context =
+              {
+                variables =
+                  List.map (fun (name, typ) -> (name, typ, None)) env_with_guard;
+                parent = clause_context.parent;
+              }
+            in
+
+            (* Type check body *)
+            let body_type, body_subst, _ =
+              infer_expr_with_context updated_context body
+            in
+
+            (* Unify with result type *)
+            let return_unify = unify result_type body_type in
+
+            let combined_subst =
+              compose_subst
+                (compose_subst subst_acc guard_subst)
+                (compose_subst body_subst return_unify)
+            in
+            let clause_type =
+              List.fold_right
+                (fun param_type acc -> TFun (param_type, acc))
+                param_types body_type
+            in
+            (combined_subst, clause_type :: types_acc))
+          ([], []) clauses
+      in
+
+      (* All clauses should have compatible function types *)
+      let final_type =
+        match List.rev clause_types with
+        | [] -> failwith "Fun expression has no clauses"
+        | first_type :: _ -> apply_subst final_subst first_type
+      in
+
+      (final_type, final_subst, context)
+  | BinOp (left, op, right) ->
+      let left_type, subst1, ctx1 = infer_expr_with_context context left in
+      let right_type, subst2, ctx2 = infer_expr_with_context ctx1 right in
+      let combined_subst = compose_subst subst1 subst2 in
+      (* For arithmetic operations, both operands should be numbers *)
+      let result_type, final_subst =
+        match op with
+        | "++" ->
+            (* String concatenation requires string operands and returns string *)
+            let string_unify1 =
+              unify (apply_subst combined_subst left_type) TString
+            in
+            let string_unify2 =
+              unify (apply_subst combined_subst right_type) TString
+            in
+            let final_subst =
+              compose_subst
+                (compose_subst combined_subst string_unify1)
+                string_unify2
+            in
+            (TString, final_subst)
+        | "+" | "-" | "*" | "/" ->
+            let int_unify1 =
+              unify (apply_subst combined_subst left_type) TInteger
+            in
+            let int_unify2 =
+              unify (apply_subst combined_subst right_type) TInteger
+            in
+            let final_subst =
+              compose_subst (compose_subst combined_subst int_unify1) int_unify2
+            in
+            (TInteger, final_subst)
+        (* Comparison operations return boolean *)
+        | "==" | "!=" | "<" | ">" | "<=" | ">=" ->
+            (* For now, allow comparison of any types - could be more strict *)
+            (TBool, combined_subst)
+        (* Logical operations require boolean operands and return boolean *)
+        | "and" | "or" | "andalso" | "orelse" ->
+            let bool_unify1 =
+              unify (apply_subst combined_subst left_type) TBool
+            in
+            let bool_unify2 =
+              unify (apply_subst combined_subst right_type) TBool
+            in
+            let final_subst =
+              compose_subst
+                (compose_subst combined_subst bool_unify1)
+                bool_unify2
+            in
+            (TBool, final_subst)
+        | _ -> failwith ("Unknown binary operator: " ^ op)
+      in
+      (result_type, final_subst, ctx2)
+  | App (func, args) ->
+      let func_type, subst1, ctx1 = infer_expr_with_context context func in
+      let arg_types, subst2, final_ctx =
+        List.fold_left
+          (fun (types_acc, subst_acc, ctx_acc) arg ->
+            let arg_type, subst, new_ctx =
+              infer_expr_with_context ctx_acc arg
+            in
+            (arg_type :: types_acc, compose_subst subst_acc subst, new_ctx))
+          ([], subst1, ctx1) args
+      in
+      let arg_types = List.rev arg_types in
+      let result_type = fresh_type_var () in
+      let expected_func_type =
+        List.fold_right
+          (fun arg_type acc -> TFun (arg_type, acc))
+          arg_types result_type
+      in
+      let unify_subst =
+        unify (apply_subst subst2 func_type) expected_func_type
+      in
+      let final_subst = compose_subst subst2 unify_subst in
+      (apply_subst final_subst result_type, final_subst, final_ctx)
   | _ ->
       (* For other expressions, convert context to env and use original function *)
       let env = context_to_env context in
@@ -1654,6 +1824,74 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
 
       let complete_subst = compose_subst final_subst timeout_subst in
       (apply_subst complete_subst result_type, complete_subst)
+  (* Fun expression types *)
+  | FunExpression (params, body) ->
+      (* Create fresh type variables for parameters *)
+      let param_types = List.map (fun _ -> fresh_type_var ()) params in
+      let param_env = List.combine params param_types in
+      let extended_env = param_env @ env in
+
+      (* Infer body type *)
+      let body_type, body_subst = infer_expr_original extended_env body in
+
+      (* Create function type *)
+      let param_types_subst = List.map (apply_subst body_subst) param_types in
+      let fun_type =
+        List.fold_right
+          (fun param_type acc -> TFun (param_type, acc))
+          param_types_subst body_type
+      in
+      (fun_type, body_subst)
+  | FunExpressionClauses clauses ->
+      (* Infer types for all clauses *)
+      let result_type = fresh_type_var () in
+
+      let final_subst, clause_types =
+        List.fold_left
+          (fun (subst_acc, types_acc) (params, guard_opt, body) ->
+            (* Create fresh type variables for parameters *)
+            let param_types = List.map (fun _ -> fresh_type_var ()) params in
+            let param_env = List.combine params param_types in
+            let extended_env = param_env @ apply_subst_env subst_acc env in
+
+            (* Type check guard if present *)
+            let guard_subst =
+              match guard_opt with
+              | Some guard -> infer_guard_expr extended_env guard
+              | None -> []
+            in
+            let env_with_guard = apply_subst_env guard_subst extended_env in
+
+            (* Type check body *)
+            let body_type, body_subst =
+              infer_expr_original env_with_guard body
+            in
+
+            (* Unify with result type *)
+            let return_unify = unify result_type body_type in
+
+            let combined_subst =
+              compose_subst
+                (compose_subst subst_acc guard_subst)
+                (compose_subst body_subst return_unify)
+            in
+            let clause_type =
+              List.fold_right
+                (fun param_type acc -> TFun (param_type, acc))
+                param_types body_type
+            in
+            (combined_subst, clause_type :: types_acc))
+          ([], []) clauses
+      in
+
+      (* All clauses should have compatible function types *)
+      let final_type =
+        match List.rev clause_types with
+        | [] -> failwith "Fun expression has no clauses"
+        | first_type :: _ -> apply_subst final_subst first_type
+      in
+
+      (final_type, final_subst)
 
 (* Extract all variables from a pattern *)
 let rec extract_pattern_vars (pattern : pattern) : string list =

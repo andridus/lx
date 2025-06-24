@@ -321,6 +321,30 @@ and emit_expr ctx (e : expr) : string =
           receive_body ^ "\nafter\n    " ^ emit_expr ctx timeout_expr
           ^ " ->\n        " ^ emit_expr ctx timeout_body ^ "\nend"
       | None -> receive_body ^ "\nend")
+  (* Fun expression types *)
+  | FunExpression (params, body) ->
+      let fun_ctx = create_scope (Some ctx) in
+      let renamed_params = List.map (add_var_to_scope fun_ctx) params in
+      "fun("
+      ^ String.concat ", " renamed_params
+      ^ ") -> " ^ emit_expr fun_ctx body ^ " end"
+  | FunExpressionClauses clauses ->
+      let emit_fun_clause ctx (params, guard_opt, body) =
+        let clause_ctx = create_scope (Some ctx) in
+        let renamed_params = List.map (add_var_to_scope clause_ctx) params in
+        let params_str = String.concat ", " renamed_params in
+        let guard_str =
+          match guard_opt with
+          | Some guard -> " when " ^ emit_guard_expr ctx guard
+          | None -> ""
+        in
+        let body_str = emit_expr clause_ctx body in
+        "(" ^ params_str ^ ")" ^ guard_str ^ " -> " ^ body_str
+      in
+      let clauses_str =
+        String.concat ";\n    " (List.map (emit_fun_clause ctx) clauses)
+      in
+      "fun " ^ clauses_str ^ "\nend"
 
 (* Helper function to emit receive clauses *)
 and emit_receive_clause ctx (pattern, guard_opt, body) =

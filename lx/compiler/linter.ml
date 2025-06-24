@@ -654,8 +654,17 @@ let rec lint_expr ctx errors expr =
           errors params
       in
       lint_expr func_ctx errors body
-  | Tuple exprs | List exprs | Sequence exprs | Block exprs ->
+  | Tuple exprs | List exprs -> List.fold_left (lint_expr ctx) errors exprs
+  | Sequence exprs ->
+      (* For sequences, use the same context (variables persist across expressions) *)
       List.fold_left (lint_expr ctx) errors exprs
+  | Block exprs ->
+      (* For blocks, create a new scope but don't leak variables *)
+      let block_ctx = create_context (Some ctx) in
+      let block_errors = List.fold_left (lint_expr block_ctx) errors exprs in
+      (* Check for unused variables in the block *)
+      let unused_errors = check_unused_variables block_ctx in
+      block_errors @ unused_errors
   | Match (expr, cases) ->
       let errors = lint_expr ctx errors expr in
       List.fold_left
@@ -742,6 +751,41 @@ let rec lint_expr ctx errors expr =
               let acc = lint_expr ctx acc key_expr in
               lint_expr ctx acc value_expr)
         errors fields
+  (* Fun expression types *)
+  | FunExpression (params, body) ->
+      let func_ctx = create_context (Some ctx) in
+      let errors =
+        List.fold_left
+          (fun acc param ->
+            match define_variable func_ctx param None with
+            | Some error -> error :: acc
+            | None -> acc)
+          errors params
+      in
+      lint_expr func_ctx errors body
+  | FunExpressionClauses clauses ->
+      (* Lint each clause in the fun expression *)
+      List.fold_left
+        (fun acc (params, guard_opt, body) ->
+          let clause_ctx = create_context (Some ctx) in
+          let acc =
+            List.fold_left
+              (fun acc param ->
+                match define_variable clause_ctx param None with
+                | Some error -> error :: acc
+                | None -> acc)
+              acc params
+          in
+          let acc =
+            match guard_opt with
+            | Some guard -> lint_guard_expr clause_ctx acc guard
+            | None -> acc
+          in
+          let acc = lint_expr clause_ctx acc body in
+          (* Check for unused variables in this clause *)
+          let unused_errors = check_unused_variables clause_ctx in
+          acc @ unused_errors)
+        errors clauses
   | _ -> errors
 
 (* Guard expression analysis *)

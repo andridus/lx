@@ -32,8 +32,12 @@ and guard_atom =
   | GuardLiteral of literal
   | GuardCallAtom of string * guard_atom list
 
+(* Fun expression clause definition - needs to be defined before expr *)
+type fun_clause =
+  string list * guard_expr option * expr (* params, optional guard, body *)
+
 (* Mutually recursive type definitions *)
-type expr =
+and expr =
   | Literal of literal
   | Var of ident
   | Assign of ident * expr * position option (* variable, value, position *)
@@ -65,6 +69,9 @@ type expr =
   | MapCreate of map_field list
   | MapAccess of expr * expr (* map[key] syntax if needed *)
   | BinaryCreate of binary_element list (* Binary construction *)
+  (* Fun expression types *)
+  | FunExpression of string list * expr (* Simple fun with parameter names *)
+  | FunExpressionClauses of fun_clause list (* Multi-clause fun *)
 
 (* Pattern matching *)
 and pattern =
