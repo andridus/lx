@@ -37,10 +37,6 @@ let () =
   | Compiler.Error.CompilationError error ->
       Printf.eprintf "%s\n" (Compiler.Error.string_of_error error);
       exit 1
-  | Compiler.Typechecker.TypeError error ->
-      Printf.eprintf "Type Error: %s\n"
-        (Compiler.Typechecker.string_of_type_error error);
-      exit 1
   | Compiler.Otp_validator.OtpValidationError error ->
       Printf.eprintf "OTP Validation Error: %s\n"
         (Compiler.Otp_validator.string_of_otp_error error);

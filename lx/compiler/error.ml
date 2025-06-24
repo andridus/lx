@@ -20,6 +20,8 @@ type error_kind =
       string * position option (* variable name, first definition position *)
   | VariableShadowing of
       string * position option (* variable name, parent definition position *)
+  | PatternMatchError of
+      string (* Special case for clean pattern match errors *)
 
 type compilation_error = {
   kind : error_kind;
@@ -141,6 +143,7 @@ let string_of_error_kind = function
       in
       Printf.sprintf "Variable %s%s%s%s cannot shadow parent scope variable%s"
         yellow bold var reset parent_pos_str
+  | PatternMatchError msg -> msg
 
 let make_suggestion = function
   | RecordFieldError (field, record_type, available) -> (
@@ -200,6 +203,7 @@ let make_suggestion = function
            "Use a different variable name like '%s_local', 'inner_%s', or \
             '%s_block'"
            var var var)
+  | PatternMatchError _msg -> None
   | _ -> None
 
 let make_context = function
@@ -216,10 +220,10 @@ let string_of_error err =
   let context_part =
     match err.context with Some c -> "\n  Context: " ^ c | None -> ""
   in
-  (* For SyntaxError, the message is already included in string_of_error_kind *)
   let message_part =
     match err.kind with
     | SyntaxError _ -> "" (* Don't repeat the message *)
+    | PatternMatchError _ -> "" (* Don't repeat the message *)
     | _ -> "\n" ^ err.message
   in
   Printf.sprintf "%s: %s%s%s%s"

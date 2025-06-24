@@ -863,13 +863,7 @@ let parse_file (filename : string) : program =
 let compile_to_string_with_module_name (program : program)
     (base_module_name : string) ?(filename : string option = None) () :
     (string * string) list =
-  (* Linting phase - must pass before any other validation *)
-  (try Linter.lint_program program
-   with Linter.LintError errors ->
-     Printf.eprintf "Lint Errors:\n%s\n" (Linter.string_of_lint_errors errors);
-     failwith "Linting failed - compilation aborted");
-
-  (* Type checking phase *)
+  (* Type checking phase - must pass before any other validation *)
   (try
      let _ = Typechecker.type_check_program program in
      (* OTP validation phase *)
@@ -880,8 +874,31 @@ let compile_to_string_with_module_name (program : program)
    with
   | Error.CompilationError _ as e -> raise e
   | Typechecker.TypeError error ->
-      Printf.eprintf "Type Error: %s\n" (Typechecker.string_of_type_error error);
-      failwith "Type checking failed");
+      (* Create a compilation error to stop the process immediately *)
+      let error_obj =
+        match error with
+        | Typechecker.PatternMatchError (_, _, Some pos, msg) ->
+            (* For pattern match errors, use the special PatternMatchError type *)
+            {
+              Error.kind = Error.PatternMatchError msg;
+              Error.position = pos;
+              Error.message = msg;
+              Error.suggestion = None;
+              Error.context = None;
+            }
+        | _ ->
+            Error.make_error_with_position
+              (Error.TypeError ("Type checking failed", None))
+              (Error.make_position 1 1)
+              (Typechecker.string_of_type_error error)
+      in
+      raise (Error.CompilationError error_obj));
+
+  (* Linting phase - must pass before compilation *)
+  (try Linter.lint_program program
+   with Linter.LintError errors ->
+     Printf.eprintf "Lint Errors:\n%s\n" (Linter.string_of_lint_errors errors);
+     failwith "Linting failed - compilation aborted");
 
   (* Separate OTP components from regular items *)
   let otp_components, regular_items =
@@ -946,8 +963,25 @@ let compile_to_string_for_tests (program : program) : string =
   (try ignore (Typechecker.type_check_program program) with
   | Error.CompilationError _ as e -> raise e
   | Typechecker.TypeError error ->
-      Printf.eprintf "Type Error: %s\n" (Typechecker.string_of_type_error error);
-      failwith "Type checking failed");
+      (* Create a compilation error to stop the process immediately *)
+      let error_obj =
+        match error with
+        | Typechecker.PatternMatchError (_, _, Some pos, msg) ->
+            (* For pattern match errors, use the special PatternMatchError type *)
+            {
+              Error.kind = Error.PatternMatchError msg;
+              Error.position = pos;
+              Error.message = msg;
+              Error.suggestion = None;
+              Error.context = None;
+            }
+        | _ ->
+            Error.make_error_with_position
+              (Error.TypeError ("Type checking failed", None))
+              (Error.make_position 1 1)
+              (Typechecker.string_of_type_error error)
+      in
+      raise (Error.CompilationError error_obj));
 
   (* Generate code *)
   let base_module_name = "generated" in
@@ -957,12 +991,6 @@ let compile_to_string_for_tests (program : program) : string =
 
 (* Type check a program without compilation *)
 let type_check_program (program : program) : Typechecker.type_env =
-  (* Linting phase - must pass before type checking *)
-  (try Linter.lint_program program
-   with Linter.LintError errors ->
-     Printf.eprintf "Lint Errors:\n%s\n" (Linter.string_of_lint_errors errors);
-     failwith "Linting failed - type checking aborted");
-
   try
     let type_env = Typechecker.type_check_program program in
     Printf.printf "Type checking completed successfully.\n";
@@ -990,12 +1018,35 @@ let type_check_program (program : program) : Typechecker.type_env =
        Printf.eprintf "%s\n" (Otp_validator.string_of_otp_error error);
        failwith "OTP validation failed");
 
+    (* Linting phase - run after type checking *)
+    (try Linter.lint_program program
+     with Linter.LintError errors ->
+       Printf.eprintf "Lint Errors:\n%s\n" (Linter.string_of_lint_errors errors);
+       failwith "Linting failed");
+
     type_env
   with
   | Error.CompilationError _ as e -> raise e
   | Typechecker.TypeError error ->
-      Printf.eprintf "Type Error: %s\n" (Typechecker.string_of_type_error error);
-      failwith "Type checking failed"
+      (* Create a compilation error to stop the process immediately *)
+      let error_obj =
+        match error with
+        | Typechecker.PatternMatchError (_, _, Some pos, msg) ->
+            (* For pattern match errors, use the special PatternMatchError type *)
+            {
+              Error.kind = Error.PatternMatchError msg;
+              Error.position = pos;
+              Error.message = msg;
+              Error.suggestion = None;
+              Error.context = None;
+            }
+        | _ ->
+            Error.make_error_with_position
+              (Error.TypeError ("Type checking failed", None))
+              (Error.make_position 1 1)
+              (Typechecker.string_of_type_error error)
+      in
+      raise (Error.CompilationError error_obj)
 
 (* Type check a file *)
 let type_check_file (filename : string) : Typechecker.type_env =
@@ -1056,10 +1107,9 @@ let compile_file ?(skip_rebar = false) (filename : string) : unit =
   let build_dir = Filename.concat source_dir "_build" in
   if not (Sys.file_exists build_dir) then Unix.mkdir build_dir 0o755;
 
-  (* Clean up any existing build artifacts before compilation *)
-  cleanup_build_artifacts build_dir base_name;
-
-  if has_application then
+  if has_application then (
+    (* Clean up any existing build artifacts before compilation *)
+    cleanup_build_artifacts build_dir base_name;
     (* If there's an application definition, let App_generator handle everything *)
     match App_generator.find_application_def program with
     | Some app_def ->
@@ -1068,8 +1118,10 @@ let compile_file ?(skip_rebar = false) (filename : string) : unit =
           program app_def;
         Printf.printf "Generated application files for %s in _build/%s\n"
           base_name base_name
-    | None -> () (* This case should not happen *)
-  else
+    | None -> () (* This case should not happen *))
+  else (
+    (* Clean up any existing build artifacts before compilation *)
+    cleanup_build_artifacts build_dir base_name;
     (* No application definition, generate individual modules in _build/filename/ *)
     let project_build_dir = Filename.concat build_dir base_name in
     if not (Sys.file_exists project_build_dir) then
@@ -1092,4 +1144,4 @@ let compile_file ?(skip_rebar = false) (filename : string) : unit =
         Printf.printf "Generated module: %s\n" output_filename)
       modules;
 
-    Printf.printf "Compiled %s in _build/%s/\n" filename base_name
+    Printf.printf "Compiled %s in _build/%s/\n" filename base_name)

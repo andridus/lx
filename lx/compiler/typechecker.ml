@@ -148,6 +148,7 @@ type substitution = (type_var * lx_type) list
 (* Enhanced error types with better context *)
 type type_error =
   | UnificationError of lx_type * lx_type * string option
+  | PatternMatchError of lx_type * lx_type * Error.position option * string
   | UnboundVariable of ident * string list
   | OccursCheck of type_var * lx_type
   | InvalidOtpComponent of string
@@ -230,6 +231,8 @@ let rec string_of_type = function
   | TOtpInfo -> "otp_info"
 
 let string_of_type_error = function
+  | PatternMatchError (_pattern_type, _value_type, _pos, explanation) ->
+      explanation
   | UnificationError (t1, t2, context) ->
       let context_part =
         match context with Some ctx -> " in " ^ ctx | None -> ""
@@ -286,6 +289,48 @@ let get_env_var_names env = List.map fst env
 let get_record_fields = function
   | TRecord fields -> List.map fst fields
   | _ -> []
+
+(* Generate specific error message for pattern matching *)
+let generate_pattern_match_error pattern_type value_type =
+  match (pattern_type, value_type) with
+  | TInteger, TNamedRecord name ->
+      Printf.sprintf
+        "Cannot match integer pattern against record value of type '%s'.\n\
+         The pattern '1 = x' attempts to match the integer 1 against a record \
+         value, which is impossible."
+        name
+  | TNamedRecord name, TInteger ->
+      Printf.sprintf
+        "Cannot match record pattern of type '%s' against integer value.\n\
+         Make sure the pattern type matches the value type."
+        name
+  | TInteger, _ ->
+      Printf.sprintf
+        "Cannot match integer pattern against value of type '%s'.\n\
+         Pattern and value types must be compatible."
+        (string_of_type value_type)
+  | _, TInteger ->
+      Printf.sprintf
+        "Cannot match pattern of type '%s' against integer value.\n\
+         Pattern and value types must be compatible."
+        (string_of_type pattern_type)
+  | _ ->
+      Printf.sprintf
+        "Pattern type '%s' does not match value type '%s'.\n\
+         Pattern and value types must be compatible."
+        (string_of_type pattern_type)
+        (string_of_type value_type)
+
+(* Convert AST position to Error position *)
+let convert_position = function
+  | Some pos ->
+      Some
+        {
+          Error.line = pos.line;
+          Error.column = pos.column;
+          Error.filename = pos.filename;
+        }
+  | None -> None
 
 (* Substitution operations *)
 let rec apply_subst (subst : substitution) (typ : lx_type) : lx_type =
@@ -472,6 +517,17 @@ let rec unify (t1 : lx_type) (t2 : lx_type) : substitution =
       compose_subst s1 s2
   | _ -> raise (TypeError (UnificationError (t1, t2, None)))
 
+(* Special unification for pattern matching with position and better error messages *)
+let unify_pattern_match (pattern_type : lx_type) (value_type : lx_type)
+    (pos : Error.position option) : substitution =
+  try unify pattern_type value_type with
+  | TypeError (UnificationError (_t1, _t2, _)) ->
+      let error_msg = generate_pattern_match_error pattern_type value_type in
+      raise
+        (TypeError
+           (PatternMatchError (pattern_type, value_type, pos, error_msg)))
+  | other -> raise other
+
 (* Type inference for patterns *)
 let rec infer_pattern (env : type_env) (pattern : pattern) :
     lx_type * type_env * substitution =
@@ -611,7 +667,9 @@ let rec infer_expr_with_context (context : symbol_context) (expr : expr) :
         infer_pattern (context_to_env new_context) pattern
       in
       (* Unify the pattern type with the value type *)
-      let unify_subst = unify value_type pattern_type in
+      let unify_subst =
+        unify_pattern_match pattern_type value_type (convert_position _pos)
+      in
       let final_subst =
         compose_subst (compose_subst subst pattern_subst) unify_subst
       in
@@ -733,7 +791,9 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
         infer_pattern env pattern
       in
       (* Unify the pattern type with the value type *)
-      let unify_subst = unify value_type pattern_type in
+      let unify_subst =
+        unify_pattern_match pattern_type value_type (convert_position _pos)
+      in
       let final_subst =
         compose_subst (compose_subst subst pattern_subst) unify_subst
       in

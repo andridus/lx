@@ -889,21 +889,38 @@ let cleanup_old_files output_dir app_name =
 (* Main function to generate all application files *)
 let generate_application_files ?(skip_rebar = false) output_dir filename program
     app_def =
-  (* Linting phase - must pass before any generation *)
-  (try Linter.lint_program program
-   with Linter.LintError errors ->
-     Printf.eprintf "Lint Errors:\n%s\n" (Linter.string_of_lint_errors errors);
-     failwith "Linting failed - application generation aborted");
-
   (* Type checking phase - must pass before any generation *)
   (try
      let _ = Typechecker.type_check_program program in
      ()
    with
   | Typechecker.TypeError error ->
-      Printf.eprintf "Type Error: %s\n" (Typechecker.string_of_type_error error);
-      failwith "Type checking failed"
+      (* Create a compilation error to stop the process immediately *)
+      let error_obj =
+        match error with
+        | Typechecker.PatternMatchError (_, _, Some pos, msg) ->
+            (* For pattern match errors, use the special PatternMatchError type *)
+            {
+              Error.kind = Error.PatternMatchError msg;
+              Error.position = pos;
+              Error.message = msg;
+              Error.suggestion = None;
+              Error.context = None;
+            }
+        | _ ->
+            Error.make_error_with_position
+              (Error.TypeError ("Type checking failed", None))
+              (Error.make_position 1 1)
+              (Typechecker.string_of_type_error error)
+      in
+      raise (Error.CompilationError error_obj)
   | Error.CompilationError _ as e -> raise e);
+
+  (* Linting phase - must pass before any generation *)
+  (try Linter.lint_program program
+   with Linter.LintError errors ->
+     Printf.eprintf "Lint Errors:\n%s\n" (Linter.string_of_lint_errors errors);
+     failwith "Linting failed - application generation aborted");
 
   let app_name = extract_app_name filename in
 

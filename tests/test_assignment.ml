@@ -88,9 +88,15 @@ pub fun test() {
   | Compiler.Error.CompilationError err
     when string_contains_substring
            (Compiler.Error.string_of_error err)
+           "already defined" ->
+      ()
+  | Compiler.Error.CompilationError err
+    when string_contains_substring
+           (Compiler.Error.string_of_error err)
            "shadows" ->
       ()
   | Failure msg when string_contains_substring msg "shadows" -> ()
+  | Failure msg when string_contains_substring msg "already defined" -> ()
   | Failure msg when string_contains_substring msg "Linting failed" -> ()
   | e -> Alcotest.fail ("Unexpected error: " ^ Printexc.to_string e)
 
