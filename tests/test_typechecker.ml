@@ -6,6 +6,7 @@ open Compiler.Typechecker
 let test_basic_types () =
   let program =
     {
+      deps = None;
       items =
         [
           Function
@@ -28,6 +29,7 @@ let test_basic_types () =
 let test_function_types () =
   let program =
     {
+      deps = None;
       items =
         [ Function (make_single_clause_function "add" [ "x"; "y" ] (Var "x")) ];
     }
@@ -44,6 +46,7 @@ let test_function_types () =
 let test_type_error () =
   let program =
     {
+      deps = None;
       items =
         [
           Function
@@ -66,6 +69,7 @@ let test_type_error () =
 let test_nil_type () =
   let program =
     {
+      deps = None;
       items =
         [ Function (make_single_clause_function "test_nil" [] (Literal LNil)) ];
     }
@@ -85,6 +89,7 @@ let test_nil_type () =
 let test_integer_type () =
   let program =
     {
+      deps = None;
       items =
         [
           Function
@@ -109,6 +114,7 @@ let test_integer_type () =
 let test_optional_types () =
   let program =
     {
+      deps = None;
       items =
         [
           Function
@@ -134,6 +140,7 @@ let test_optional_types () =
 let test_if_then_else_consistent () =
   let program =
     {
+      deps = None;
       items =
         [
           Function
@@ -160,6 +167,7 @@ let test_if_then_else_consistent () =
 let test_empty_function_body () =
   let program =
     {
+      deps = None;
       items =
         [
           Function (make_single_clause_function "test_empty" [] (Literal LNil));
@@ -182,6 +190,7 @@ let test_empty_function_body () =
 let test_tuple_types () =
   let program =
     {
+      deps = None;
       items =
         [
           Function

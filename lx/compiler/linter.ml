@@ -640,7 +640,7 @@ let rec lint_expr ctx errors expr =
         | _ -> lint_expr ctx errors func_expr
       in
       List.fold_left (lint_expr ctx) errors args
-  | ExternalCall (_module_name, _func_name, args) ->
+  | ExternalCall (_module_name, _func_name, args, _pos_opt) ->
       (* Check if the external call is valid *)
       List.fold_left (lint_expr ctx) errors args
   | Fun (params, body) ->

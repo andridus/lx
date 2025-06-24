@@ -1,3 +1,27 @@
+(* Module dependency system types - defined early for use in program type *)
+type dependency_source =
+  | Simple of string (* Simple module name *)
+  | Version of string * string (* Module name * version spec *)
+  | GitHub of string * string (* Module name * github path *)
+  | Path of string * string (* Module name * local path *)
+  | Hex of string * string (* Module name * hex version *)
+
+type dependency = dependency_source
+
+(* Global project configuration *)
+type project_field =
+  | ProjectName of string
+  | ProjectVersion of string
+  | ProjectDeps of dependency list
+  | ProjectApps of string list
+
+type project_config = {
+  name : string option;
+  version : string option;
+  deps : dependency list;
+  apps : string list;
+}
+
 type ident = string
 
 (* Position information for better error reporting *)
@@ -48,7 +72,11 @@ and expr =
       * bool (* pattern, value, position, unsafe *)
   | Fun of ident list * expr
   | App of expr * expr list
-  | ExternalCall of string * string * expr list (* module, function, args *)
+  | ExternalCall of
+      string
+      * string
+      * expr list
+      * position option (* module, function, args, position *)
   | Tuple of expr list
   | List of expr list
   | Match of expr * (pattern * guard_expr option * expr) list
@@ -234,7 +262,13 @@ type module_item =
   | RecordDef of record_def
 
 (* Complete program *)
-type program = { items : module_item list }
+type program = { deps : dependency list option; items : module_item list }
+
+(* Complete project structure *)
+type lx_project = {
+  config : project_config option; (* From lx.config if exists *)
+  modules : (string * program) list; (* filename * parsed content *)
+}
 
 (* Helper functions for OTP callback validation *)
 let string_of_otp_callback = function
@@ -271,3 +305,20 @@ let expected_arity_for_callback = function
   | Terminate -> 2
   | CodeChange -> 3
   | FormatStatus -> 1
+
+(* External function call validation *)
+type external_function_info = {
+  module_name : string;
+  function_name : string;
+  arity : int;
+  param_types : type_expr list option; (* If available from BEAM *)
+  return_type : type_expr option; (* If available from BEAM *)
+}
+
+(* Dependency resolution *)
+type resolved_dependency = {
+  name : string;
+  source : dependency_source;
+  resolved_path : string; (* Actual path to BEAM files *)
+  version : string option; (* Resolved version *)
+}

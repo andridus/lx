@@ -76,6 +76,13 @@ rule read = parse
       | "applications" -> APPLICATIONS | "registered" -> REGISTERED | "env" -> ENV
       | "record" -> RECORD
       | "unsafe" -> UNSAFE
+      | "deps" -> DEPS
+      | "project" -> PROJECT
+
+      | "apps" -> APPS
+      | "github" -> GITHUB
+      | "path" -> PATH
+      | "hex" -> HEX
       | word when List.mem word ["spec"; "worker"; "supervisor"] ->
           (* Other commonly misused reserved words *)
           Error.reserved_word_error ~filename:(!filename_ref) lexbuf word

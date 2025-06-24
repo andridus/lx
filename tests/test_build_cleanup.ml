@@ -265,9 +265,18 @@ pub fun new_feature() {
       (file_exists (Filename.concat project_dir "rebar.config"));
 
     cleanup ()
-  with exn ->
-    cleanup ();
-    failwith ("Test failed with exception: " ^ Printexc.to_string exn)
+  with
+  | Compiler.Error.CompilationError err ->
+      cleanup ();
+      Printf.printf "[DEBUG] CompilationError: %s\n"
+        (Compiler.Error.string_of_error err);
+      failwith
+        ("Test failed with CompilationError: "
+        ^ Compiler.Error.string_of_error err)
+  | exn ->
+      cleanup ();
+      Printf.printf "[DEBUG] Exception: %s\n" (Printexc.to_string exn);
+      failwith ("Test failed with exception: " ^ Printexc.to_string exn)
 
 let test_cleanup_handles_missing_directory () =
   let temp_dir = create_temp_dir "lx_test_cleanup_" in

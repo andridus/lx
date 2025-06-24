@@ -31,7 +31,7 @@ let test_valid_worker_with_init () =
       }
   in
 
-  let program = { items = [ OtpComponent worker ] } in
+  let program = { deps = None; items = [ OtpComponent worker ] } in
 
   try
     validate_program program None;
@@ -54,7 +54,7 @@ let test_worker_missing_init () =
       }
   in
 
-  let program = { items = [ OtpComponent worker ] } in
+  let program = { deps = None; items = [ OtpComponent worker ] } in
 
   try
     validate_program program None;

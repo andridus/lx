@@ -1,0 +1,11 @@
+# Debug test for binary parsing
+
+pub fun test_string_only() {
+    data = <<"test">>
+    data
+}
+
+pub fun main() {
+    result = test_string_only()
+    result
+}

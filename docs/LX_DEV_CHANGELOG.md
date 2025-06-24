@@ -2,7 +2,7 @@
 
 This document tracks major improvements and features added to the Lx language compiler and toolchain.
 
-## [Latest] Task 7: Fun Expressions Implementation
+## Fun Expressions Implementation
 
 ### Overview
 Successfully implemented comprehensive anonymous function expressions (fun expressions) in Lx, enabling functional programming patterns including closures, higher-order functions, and functional composition. This implementation provides full compatibility with Erlang's fun syntax and includes support for both simple and multi-clause fun expressions with pattern matching and guards.
@@ -241,7 +241,7 @@ The fun expressions implementation is complete and provides a solid foundation f
 
 ---
 
-## [Latest] Complete Binary/Bitstring Implementation with Pattern Matching Fix
+## Complete Binary/Bitstring Implementation with Pattern Matching Fix
 
 ### Overview
 Successfully implemented comprehensive binary and bitstring support in Lx, enabling efficient binary data manipulation for protocols, file I/O, and network communication. This implementation provides full compatibility with Erlang's binary syntax and includes advanced features like type specifiers, size specifications, and pattern matching. Additionally, resolved a critical parser issue that prevented binary pattern matching in assignment statements.
@@ -595,7 +595,7 @@ pub fun extract_header(packet) {
 
 This implementation provides a solid foundation for binary data manipulation in Lx and enables the development of efficient, protocol-aware applications that leverage the full power of the Erlang/BEAM VM.
 
-## [Latest] Comprehensive Maps & Pattern Matching Test Suite
+## Comprehensive Maps & Pattern Matching Test Suite
 
 ### Overview
 Added extensive test coverage for maps and pattern matching functionality, validating all aspects of map creation, access, and pattern matching. This comprehensive test suite ensures the robustness and reliability of the map implementation while providing clear examples for developers.
@@ -814,7 +814,7 @@ pub fun validate_user(user) {
 
 This comprehensive test suite establishes maps as a fully validated, production-ready feature in the Lx language, providing developers with confidence in using maps for complex data manipulation and pattern matching scenarios.
 
-## [Latest] Map Pattern Matching Validation Fix & Unsafe Keyword
+## Map Pattern Matching Validation Fix & Unsafe Keyword
 
 ### Overview
 Fixed a critical issue in map pattern matching validation where the compiler was incorrectly rejecting valid mixed-key patterns when using the `<-` operator. The implementation was overly restrictive and not aligned with the documented syntax and test expectations. This fix ensures that both `=` and `<-` operators properly allow mixed key types by default, while maintaining the `unsafe` keyword as a complete escape valve for all type checking.
@@ -1016,7 +1016,7 @@ unsafe %{ unknown_field: value, another_field: data } <- dynamic_map  # ✅ No v
 
 This fix resolves a fundamental issue with map pattern matching validation, ensuring that the Lx language behaves as documented and expected while maintaining robust type safety where it matters most.
 
-## [Previous] Record Update Bug Fix & Comprehensive Test Suite
+## Record Update Bug Fix & Comprehensive Test Suite
 
 ### Overview
 Fixed a critical bug in record update operations where the generated Erlang code used incorrect record type names. When updating records using the `{record | field: value}` syntax, the compiler incorrectly generated `#record{...}` instead of the correct record type name (e.g., `#person{...}`). This fix ensures proper record type tracking and includes a comprehensive test suite covering all record update scenarios.
@@ -1238,7 +1238,7 @@ invalid = {number | field: "value"}
 
 This implementation provides robust, reliable record update functionality that integrates seamlessly with Lx's type system and generates correct, efficient Erlang code for production use.
 
-## [Latest] String Concatenation Operator & OTP Syntax Fixes
+## String Concatenation Operator & OTP Syntax Fixes
 
 ### Overview
 Implemented the string concatenation operator (`++`) for combining strings, along with critical fixes to OTP supervisor and worker parsing. This update enables essential string manipulation operations while resolving syntax issues that prevented proper OTP component definitions with lowercase naming conventions.
@@ -1491,7 +1491,7 @@ supervisor cart_sup {       # ✅ Correct Erlang convention
 
 This implementation provides essential string manipulation capabilities and resolves critical OTP syntax issues, enabling the development of production-ready Erlang applications with clean, type-safe Lx code.
 
-## [Previous] List Pattern Optimization & Code Quality Improvements
+## List Pattern Optimization & Code Quality Improvements
 
 ### Overview
 Implemented significant optimizations for list pattern matching in receive expressions and throughout the codebase, improving the readability and maintainability of generated Erlang code. Enhanced the pattern matching system to generate cleaner, more intuitive Erlang patterns while maintaining full semantic correctness.
@@ -1695,7 +1695,7 @@ Comprehensive test suite covering:
 
 This implementation provides complete message reception capabilities, enabling full actor model programming and robust OTP application development in Lx.
 
-## [Previous] Send Operator Implementation
+## Send Operator Implementation
 
 ### Overview
 Implemented the send operator (`!`) for message passing between processes, enabling essential OTP functionality. This operator allows sending messages to process identifiers (PIDs), atoms, and tuples, following Erlang's message passing semantics.
@@ -1814,7 +1814,7 @@ Comprehensive test suite covering:
 
 This implementation provides essential message passing capabilities for building robust OTP applications in Lx.
 
-## [Previous] Case Expression Syntax Simplification
+## Case Expression Syntax Simplification
 
 ### Overview
 Simplified case expression syntax by removing semicolon requirements between case branches. The language now uses a cleaner, more intuitive syntax that aligns with modern functional programming languages while maintaining full Erlang compatibility.
@@ -1972,7 +1972,7 @@ A simple find-and-replace can update existing code:
 
 This change makes Lx case expressions more elegant and easier to read while maintaining full compatibility with Erlang's pattern matching semantics.
 
-## [Previous] Complete Guard Function Calls Implementation
+## Complete Guard Function Calls Implementation
 
 ### Overview
 Implemented comprehensive support for function calls in guard expressions, enabling complex guard conditions with nested function calls. This enhancement provides full Erlang-compatible guard functionality, allowing developers to use built-in guard functions like `hd/1`, `tl/1`, `length/1`, and type checking functions in any guard context.
@@ -2218,7 +2218,7 @@ fun type_safe_guards {
 
 This implementation provides complete guard function call support, enabling developers to write sophisticated, type-safe guard expressions that compile to efficient Erlang code.
 
-## [Previous] Complete Logical Operators Implementation
+## Complete Logical Operators Implementation
 
 ### Overview
 Implemented comprehensive support for all logical operators in the Lx language, including both strict evaluation operators (`and`, `or`, `not`) and short-circuit operators (`andalso`, `orelse`). This implementation provides full compatibility with Erlang's logical operator semantics while maintaining the familiar syntax developers expect.
@@ -2384,7 +2384,7 @@ fun test_short_circuit(x, y) {
 - **Type safety**: Prevents logical errors at compile time
 - **Erlang optimization**: Generates optimal Erlang code
 
-## [Previous] Guards Implementation
+## Guards Implementation
 
 ### Overview
 Implemented guard expressions (when clauses) in Lx to enable conditional function clauses and pattern matching. Guards are essential for OTP applications and functional programming patterns, providing Erlang-style conditional logic with full type safety.
@@ -2640,7 +2640,7 @@ test(_) ->
 - **State validation**: Guard-based state checking
 - **Error handling**: Pattern-based error handling with guards
 
-## [Previous] Comparison Operators Implementation
+## Comparison Operators Implementation
 
 ### Overview
 Implemented comprehensive support for comparison operators in the Lx language, enabling traditional comparison syntax while maintaining seamless Erlang/BEAM compatibility. This fundamental addition enables proper conditional logic and boolean expressions throughout the language.
@@ -2871,7 +2871,7 @@ Complete examples of comparison usage, precedence rules, and integration with co
 - **Custom comparison**: Support for user-defined comparison operators
 
 ---
-## [Previous] Comprehensive Linter System Integration
+## Comprehensive Linter System Integration
 
 ### Overview
 Implemented a comprehensive static analysis linter that runs during the compilation process, providing extensive validation beyond basic syntax checking. The linter performs deep analysis of code quality, variable usage, OTP compliance, and catches common programming errors before they reach runtime.
@@ -3119,7 +3119,7 @@ worker my_worker {
 
 ---
 
-## [Previous] Public Function Support & Export System Overhaul
+## Public Function Support & Export System Overhaul
 
 ### Overview
 Implemented comprehensive function visibility system with `pub` keyword support and automatic export generation, eliminating the use of `export_all` and providing precise control over module interfaces.
@@ -3368,7 +3368,7 @@ fun handle_call(req, _from, state) { .{:reply, :ok, state} }
 
 ---
 
-## [Previous] Enhanced Build Directory Management & Cleanup System
+## Enhanced Build Directory Management & Cleanup System
 
 ### Overview
 Implemented comprehensive build directory management with automatic cleanup of old artifacts when switching between application and non-application compilation modes. This prevents build artifact pollution and ensures clean compilation environments.
@@ -3544,7 +3544,7 @@ fun hello() { "world" }
 
 ---
 
-## [Latest] Syntax Cleanup - Removed `then` Token
+## Syntax Cleanup - Removed `then` Token
 
 ### Overview
 Removed the `then` token from the Lx language to simplify syntax and eliminate inconsistencies. The language now uses a unified brace-based syntax for all conditional expressions.
@@ -3668,7 +3668,7 @@ end
 
 ---
 
-## [Previous] Automatic Rebar3 Integration
+## Automatic Rebar3 Integration
 
 ### Overview
 Complete integration of rebar3 compilation into the Lx compiler workflow, providing seamless OTP application compilation with automatic dependency management and error reporting.
@@ -3800,7 +3800,7 @@ chmod +x ~/.lx/rebar3
 
 ---
 
-## [Previous] Advanced Ambiguity Detection & Typed Children Syntax
+## Advanced Ambiguity Detection & Typed Children Syntax
 
 ### Overview
 Implemented comprehensive ambiguity detection for OTP components with intelligent typed children syntax to resolve name conflicts between workers and supervisors.
@@ -3886,7 +3886,7 @@ supervisor main_supervisor {
 
 ---
 
-## [Previous] Enhanced Supervisor Error Testing
+## Enhanced Supervisor Error Testing
 
 ### Overview
 Comprehensive test coverage for supervisor error messages ensuring clear, actionable feedback for syntax errors.
@@ -3907,7 +3907,7 @@ Comprehensive test coverage for supervisor error messages ensuring clear, action
 
 ---
 
-## [Previous] Special Syntax Features
+## Special Syntax Features
 
 ### Overview
 Advanced syntax features for improved Erlang/OTP integration and developer experience.
@@ -3962,7 +3962,7 @@ io.format("Hello ~p~n", [__MODULE__])
 
 ---
 
-## [Previous] Advanced Error Reporting System
+## Advanced Error Reporting System
 
 ### Overview
 Complete overhaul of error reporting with precise position tracking, visual enhancements, and contextual suggestions.
@@ -3994,7 +3994,7 @@ After:  3:3: Variable result is already defined within the same scope and cannot
 
 ---
 
-## [Previous] Optimized Block Compilation & Scoping Rules
+## Optimized Block Compilation & Scoping Rules
 
 ### Overview
 Performance improvements and strict scoping rules to prevent common programming errors.

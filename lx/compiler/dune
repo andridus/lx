@@ -13,7 +13,9 @@
   error
   error_formatter
   app_generator
-  rebar_manager))
+  rebar_manager
+  beam_analyzer
+  dependency_resolver))
 
 (menhir
  (modules parser))

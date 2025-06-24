@@ -222,7 +222,7 @@ and emit_expr ctx (e : expr) : string =
       emit_expr ctx func ^ "("
       ^ String.concat ", " (List.map (emit_expr ctx) args)
       ^ ")"
-  | ExternalCall (module_name, func_name, args) ->
+  | ExternalCall (module_name, func_name, args, _pos_opt) ->
       module_name ^ ":" ^ func_name ^ "("
       ^ String.concat ", " (List.map (emit_expr ctx) args)
       ^ ")"

@@ -1,0 +1,11 @@
+# Debug test for binary with spec
+
+pub fun test_with_spec() {
+    data = <<"test"/utf8>>
+    data
+}
+
+pub fun main() {
+    result = test_with_spec()
+    result
+}

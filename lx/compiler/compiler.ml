@@ -9,6 +9,7 @@ module Error = Error
 module App_generator = App_generator
 module Rebar_manager = Rebar_manager
 open Ast
+open Dependency_resolver
 
 (* Initialize random number generator *)
 let () = Random.self_init ()
@@ -397,7 +398,7 @@ and emit_expr ctx (e : expr) : string =
       emit_expr ctx func ^ "("
       ^ String.concat ", " (List.map (emit_expr ctx) args)
       ^ ")"
-  | ExternalCall (module_name, func_name, args) ->
+  | ExternalCall (module_name, func_name, args, _pos_opt) ->
       (* Generate Erlang external call: module:function(args) *)
       module_name ^ ":" ^ func_name ^ "("
       ^ String.concat ", " (List.map (emit_expr ctx) args)
@@ -929,6 +930,10 @@ let parse_file (filename : string) : program =
 let compile_to_string_with_module_name (program : program)
     (base_module_name : string) ?(filename : string option = None) () :
     (string * string) list =
+  (* Load dependencies first *)
+  let effective_deps = get_effective_dependencies program.deps in
+  load_dependencies effective_deps;
+
   (* Type checking phase - must pass before any other validation *)
   (try
      let _ = Typechecker.type_check_program program in
@@ -1019,6 +1024,10 @@ let compile_to_string (program : program) : string =
 
 (* Special version for tests that skips unused function checking *)
 let compile_to_string_for_tests (program : program) : string =
+  (* Load dependencies first *)
+  let effective_deps = get_effective_dependencies program.deps in
+  load_dependencies effective_deps;
+
   (* Linting phase - skip unused function checking for tests *)
   (try Linter.lint_program ~skip_unused_functions:true program
    with Linter.LintError errors ->
@@ -1057,6 +1066,10 @@ let compile_to_string_for_tests (program : program) : string =
 
 (* Type check a program without compilation *)
 let type_check_program (program : program) : Typechecker.type_env =
+  (* Load dependencies first *)
+  let effective_deps = get_effective_dependencies program.deps in
+  load_dependencies effective_deps;
+
   try
     let type_env = Typechecker.type_check_program program in
     Printf.printf "Type checking completed successfully.\n";

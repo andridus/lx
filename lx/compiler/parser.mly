@@ -62,6 +62,9 @@ let string_of_simple_tuple_element = function
 %token PUB FUN CASE IF ELSE FOR WHEN IN AND OR NOT ANDALSO ORELSE RECEIVE AFTER MATCH_KEYWORD
 %token RECORD UNSAFE
 
+(* Module System Keywords *)
+%token DEPS PROJECT VERSION APPS GITHUB PATH HEX
+
 (* OTP Keywords *)
 %token WORKER SUPERVISOR STRATEGY CHILDREN
 %token ONE_FOR_ONE ONE_FOR_ALL REST_FOR_ONE
@@ -118,7 +121,49 @@ let string_of_simple_tuple_element = function
 %%
 
 main:
-  | items = module_item* EOF { { items } }
+  | deps = deps_declaration? items = module_item* EOF { { deps; items } }
+
+(* For lx.config files *)
+config_file:
+  | project_declaration EOF { $1 }
+
+project_declaration:
+  | PROJECT LBRACE project_fields RBRACE { $3 }
+
+project_fields:
+  | fields = project_field* {
+      let name = ref None in
+      let version = ref None in
+      let deps = ref [] in
+      let apps = ref [] in
+      List.iter (function
+        | ProjectName n -> name := Some n
+        | ProjectVersion v -> version := Some v
+        | ProjectDeps d -> deps := d
+        | ProjectApps a -> apps := a
+      ) fields;
+      { name = !name; version = !version; deps = !deps; apps = !apps }
+    }
+
+project_field:
+  | name = IDENT s = STRING { if name = "name" then ProjectName s else failwith ("Expected 'name', got '" ^ name ^ "'") }
+  | VERSION s = STRING { ProjectVersion s }
+  | DEPS LBRACKET deps = separated_list(COMMA, dependency_spec) RBRACKET { ProjectDeps deps }
+  | APPS LBRACKET apps = separated_list(COMMA, STRING) RBRACKET { ProjectApps apps }
+
+deps_declaration:
+  | DEPS LBRACKET deps = separated_list(COMMA, dependency_spec) RBRACKET { deps }
+
+dependency_spec:
+  | atom = atom { Simple atom }
+  | DOT_LBRACE atom = atom COMMA version = STRING RBRACE { Version (atom, version) }
+  | DOT_LBRACE atom = atom COMMA COLON GITHUB COMMA repo = STRING RBRACE { GitHub (atom, repo) }
+  | DOT_LBRACE atom = atom COMMA COLON PATH COMMA path = STRING RBRACE { Path (atom, path) }
+  | DOT_LBRACE atom = atom COMMA COLON HEX COMMA version = STRING RBRACE { Hex (atom, version) }
+
+atom:
+  | COLON name = IDENT { name }
+  | name = ATOM { name }
 
 module_item:
   | f = function_def { Function f }
@@ -396,7 +441,7 @@ simple_expr:
   | MODULE_MACRO { Var "?MODULE" }
   (* External function call: module.function(args) *)
   | module_name = IDENT DOT func_name = IDENT LPAREN args = separated_list(COMMA, expr) RPAREN
-    { ExternalCall (module_name, func_name, args) }
+    { let pos = make_position $startpos in ExternalCall (module_name, func_name, args, Some pos) }
   (* Record field access *)
   | record_var = IDENT DOT field_name = IDENT
     { RecordAccess (Var record_var, field_name) }

@@ -59,7 +59,9 @@ let test_record_update_normal_variable () =
       (Sequence [ assign1; assign2; Var "person2" ])
   in
 
-  let program = { items = [ RecordDef record_def; Function func ] } in
+  let program =
+    { deps = None; items = [ RecordDef record_def; Function func ] }
+  in
   let result = Compiler.compile_to_string_for_tests program in
 
   (* Should generate correct record type in update *)
@@ -114,7 +116,9 @@ let test_record_update_record_keyword_variable () =
       (Sequence [ assign1; assign2; Var "record1" ])
   in
 
-  let program = { items = [ RecordDef record_def; Function func ] } in
+  let program =
+    { deps = None; items = [ RecordDef record_def; Function func ] }
+  in
   let result = Compiler.compile_to_string_for_tests program in
 
   (* Should generate correct record type even when variable is 'record' *)
@@ -180,7 +184,9 @@ let test_record_update_chained () =
       (Sequence [ assign1; assign2; assign3; Var "product2" ])
   in
 
-  let program = { items = [ RecordDef record_def; Function func ] } in
+  let program =
+    { deps = None; items = [ RecordDef record_def; Function func ] }
+  in
   let result = Compiler.compile_to_string_for_tests program in
 
   (* All updates should use correct record type *)
@@ -246,7 +252,9 @@ let test_record_update_multiple_fields () =
       (Sequence [ assign1; assign2; Var "emp_updated" ])
   in
 
-  let program = { items = [ RecordDef record_def; Function func ] } in
+  let program =
+    { deps = None; items = [ RecordDef record_def; Function func ] }
+  in
   let result = Compiler.compile_to_string_for_tests program in
 
   (* Should update multiple fields with correct record type *)
@@ -297,7 +305,9 @@ let test_record_access_after_update () =
       (Sequence [ assign1; assign2; config_access ])
   in
 
-  let program = { items = [ RecordDef record_def; Function func ] } in
+  let program =
+    { deps = None; items = [ RecordDef record_def; Function func ] }
+  in
   let result = Compiler.compile_to_string_for_tests program in
 
   (* Should use correct record type in both update and access *)
@@ -315,7 +325,7 @@ let test_record_update_undefined_type_error () =
   in
 
   let func = make_single_clause_function "test_undefined" [] undefined_update in
-  let program = { items = [ Function func ] } in
+  let program = { deps = None; items = [ Function func ] } in
 
   try
     ignore (Compiler.compile_to_string_for_tests program);
@@ -354,7 +364,9 @@ let test_record_update_nonexistent_field_error () =
       (Sequence [ assign1; invalid_update ])
   in
 
-  let program = { items = [ RecordDef record_def; Function func ] } in
+  let program =
+    { deps = None; items = [ RecordDef record_def; Function func ] }
+  in
 
   try
     ignore (Compiler.compile_to_string_for_tests program);
@@ -368,7 +380,7 @@ let test_record_update_non_record_error () =
   in
 
   let func = make_single_clause_function "test_non_record" [] invalid_update in
-  let program = { items = [ Function func ] } in
+  let program = { deps = None; items = [ Function func ] } in
 
   try
     ignore (Compiler.compile_to_string_for_tests program);

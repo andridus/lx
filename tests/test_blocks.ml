@@ -18,6 +18,7 @@ let test_simple_block_assignment () =
   let sequence_expr = Sequence [ assign_expr; Var "x" ] in
   let program =
     {
+      deps = None;
       items =
         [
           Function
@@ -53,6 +54,7 @@ let test_nested_block_assignment () =
   let sequence_expr = Sequence [ assign_expr; Var "x" ] in
   let program =
     {
+      deps = None;
       items =
         [
           Function
@@ -95,6 +97,7 @@ let test_multiple_assignments_in_block () =
   let sequence_expr = Sequence [ assign_expr; Var "x" ] in
   let program =
     {
+      deps = None;
       items =
         [
           Function
@@ -136,7 +139,7 @@ let test_block_with_sequence () =
       ]
   in
   let func = make_single_clause_function "test" [] sequence_expr in
-  let program = { items = [ Function func ] } in
+  let program = { deps = None; items = [ Function func ] } in
   let result = Compiler.compile_to_string_for_tests program in
   (* Should contain block structure with proper scoping *)
   let contains_block_start = string_contains_substring result "% start block" in

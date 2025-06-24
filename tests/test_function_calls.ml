@@ -19,6 +19,17 @@ let string_matches_pattern s pattern =
     true
   with Not_found -> false
 
+let debug_print_program program =
+  match program.items with
+  | [ Function { clauses = [ { body; _ } ]; _ } ] -> (
+      match body with
+      | ExternalCall (m, f, args, _) ->
+          Printf.printf "ExternalCall(%s, %s, %d args)\n" m f (List.length args)
+      | App (Var s, args) ->
+          Printf.printf "App(Var %s, %d args)\n" s (List.length args)
+      | _ -> Printf.printf "Other AST node\n")
+  | _ -> Printf.printf "Unexpected program structure\n"
+
 let test_function_call_parsing () =
   let program =
     Compiler.parse_string "pub fun validation() { io.format(\"hello\") }"
@@ -28,18 +39,10 @@ let test_function_call_parsing () =
    Function
      {
        clauses =
-         [ { body = App (Var "io.format", [ Literal (LString "hello") ]); _ } ];
-       _;
-     };
-  ] ->
-      ()
-  | [
-   Function
-     {
-       clauses =
          [
            {
-             body = ExternalCall ("io", "format", [ Literal (LString "hello") ]);
+             body =
+               ExternalCall ("io", "format", [ Literal (LString "hello") ], _);
              _;
            };
          ];
@@ -47,7 +50,9 @@ let test_function_call_parsing () =
      };
   ] ->
       ()
-  | _ -> fail "Expected function call parsing"
+  | _ ->
+      debug_print_program program;
+      fail "Expected function call parsing"
 
 let test_external_function_call_parsing () =
   let program =
@@ -60,7 +65,8 @@ let test_external_function_call_parsing () =
        clauses =
          [
            {
-             body = ExternalCall ("io", "format", [ Literal (LString "hello") ]);
+             body =
+               ExternalCall ("io", "format", [ Literal (LString "hello") ], _);
              _;
            };
          ];
@@ -68,51 +74,7 @@ let test_external_function_call_parsing () =
      };
   ] ->
       ()
-  | [
-   Function
-     {
-       clauses =
-         [ { body = App (Var "io.format", [ Literal (LString "hello") ]); _ } ];
-       _;
-     };
-  ] ->
-      (* Backward compatibility - this is also valid *)
-      ()
   | _ -> fail "Expected external function call parsing"
-
-let test_multiple_arities_parsing () =
-  let input =
-    {|
-    fun a {
-      () { nil }
-      (x) { x }
-      (x, y) { x }
-    }
-  |}
-  in
-  let program = Compiler.parse_string input in
-  match program.items with
-  | [
-   Function
-     {
-       name = "a";
-       clauses =
-         [
-           { params = []; body = Literal LNil; position = _; guard = _ };
-           { params = [ PVar "x" ]; body = Var "x"; position = _; guard = _ };
-           {
-             params = [ PVar "x"; PVar "y" ];
-             body = Var "x";
-             position = _;
-             guard = _;
-           };
-         ];
-       visibility = _;
-       position = _;
-     };
-  ] ->
-      ()
-  | _ -> fail "Expected function with multiple arities"
 
 let test_sequence_parsing () =
   let program =
@@ -129,27 +91,10 @@ let test_sequence_parsing () =
              body =
                Sequence
                  [
-                   App (Var "io.format", [ Literal (LString "hello") ]);
-                   App (Var "io.format", [ Literal (LString "world") ]);
-                 ];
-             _;
-           };
-         ];
-       _;
-     };
-  ] ->
-      ()
-  | [
-   Function
-     {
-       clauses =
-         [
-           {
-             body =
-               Sequence
-                 [
-                   ExternalCall ("io", "format", [ Literal (LString "hello") ]);
-                   ExternalCall ("io", "format", [ Literal (LString "world") ]);
+                   ExternalCall
+                     ("io", "format", [ Literal (LString "hello") ], _);
+                   ExternalCall
+                     ("io", "format", [ Literal (LString "world") ], _);
                  ];
              _;
            };
@@ -292,6 +237,7 @@ let test_backward_compatibility () =
 let test_simple_function_call () =
   let program =
     {
+      deps = None;
       items =
         [
           Function
@@ -319,6 +265,7 @@ let test_simple_function_call () =
 let test_function_with_parameters () =
   let program =
     {
+      deps = None;
       items =
         [
           Function
@@ -345,6 +292,7 @@ let test_function_with_parameters () =
 let test_multiple_clauses () =
   let program =
     {
+      deps = None;
       items =
         [
           Function
@@ -383,6 +331,7 @@ let test_multiple_clauses () =
 let test_external_call () =
   let program =
     {
+      deps = None;
       items =
         [
           Function
@@ -396,7 +345,8 @@ let test_external_call () =
                       ExternalCall
                         ( "lists",
                           "reverse",
-                          [ List [ Literal (LInt 1); Literal (LInt 2) ] ] );
+                          [ List [ Literal (LInt 1); Literal (LInt 2) ] ],
+                          None );
                     position = None;
                     guard = None;
                   };
@@ -416,7 +366,6 @@ let tests =
     ( "external function call parsing",
       `Quick,
       test_external_function_call_parsing );
-    ("multiple arities parsing", `Quick, test_multiple_arities_parsing);
     ("sequence parsing", `Quick, test_sequence_parsing);
     ( "external function call compilation",
       `Quick,

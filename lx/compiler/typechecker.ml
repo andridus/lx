@@ -2,6 +2,7 @@
 (* Implements Hindley-Milner type inference with OTP support *)
 
 open Ast
+open Dependency_resolver
 
 (* Type variables and type expressions *)
 type type_var = int
@@ -1272,9 +1273,9 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
       in
       let final_subst = compose_subst subst2 unify_subst in
       (apply_subst final_subst result_type, final_subst)
-  | ExternalCall (_module_name, _func_name, args) ->
-      (* Type check external function calls *)
-      let _arg_types, subst =
+  | ExternalCall (module_name, func_name, args, pos_opt) -> (
+      (* Type check external function calls with dependency validation *)
+      let arg_types, subst =
         List.fold_left
           (fun (types, subst_acc) arg ->
             let arg_type, subst =
@@ -1283,10 +1284,103 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
             (arg_type :: types, compose_subst subst_acc subst))
           ([], []) args
       in
-      (* For external calls, we assume they return a generic type *)
-      (* In a real implementation, we would look up the module's type signature *)
-      let result_type = fresh_type_var () in
-      (result_type, subst)
+      let arg_types = List.rev arg_types in
+
+      (* Validate external call using dependency resolver *)
+      try
+        let func_info = validate_external_call module_name func_name args in
+
+        (* Type check arguments if type information is available *)
+        (match func_info.param_types with
+        | Some expected_types ->
+            if List.length expected_types != List.length arg_types then
+              raise
+                (TypeError
+                   (ArityMismatch
+                      ( func_name,
+                        List.length expected_types,
+                        List.length arg_types )))
+        (* For now, we'll skip detailed type checking of external args *)
+        (* In a full implementation, we would convert type_expr to lx_type and unify *)
+        | None -> ());
+
+        (* No type info available - allow any types *)
+
+        (* Return type *)
+        let result_type =
+          match func_info.return_type with
+          | Some ret_type -> (
+              (* Convert type_expr to lx_type - simplified conversion *)
+              match ret_type with
+              | TypeName "integer" -> TInteger
+              | TypeName "float" -> TFloat
+              | TypeName "string" -> TString
+              | TypeName "boolean" -> TBool
+              | TypeName "atom" -> TAtom
+              | TypeName "pid" -> TPid
+              | TypeName "binary" -> TBinary
+              | TypeName "ok" -> TAtom
+              | TypeName "any" -> fresh_type_var ()
+              | TypeList _ -> TList (fresh_type_var ())
+              | TypeTuple inner_types ->
+                  TTuple (List.map (fun _ -> fresh_type_var ()) inner_types)
+              | TypeUnion (_, _) ->
+                  fresh_type_var
+                    () (* Simplified - would need proper union types *)
+              | _ -> fresh_type_var ())
+          | None -> fresh_type_var () (* Unknown return type *)
+        in
+
+        (result_type, subst)
+      with DependencyError msg -> (
+        (* Create detailed error message with examples *)
+        let error_msg = "External call validation failed: " ^ msg in
+        let suggestion =
+          "Add the module to your deps declaration:\n\n" ^ "deps [:"
+          ^ module_name ^ "]\n\n" ^ "Or for versioned dependencies:\n"
+          ^ "deps [.{:" ^ module_name ^ ", \"~> 1.0.0\"}]\n\n"
+          ^ "Available dependency formats:\n"
+          ^ "  :module_name                     # Simple dependency\n"
+          ^ "  .{:module, \"~> 1.0.0\"}          # Version specification\n"
+          ^ "  .{:module, :github, \"user/repo\"} # GitHub dependency\n"
+          ^ "  .{:module, :path, \"/local/path\"}  # Local path dependency\n"
+          ^ "  .{:module, :hex, \"~> 1.0.0\"}     # Hex package"
+        in
+        let context =
+          "Module: " ^ module_name ^ ", Function: " ^ func_name ^ "/"
+          ^ string_of_int (List.length args)
+        in
+
+        (* Use position from ExternalCall if available *)
+        match pos_opt with
+        | Some pos ->
+            let error_pos =
+              {
+                Error.line = pos.line;
+                Error.column = pos.column;
+                Error.filename = pos.filename;
+              }
+            in
+            let error_obj =
+              {
+                Error.kind = Error.TypeError (error_msg, Some suggestion);
+                Error.position = error_pos;
+                Error.message = error_msg;
+                Error.suggestion = Some suggestion;
+                Error.context = Some context;
+              }
+            in
+            raise (Error.CompilationError error_obj)
+        | None ->
+            (* Fallback to old error format if no position *)
+            raise
+              (TypeError
+                 (ContextualTypeError
+                    ( "External call validation failed",
+                      msg,
+                      Some
+                        ("Module: " ^ module_name ^ ", Function: " ^ func_name)
+                    )))))
   | Tuple exprs ->
       let types, subst =
         List.fold_left

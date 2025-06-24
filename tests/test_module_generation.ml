@@ -27,7 +27,7 @@ let test_module_name_generation () =
       visibility = Public;
     }
   in
-  let program = { items = [ Function func ] } in
+  let program = { deps = None; items = [ Function func ] } in
   let modules =
     Compiler.compile_to_string_with_module_name program "my_app" ()
   in
@@ -57,7 +57,7 @@ let test_multiple_modules_generation () =
       visibility = Public;
     }
   in
-  let program = { items = [ Function func1; Function func2 ] } in
+  let program = { deps = None; items = [ Function func1; Function func2 ] } in
   let modules =
     Compiler.compile_to_string_with_module_name program "test_app" ()
   in
@@ -77,7 +77,7 @@ let test_multiple_modules_generation () =
 
 (* Test empty module generation *)
 let test_empty_module_generation () =
-  let program = { items = [] } in
+  let program = { deps = None; items = [] } in
   let modules =
     Compiler.compile_to_string_with_module_name program "empty_app" ()
   in
@@ -103,7 +103,7 @@ let test_module_content_structure () =
       visibility = Public;
     }
   in
-  let program = { items = [ Function func ] } in
+  let program = { deps = None; items = [ Function func ] } in
   let modules =
     Compiler.compile_to_string_with_module_name program "greeting" ()
   in

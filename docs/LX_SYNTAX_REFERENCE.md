@@ -26,6 +26,7 @@ Lx is a statically scoped, expression-based functional language designed for bui
 17. Testing — structure and assertions for test blocks
 18. Application Definition — project-level metadata and setup
 19. Build System — compiling and generating artifacts
+20. Module System and Dependencies — declaring dependencies and integrating with external modules
 
 ---
 
@@ -942,5 +943,86 @@ Compilation and integration:
 - `--skip-rebar` to disable external builds
 - Compiled output: `_build/dev/` or `_build/prod/`
 - Complies with standard Erlang project structure
+
+---
+
+### 20. Module System and Dependencies
+
+Lx features a module and dependency system inspired by the Erlang/OTP ecosystem, enabling safe and explicit integration with external modules, compile-time type validation, and support for multiple dependency sources.
+
+#### Declaring Dependencies
+
+Dependencies can be declared in two ways:
+
+##### 1. Global Configuration (lx.config)
+
+```lx
+project {
+    name "my_project"
+    version "1.0.0"
+    deps [
+        :erlang,
+        :kernel,
+        :stdlib,
+        .{:crypto, "~> 5.0.0"},
+        .{:mnesia, "~> 4.15.0"},
+        .{:custom_lib, :github, "user/repo"},
+        .{:local_lib, :path, "./libs/local_lib"}
+    ]
+    apps ["web_server", "database_worker", "auth_service"]
+}
+```
+
+##### 2. Per-File Dependencies
+
+```lx
+# web_server.lx
+deps [:cowboy, :jsx]
+
+deps [
+    :erlang,
+    .{:crypto, "~> 5.0.0"},
+    .{:custom_lib, :github, "user/repo"},
+    .{:local_lib, :path, "/path/to/lib"},
+    .{:hex_lib, :hex, "~> 2.1.0"}
+]
+```
+
+#### Supported Dependency Sources
+- **Simple**: `:erlang`, `:crypto` (built-in modules)
+- **Versioned**: `.{:crypto, "~> 5.0.0"}`
+- **GitHub**: `.{:custom_lib, :github, "user/repo"}`
+- **Local path**: `.{:local_lib, :path, "/path/to/lib"}`
+- **Hex**: `.{:hex_lib, :hex, "~> 2.1.0"}`
+
+#### Dependency Resolution
+- **Global**: The `lx.config` file defines global dependencies for the entire project
+- **Local**: Each `.lx` file can declare additional dependencies or override versions
+- **Priority**: Local dependencies override global ones with the same name
+
+#### Integration with External Calls
+- All `mod.fun()` calls are validated at compile time
+- Arity, argument types, and return types are checked using BEAM file information
+- Clear errors for missing functions, arity, or type mismatches
+
+#### Example Usage
+
+```lx
+deps [:erlang, :crypto]
+
+worker cart_manager {
+    fun init(_) {
+        timestamp = erlang.system_time(:millisecond)
+        uuid = crypto.strong_rand_bytes(16)
+        .{:ok, #{carts: #{}, created_at: timestamp, session_id: uuid}}
+    }
+}
+```
+
+#### Benefits
+- Type safety for all external integrations
+- Explicit dependency management
+- Support for umbrella and multi-app projects
+- Full compatibility with OTP/Erlang
 
 ---

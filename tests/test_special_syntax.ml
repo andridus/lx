@@ -65,15 +65,16 @@ let test_ignored_variables () =
 let test_valid_dot_syntax () =
   let input = "pub fun test() { gen_server.call(module_ref, :get) }" in
   let program = Compiler.parse_string input in
-
-  (* Test that dot syntax parses correctly as ExternalCall *)
   match program.items with
   | [
    Function
-     { clauses = [ { body = ExternalCall ("gen_server", "call", _); _ } ]; _ };
+     {
+       clauses = [ { body = ExternalCall ("gen_server", "call", _, _); _ } ];
+       _;
+     };
   ] ->
       check bool "dot syntax parses correctly" true true
-  | _ -> check bool "dot syntax parses correctly" false true
+  | _ -> check bool "dot syntax parses correctly" true false
 
 (* Test worker with special syntax features *)
 let test_worker_special_syntax () =
