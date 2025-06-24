@@ -26,7 +26,8 @@
   test_send_operator
   test_tuple_detection
   test_record_update
-  test_maps))
+  test_maps
+  test_pattern_matching))
 
 (rule
  (alias runtest)

@@ -26,4 +26,5 @@ let () =
       ("Tuple Detection Tests", Test_tuple_detection.tests);
       ("Record Update Tests", Test_record_update.tests);
       ("Maps Tests", Test_maps.tests);
+      ("Pattern Matching Tests", Test_pattern_matching.tests);
     ]
