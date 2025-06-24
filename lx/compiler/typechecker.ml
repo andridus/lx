@@ -22,6 +22,8 @@ type lx_type =
   | TRecord of (string * lx_type) list
   | TNamedRecord of string (* Named record type *)
   | TMap of lx_type * lx_type (* TMap(key_type, value_type) *)
+  | TConcreteMap of
+      (string * lx_type) list (* Concrete map with specific atom keys *)
   | TOtpState
   | TOtpReply of lx_type
   | TOtpCast
@@ -159,6 +161,14 @@ type type_error =
   | MissingRecordField of string * string
   | InvalidRecordAccess of lx_type * string
   | InvalidRecordUpdate of lx_type
+  | MapFieldMismatch of
+      string list
+      * string list
+      * string (* pattern_fields, map_fields, context *)
+  | MissingMapField of
+      string
+      * string list
+      * string (* missing_field, available_fields, context *)
 
 exception TypeError of type_error
 
@@ -225,6 +235,11 @@ let rec string_of_type = function
   | TNamedRecord name -> name
   | TMap (key_type, value_type) ->
       "%{" ^ string_of_type key_type ^ " => " ^ string_of_type value_type ^ "}"
+  | TConcreteMap fields ->
+      "{"
+      ^ String.concat ", "
+          (List.map (fun (k, v) -> k ^ ": " ^ string_of_type v) fields)
+      ^ "}"
   | TOtpState -> "otp_state"
   | TOtpReply t -> "otp_reply(" ^ string_of_type t ^ ")"
   | TOtpCast -> "otp_cast"
@@ -281,6 +296,15 @@ let string_of_type_error = function
         (string_of_type typ)
   | InvalidRecordUpdate typ ->
       Printf.sprintf "Cannot update non-record type: %s" (string_of_type typ)
+  | MapFieldMismatch (pattern_fields, map_fields, context) ->
+      Printf.sprintf "Map field mismatch: %s vs %s in %s"
+        (String.concat ", " pattern_fields)
+        (String.concat ", " map_fields)
+        context
+  | MissingMapField (missing_field, available_fields, context) ->
+      Printf.sprintf "Missing map field: %s in %s. Available fields: %s"
+        missing_field context
+        (String.concat ", " available_fields)
 
 (* Helper function to get variable names from environment *)
 let get_env_var_names env = List.map fst env
@@ -321,6 +345,29 @@ let generate_pattern_match_error pattern_type value_type =
         (string_of_type pattern_type)
         (string_of_type value_type)
 
+(* Generate specific error message for map pattern matching with actual keys *)
+let generate_map_pattern_error (pattern_fields : map_pattern_field list)
+    (value_type : lx_type) =
+  let pattern_keys =
+    List.map
+      (function
+        | AtomKeyPattern (key, _) -> key ^ ":"
+        | GeneralKeyPattern (key_expr, _) -> (
+            match key_expr with
+            | Literal (LString s) -> "\"" ^ s ^ "\" =>"
+            | Literal (LInt i) -> string_of_int i ^ " =>"
+            | Literal (LAtom a) -> ":" ^ a ^ " =>"
+            | _ -> "key =>"))
+      pattern_fields
+  in
+  let pattern_str = "%{" ^ String.concat ", " pattern_keys ^ " ...}" in
+
+  Printf.sprintf
+    "Pattern type '%s' does not match value type '%s'.\n\
+     Pattern and value types must be compatible."
+    pattern_str
+    (string_of_type value_type)
+
 (* Convert AST position to Error position *)
 let convert_position = function
   | Some pos ->
@@ -346,6 +393,8 @@ let rec apply_subst (subst : substitution) (typ : lx_type) : lx_type =
       TNamedRecord name (* Named records don't need substitution *)
   | TMap (key_type, value_type) ->
       TMap (apply_subst subst key_type, apply_subst subst value_type)
+  | TConcreteMap fields ->
+      TConcreteMap (List.map (fun (k, v) -> (k, apply_subst subst v)) fields)
   | TOtpReply t -> TOtpReply (apply_subst subst t)
   | _ -> typ
 
@@ -476,6 +525,8 @@ let rec occurs_check (var : type_var) (typ : lx_type) : bool =
   | TOption t -> occurs_check var t
   | TRecord fields -> List.exists (fun (_, t) -> occurs_check var t) fields
   | TNamedRecord _ -> false (* Named records don't contain type variables *)
+  | TMap (k, v) -> occurs_check var k || occurs_check var v
+  | TConcreteMap fields -> List.exists (fun (_, t) -> occurs_check var t) fields
   | TOtpReply t -> occurs_check var t
   | _ -> false
 
@@ -515,6 +566,45 @@ let rec unify (t1 : lx_type) (t2 : lx_type) : substitution =
       let s1 = unify k1 k2 in
       let s2 = unify (apply_subst s1 v1) (apply_subst s1 v2) in
       compose_subst s1 s2
+  | TConcreteMap fields1, TConcreteMap fields2 ->
+      (* For concrete maps, check that pattern fields are subset of value fields *)
+      let sorted_fields1 =
+        List.sort (fun (k1, _) (k2, _) -> compare k1 k2) fields1
+      in
+      let sorted_fields2 =
+        List.sort (fun (k1, _) (k2, _) -> compare k1 k2) fields2
+      in
+
+      (* For pattern matching, we allow pattern to have subset of fields *)
+      List.fold_left
+        (fun acc (k1, v1) ->
+          try
+            let v2 = List.assoc k1 sorted_fields2 in
+            let s = unify (apply_subst acc v1) (apply_subst acc v2) in
+            compose_subst acc s
+          with Not_found ->
+            (* Field in pattern not found in value - this will be caught by field validation *)
+            acc)
+        [] sorted_fields1
+  | TConcreteMap _, TMap (TAtom, value_type) ->
+      (* Allow concrete map to unify with generic atom-keyed map *)
+      let concrete_value_type =
+        match t1 with
+        | TConcreteMap fields ->
+            if List.length fields = 0 then fresh_type_var ()
+            else
+              List.fold_left
+                (fun acc (_, v) ->
+                  let s = unify acc v in
+                  apply_subst s acc)
+                (snd (List.hd fields))
+                (List.tl fields)
+        | _ -> fresh_type_var ()
+      in
+      unify concrete_value_type value_type
+  | TMap (TAtom, _value_type), TConcreteMap _ ->
+      (* Symmetric case *)
+      unify t2 t1
   | _ -> raise (TypeError (UnificationError (t1, t2, None)))
 
 (* Special unification for pattern matching with position and better error messages *)
@@ -523,6 +613,18 @@ let unify_pattern_match (pattern_type : lx_type) (value_type : lx_type)
   try unify pattern_type value_type with
   | TypeError (UnificationError (_t1, _t2, _)) ->
       let error_msg = generate_pattern_match_error pattern_type value_type in
+      raise
+        (TypeError
+           (PatternMatchError (pattern_type, value_type, pos, error_msg)))
+  | other -> raise other
+
+(* Special unification for map pattern matching with better error messages *)
+let unify_map_pattern_match (pattern_fields : map_pattern_field list)
+    (pattern_type : lx_type) (value_type : lx_type)
+    (pos : Error.position option) : substitution =
+  try unify pattern_type value_type with
+  | TypeError (UnificationError (_t1, _t2, _)) ->
+      let error_msg = generate_map_pattern_error pattern_fields value_type in
       raise
         (TypeError
            (PatternMatchError (pattern_type, value_type, pos, error_msg)))
@@ -602,34 +704,113 @@ let rec infer_pattern (env : type_env) (pattern : pattern) :
 
       (record_type, final_env, final_subst)
   | PMap pattern_fields ->
-      (* For map patterns, we need to be more flexible with types *)
-      (* Extract the pattern variables and let the unification handle the types *)
-      let final_env, final_subst =
-        List.fold_left
-          (fun (env_acc, subst_acc) field ->
-            match field with
-            | AtomKeyPattern (_, field_pattern) ->
-                let _field_type, field_env, field_subst =
-                  infer_pattern env_acc field_pattern
-                in
-                (field_env, compose_subst subst_acc field_subst)
-            | GeneralKeyPattern (_key_expr, field_pattern) ->
-                (* For general patterns, we need to infer the key type too *)
-                let _field_type, field_env, field_subst =
-                  infer_pattern env_acc field_pattern
-                in
-                (field_env, compose_subst subst_acc field_subst))
-          (env, []) pattern_fields
+      (* Check if all patterns are atom keys - if so, create concrete map pattern *)
+      let all_atom_keys =
+        List.for_all
+          (function AtomKeyPattern _ -> true | _ -> false)
+          pattern_fields
       in
 
-      (* For map patterns, we create a generic map type that can be unified later *)
-      (* The key insight is that the pattern should be flexible enough to match any map *)
-      let key_type = fresh_type_var () in
-      let value_type = fresh_type_var () in
-      (TMap (key_type, value_type), final_env, final_subst)
+      if all_atom_keys then
+        (* Create concrete map pattern with specific fields *)
+        let concrete_fields, final_env, final_subst =
+          List.fold_left
+            (fun (fields_acc, env_acc, subst_acc) field ->
+              match field with
+              | AtomKeyPattern (key_name, field_pattern) ->
+                  let field_type, field_env, field_subst =
+                    infer_pattern env_acc field_pattern
+                  in
+                  ( (key_name, field_type) :: fields_acc,
+                    field_env,
+                    compose_subst subst_acc field_subst )
+              | _ -> failwith "Expected atom key pattern")
+            ([], env, []) pattern_fields
+        in
+        (TConcreteMap (List.rev concrete_fields), final_env, final_subst)
+      else
+        (* Fallback to generic map pattern *)
+        let final_env, final_subst =
+          List.fold_left
+            (fun (env_acc, subst_acc) field ->
+              match field with
+              | AtomKeyPattern (_, field_pattern) ->
+                  let _field_type, field_env, field_subst =
+                    infer_pattern env_acc field_pattern
+                  in
+                  (field_env, compose_subst subst_acc field_subst)
+              | GeneralKeyPattern (_key_expr, field_pattern) ->
+                  (* For general patterns, we need to infer the key type too *)
+                  let _field_type, field_env, field_subst =
+                    infer_pattern env_acc field_pattern
+                  in
+                  (field_env, compose_subst subst_acc field_subst))
+            (env, []) pattern_fields
+        in
+
+        (* For map patterns, we create a generic map type that can be unified later *)
+        let key_type = fresh_type_var () in
+        let value_type = fresh_type_var () in
+        (TMap (key_type, value_type), final_env, final_subst)
+
+(* Helper function to extract atom key names from map pattern *)
+let rec extract_atom_keys_from_pattern (pattern_fields : map_pattern_field list)
+    : string list =
+  List.fold_left
+    (fun acc field ->
+      match field with
+      | AtomKeyPattern (key_name, _) -> key_name :: acc
+      | GeneralKeyPattern (_, _) -> acc (* Skip general patterns *))
+    [] pattern_fields
+  |> List.rev
+
+(* Validate map pattern against map type *)
+and validate_map_pattern_compatibility (pattern_fields : string list)
+    (map_type : lx_type) (unsafe : bool) (pos : Error.position option) : unit =
+  match map_type with
+  | TConcreteMap map_fields ->
+      let map_field_names = List.map fst map_fields in
+      let missing_fields =
+        List.filter (fun pf -> not (List.mem pf map_field_names)) pattern_fields
+      in
+      if (not unsafe) && List.length missing_fields > 0 then
+        let missing_field = List.hd missing_fields in
+        let error =
+          Error.make_error_with_position
+            (Error.MissingMapField
+               (missing_field, map_field_names, "pattern matching"))
+            (match pos with Some p -> p | None -> Error.make_position 1 1)
+            ""
+        in
+        raise (Error.CompilationError error)
+  | TMap (TAtom, _) ->
+      (* Generic atom-keyed map - allow any atom keys *)
+      ()
+  | TMap (_, _) ->
+      (* Generic map with non-atom keys - pattern must use general key patterns *)
+      ()
+  | _ ->
+      (* Not a map type - will be caught by unification *)
+      ()
+
+(* Validate that non-atom keys require unsafe *)
+and validate_map_pattern_key_safety (_pattern_fields : map_pattern_field list)
+    (_unsafe : bool) (_pos : Error.position option) : unit =
+  (* No validation needed - both = and <- operators allow mixed keys by default *)
+  (* Only explicit unsafe skips all validations *)
+  ()
+
+(* Validate all map pattern constraints *)
+and validate_complete_map_pattern (pattern_fields : map_pattern_field list)
+    (map_type : lx_type) (unsafe : bool) (pos : Error.position option) : unit =
+  (* First validate key types *)
+  validate_map_pattern_key_safety pattern_fields unsafe pos;
+  (* Then validate field existence for atom keys *)
+  let pattern_atom_keys = extract_atom_keys_from_pattern pattern_fields in
+  validate_map_pattern_compatibility pattern_atom_keys map_type unsafe pos
 
 (* Type inference for expressions with symbol context *)
-let rec infer_expr_with_context (context : symbol_context) (expr : expr) :
+and infer_expr_with_context (context : symbol_context) (expr : expr) :
     lx_type * substitution * symbol_context =
   match expr with
   | Literal l -> (infer_literal l, [], context)
@@ -659,16 +840,33 @@ let rec infer_expr_with_context (context : symbol_context) (expr : expr) :
         add_variable_to_context id value_type ?pos:error_position new_context
       in
       (value_type, subst, updated_context)
-  | PatternMatch (pattern, value, _pos) ->
+  | PatternMatch (pattern, value, _pos, unsafe) ->
       let value_type, subst, new_context =
         infer_expr_with_context context value
       in
       let pattern_type, pattern_env, pattern_subst =
         infer_pattern (context_to_env new_context) pattern
       in
+
+      (* Validate map pattern compatibility if it's a map pattern *)
+      (match pattern with
+      | PMap pattern_fields ->
+          validate_complete_map_pattern pattern_fields
+            (apply_subst subst value_type)
+            unsafe (convert_position _pos)
+      | _ -> ());
+
       (* Unify the pattern type with the value type *)
       let unify_subst =
-        unify_pattern_match pattern_type value_type (convert_position _pos)
+        if unsafe then [] (* Skip type unification when unsafe *)
+        else
+          match pattern with
+          | PMap pattern_fields ->
+              unify_map_pattern_match pattern_fields pattern_type value_type
+                (convert_position _pos)
+          | _ ->
+              unify_pattern_match pattern_type value_type
+                (convert_position _pos)
       in
       let final_subst =
         compose_subst (compose_subst subst pattern_subst) unify_subst
@@ -705,6 +903,7 @@ let rec infer_expr_with_context (context : symbol_context) (expr : expr) :
           let last_type, last_subst, final_context =
             infer_expr_with_context accumulated_context last_expr
           in
+          (* Return the original context (block variables don't leak out) *)
           (last_type, compose_subst final_subst last_subst, final_context))
   | Block exprs ->
       (* Block expressions create a new scope *)
@@ -785,14 +984,31 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
       let value_type, subst = infer_expr_original env value in
       (* Assignment returns the assigned value type *)
       (value_type, subst)
-  | PatternMatch (pattern, value, _pos) ->
+  | PatternMatch (pattern, value, _pos, unsafe) ->
       let value_type, subst = infer_expr_original env value in
       let pattern_type, _pattern_env, pattern_subst =
         infer_pattern env pattern
       in
+
+      (* Validate map pattern compatibility if it's a map pattern *)
+      (match pattern with
+      | PMap pattern_fields ->
+          validate_complete_map_pattern pattern_fields
+            (apply_subst subst value_type)
+            unsafe (convert_position _pos)
+      | _ -> ());
+
       (* Unify the pattern type with the value type *)
       let unify_subst =
-        unify_pattern_match pattern_type value_type (convert_position _pos)
+        if unsafe then [] (* Skip type unification when unsafe *)
+        else
+          match pattern with
+          | PMap pattern_fields ->
+              unify_map_pattern_match pattern_fields pattern_type value_type
+                (convert_position _pos)
+          | _ ->
+              unify_pattern_match pattern_type value_type
+                (convert_position _pos)
       in
       let final_subst =
         compose_subst (compose_subst subst pattern_subst) unify_subst
@@ -1185,46 +1401,71 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
                (UnificationError (record_type, TRecord [], Some "record update")))
       )
   | MapCreate fields ->
-      let key_type = fresh_type_var () in
-      let value_type = fresh_type_var () in
-
-      let subst =
-        List.fold_left
-          (fun subst_acc field ->
-            match field with
-            | AtomKeyField (_, value_expr) ->
-                (* Atom keys are always atoms *)
-                let value_typ, value_subst =
-                  infer_expr (apply_subst_env subst_acc env) value_expr
-                in
-                let key_unify = unify (apply_subst subst_acc key_type) TAtom in
-                let value_unify =
-                  unify (apply_subst value_subst value_type) value_typ
-                in
-                compose_subst
-                  (compose_subst subst_acc value_subst)
-                  (compose_subst key_unify value_unify)
-            | GeneralKeyField (key_expr, value_expr) ->
-                let key_typ, key_subst =
-                  infer_expr (apply_subst_env subst_acc env) key_expr
-                in
-                let value_typ, value_subst =
-                  infer_expr (apply_subst_env key_subst env) value_expr
-                in
-                let key_unify =
-                  unify (apply_subst key_subst key_type) key_typ
-                in
-                let value_unify =
-                  unify (apply_subst value_subst value_type) value_typ
-                in
-                compose_subst
-                  (compose_subst subst_acc key_subst)
-                  (compose_subst value_subst
-                     (compose_subst key_unify value_unify)))
-          [] fields
+      (* Check if all fields are atom keys - if so, create a concrete map type *)
+      let all_atom_keys =
+        List.for_all (function AtomKeyField _ -> true | _ -> false) fields
       in
 
-      (TMap (apply_subst subst key_type, apply_subst subst value_type), subst)
+      if all_atom_keys then
+        (* Create concrete map with specific fields *)
+        let concrete_fields, subst =
+          List.fold_left
+            (fun (fields_acc, subst_acc) field ->
+              match field with
+              | AtomKeyField (key_name, value_expr) ->
+                  let value_typ, value_subst =
+                    infer_expr (apply_subst_env subst_acc env) value_expr
+                  in
+                  ( (key_name, value_typ) :: fields_acc,
+                    compose_subst subst_acc value_subst )
+              | _ -> failwith "Expected atom key field")
+            ([], []) fields
+        in
+        (TConcreteMap (List.rev concrete_fields), subst)
+      else
+        (* Fallback to generic map type *)
+        let key_type = fresh_type_var () in
+        let value_type = fresh_type_var () in
+
+        let subst =
+          List.fold_left
+            (fun subst_acc field ->
+              match field with
+              | AtomKeyField (_, value_expr) ->
+                  (* Atom keys are always atoms *)
+                  let value_typ, value_subst =
+                    infer_expr (apply_subst_env subst_acc env) value_expr
+                  in
+                  let key_unify =
+                    unify (apply_subst subst_acc key_type) TAtom
+                  in
+                  let value_unify =
+                    unify (apply_subst value_subst value_type) value_typ
+                  in
+                  compose_subst
+                    (compose_subst subst_acc value_subst)
+                    (compose_subst key_unify value_unify)
+              | GeneralKeyField (key_expr, value_expr) ->
+                  let key_typ, key_subst =
+                    infer_expr (apply_subst_env subst_acc env) key_expr
+                  in
+                  let value_typ, value_subst =
+                    infer_expr (apply_subst_env key_subst env) value_expr
+                  in
+                  let key_unify =
+                    unify (apply_subst key_subst key_type) key_typ
+                  in
+                  let value_unify =
+                    unify (apply_subst value_subst value_type) value_typ
+                  in
+                  compose_subst
+                    (compose_subst subst_acc key_subst)
+                    (compose_subst value_subst
+                       (compose_subst key_unify value_unify)))
+            [] fields
+        in
+
+        (TMap (apply_subst subst key_type, apply_subst subst value_type), subst)
   | MapAccess (map_expr, key_expr) ->
       let map_type, map_subst = infer_expr env map_expr in
       let key_type, key_subst =

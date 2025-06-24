@@ -607,7 +607,7 @@ let rec lint_expr ctx errors expr =
       match define_variable ctx var_name (convert_position position) with
       | Some error -> error :: errors
       | None -> errors)
-  | PatternMatch (pattern, value_expr, _position) ->
+  | PatternMatch (pattern, value_expr, _position, _unsafe) ->
       let errors = lint_expr ctx errors value_expr in
       (* Lint the pattern and define variables from it in the current context *)
       lint_pattern ctx errors pattern

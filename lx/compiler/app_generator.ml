@@ -188,7 +188,7 @@ and emit_expr ctx (e : expr) : string =
               track_var_record_type ctx id source_type
         | _ -> ());
         renamed ^ " = " ^ emit_expr ctx value
-  | PatternMatch (pattern, value, _pos) ->
+  | PatternMatch (pattern, value, _pos, _unsafe) ->
       (* Generate Erlang pattern matching: pattern = value *)
       emit_pattern ctx pattern ^ " = " ^ emit_expr ctx value
   | Fun (params, body) ->

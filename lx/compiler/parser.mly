@@ -53,7 +53,7 @@ let string_of_simple_tuple_element = function
 
 (* Keywords *)
 %token PUB FUN CASE IF ELSE FOR WHEN IN AND OR NOT ANDALSO ORELSE RECEIVE AFTER MATCH_KEYWORD
-%token RECORD
+%token RECORD UNSAFE
 
 (* OTP Keywords *)
 %token WORKER SUPERVISOR STRATEGY CHILDREN
@@ -278,13 +278,27 @@ expr:
       | _ ->
         (* Convert expression to pattern for pattern matching *)
         let pattern = expr_to_pattern left in
-        PatternMatch (pattern, right, Some pos)
+        PatternMatch (pattern, right, Some pos, false)
+    }
+  | UNSAFE left = expr EQ right = expr
+    { let pos = make_position $startpos in
+      match left with
+      | Var name -> Assign (name, right, Some pos)  (* Simple variable binding *)
+      | _ ->
+        (* Convert expression to pattern for pattern matching with unsafe flag *)
+        let pattern = expr_to_pattern left in
+        PatternMatch (pattern, right, Some pos, true)
     }
   (* Pattern matching operator using <- (always pattern matching, never binding) *)
   | left = expr PATTERN_MATCH right = expr
     { let pos = make_position $startpos in
       let pattern = expr_to_pattern left in
-      PatternMatch (pattern, right, Some pos)
+      PatternMatch (pattern, right, Some pos, false)
+    }
+  | UNSAFE left = expr PATTERN_MATCH right = expr
+    { let pos = make_position $startpos in
+      let pattern = expr_to_pattern left in
+      PatternMatch (pattern, right, Some pos, true)
     }
   | func = expr LPAREN args = separated_list(COMMA, expr) RPAREN
     { App (func, args) }

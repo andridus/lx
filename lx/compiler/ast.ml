@@ -38,7 +38,10 @@ type expr =
   | Var of ident
   | Assign of ident * expr * position option (* variable, value, position *)
   | PatternMatch of
-      pattern * expr * position option (* pattern, value, position *)
+      pattern
+      * expr
+      * position option
+      * bool (* pattern, value, position, unsafe *)
   | Fun of ident list * expr
   | App of expr * expr list
   | ExternalCall of string * string * expr list (* module, function, args *)

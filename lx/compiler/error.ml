@@ -16,6 +16,10 @@ type error_kind =
   | ArityMismatch of string * int * int (* function_name, expected, found *)
   | MissingField of
       string * string * string list (* field, record_type, required_fields *)
+  | MissingMapField of
+      string
+      * string list
+      * string (* missing_field, available_fields, context *)
   | VariableRedefinition of
       string * position option (* variable name, first definition position *)
   | VariableShadowing of
@@ -121,6 +125,10 @@ let string_of_error_kind = function
   | MissingField (field, record_type, _required) ->
       Printf.sprintf "Missing required field '%s' in record of type '%s'" field
         record_type
+  | MissingMapField (missing_field, available_fields, context) ->
+      Printf.sprintf "Missing map field '%s' in %s. Available fields: %s"
+        missing_field context
+        (String.concat ", " available_fields)
   | VariableRedefinition (var, first_pos) ->
       let first_pos_str =
         match first_pos with
@@ -153,6 +161,20 @@ let make_suggestion = function
           Some
             (Printf.sprintf "Available fields in '%s': %s" record_type
                (String.concat ", " available))
+      | [ suggestion ] -> Some (Printf.sprintf "Did you mean '%s'?" suggestion)
+      | suggestions ->
+          Some
+            (Printf.sprintf "Did you mean one of: %s?"
+               (String.concat ", " suggestions)))
+  | MissingMapField (missing_field, available_fields, _context) -> (
+      let similar = find_similar_names missing_field available_fields in
+      match similar with
+      | [] ->
+          Some
+            (Printf.sprintf
+               "Use 'unsafe' if you expect this field to exist at runtime: \
+                'unsafe %%{%s: value} = map'"
+               missing_field)
       | [ suggestion ] -> Some (Printf.sprintf "Did you mean '%s'?" suggestion)
       | suggestions ->
           Some

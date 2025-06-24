@@ -351,7 +351,7 @@ and emit_expr ctx (e : expr) : string =
             (* For single assignment in block, use the inner value directly *)
             renamed ^ " = " ^ emit_expr ctx inner_value
         | _ -> renamed ^ " = " ^ emit_expr ctx value)
-  | PatternMatch (pattern, value, _pos) ->
+  | PatternMatch (pattern, value, _pos, _unsafe) ->
       (* Generate Erlang pattern matching: pattern = value *)
       emit_pattern ctx pattern ^ " = " ^ emit_expr ctx value
   | Fun (params, body) ->

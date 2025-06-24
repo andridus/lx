@@ -304,7 +304,8 @@ let test_map_pattern_ast_structure () =
     | [
      Function
        {
-         clauses = [ { body = Sequence [ PatternMatch (PMap _, _, _); _ ]; _ } ];
+         clauses =
+           [ { body = Sequence [ PatternMatch (PMap _, _, _, _); _ ]; _ } ];
          _;
        };
     ] ->
