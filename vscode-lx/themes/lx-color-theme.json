@@ -1,0 +1,157 @@
+{
+  "name": "Lx Color Theme",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#1e1e1e",
+    "editor.foreground": "#d4d4d4"
+  },
+  "tokenColors": [
+    {
+      "name": "Atoms",
+      "scope": "constant.other.symbol.lx",
+      "settings": {
+        "foreground": "#4EC9B0"
+      }
+    },
+    {
+      "name": "Constants",
+      "scope": "constant.language.lx",
+      "settings": {
+        "foreground": "#4FC1FF"
+      }
+    },
+    {
+      "name": "Numbers",
+      "scope": "constant.numeric.lx",
+      "settings": {
+        "foreground": "#B5CEA8"
+      }
+    },
+    {
+      "name": "Keywords Function",
+      "scope": "keyword.control.function.lx",
+      "settings": {
+        "foreground": "#569CD6"
+      }
+    },
+    {
+      "name": "Keywords Conditional",
+      "scope": "keyword.control.conditional.lx",
+      "settings": {
+        "foreground": "#C586C0"
+      }
+    },
+    {
+      "name": "Keywords Loop",
+      "scope": "keyword.control.loop.lx",
+      "settings": {
+        "foreground": "#FF8C00"
+      }
+    },
+    {
+      "name": "Keywords Concurrency",
+      "scope": "keyword.control.concurrency.lx",
+      "settings": {
+        "foreground": "#FFD700"
+      }
+    },
+    {
+      "name": "Keywords OTP",
+      "scope": "keyword.control.otp.lx",
+      "settings": {
+        "foreground": "#98FB98"
+      }
+    },
+    {
+      "name": "Keywords Specification",
+      "scope": "keyword.control.specification.lx",
+      "settings": {
+        "foreground": "#FF69B4"
+      }
+    },
+    {
+      "name": "Keywords Testing",
+      "scope": "keyword.control.testing.lx",
+      "settings": {
+        "foreground": "#00CED1"
+      }
+    },
+    {
+      "name": "Keywords Project",
+      "scope": "keyword.control.project.lx",
+      "settings": {
+        "foreground": "#FF6347"
+      }
+    },
+    {
+      "name": "Keywords Other",
+      "scope": "keyword.control.other.lx",
+      "settings": {
+        "foreground": "#DDA0DD"
+      }
+    },
+    {
+      "name": "Keywords Storage",
+      "scope": "storage.type.lx",
+      "settings": {
+        "foreground": "#569CD6"
+      }
+    },
+    {
+      "name": "Comments",
+      "scope": "comment.line.number-sign.lx",
+      "settings": {
+        "foreground": "#6A9955"
+      }
+    },
+    {
+      "name": "Strings",
+      "scope": "string.quoted.double.lx",
+      "settings": {
+        "foreground": "#CE9178"
+      }
+    },
+    {
+      "name": "Modules",
+      "scope": "support.class.module.lx",
+      "settings": {
+        "foreground": "#DCDCAA"
+      }
+    },
+    {
+      "name": "Functions",
+      "scope": "entity.name.function.lx",
+      "settings": {
+        "foreground": "#DCDCAA"
+      }
+    },
+    {
+      "name": "Types",
+      "scope": "entity.name.type.lx",
+      "settings": {
+        "foreground": "#4EC9B0"
+      }
+    },
+    {
+      "name": "Operators",
+      "scope": "keyword.operator.lx",
+      "settings": {
+        "foreground": "#D4D4D4"
+      }
+    },
+    {
+      "name": "Variables",
+      "scope": "variable.other.lx",
+      "settings": {
+        "foreground": "#9CDCFE"
+      }
+    },
+    {
+      "name": "Punctuation",
+      "scope": "punctuation.lx",
+      "settings": {
+        "foreground": "#D4D4D4"
+      }
+    }
+  ]
+}

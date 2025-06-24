@@ -1,0 +1,41 @@
+{
+  "name": "lx-language-support",
+  "displayName": "Lx Language Support",
+  "description": "Syntax highlighting for the Lx programming language.",
+  "version": "0.0.1",
+  "publisher": "Helder de Sousa",
+  "engines": {
+    "vscode": ">=1.50.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "lx",
+        "aliases": ["Lx", "lx"],
+        "extensions": [".lx"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "lx",
+        "scopeName": "source.lx",
+        "path": "./syntaxes/lx.tmLanguage.json"
+      }
+    ],
+    "themes": [
+      {
+        "label": "Lx Color Theme",
+        "uiTheme": "vs-dark",
+        "path": "./themes/lx-color-theme.json"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/andridus/lx"
+  }
+}
