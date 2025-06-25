@@ -80,6 +80,8 @@ and expr =
   | Tuple of expr list
   | List of expr list
   | Match of expr * (pattern * guard_expr option * expr) list
+  | MatchRescue of (pattern * expr * expr) list * expr (* steps, success_body *)
+  | MatchRescueStep of pattern * expr * expr (* pattern, value, rescue_expr *)
   | If of expr * expr * else_branch option
   | With of
       (pattern * expr) list

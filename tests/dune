@@ -28,7 +28,8 @@
   test_record_update
   test_maps
   test_pattern_matching
-  test_control_flow_enhanced))
+  test_control_flow_enhanced
+  test_match_rescue))
 
 (rule
  (alias runtest)

@@ -10,9 +10,9 @@ let parse_expr_helper input =
   try
     let parsed = main read lexbuf in
     match parsed.items with
-    | [Function func] -> (
+    | [ Function func ] -> (
         match func.clauses with
-        | [clause] -> clause.body
+        | [ clause ] -> clause.body
         | _ -> failwith "Expected single clause")
     | _ -> failwith "Expected single function"
   with _ -> failwith ("Failed to parse: " ^ input)
@@ -35,7 +35,8 @@ let contains_substring s ~substring =
 
 (* Test if expressions with else *)
 let test_if_else () =
-  let input = {|
+  let input =
+    {|
     fun test(x) {
       if x == 1 {
         "one"
@@ -43,16 +44,21 @@ let test_if_else () =
         "other"
       }
     }
-  |} in
+  |}
+  in
   let expr = parse_expr_helper input in
   match expr with
-  | If (BinOp (Var "x", "==", Literal (LInt 1)), Literal (LString "one"), Some (SimpleElse (Literal (LString "other")))) ->
+  | If
+      ( BinOp (Var "x", "==", Literal (LInt 1)),
+        Literal (LString "one"),
+        Some (SimpleElse (Literal (LString "other"))) ) ->
       ()
   | _ -> Alcotest.fail "Expected if-else expression"
 
 (* Test if expressions with case *)
 let test_if_case () =
-  let input = {|
+  let input =
+    {|
     fun test(x) {
       if x == 1 {
         "one"
@@ -61,31 +67,39 @@ let test_if_case () =
         _ -> "other"
       }
     }
-  |} in
+  |}
+  in
   let expr = parse_expr_helper input in
   match expr with
-  | If (BinOp (Var "x", "==", Literal (LInt 1)), Literal (LString "one"), Some (ClauseElse clauses)) ->
+  | If
+      ( BinOp (Var "x", "==", Literal (LInt 1)),
+        Literal (LString "one"),
+        Some (ClauseElse clauses) ) ->
       check int "case clauses count" 2 (List.length clauses)
   | _ -> Alcotest.fail "Expected if-case expression"
 
 (* Test if expressions without else/case *)
 let test_if_no_else () =
-  let input = {|
+  let input =
+    {|
     fun test(x) {
       if x == 1 {
         "one"
       }
     }
-  |} in
+  |}
+  in
   let expr = parse_expr_helper input in
   match expr with
-  | If (BinOp (Var "x", "==", Literal (LInt 1)), Literal (LString "one"), None) ->
+  | If (BinOp (Var "x", "==", Literal (LInt 1)), Literal (LString "one"), None)
+    ->
       ()
   | _ -> Alcotest.fail "Expected if without else"
 
 (* Test with expressions with else *)
 let test_with_else () =
-  let input = {|
+  let input =
+    {|
     fun test() {
       with .{:ok, value} <= get_result() {
         value
@@ -93,7 +107,8 @@ let test_with_else () =
         "failed"
       }
     }
-  |} in
+  |}
+  in
   let expr = parse_expr_helper input in
   match expr with
   | With (steps, Var "value", Some (SimpleElse (Literal (LString "failed")))) ->
@@ -102,7 +117,8 @@ let test_with_else () =
 
 (* Test with expressions with case *)
 let test_with_case () =
-  let input = {|
+  let input =
+    {|
     fun test() {
       with .{:ok, value} <= get_result() {
         value
@@ -111,7 +127,8 @@ let test_with_case () =
         _ -> "unknown"
       }
     }
-  |} in
+  |}
+  in
   let expr = parse_expr_helper input in
   match expr with
   | With (steps, Var "value", Some (ClauseElse clauses)) ->
@@ -121,13 +138,15 @@ let test_with_case () =
 
 (* Test with expressions without else/case *)
 let test_with_no_else () =
-  let input = {|
+  let input =
+    {|
     fun test() {
       with .{:ok, value} <= get_result() {
         value
       }
     }
-  |} in
+  |}
+  in
   let expr = parse_expr_helper input in
   match expr with
   | With (steps, Var "value", None) ->
@@ -136,7 +155,8 @@ let test_with_no_else () =
 
 (* Test multiple with steps *)
 let test_with_multiple_steps () =
-  let input = {|
+  let input =
+    {|
     fun test() {
       with .{:ok, user} <= get_user(),
            .{:ok, role} <= get_role(user) {
@@ -145,16 +165,18 @@ let test_with_multiple_steps () =
         .{:error, "failed"}
       }
     }
-  |} in
+  |}
+  in
   let expr = parse_expr_helper input in
   match expr with
-  | With (steps, Tuple [Var "user"; Var "role"], Some (SimpleElse _)) ->
+  | With (steps, Tuple [ Var "user"; Var "role" ], Some (SimpleElse _)) ->
       check int "with steps count" 2 (List.length steps)
   | _ -> Alcotest.fail "Expected with multiple steps"
 
 (* Test with guards in case *)
 let test_with_case_guards () =
-  let input = {|
+  let input =
+    {|
     fun test() {
       with .{:ok, value} <= get_result() {
         value
@@ -164,20 +186,22 @@ let test_with_case_guards () =
         _ -> "unknown"
       }
     }
-  |} in
+  |}
+  in
   let expr = parse_expr_helper input in
   match expr with
-  | With (_, _, Some (ClauseElse clauses)) ->
+  | With (_, _, Some (ClauseElse clauses)) -> (
       check int "case clauses count" 3 (List.length clauses);
       (* Check that first clause has a guard *)
-      (match List.hd clauses with
-      | (_, Some _, _) -> ()
+      match List.hd clauses with
+      | _, Some _, _ -> ()
       | _ -> Alcotest.fail "Expected guard in first clause")
   | _ -> Alcotest.fail "Expected with-case with guards"
 
 (* Test if compilation to Erlang *)
 let test_if_compilation () =
-  let input = {|
+  let input =
+    {|
     pub fun test_if_else(x) {
       if x == 1 {
         "one"
@@ -194,7 +218,8 @@ let test_if_compilation () =
         _ -> "negative"
       }
     }
-  |} in
+  |}
+  in
   let compiled = parse_and_compile input in
   check bool "contains if-else pattern" true
     (contains_substring compiled ~substring:"case");
@@ -203,7 +228,8 @@ let test_if_compilation () =
 
 (* Test with compilation to Erlang *)
 let test_with_compilation () =
-  let input = {|
+  let input =
+    {|
     pub fun get_result() { .{:ok, "test"} }
 
     pub fun test_with_else() {
@@ -222,7 +248,8 @@ let test_with_compilation () =
         _ -> "unknown"
       }
     }
-  |} in
+  |}
+  in
   let compiled = parse_and_compile input in
   check bool "contains with pattern" true
     (contains_substring compiled ~substring:"case get_result()");
@@ -231,7 +258,8 @@ let test_with_compilation () =
 
 (* Test type checking for if expressions *)
 let test_if_type_checking () =
-  let input = {|
+  let input =
+    {|
     fun test_if_else(x) {
       if x == 1 {
         "one"
@@ -239,7 +267,8 @@ let test_if_type_checking () =
         "other"
       }
     }
-  |} in
+  |}
+  in
   let lexbuf = Lexing.from_string input in
   let parsed = main read lexbuf in
   try
@@ -249,7 +278,8 @@ let test_if_type_checking () =
 
 (* Test type checking for with expressions *)
 let test_with_type_checking () =
-  let input = {|
+  let input =
+    {|
     fun get_result() { .{:ok, "test"} }
 
     fun test_with_else() {
@@ -259,7 +289,8 @@ let test_with_type_checking () =
         "failed"
       }
     }
-  |} in
+  |}
+  in
   let lexbuf = Lexing.from_string input in
   let parsed = main read lexbuf in
   try
@@ -269,7 +300,8 @@ let test_with_type_checking () =
 
 (* Test type error for mismatched branch types *)
 let test_type_error_mismatched_branches () =
-  let input = {|
+  let input =
+    {|
     fun test_bad_types(x) {
       if x == 1 {
         "string"
@@ -277,7 +309,8 @@ let test_type_error_mismatched_branches () =
         42
       }
     }
-  |} in
+  |}
+  in
   let lexbuf = Lexing.from_string input in
   let parsed = main read lexbuf in
   try
@@ -286,18 +319,21 @@ let test_type_error_mismatched_branches () =
   with _ -> () (* Should fail with type error *)
 
 (* Test suite *)
-let tests = [
-  ("if with else", `Quick, test_if_else);
-  ("if with case", `Quick, test_if_case);
-  ("if without else", `Quick, test_if_no_else);
-  ("with with else", `Quick, test_with_else);
-  ("with with case", `Quick, test_with_case);
-  ("with without else", `Quick, test_with_no_else);
-  ("with multiple steps", `Quick, test_with_multiple_steps);
-  ("with case guards", `Quick, test_with_case_guards);
-  ("if compilation", `Quick, test_if_compilation);
-  ("with compilation", `Quick, test_with_compilation);
-  ("if type checking", `Quick, test_if_type_checking);
-  ("with type checking", `Quick, test_with_type_checking);
-  ("type error mismatched branches", `Quick, test_type_error_mismatched_branches);
-]
+let tests =
+  [
+    ("if with else", `Quick, test_if_else);
+    ("if with case", `Quick, test_if_case);
+    ("if without else", `Quick, test_if_no_else);
+    ("with with else", `Quick, test_with_else);
+    ("with with case", `Quick, test_with_case);
+    ("with without else", `Quick, test_with_no_else);
+    ("with multiple steps", `Quick, test_with_multiple_steps);
+    ("with case guards", `Quick, test_with_case_guards);
+    ("if compilation", `Quick, test_if_compilation);
+    ("with compilation", `Quick, test_with_compilation);
+    ("if type checking", `Quick, test_if_type_checking);
+    ("with type checking", `Quick, test_with_type_checking);
+    ( "type error mismatched branches",
+      `Quick,
+      test_type_error_mismatched_branches );
+  ]

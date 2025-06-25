@@ -244,3 +244,109 @@ worker cart_manager {
 - Hot code loading, BEAM analysis cache, LSP integration, Lx package manager
 
 ---
+
+## Match Rescue Error Handling Implementation
+
+### Overview
+Complete implementation of the `match ... rescue` error handling construct in Lx, providing elegant and type-safe error handling for operations that may fail. This feature supports both individual steps and sequential operations, compiling to efficient nested Erlang case expressions.
+
+### Key Features
+
+#### 1. Individual Match Rescue Steps
+- **Syntax**: `match pattern <- expr rescue { rescue_expr }`
+- **Sequential composition**: Multiple steps can be chained naturally
+- **Pattern extraction**: Variables bound in patterns are available in subsequent code
+- **Type safety**: Full type checking for all components
+
+#### 2. Pattern Matching Support
+- **Tuples**: `match .{:ok, value} <- operation() rescue { :error }`
+- **Maps**: `match %{name: user_name} <- get_user() rescue { %{name: "unknown"} }`
+- **Lists**: `match [head | tail] <- get_list() rescue { [] }`
+- **Complex patterns**: Nested structures and mixed pattern types
+
+#### 3. Code Generation
+- **Efficient Erlang**: Compiles to nested `case` expressions
+- **Proper scoping**: Variables from patterns correctly scoped
+- **Sequential nesting**: Multiple steps create properly nested cases
+- **Optimized output**: Clean and readable generated Erlang code
+
+### Usage Examples
+
+#### Individual Steps
+```lx
+pub fun process_user(id) {
+  match .{:ok, user} <- get_user(id) rescue { :user_not_found }
+  :log_user_found
+  match .{:ok, perms} <- get_permissions(user) rescue { :no_permissions }
+  :log_permissions_found
+  .{user, perms}
+}
+```
+
+#### Generated Erlang
+```erlang
+process_user(Id) ->
+    case get_user(Id) of
+        {ok, User} ->
+            log_user_found,
+            case get_permissions(User) of
+                {ok, Perms} ->
+                    log_permissions_found,
+                    {User, Perms};
+                _ ->
+                    no_permissions
+            end;
+        _ ->
+            user_not_found
+    end.
+```
+
+#### Complex Patterns
+```lx
+pub fun extract_data() {
+  match %{status: :ok, data: %{items: items}} <- fetch_complex_data() rescue { [] }
+  match [first | rest] <- items rescue { :empty_list }
+  .{first, length(rest)}
+}
+```
+
+### Implementation Details
+
+#### 1. AST Extensions
+- **MatchRescueStep**: `pattern * expr * expr` for individual steps
+- **Sequence handling**: Automatic detection and nesting of rescue steps
+- **Type integration**: Full integration with existing type system
+
+#### 2. Parser Implementation
+- **Clean syntax**: Natural and readable error handling syntax
+- **Conflict resolution**: Proper handling of operator precedence
+- **Error messages**: Clear syntax error reporting
+
+#### 3. Compiler Integration
+- **Code generation**: Efficient nested case expression generation
+- **Variable handling**: Proper variable scoping and renaming
+- **Type checking**: Complete type safety validation
+
+#### 4. Testing Coverage
+- **Parse testing**: Comprehensive syntax validation
+- **Code generation**: Erlang output verification
+- **Pattern types**: All pattern types thoroughly tested
+- **Error cases**: Edge cases and error conditions covered
+
+### Benefits
+- **Ergonomic syntax**: Clean and readable error handling
+- **Type safety**: Compile-time error detection
+- **Performance**: Efficient Erlang code generation
+- **Composability**: Natural sequential operation handling
+- **OTP compatibility**: Perfect integration with Erlang/OTP patterns
+
+### Testing and Validation
+- Complete test suite with 8 comprehensive test cases
+- Parse testing for all syntax variants
+- Code generation validation for Erlang output
+- Pattern matching tests for all supported types
+- Error handling validation for edge cases
+
+This implementation provides Lx developers with a powerful and type-safe error handling mechanism that compiles efficiently to Erlang while maintaining clean and readable source code.
+
+---

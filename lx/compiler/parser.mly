@@ -60,7 +60,7 @@ let string_of_simple_tuple_element = function
 
 (* Keywords *)
 %token PUB FUN CASE IF ELSE FOR WHEN IN AND OR NOT ANDALSO ORELSE RECEIVE AFTER MATCH_KEYWORD
-  %token RECORD UNSAFE WITH
+  %token RECORD UNSAFE WITH RESCUE
 
 (* Module System Keywords *)
 %token DEPS PROJECT VERSION APPS GITHUB PATH HEX
@@ -424,6 +424,10 @@ expr:
     { failwith "Enhanced:Missing condition after 'if' keyword|Suggestion:Add a boolean expression after 'if'|Context:if statement" }
   | CASE value = expr LBRACE cases = nonempty_list(case_branch) RBRACE
     { Match (value, cases) }
+  | MATCH_KEYWORD steps = match_rescue_steps LBRACE success_body = expr RBRACE
+    { MatchRescue (steps, success_body) }
+  | MATCH_KEYWORD pattern = pattern PATTERN_MATCH expr = expr RESCUE rescue_expr = expr
+    { MatchRescueStep (pattern, expr, rescue_expr) }
   | WITH steps = with_steps LBRACE success_body = expr RBRACE
     { With (steps, success_body, None) }
   | WITH steps = with_steps LBRACE success_body = expr RBRACE ELSE LBRACE else_statements = statement_list RBRACE
@@ -768,6 +772,16 @@ with_steps:
 with_step:
   | pattern = pattern LEQ expr = expr
     { (pattern, expr) }
+
+match_rescue_steps:
+  | step = match_rescue_step
+    { [step] }
+  | step = match_rescue_step COMMA steps = match_rescue_steps
+    { step :: steps }
+
+match_rescue_step:
+  | pattern = pattern PATTERN_MATCH expr = expr RESCUE rescue_expr = expr
+    { (pattern, expr, rescue_expr) }
 
 (* Binary specifications *)
 binary_spec:

@@ -286,10 +286,47 @@ and emit_expr ctx (e : expr) : string =
                emit_pattern ctx p ^ " -> " ^ emit_expr ctx e)
              cases)
       ^ " end"
+  | MatchRescue (steps, success_body) ->
+      (* Generate nested case expressions for match rescue *)
+      let rec emit_match_rescue_steps steps =
+        match steps with
+        | [] -> emit_expr ctx success_body
+        | (pattern, value, rescue_expr) :: remaining_steps ->
+            "case " ^ emit_expr ctx value ^ " of " ^ emit_pattern ctx pattern
+            ^ " -> "
+            ^ emit_match_rescue_steps remaining_steps
+            ^ "; _ -> " ^ emit_expr ctx rescue_expr ^ " end"
+      in
+      emit_match_rescue_steps steps
+  | MatchRescueStep (pattern, value, rescue_expr) ->
+      (* Generate a single case expression for individual match rescue *)
+      "case " ^ emit_expr ctx value ^ " of " ^ emit_pattern ctx pattern
+      ^ " -> ok; _ -> " ^ emit_expr ctx rescue_expr ^ " end"
   | For (_, _, _) -> "% For expressions not yet implemented"
   | Sequence exprs ->
       let block_ctx = create_scope (Some ctx) in
-      String.concat ",\n    " (List.map (emit_expr block_ctx) exprs)
+      (* Check if this is a sequence with MatchRescueStep patterns *)
+      let rec emit_match_rescue_sequence exprs =
+        match exprs with
+        | [] -> "ok"
+        | [ last_expr ] -> emit_expr block_ctx last_expr
+        | MatchRescueStep (pattern, value, rescue_expr) :: rest ->
+            "case " ^ emit_expr block_ctx value ^ " of "
+            ^ emit_pattern block_ctx pattern
+            ^ " -> "
+            ^ emit_match_rescue_sequence rest
+            ^ "; _ -> "
+            ^ emit_expr block_ctx rescue_expr
+            ^ " end"
+        | expr :: rest ->
+            emit_expr block_ctx expr ^ ", " ^ emit_match_rescue_sequence rest
+      in
+      (* Check if any expression is a MatchRescueStep *)
+      let has_match_rescue =
+        List.exists (function MatchRescueStep _ -> true | _ -> false) exprs
+      in
+      if has_match_rescue then emit_match_rescue_sequence exprs
+      else String.concat ",\n    " (List.map (emit_expr block_ctx) exprs)
   | Block exprs ->
       let block_ctx = create_scope (Some ctx) in
       String.concat ",\n    " (List.map (emit_expr block_ctx) exprs)

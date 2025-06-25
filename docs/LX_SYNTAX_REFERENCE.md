@@ -447,6 +447,84 @@ case input {
 }
 ```
 
+#### `match ... rescue` (Error Handling):
+
+The `match ... rescue` construct provides elegant error handling for operations that may fail. It supports both individual steps and sequential operations.
+
+##### Individual Match Rescue Steps:
+
+```lx
+# Single match rescue - if pattern doesn't match, execute rescue expression
+match .{:ok, user} <- get_user(id) rescue { :user_not_found }
+:continue_processing
+
+# Multiple sequential match rescue steps
+match .{:ok, user} <- get_user(id) rescue { :user_error }
+:log_user_retrieved
+match .{:ok, perms} <- get_permissions(user) rescue { :permission_error }
+:log_permissions_retrieved
+:success
+```
+
+##### Pattern Matching Support:
+
+```lx
+# Works with different pattern types
+match [head | tail] <- get_list() rescue { [] }
+match %{name: user_name, age: user_age} <- get_user_data() rescue { %{name: "unknown", age: 0} }
+match .{:ok, value} <- computation() rescue { .{:error, "failed"} }
+```
+
+##### Generated Erlang Code:
+
+```lx
+# Lx source
+match .{:ok, user} <- get_user() rescue { :error }
+:continue
+```
+
+```erlang
+% Generated Erlang
+case get_user() of
+    {ok, User} ->
+        continue;
+    _ ->
+        error
+end
+```
+
+##### Sequential Match Rescue:
+
+```lx
+# Multiple steps create nested case expressions
+match .{:ok, user} <- get_user() rescue { :user_error }
+match .{:ok, role} <- get_role(user) rescue { :role_error }
+:success
+```
+
+```erlang
+% Generated nested Erlang cases
+case get_user() of
+    {ok, User} ->
+        case get_role(User) of
+            {ok, Role} ->
+                success;
+            _ ->
+                role_error
+        end;
+    _ ->
+        user_error
+end
+```
+
+##### Key Features:
+
+- **Type Safe**: Full type checking for patterns, values, and rescue expressions
+- **Pattern Extraction**: Variables bound in patterns are available in subsequent code
+- **Flexible Patterns**: Supports tuples, maps, lists, and complex nested patterns
+- **Efficient Compilation**: Generates optimal nested Erlang case expressions
+- **Sequential Processing**: Each step can depend on variables from previous steps
+
 #### `for` loop:
 
 ```lx

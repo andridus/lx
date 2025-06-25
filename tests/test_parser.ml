@@ -212,7 +212,8 @@ let test_comparison_precedence () =
 (* Test parsing of if with case *)
 let test_if_with_case () =
   let result =
-    Compiler.parse_string {|
+    Compiler.parse_string
+      {|
       pub fun test(x) {
         if x == 1 {
           "one"
@@ -251,7 +252,9 @@ let test_if_with_case () =
 (* Test parsing of with with else *)
 let test_with_with_else () =
   let result =
-    Compiler.parse_string "pub fun test() { with .{:ok, value} <= get_result() { value } else { \"failed\" } }"
+    Compiler.parse_string
+      "pub fun test() { with .{:ok, value} <= get_result() { value } else { \
+       \"failed\" } }"
   in
   match result.items with
   | [
@@ -281,7 +284,8 @@ let test_with_with_else () =
 (* Test parsing of with with case *)
 let test_with_with_case () =
   let result =
-    Compiler.parse_string {|
+    Compiler.parse_string
+      {|
       pub fun test() {
         with .{:ok, value} <= get_result() {
           value
@@ -301,11 +305,7 @@ let test_with_with_case () =
          [
            {
              params = [];
-             body =
-               With
-                 ( steps,
-                   Var "value",
-                   Some (ClauseElse clauses) );
+             body = With (steps, Var "value", Some (ClauseElse clauses));
              position = _;
              guard = _;
            };
@@ -321,7 +321,9 @@ let test_with_with_case () =
 (* Test parsing of multiple with steps *)
 let test_with_multiple_steps () =
   let result =
-    Compiler.parse_string "pub fun test() { with .{:ok, user} <= get_user(), .{:ok, role} <= get_role(user) { .{user, role} } else { .{:error, \"failed\"} } }"
+    Compiler.parse_string
+      "pub fun test() { with .{:ok, user} <= get_user(), .{:ok, role} <= \
+       get_role(user) { .{user, role} } else { .{:error, \"failed\"} } }"
   in
   match result.items with
   | [
@@ -334,9 +336,7 @@ let test_with_multiple_steps () =
              params = [];
              body =
                With
-                 ( steps,
-                   Tuple [Var "user"; Var "role"],
-                   Some (SimpleElse _) );
+                 (steps, Tuple [ Var "user"; Var "role" ], Some (SimpleElse _));
              position = _;
              guard = _;
            };
@@ -351,7 +351,8 @@ let test_with_multiple_steps () =
 (* Test parsing of with case with guards *)
 let test_with_case_with_guards () =
   let result =
-    Compiler.parse_string {|
+    Compiler.parse_string
+      {|
       pub fun test() {
         with .{:ok, value} <= get_result() {
           value
@@ -371,11 +372,7 @@ let test_with_case_with_guards () =
          [
            {
              params = [];
-             body =
-               With
-                 ( _,
-                   Var "value",
-                   Some (ClauseElse clauses) );
+             body = With (_, Var "value", Some (ClauseElse clauses));
              position = _;
              guard = _;
            };
@@ -383,11 +380,11 @@ let test_with_case_with_guards () =
        visibility = Public;
        position = _;
      };
-  ] ->
+  ] -> (
       check int "case clauses count" 2 (List.length clauses);
       (* Check that first clause has a guard *)
-      (match List.hd clauses with
-      | (_, Some _, _) -> ()
+      match List.hd clauses with
+      | _, Some _, _ -> ()
       | _ -> fail "Expected guard in first clause")
   | _ -> fail "Expected with-case with guards"
 
@@ -424,7 +421,8 @@ let test_if_without_else () =
 (* Test parsing of with without else *)
 let test_with_without_else () =
   let result =
-    Compiler.parse_string "pub fun test() { with .{:ok, value} <= get_result() { value } }"
+    Compiler.parse_string
+      "pub fun test() { with .{:ok, value} <= get_result() { value } }"
   in
   match result.items with
   | [
@@ -435,11 +433,7 @@ let test_with_without_else () =
          [
            {
              params = [];
-             body =
-               With
-                 ( steps,
-                   Var "value",
-                   None );
+             body = With (steps, Var "value", None);
              position = _;
              guard = _;
            };

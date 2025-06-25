@@ -78,6 +78,7 @@ rule read = parse
       | "unsafe" -> UNSAFE
       | "deps" -> DEPS
       | "project" -> PROJECT
+      | "rescue" -> RESCUE
 
       | "apps" -> APPS
       | "github" -> GITHUB

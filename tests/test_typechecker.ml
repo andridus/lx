@@ -224,10 +224,12 @@ let test_if_with_case () =
                (If
                   ( Literal (LBool true),
                     Literal (LString "yes"),
-                    Some (ClauseElse [
-                      (PVar "x", None, Literal (LString "no"));
-                      (PWildcard, None, Literal (LString "default"));
-                    ]) )));
+                    Some
+                      (ClauseElse
+                         [
+                           (PVar "x", None, Literal (LString "no"));
+                           (PWildcard, None, Literal (LString "default"));
+                         ]) )));
         ];
     }
   in
@@ -249,12 +251,16 @@ let test_with_else () =
       deps = None;
       items =
         [
-          Function (make_single_clause_function "get_result" []
-            (Tuple [Literal (LAtom "ok"); Literal (LString "test")]));
+          Function
+            (make_single_clause_function "get_result" []
+               (Tuple [ Literal (LAtom "ok"); Literal (LString "test") ]));
           Function
             (make_single_clause_function "test_with_else" []
                (With
-                  ( [(PTuple [PAtom "ok"; PVar "value"], App (Var "get_result", []))],
+                  ( [
+                      ( PTuple [ PAtom "ok"; PVar "value" ],
+                        App (Var "get_result", []) );
+                    ],
                     Var "value",
                     Some (SimpleElse (Literal (LString "failed"))) )));
         ];
@@ -278,17 +284,25 @@ let test_with_case () =
       deps = None;
       items =
         [
-          Function (make_single_clause_function "get_result" []
-            (Tuple [Literal (LAtom "ok"); Literal (LString "test")]));
+          Function
+            (make_single_clause_function "get_result" []
+               (Tuple [ Literal (LAtom "ok"); Literal (LString "test") ]));
           Function
             (make_single_clause_function "test_with_case" []
                (With
-                  ( [(PTuple [PAtom "ok"; PVar "value"], App (Var "get_result", []))],
+                  ( [
+                      ( PTuple [ PAtom "ok"; PVar "value" ],
+                        App (Var "get_result", []) );
+                    ],
                     Var "value",
-                    Some (ClauseElse [
-                      (PTuple [PAtom "error"; PVar "reason"], None, Var "reason");
-                      (PWildcard, None, Literal (LString "unknown"));
-                    ]) )));
+                    Some
+                      (ClauseElse
+                         [
+                           ( PTuple [ PAtom "error"; PVar "reason" ],
+                             None,
+                             Var "reason" );
+                           (PWildcard, None, Literal (LString "unknown"));
+                         ]) )));
         ];
     }
   in
@@ -310,19 +324,30 @@ let test_with_case_guards () =
       deps = None;
       items =
         [
-          Function (make_single_clause_function "get_result" []
-            (Tuple [Literal (LAtom "error"); Literal (LString "timeout")]));
+          Function
+            (make_single_clause_function "get_result" []
+               (Tuple [ Literal (LAtom "error"); Literal (LString "timeout") ]));
           Function
             (make_single_clause_function "test_with_guards" []
                (With
-                  ( [(PTuple [PAtom "ok"; PVar "value"], App (Var "get_result", []))],
+                  ( [
+                      ( PTuple [ PAtom "ok"; PVar "value" ],
+                        App (Var "get_result", []) );
+                    ],
                     Var "value",
-                    Some (ClauseElse [
-                      (PTuple [PAtom "error"; PVar "reason"],
-                       Some (GuardBinOp (GuardAtomValue (GuardVar "reason"), "==", GuardAtomValue (GuardLiteral (LString "timeout")))),
-                       Literal (LString "timeout"));
-                      (PWildcard, None, Literal (LString "other"));
-                    ]) )));
+                    Some
+                      (ClauseElse
+                         [
+                           ( PTuple [ PAtom "error"; PVar "reason" ],
+                             Some
+                               (GuardBinOp
+                                  ( GuardAtomValue (GuardVar "reason"),
+                                    "==",
+                                    GuardAtomValue
+                                      (GuardLiteral (LString "timeout")) )),
+                             Literal (LString "timeout") );
+                           (PWildcard, None, Literal (LString "other"));
+                         ]) )));
         ];
     }
   in
@@ -332,7 +357,8 @@ let test_with_case_guards () =
     match List.assoc_opt "test_with_guards" env with
     | Some TString -> ()
     | Some t ->
-        fail ("With-guards test failed: expected TString, got " ^ string_of_type t)
+        fail
+          ("With-guards test failed: expected TString, got " ^ string_of_type t)
     | None -> fail "With-guards test failed: function not found"
   with TypeError error ->
     fail ("With-guards test failed: " ^ string_of_type_error error)
@@ -344,19 +370,29 @@ let test_with_multiple_steps () =
       deps = None;
       items =
         [
-          Function (make_single_clause_function "get_user" []
-            (Tuple [Literal (LAtom "ok"); Literal (LString "john")]));
-          Function (make_single_clause_function "get_role" ["user"]
-            (Tuple [Literal (LAtom "ok"); Literal (LString "admin")]));
+          Function
+            (make_single_clause_function "get_user" []
+               (Tuple [ Literal (LAtom "ok"); Literal (LString "john") ]));
+          Function
+            (make_single_clause_function "get_role" [ "user" ]
+               (Tuple [ Literal (LAtom "ok"); Literal (LString "admin") ]));
           Function
             (make_single_clause_function "test_with_multiple" []
                (With
                   ( [
-                      (PTuple [PAtom "ok"; PVar "user"], App (Var "get_user", []));
-                      (PTuple [PAtom "ok"; PVar "role"], App (Var "get_role", [Var "user"]));
+                      ( PTuple [ PAtom "ok"; PVar "user" ],
+                        App (Var "get_user", []) );
+                      ( PTuple [ PAtom "ok"; PVar "role" ],
+                        App (Var "get_role", [ Var "user" ]) );
                     ],
-                    Tuple [Var "user"; Var "role"],
-                    Some (SimpleElse (Tuple [Literal (LString "error"); Literal (LString "failed")])) )));
+                    Tuple [ Var "user"; Var "role" ],
+                    Some
+                      (SimpleElse
+                         (Tuple
+                            [
+                              Literal (LString "error");
+                              Literal (LString "failed");
+                            ])) )));
         ];
     }
   in
@@ -364,9 +400,11 @@ let test_with_multiple_steps () =
   try
     let env = type_check_program program in
     match List.assoc_opt "test_with_multiple" env with
-    | Some (TTuple [TString; TString]) -> ()
+    | Some (TTuple [ TString; TString ]) -> ()
     | Some t ->
-        fail ("With-multiple test failed: expected TTuple [TString; TString], got " ^ string_of_type t)
+        fail
+          ("With-multiple test failed: expected TTuple [TString; TString], got "
+         ^ string_of_type t)
     | None -> fail "With-multiple test failed: function not found"
   with TypeError error ->
     fail ("With-multiple test failed: " ^ string_of_type_error error)
@@ -383,10 +421,12 @@ let test_if_case_type_mismatch () =
                (If
                   ( Literal (LBool true),
                     Literal (LString "string"),
-                    Some (ClauseElse [
-                      (PVar "x", None, Literal (LInt 42));
-                      (PWildcard, None, Literal (LString "default"));
-                    ]) )));
+                    Some
+                      (ClauseElse
+                         [
+                           (PVar "x", None, Literal (LInt 42));
+                           (PWildcard, None, Literal (LString "default"));
+                         ]) )));
         ];
     }
   in
@@ -394,8 +434,7 @@ let test_if_case_type_mismatch () =
   try
     let _ = type_check_program program in
     fail "Type mismatch test failed: should have thrown error"
-  with
-  | TypeError _ -> () (* Expected to fail *)
+  with TypeError _ -> () (* Expected to fail *)
 
 (* Test type error for mismatched branch types in with-case *)
 let test_with_case_type_mismatch () =
@@ -404,17 +443,25 @@ let test_with_case_type_mismatch () =
       deps = None;
       items =
         [
-          Function (make_single_clause_function "get_result" []
-            (Tuple [Literal (LAtom "ok"); Literal (LString "test")]));
+          Function
+            (make_single_clause_function "get_result" []
+               (Tuple [ Literal (LAtom "ok"); Literal (LString "test") ]));
           Function
             (make_single_clause_function "test_with_mismatch" []
                (With
-                  ( [(PTuple [PAtom "ok"; PVar "value"], App (Var "get_result", []))],
+                  ( [
+                      ( PTuple [ PAtom "ok"; PVar "value" ],
+                        App (Var "get_result", []) );
+                    ],
                     Var "value",
-                    Some (ClauseElse [
-                      (PTuple [PAtom "error"; PVar "reason"], None, Literal (LInt 42));
-                      (PWildcard, None, Literal (LString "unknown"));
-                    ]) )));
+                    Some
+                      (ClauseElse
+                         [
+                           ( PTuple [ PAtom "error"; PVar "reason" ],
+                             None,
+                             Literal (LInt 42) );
+                           (PWildcard, None, Literal (LString "unknown"));
+                         ]) )));
         ];
     }
   in
@@ -422,8 +469,7 @@ let test_with_case_type_mismatch () =
   try
     let _ = type_check_program program in
     fail "With type mismatch test failed: should have thrown error"
-  with
-  | TypeError _ -> () (* Expected to fail *)
+  with TypeError _ -> () (* Expected to fail *)
 
 (* Test if-else with optional result *)
 let test_if_else_optional () =
@@ -434,10 +480,7 @@ let test_if_else_optional () =
         [
           Function
             (make_single_clause_function "test_optional" []
-               (If
-                  ( Literal (LBool true),
-                    Literal (LString "some"),
-                    None )));
+               (If (Literal (LBool true), Literal (LString "some"), None)));
         ];
     }
   in
@@ -447,7 +490,9 @@ let test_if_else_optional () =
     match List.assoc_opt "test_optional" env with
     | Some (TOption TString) -> ()
     | Some t ->
-        fail ("Optional if test failed: expected TOption TString, got " ^ string_of_type t)
+        fail
+          ("Optional if test failed: expected TOption TString, got "
+         ^ string_of_type t)
     | None -> fail "Optional if test failed: function not found"
   with TypeError error ->
     fail ("Optional if test failed: " ^ string_of_type_error error)
@@ -459,12 +504,16 @@ let test_with_optional () =
       deps = None;
       items =
         [
-          Function (make_single_clause_function "get_result" []
-            (Tuple [Literal (LAtom "ok"); Literal (LString "test")]));
+          Function
+            (make_single_clause_function "get_result" []
+               (Tuple [ Literal (LAtom "ok"); Literal (LString "test") ]));
           Function
             (make_single_clause_function "test_with_optional" []
                (With
-                  ( [(PTuple [PAtom "ok"; PVar "value"], App (Var "get_result", []))],
+                  ( [
+                      ( PTuple [ PAtom "ok"; PVar "value" ],
+                        App (Var "get_result", []) );
+                    ],
                     Var "value",
                     None )));
         ];
@@ -476,7 +525,9 @@ let test_with_optional () =
     match List.assoc_opt "test_with_optional" env with
     | Some (TOption TString) -> ()
     | Some t ->
-        fail ("Optional with test failed: expected TOption TString, got " ^ string_of_type t)
+        fail
+          ("Optional with test failed: expected TOption TString, got "
+         ^ string_of_type t)
     | None -> fail "Optional with test failed: function not found"
   with TypeError error ->
     fail ("Optional with test failed: " ^ string_of_type_error error)

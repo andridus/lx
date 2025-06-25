@@ -2112,6 +2112,86 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
       in
 
       (final_type, final_subst)
+  | MatchRescue (steps, success_body) ->
+      (* Type check match rescue expression steps *)
+      let result_type = fresh_type_var () in
+      let final_subst =
+        List.fold_left
+          (fun subst_acc (pattern, value, rescue_expr) ->
+            let value_type, value_subst =
+              infer_expr (apply_subst_env subst_acc env) value
+            in
+            let pattern_type, _pattern_env, pattern_subst =
+              infer_pattern env pattern
+            in
+            let combined_subst =
+              compose_subst (compose_subst subst_acc value_subst) pattern_subst
+            in
+
+            (* Unify pattern with value *)
+            let pattern_unify =
+              unify
+                (apply_subst combined_subst pattern_type)
+                (apply_subst combined_subst value_type)
+            in
+            let pattern_combined_subst =
+              compose_subst combined_subst pattern_unify
+            in
+
+            (* Type check rescue expression *)
+            let _rescue_type, rescue_subst =
+              infer_expr
+                (apply_subst_env pattern_combined_subst env)
+                rescue_expr
+            in
+            let rescue_combined_subst =
+              compose_subst pattern_combined_subst rescue_subst
+            in
+
+            (* Unify rescue type with result type *)
+            let rescue_unify =
+              unify (apply_subst rescue_combined_subst result_type) _rescue_type
+            in
+            compose_subst rescue_combined_subst rescue_unify)
+          [] steps
+      in
+
+      (* Type check success body *)
+      let success_type, success_subst =
+        infer_expr (apply_subst_env final_subst env) success_body
+      in
+      let success_unify =
+        unify (apply_subst success_subst result_type) success_type
+      in
+      let complete_subst =
+        compose_subst (compose_subst final_subst success_subst) success_unify
+      in
+
+      (apply_subst complete_subst result_type, complete_subst)
+  | MatchRescueStep (pattern, value, rescue_expr) ->
+      (* Type check individual match rescue step *)
+      let value_type, value_subst = infer_expr env value in
+      let pattern_type, _pattern_env, pattern_subst =
+        infer_pattern env pattern
+      in
+      let combined_subst = compose_subst value_subst pattern_subst in
+
+      (* Unify pattern with value *)
+      let pattern_unify =
+        unify
+          (apply_subst combined_subst pattern_type)
+          (apply_subst combined_subst value_type)
+      in
+      let pattern_combined_subst = compose_subst combined_subst pattern_unify in
+
+      (* Type check rescue expression *)
+      let _rescue_type, rescue_subst =
+        infer_expr (apply_subst_env pattern_combined_subst env) rescue_expr
+      in
+      let final_subst = compose_subst pattern_combined_subst rescue_subst in
+
+      (* Return atom type (ok) since individual match rescue steps return ok on success *)
+      (TAtom, final_subst)
 
 (* Extract all variables from a pattern *)
 let rec extract_pattern_vars (pattern : pattern) : string list =
