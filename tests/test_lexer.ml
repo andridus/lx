@@ -20,11 +20,11 @@ let test_tokenize_eq () =
   | _ -> Alcotest.fail "Expected EQ token"
 
 let test_comment_with_newline () =
-  let lexbuf = Lexing.from_string "# This is a comment\nfun" in
+  let lexbuf = Lexing.from_string "# This is a comment\ndef" in
   let token = Compiler.Lexer.read lexbuf in
   match token with
-  | Compiler.Parser.FUN -> ()
-  | _ -> Alcotest.fail "Expected FUN token after comment"
+  | Compiler.Parser.DEF -> ()
+  | _ -> Alcotest.fail "Expected DEF token after comment"
 
 let test_comment_at_eof () =
   let lexbuf = Lexing.from_string "# This is a comment at end of file" in

@@ -37,7 +37,7 @@ let contains_substring s ~substring =
 let test_if_else () =
   let input =
     {|
-    fun test(x) do
+    defp test(x) do
       if x == 1 do
         "one"
       else
@@ -59,7 +59,7 @@ let test_if_else () =
 let test_if_no_else () =
   let input =
     {|
-    fun test(x) do
+    defp test(x) do
       if x == 1 do
         "one"
       end
@@ -77,7 +77,7 @@ let test_if_no_else () =
 let test_with_else () =
   let input =
     {|
-    fun test() do
+    defp test() do
       with .{:ok, value} <= get_result() do
         value
       else
@@ -96,7 +96,7 @@ let test_with_else () =
 let test_with_case () =
   let input =
     {|
-    fun test() do
+    defp test() do
       with .{:ok, value} <= get_result() do
         value
       case
@@ -117,7 +117,7 @@ let test_with_case () =
 let test_with_no_else () =
   let input =
     {|
-    fun test() do
+    defp test() do
       with .{:ok, value} <= get_result() do
         value
       end
@@ -134,7 +134,7 @@ let test_with_no_else () =
 let test_with_multiple_steps () =
   let input =
     {|
-    fun test() do
+    defp test() do
       with .{:ok, user} <= get_user(),
            .{:ok, role} <= get_role(user) do
         .{user, role}
@@ -154,7 +154,7 @@ let test_with_multiple_steps () =
 let test_with_case_guards () =
   let input =
     {|
-    fun test() do
+    defp test() do
       with .{:ok, value} <= get_result() do
         value
       case
@@ -179,7 +179,7 @@ let test_with_case_guards () =
 let test_if_compilation () =
   let input =
     {|
-    pub fun test_if_else(x) do
+    def test_if_else(x) do
       if x == 1 do
         "one"
       else
@@ -196,9 +196,9 @@ let test_if_compilation () =
 let test_with_compilation () =
   let input =
     {|
-    pub fun get_result() do .{:ok, "test"} end
+    def get_result() do .{:ok, "test"} end
 
-    pub fun test_with_else() do
+    def test_with_else() do
       with .{:ok, value} <= get_result() do
         value
       else
@@ -206,7 +206,7 @@ let test_with_compilation () =
       end
     end
 
-    pub fun test_with_case() do
+    def test_with_case() do
       with .{:ok, value} <= get_result() do
         value
       case
@@ -226,7 +226,7 @@ let test_with_compilation () =
 let test_if_type_checking () =
   let input =
     {|
-    fun test_if_else(x) do
+    defp test_if_else(x) do
       if x == 1 do
         "one"
       else
@@ -246,9 +246,9 @@ let test_if_type_checking () =
 let test_with_type_checking () =
   let input =
     {|
-    fun get_result() do .{:ok, "test"} end
+    defp get_result() do .{:ok, "test"} end
 
-    fun test_with_else() do
+    defp test_with_else() do
       with .{:ok, value} <= get_result() do
         value
       else
@@ -268,7 +268,7 @@ let test_with_type_checking () =
 let test_type_error_mismatched_branches () =
   let input =
     {|
-    fun test_bad_types(x) do
+    defp test_bad_types(x) do
       if x == 1 do
         "string"
       else

@@ -83,15 +83,15 @@ supervisor cart_sup do
 end
 
 worker cart do
-  fun init(_) do .{:ok, []} end
+  def init(_) do .{:ok, []} end
 end
 
 worker inventory do
-  fun init(_) do .{:ok, .{}} end
+  def init(_) do .{:ok, .{}} end
 end
 
 worker payment do
-  fun init(_) do .{:ok, []} end
+  def init(_) do .{:ok, []} end
 end
 |}
   in

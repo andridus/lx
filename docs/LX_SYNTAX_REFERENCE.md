@@ -34,7 +34,7 @@ Lx is a statically scoped, expression-based functional language designed for bui
 
 These reserved words define control flow, type contracts, concurrency, and OTP structure. They cannot be redefined.
 
-- **Core**: `fun`, `pub`, `case`, `if`, `else`, `do`, `end`, `with`, `for`, `when`, `receive`, `after`, `true`, `false`, `nil`, `unsafe`
+- **Core**: `def`, `defp`, `case`, `if`, `else`, `do`, `end`, `with`, `for`, `when`, `receive`, `after`, `true`, `false`, `nil`, `unsafe`
 - **Data**: `record` — structured data type definitions
 - **OTP**: `worker`, `supervisor`, `strategy`, `children`, `one_for_one`, `one_for_all`, `rest_for_one`
 - **Specification**: `spec`, `requires`, `ensures`, `matches`
@@ -178,14 +178,14 @@ Functions now use `do`/`end` syntax instead of curly braces:
 #### Single clause:
 
 ```lx
-fun greet(name) do "Hello, " ++ name end
-pub fun ping() do :pong end
+def greet(name) do "Hello, " ++ name end
+defp ping() do :pong end
 ```
 
 #### Multiple clauses:
 
 ```lx
-fun factorial do
+def factorial do
   (0) do 1 end
   (N) when N > 0 do N * factorial(N - 1) end
 end
@@ -201,16 +201,16 @@ Fun expressions create anonymous functions using `do`/`end` syntax:
 
 ```lx
 # Basic anonymous function
-add = fun(x, y) do x + y end
+add = fn(x, y) do x + y end
 result = add(3, 4)  # Returns 7
 
 # Fun expression as argument to higher-order function
 numbers = [1, 2, 3, 4, 5]
-doubled = map(numbers, fun(x) do x * 2 end)
+doubled = map(numbers, fn(x) do x * 2 end)
 
 # Fun expression with closure (captures variables from enclosing scope)
 multiplier = 3
-scale = fun(x) do x * multiplier end
+scale = fn(x) do x * multiplier end
 scaled_value = scale(10)  # Returns 30
 ```
 
@@ -220,21 +220,21 @@ Fun expressions can have multiple clauses with pattern matching and optional gua
 
 ```lx
 # Pattern matching fun expression
-process = fun do
+process = fn do
   (:ok) do "Success" end
   (:error) do "Failed" end
   (_) do "Unknown" end
 end
 
 # Fun expression with guards
-validate = fun do
+validate = fn do
   (x) when x > 0 do :positive end
   (x) when x < 0 do :negative end
   (0) do :zero end
 end
 
 # Complex pattern matching with destructuring
-handle_message = fun do
+handle_message = fn do
   (.{:user, name, age}) when age >= 18 do "Adult: " ++ name end
   (.{:user, name, age}) when age < 18 do "Minor: " ++ name end
   (.{:system, msg}) do "System: " ++ msg end
@@ -248,28 +248,28 @@ Fun expressions enable powerful functional programming patterns:
 
 ```lx
 # Function that returns a function
-make_adder = fun(n) do
-  fun(x) do x + n end
+make_adder = fn(n) do
+  fn(x) do x + n end
 end
 
 add5 = make_adder(5)
 result = add5(10)  # Returns 15
 
 # Function that takes a function as argument
-apply_twice = fun(f, x) do
+apply_twice = fn(f, x) do
   f(f(x))
 end
 
-double = fun(x) do x * 2 end
+double = fn(x) do x * 2 end
 result = apply_twice(double, 3)  # Returns 12
 
 # Functional composition
-compose = fun(f, g) do
-  fun(x) do f(g(x)) end
+compose = fn(f, g) do
+  fn(x) do f(g(x)) end
 end
 
-add_one = fun(x) do x + 1 end
-multiply_two = fun(x) do x * 2 end
+add_one = fn(x) do x + 1 end
+multiply_two = fn(x) do x * 2 end
 add_then_multiply = compose(multiply_two, add_one)
 result = add_then_multiply(5)  # Returns 12 ((5 + 1) * 2)
 ```
@@ -278,44 +278,44 @@ result = add_then_multiply(5)  # Returns 12 ((5 + 1) * 2)
 
 ```lx
 # Event handler with state
-pub fun create_counter() {
+def create_counter() do
   count = 0
-  fun() {
+  fn() do
     count = count + 1
     count
-  }
-}
+  end
+end
 
 # List processing with fun expressions
-pub fun filter_map(list, predicate, mapper) {
+def filter_map(list, predicate, mapper) do
   list
   |> filter(predicate)
   |> map(mapper)
-}
+end
 
 # Usage example
 numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 even_doubled = filter_map(
   numbers,
-  fun(x) { x % 2 == 0 },  # Filter even numbers
-  fun(x) { x * 2 }        # Double them
+  fn(x) do x % 2 == 0 end,  # Filter even numbers
+  fn(x) do x * 2 end        # Double them
 )
 # Result: [4, 8, 12, 16, 20]
 
 # Callback-style programming
-pub fun async_operation(data, callback) {
+def async_operation(data, callback) do
   # Simulate async work
   result = process_data(data)
   callback(result)
-}
+end
 
 # Usage with fun expression
-async_operation(my_data, fun(result) {
-  case result {
+async_operation(my_data, fn(result) do
+  case result do
     :ok -> log("Operation succeeded")
     :error -> log("Operation failed")
-  }
-})
+  end
+end)
 ```
 
 #### Fun Expression Properties:
@@ -334,7 +334,7 @@ async_operation(my_data, fun(result) {
 Conditions to refine pattern matching:
 
 ```lx
-fun is_non_empty_list(x) when is_list(x) andalso length(x) > 0 do
+def is_non_empty_list(x) when is_list(x) andalso length(x) > 0 do
   :yes
 end
 ```
@@ -603,50 +603,36 @@ value = config[key]
 ##### Map Pattern Matching:
 
 ```lx
-# Basic pattern matching with assignment operator (=) or pattern operator (<-)
-%{ name: user_name, age: user_age } = user
-%{ name: user_name, age: _user_age } <- user
-
-# Mixed key pattern matching
-%{ :status => status, "message" => message } <- response
-
-# Partial pattern matching (extract subset of fields)
-%{ name: user_name } <- user
-
-# Unsafe pattern matching - bypasses all type checking and validation
-unsafe %{ name: user_name, unknown_field: value } = user
-unsafe %{ "dynamic_key" => data } <- response
-
 # Pattern matching in function parameters
-pub fun process_user(%{ name: user_name, age: user_age }) {
-  if user_age >= 18 {
+def process_user(%{ name: user_name, age: user_age }) do
+  if user_age >= 18 do
     %{ name: user_name, status: :adult }
-  } else {
+  else
     %{ name: user_name, status: :minor }
-  }
-}
+  end
+end
 
 # Pattern matching in case expressions
-pub fun handle_response(response) {
-  case response {
+def handle_response(response) do
+  case response do
     %{ status: :ok, data: data } -> data
     %{ status: :error, message: msg } -> .{:error, msg}
     _ -> :unknown
-  }
-}
+  end
+end
 
 # Nested map patterns
 data = %{ user: %{ name: "Alice", profile: %{ age: 25 } } }
 %{ user: %{ name: user_name, profile: %{ age: user_age } } } <- data
 
 # Map patterns with guards
-pub fun validate_user(user) {
-  case user {
+def validate_user(user) do
+  case user do
     %{ age: age, name: name } when age >= 18 -> %{ name: name, status: :adult }
     %{ age: age, name: name } when age < 18 -> %{ name: name, status: :minor }
     _ -> :invalid
-  }
-}
+  end
+end
 ```
 
 ##### Key Types and Syntax:
@@ -763,19 +749,19 @@ case packet {
 }
 
 # Binary patterns in function parameters
-pub fun parse_header(<<version:8, length:16, data:length/binary>>) {
-    .{:ok, version, length, data}
-}
+def parse_header(<<version:8, length:16, data:length/binary>>) do
+  .{:ok, version, length, data}
+end
 
-pub fun parse_header(_) {
-    :error
-}
+def parse_header(_) do
+  :error
+end
 
 # Binary pattern matching in assignments
-pub fun extract_header(packet) {
-    <<version:8, length:16, flags:8>> = packet
-    .{version, length, flags}
-}
+def extract_header(packet) do
+  <<version:8, length:16, flags:8>> = packet
+  .{version, length, flags}
+end
 ```
 
 ##### Binary Type Specifiers:
@@ -812,46 +798,46 @@ length = 10
 
 ```lx
 # Network protocol parsing
-pub fun parse_tcp_header(<<src_port:16, dst_port:16, seq:32, ack:32, rest/binary>>) {
-    .{:tcp_header, src_port, dst_port, seq, ack, rest}
-}
+def parse_tcp_header(<<src_port:16, dst_port:16, seq:32, ack:32, rest/binary>>) do
+  .{:tcp_header, src_port, dst_port, seq, ack, rest}
+end
 
 # Message encoding
-pub fun encode_message(type_id, message) {
-    case type_id {
-        :text -> <<"TEXT"/binary, message/binary>>
-        :data -> <<"DATA"/binary, message/binary>>
-        :error -> <<"ERRO"/binary, message/binary>>
-        _ -> <<"UNKN"/binary, message/binary>>
-    }
-}
+def encode_message(type_id, message) do
+  case type_id do
+    :text -> <<"TEXT"/binary, message/binary>>
+    :data -> <<"DATA"/binary, message/binary>>
+    :error -> <<"ERRO"/binary, message/binary>>
+    _ -> <<"UNKN"/binary, message/binary>>
+  end
+end
 
 # File format handling
-pub fun parse_png_chunk(<<length:32, type:4/binary, data:length/binary, crc:32>>) {
-    .{:png_chunk, type, data, crc}
-}
+def parse_png_chunk(<<length:32, type:4/binary, data:length/binary, crc:32>>) do
+  .{:png_chunk, type, data, crc}
+end
 
 # Binary assignment pattern matching
-pub fun process_packet(raw_data) {
-    # Extract header information using binary patterns
-    <<version:8, length:16, flags:8>> = raw_data
+def process_packet(raw_data) do
+  # Extract header information using binary patterns
+  <<version:8, length:16, flags:8>> = raw_data
 
-    # Use extracted variables
-    if version == 1 {
-        .{:v1, length, flags}
-    } else {
-        .{:unsupported, version}
-    }
-}
+  # Use extracted variables
+  if version == 1 do
+    .{:v1, length, flags}
+  else
+    .{:unsupported, version}
+  end
+end
 
 # Complex binary pattern extraction
-pub fun parse_network_frame(frame) {
-    # Extract multiple fields in one pattern match
-    <<preamble:32, header:64/binary, payload_size:16, payload:payload_size/binary, checksum:32>> = frame
+def parse_network_frame(frame) do
+  # Extract multiple fields in one pattern match
+  <<preamble:32, header:64/binary, payload_size:16, payload:payload_size/binary, checksum:32>> = frame
 
-    # All variables are now available for use
-    .{preamble, header, payload_size, payload, checksum}
-}
+  # All variables are now available for use
+  .{preamble, header, payload_size, payload, checksum}
+end
 ```
 
 ---
@@ -919,39 +905,39 @@ case user {
 #### Records in OTP Workers:
 
 ```lx
-record UserState {
-    users :: list,
-    count :: integer
-}
+record UserState do
+  users :: list,
+  count :: integer
+end
 
-worker user_manager {
-  fun init(_) {
+worker user_manager do
+  def init(_) do
     .{:ok, UserState{users: [], count: 0}}
-  }
+  end
 
-  fun handle_call(.{:add_user, user}, _from, state) {
+  def handle_call(.{:add_user, user}, _from, state) do
     new_users = [user | state.users]
     new_state = {state | users: new_users, count: state.count + 1}
     .{:reply, :ok, new_state}
-  }
+  end
 
-  fun handle_call(:get_count, _from, state) {
+  def handle_call(:get_count, _from, state) do
     .{:reply, state.count, state}
-  }
-}
+  end
+end
 ```
 
 #### Maps in OTP Workers:
 
 ```lx
-worker session_manager {
-  fun init(_) {
+worker session_manager do
+  def init(_) do
     # Initialize state as a map
     initial_state = %{ sessions: %{}, active_count: 0 }
     .{:ok, initial_state}
-  }
+  end
 
-  fun handle_call(.{:create_session, user_id}, _from, state) {
+  def handle_call(.{:create_session, user_id}, _from, state) do
     # Extract current sessions and count using pattern matching
     %{ sessions: current_sessions, active_count: count } <- state
 
@@ -964,21 +950,21 @@ worker session_manager {
     new_state = %{ sessions: new_sessions, active_count: count + 1 }
 
     .{:reply, .{:ok, session_id}, new_state}
-  }
+  end
 
-  fun handle_call(.{:get_session, session_id}, _from, state) {
+  def handle_call(.{:get_session, session_id}, _from, state) do
     %{ sessions: sessions } <- state
 
-    case sessions[session_id] {
+    case sessions[session_id] do
       nil -> .{:reply, .{:error, :not_found}, state}
       session_data -> .{:reply, .{:ok, session_data}, state}
-    }
-  }
+    end
+  end
 
-  fun handle_call(.{:update_session, session_id, updates}, _from, state) {
+  def handle_call(.{:update_session, session_id, updates}, _from, state) do
     %{ sessions: sessions, active_count: count } <- state
 
-    case sessions[session_id] {
+    case sessions[session_id] do
       nil -> .{:reply, .{:error, :not_found}, state}
       session_data ->
         # Pattern match to extract session fields and apply updates
@@ -992,9 +978,9 @@ worker session_manager {
         new_sessions = %{ session_id => updated_session | sessions }
         new_state = %{ sessions: new_sessions, active_count: count }
         .{:reply, :ok, new_state}
-    }
-  }
-}
+    end
+  end
+end
 ```
 
 ---
@@ -1004,10 +990,10 @@ worker session_manager {
 #### Workers:
 
 ```lx
-worker my_worker {
-  fun init(_) { .{:ok, []} }
-  fun handle_call(:get, _from, state) { .{:reply, state, state} }
-}
+worker my_worker do
+  def init(_) do .{:ok, []} end
+  def handle_call(:get, _from, state) do .{:reply, state, state} end
+end
 ```
 
 #### Supervisors:
@@ -1153,13 +1139,13 @@ deps [
 ```lx
 deps [:erlang, :crypto]
 
-worker cart_manager {
-    fun init(_) {
-        timestamp = erlang.system_time(:millisecond)
-        uuid = crypto.strong_rand_bytes(16)
-        .{:ok, #{carts: #{}, created_at: timestamp, session_id: uuid}}
-    }
-}
+worker cart_manager do
+  def init(_) do
+    timestamp = erlang.system_time(:millisecond)
+    uuid = crypto.strong_rand_bytes(16)
+    .{:ok, #{carts: #{}, created_at: timestamp, session_id: uuid}}
+  end
+end
 ```
 
 #### Benefits

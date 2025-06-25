@@ -2,7 +2,7 @@ open Alcotest
 open Compiler.Ast
 
 let test_simple_function () =
-  let result = Compiler.parse_string "pub fun num() do 42 end" in
+  let result = Compiler.parse_string "def num() do 42 end" in
   match result.items with
   | [
    Function
@@ -18,7 +18,7 @@ let test_simple_function () =
   | _ -> fail "Expected single function with correct structure"
 
 let test_function_with_params () =
-  let result = Compiler.parse_string "pub fun add(x, y) do x end" in
+  let result = Compiler.parse_string "def add(x, _y) do x end" in
   match result.items with
   | [
    Function
@@ -27,7 +27,7 @@ let test_function_with_params () =
        clauses =
          [
            {
-             params = [ PVar "x"; PVar "y" ];
+             params = [ PVar "x"; PVar "_y" ];
              body = Var "x";
              position = _;
              guard = _;
@@ -42,7 +42,7 @@ let test_function_with_params () =
 
 let test_multiple_functions () =
   let result =
-    Compiler.parse_string "pub fun first() do 1 end fun second() do 2 end"
+    Compiler.parse_string "def first() do 1 end defp second() do 2 end"
   in
   match result.items with
   | [
@@ -67,7 +67,7 @@ let test_multiple_functions () =
   | _ -> fail "Expected two functions"
 
 let test_public_function () =
-  let result = Compiler.parse_string "pub fun hello() do \"world\" end" in
+  let result = Compiler.parse_string "def hello() do \"world\" end" in
   match result.items with
   | [
    Function
@@ -103,7 +103,7 @@ let test_comparison_operators () =
   in
   List.iter
     (fun (expr_str, op) ->
-      let code = "pub fun test() do " ^ expr_str ^ " end" in
+      let code = "def test() do " ^ expr_str ^ " end" in
       let result = Compiler.parse_string code in
       match result.items with
       | [
@@ -130,8 +130,7 @@ let test_comparison_operators () =
 (* Test parsing of if condition with comparison *)
 let test_if_with_comparison () =
   let result =
-    Compiler.parse_string
-      "pub fun test() do if x == 1 do :ok else :error end end"
+    Compiler.parse_string "def test() do if x == 1 do :ok else :error end end"
   in
   match result.items with
   | [
@@ -160,7 +159,7 @@ let test_if_with_comparison () =
 
 (* Test parsing of complex comparison expressions *)
 let test_complex_comparison_parsing () =
-  let result = Compiler.parse_string "pub fun test(x, y) do x >= y end" in
+  let result = Compiler.parse_string "def test(x, y) do x >= y end" in
   match result.items with
   | [
    Function
@@ -184,7 +183,7 @@ let test_complex_comparison_parsing () =
 
 (* Test parsing precedence of comparison operators *)
 let test_comparison_precedence () =
-  let result = Compiler.parse_string "pub fun test() do x + 1 == y * 2 end" in
+  let result = Compiler.parse_string "def test() do x + 1 == y * 2 end" in
   match result.items with
   | [
    Function
@@ -214,7 +213,7 @@ let test_comparison_precedence () =
 let test_with_with_else () =
   let result =
     Compiler.parse_string
-      "pub fun test() do with .{:ok, value} <= get_result() do value else \
+      "def test() do with .{:ok, value} <= get_result() do value else \
        \"failed\" end end"
   in
   match result.items with
@@ -247,7 +246,7 @@ let test_with_with_case () =
   let result =
     Compiler.parse_string
       {|
-      pub fun test() do
+      def test() do
         with .{:ok, value} <= get_result() do
           value
         case
@@ -283,7 +282,7 @@ let test_with_with_case () =
 let test_with_multiple_steps () =
   let result =
     Compiler.parse_string
-      "pub fun test() do with .{:ok, user} <= get_user(), .{:ok, role} <= \
+      "def test() do with .{:ok, user} <= get_user(), .{:ok, role} <= \
        get_role(user) do .{user, role} else .{:error, \"failed\"} end end"
   in
   match result.items with
@@ -314,7 +313,7 @@ let test_with_case_with_guards () =
   let result =
     Compiler.parse_string
       {|
-      pub fun test() do
+      def test() do
         with .{:ok, value} <= get_result() do
           value
         case
@@ -352,7 +351,7 @@ let test_with_case_with_guards () =
 (* Test parsing of if without else *)
 let test_if_without_else () =
   let result =
-    Compiler.parse_string "pub fun test(x) do if x == 1 do \"one\" end end"
+    Compiler.parse_string "def test(x) do if x == 1 do \"one\" end end"
   in
   match result.items with
   | [
@@ -383,7 +382,7 @@ let test_if_without_else () =
 let test_with_without_else () =
   let result =
     Compiler.parse_string
-      "pub fun test() do with .{:ok, value} <= get_result() do value end end"
+      "def test() do with .{:ok, value} <= get_result() do value end end"
   in
   match result.items with
   | [

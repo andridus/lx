@@ -14,7 +14,7 @@ let string_contains_substring s sub =
 
 (* Test underscore parameters in function definitions *)
 let test_underscore_parameters () =
-  let input = "pub fun init(_) do :ok end" in
+  let input = "def init(_) do :ok end" in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string_for_tests program in
   let expected_parts = [ "init(_) ->"; "ok." ] in
@@ -26,7 +26,7 @@ let test_underscore_parameters () =
 
 (* Test __MODULE__ macro compilation *)
 let test_module_macro () =
-  let input = "pub fun get_module() do __MODULE__ end" in
+  let input = "def get_module() do __MODULE__ end" in
   let program = Compiler.parse_string input in
 
   (* Test that __MODULE__ parses correctly as ?MODULE *)
@@ -38,7 +38,7 @@ let test_module_macro () =
 (* Test ignored variables with underscore prefix *)
 let test_ignored_variables () =
   let input =
-    "pub fun test() do _used = gen_server.call(erlang.self(), :get); :ok end"
+    "def test() do _used = gen_server.call(erlang.self(), :get); :ok end"
   in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string_for_tests program in
@@ -63,7 +63,7 @@ let test_ignored_variables () =
 
 (* Test valid dot syntax works correctly *)
 let test_valid_dot_syntax () =
-  let input = "pub fun test() do gen_server.call(module_ref, :get) end" in
+  let input = "def test() do gen_server.call(module_ref, :get) end" in
   let program = Compiler.parse_string input in
   match program.items with
   | [
@@ -83,7 +83,7 @@ let test_worker_special_syntax () =
 
 (* Test parsing of __MODULE__ token *)
 let test_module_macro_parsing () =
-  let input = "pub fun test() do __MODULE__ end" in
+  let input = "def test() do __MODULE__ end" in
   let program = Compiler.parse_string input in
 
   match program.items with
@@ -92,7 +92,7 @@ let test_module_macro_parsing () =
 
 (* Test underscore patterns in case expressions *)
 let test_underscore_in_patterns () =
-  let input = "pub fun test(x) do case x do _ -> :default end end" in
+  let input = "def test(x) do case x do _ -> :default end end" in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string_for_tests program in
 

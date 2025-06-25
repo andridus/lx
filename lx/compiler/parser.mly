@@ -59,7 +59,7 @@ let string_of_simple_tuple_element = function
 %token MODULE_MACRO
 
 (* Keywords *)
-%token PUB FUN CASE IF ELSE DO END FOR WHEN IN AND OR NOT ANDALSO ORELSE RECEIVE AFTER MATCH_KEYWORD
+%token DEF DEFP FN CASE IF ELSE DO END FOR WHEN IN AND OR NOT ANDALSO ORELSE RECEIVE AFTER MATCH_KEYWORD
   %token RECORD UNSAFE WITH RESCUE
 
 (* Module System Keywords *)
@@ -175,52 +175,63 @@ module_item:
   | r = record_def { RecordDef r }
 
 function_def:
-  (* Public functions - new syntax for multiple arities *)
-  | PUB FUN name = IDENT DO clauses = function_clause+ END
+  (* New syntax: def for public functions *)
+  | DEF name = IDENT DO clauses = function_clause+ END
     { let pos = make_position $startpos in { name; clauses; visibility = Public; position = Some pos } }
-  (* Public functions - backward compatibility: single clause with pattern support *)
-  | PUB FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr DO body = function_body END
+  | DEF name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr DO body = function_body END
     { let pos = make_position $startpos in
       let clause = { params; body; position = Some pos; guard = Some guard } in
       { name; clauses = [clause]; visibility = Public; position = Some pos } }
-  | PUB FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN DO body = function_body END
+  | DEF name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN DO body = function_body END
     { let pos = make_position $startpos in
       let clause = { params; body; position = Some pos; guard = None } in
       { name; clauses = [clause]; visibility = Public; position = Some pos } }
-  | PUB FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr DO END
+  | DEF name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr DO END
     { let pos = make_position $startpos in
       let clause = { params; body = Literal LNil; position = Some pos; guard = Some guard } in
       { name; clauses = [clause]; visibility = Public; position = Some pos } }
-  | PUB FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN DO END
+  | DEF name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN DO END
     { let pos = make_position $startpos in
       let clause = { params; body = Literal LNil; position = Some pos; guard = None } in
       { name; clauses = [clause]; visibility = Public; position = Some pos } }
-  (* Private functions (default) - new syntax for multiple arities *)
-  | FUN name = IDENT DO clauses = function_clause+ END
+
+  (* New syntax: defp for private functions *)
+  | DEFP name = IDENT DO clauses = function_clause+ END
     { let pos = make_position $startpos in { name; clauses; visibility = Private; position = Some pos } }
-  (* Private functions (default) - backward compatibility: single clause with pattern support *)
-  | FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr DO body = function_body END
+  | DEFP name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr DO body = function_body END
     { let pos = make_position $startpos in
       let clause = { params; body; position = Some pos; guard = Some guard } in
       { name; clauses = [clause]; visibility = Private; position = Some pos } }
-  | FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN DO body = function_body END
+  | DEFP name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN DO body = function_body END
     { let pos = make_position $startpos in
       let clause = { params; body; position = Some pos; guard = None } in
       { name; clauses = [clause]; visibility = Private; position = Some pos } }
-  | FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr DO END
+  | DEFP name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr DO END
     { let pos = make_position $startpos in
       let clause = { params; body = Literal LNil; position = Some pos; guard = Some guard } in
       { name; clauses = [clause]; visibility = Private; position = Some pos } }
-  | FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN DO END
+  | DEFP name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN DO END
     { let pos = make_position $startpos in
       let clause = { params; body = Literal LNil; position = Some pos; guard = None } in
       { name; clauses = [clause]; visibility = Private; position = Some pos } }
-  | FUN _name = IDENT LPAREN _params = separated_list(COMMA, pattern) RPAREN error
+
+
+
+  (* Error handling for new syntax *)
+  | DEF _name = IDENT LPAREN _params = separated_list(COMMA, pattern) RPAREN error
     { failwith "Enhanced:Missing function body - expected 'do' after parameter list|Suggestion:Add 'do' and 'end' to define the function body|Context:function definition" }
-  | FUN _name = IDENT error
-    { failwith "Enhanced:Missing parameter list or clause block - expected '(' or 'do' after function name|Suggestion:Use 'fun name() do body end' for single clause functions or 'fun name do (params) do body end end' for multiple clause functions|Context:function definition" }
-  | FUN error
-    { failwith "Enhanced:Missing function name after 'fun' keyword|Suggestion:Provide a valid identifier name for the function|Context:function definition" }
+  | DEF _name = IDENT error
+    { failwith "Enhanced:Missing parameter list or clause block - expected '(' or 'do' after function name|Suggestion:Use 'def name() do body end' for single clause functions or 'def name do (params) do body end end' for multiple clause functions|Context:function definition" }
+  | DEF error
+    { failwith "Enhanced:Missing function name after 'def' keyword|Suggestion:Provide a valid identifier name for the function|Context:function definition" }
+  | DEFP _name = IDENT LPAREN _params = separated_list(COMMA, pattern) RPAREN error
+    { failwith "Enhanced:Missing function body - expected 'do' after parameter list|Suggestion:Add 'do' and 'end' to define the function body|Context:function definition" }
+  | DEFP _name = IDENT error
+    { failwith "Enhanced:Missing parameter list or clause block - expected '(' or 'do' after function name|Suggestion:Use 'defp name() do body end' for single clause functions or 'defp name do (params) do body end end' for multiple clause functions|Context:function definition" }
+  | DEFP error
+    { failwith "Enhanced:Missing function name after 'defp' keyword|Suggestion:Provide a valid identifier name for the function|Context:function definition" }
+
+
 
 function_clause:
   | LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr DO body = function_body END
@@ -232,7 +243,7 @@ function_clause:
   | LPAREN params = separated_list(COMMA, pattern) RPAREN DO END
     { let pos = make_position $startpos in { params; body = Literal LNil; position = Some pos; guard = None } }
   | error
-    { failwith "Enhanced:Invalid function clause syntax - expected parameter list in parentheses|Suggestion:For single clause functions use 'fun name() do body end', for multiple clause functions use 'fun name do (params) do body end end'|Context:function clause definition" }
+    { failwith "Enhanced:Invalid function clause syntax - expected parameter list in parentheses|Suggestion:For single clause functions use 'def name() do body end' or 'defp name() do body end', for multiple clause functions use 'def name do (params) do body end end'|Context:function clause definition" }
 
 otp_component:
   | w = worker_def { w }
@@ -471,10 +482,10 @@ simple_expr:
     { RecordAccess (Var record_var, field_name) }
   | RECORD DOT field_name = IDENT
     { RecordAccess (Var "record", field_name) }
-  (* Fun expressions *)
-  | FUN LPAREN params = separated_list(COMMA, IDENT) RPAREN DO body = expr END
+  (* Anonymous function expressions *)
+  | FN LPAREN params = separated_list(COMMA, IDENT) RPAREN DO body = expr END
     { FunExpression (params, body) }
-  | FUN DO clauses = fun_expression_clause+ END
+  | FN DO clauses = fun_expression_clause+ END
     { FunExpressionClauses clauses }
   | LPAREN e = expr RPAREN { e }
   | LPAREN elements = separated_list(COMMA, expr) RPAREN

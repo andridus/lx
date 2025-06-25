@@ -11,9 +11,7 @@ let compile_program program = Compiler.compile_to_string_for_tests program
 
 (* Test basic map creation with atom keys *)
 let test_map_creation_atom_keys () =
-  let input =
-    "pub fun test() do %{ name: \"Alice\", age: 25, active: true } end"
-  in
+  let input = "def test() do %{ name: \"Alice\", age: 25, active: true } end" in
   try
     let program = parse_program_string input in
     let compiled = compile_program program in
@@ -30,8 +28,7 @@ let test_map_creation_atom_keys () =
 (* Test map creation with general keys *)
 let test_map_creation_general_keys () =
   let input =
-    "pub fun test() do %{ \"database_url\" => \"localhost\", \"port\" => 5432 \
-     } end"
+    "def test() do %{ \"database_url\" => \"localhost\", \"port\" => 5432 } end"
   in
   try
     let program = parse_program_string input in
@@ -49,8 +46,8 @@ let test_map_creation_general_keys () =
 (* Test mixed key types in maps *)
 let test_map_mixed_keys () =
   let input =
-    "pub fun test() do %{ :type => \"user\", \"created_at\" => \"2023-01-01\", \
-     1 => \"first\" } end"
+    "def test() do %{ :type => \"user\", \"created_at\" => \"2023-01-01\", 1 \
+     => \"first\" } end"
   in
   try
     let program = parse_program_string input in
@@ -66,7 +63,7 @@ let test_map_mixed_keys () =
 
 (* Test empty map creation *)
 let test_empty_map () =
-  let input = "pub fun test() do %{} end" in
+  let input = "def test() do %{} end" in
   try
     let program = parse_program_string input in
     let compiled = compile_program program in
@@ -81,7 +78,7 @@ let test_empty_map () =
 (* Test map access with atom keys *)
 let test_map_access_atom_keys () =
   let input =
-    "pub fun test() do user = %{ name: \"Alice\", age: 25 }; user[:name] end"
+    "def test() do user = %{ name: \"Alice\", age: 25 }; user[:name] end"
   in
   try
     let program = parse_program_string input in
@@ -100,7 +97,7 @@ let test_map_access_atom_keys () =
 (* Test map access with general keys *)
 let test_map_access_general_keys () =
   let input =
-    "pub fun test() do config = %{ \"port\" => 5432 }; config[\"port\"] end"
+    "def test() do config = %{ \"port\" => 5432 }; config[\"port\"] end"
   in
   try
     let program = parse_program_string input in
@@ -118,8 +115,8 @@ let test_map_access_general_keys () =
 (* Test basic map pattern matching *)
 let test_map_pattern_matching_basic () =
   let input =
-    "pub fun test() do user = %{ name: \"Alice\", age: 25 }; %{ name: \
-     user_name, age: _user_age } <- user; user_name end"
+    "def test() do user = %{ name: \"Alice\", age: 25 }; %{ name: user_name, \
+     age: _user_age } <- user; user_name end"
   in
   try
     let program = parse_program_string input in
@@ -139,8 +136,8 @@ let test_map_pattern_matching_basic () =
 (* Test map pattern matching with mixed keys *)
 let test_map_pattern_matching_mixed () =
   let input =
-    "pub fun test() do data = %{ :status => \"ok\", \"message\" => \"success\" \
-     }; %{ :status => status, \"message\" => _msg } <- data; status end"
+    "def test() do data = %{ :status => \"ok\", \"message\" => \"success\" }; \
+     %{ :status => status, \"message\" => _msg } <- data; status end"
   in
   try
     let program = parse_program_string input in
@@ -159,7 +156,7 @@ let test_map_pattern_matching_mixed () =
 (* Test partial map pattern matching *)
 let test_map_pattern_matching_partial () =
   let input =
-    "pub fun test() do user = %{ name: \"Alice\", age: 25, city: \"NYC\" }; %{ \
+    "def test() do user = %{ name: \"Alice\", age: 25, city: \"NYC\" }; %{ \
      name: user_name } <- user; user_name end"
   in
   try
@@ -179,8 +176,8 @@ let test_map_pattern_matching_partial () =
 (* Test map pattern matching in function parameters *)
 let test_map_pattern_in_function () =
   let input =
-    "pub fun process_user(%{ name: user_name, age: user_age }) do if user_age \
-     >= 18 do %{ name: user_name, status: :adult } else %{ name: user_name, \
+    "def process_user(%{ name: user_name, age: user_age }) do if user_age >= \
+     18 do %{ name: user_name, status: :adult } else %{ name: user_name, \
      status: :minor } end end"
   in
   try
@@ -200,9 +197,9 @@ let test_map_pattern_in_function () =
 (* Test map pattern matching in case expressions *)
 let test_map_pattern_in_case () =
   let input =
-    "pub fun handle_response(response) do case response do %{ status: :ok, \
-     data: data } -> data %{ status: :error, message: msg } -> .{:error, msg} \
-     _ -> :unknown end end"
+    "def handle_response(response) do case response do %{ status: :ok, data: \
+     data } -> data %{ status: :error, message: msg } -> .{:error, msg} _ -> \
+     :unknown end end"
   in
   try
     let program = parse_program_string input in
@@ -221,9 +218,9 @@ let test_map_pattern_in_case () =
 (* Test nested map patterns *)
 let test_nested_map_patterns () =
   let input =
-    "pub fun test() do data = %{ user: %{ name: \"Alice\", profile: %{ age: 25 \
-     } } }; %{ user: %{ name: user_name, profile: %{ age: _user_age } } } <- \
-     data; user_name end"
+    "def test() do data = %{ user: %{ name: \"Alice\", profile: %{ age: 25 } } \
+     }; %{ user: %{ name: user_name, profile: %{ age: _user_age } } } <- data; \
+     user_name end"
   in
   try
     let program = parse_program_string input in
@@ -241,9 +238,9 @@ let test_nested_map_patterns () =
 (* Test map pattern matching with guards *)
 let test_map_pattern_with_guards () =
   let input =
-    "pub fun validate_user(user) do case user do %{ age: age, name: name } \
-     when age >= 18 -> %{ name: name, status: :adult } %{ age: age, name: name \
-     } when age < 18 -> %{ name: name, status: :minor } _ -> :invalid end end"
+    "def validate_user(user) do case user do %{ age: age, name: name } when \
+     age >= 18 -> %{ name: name, status: :adult } %{ age: age, name: name } \
+     when age < 18 -> %{ name: name, status: :minor } _ -> :invalid end end"
   in
   try
     let program = parse_program_string input in
@@ -262,7 +259,7 @@ let test_map_pattern_with_guards () =
 (* Test complex map with lists and tuples *)
 let test_complex_map_structures () =
   let input =
-    "pub fun test() do %{ users: [%{ name: \"Alice\" }, %{ name: \"Bob\" }], \
+    "def test() do %{ users: [%{ name: \"Alice\" }, %{ name: \"Bob\" }], \
      config: %{ timeout: 5000 }, metadata: .{:version, \"1.0.0\"} } end"
   in
   try
@@ -280,7 +277,7 @@ let test_complex_map_structures () =
 
 (* Test AST structure for map creation *)
 let test_map_ast_structure () =
-  let input = "pub fun test() do %{ name: \"Alice\", age: 25 } end" in
+  let input = "def test() do %{ name: \"Alice\", age: 25 } end" in
   try
     let program = parse_program_string input in
     match program.items with
@@ -295,9 +292,7 @@ let test_map_ast_structure () =
 
 (* Test AST structure for map pattern matching *)
 let test_map_pattern_ast_structure () =
-  let input =
-    "pub fun test() do %{ name: user_name } <- user_map; user_name end"
-  in
+  let input = "def test() do %{ name: user_name } <- user_map; user_name end" in
   try
     let program = parse_program_string input in
     match program.items with

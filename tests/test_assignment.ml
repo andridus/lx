@@ -14,7 +14,7 @@ let string_matches_pattern s pattern =
 
 let test_simple_assignment () =
   let source = {|
-pub fun test() do
+def test() do
   x = 42
   x
 end
@@ -35,16 +35,14 @@ end
   else Alcotest.fail ("Expected assignment pattern not found in: " ^ erlang_code)
 
 let test_multiple_assignments () =
-  let source =
-    {|
-pub fun test() do
+  let source = {|
+def test() do
   x = 42
   y = 43
   z = 44
   x + y + z
 end
-|}
-  in
+|} in
   let lexbuf = Lexing.from_string source in
   let ast = Compiler.Parser.main Compiler.Lexer.read lexbuf in
   let modules =
@@ -72,7 +70,7 @@ end
 
 let test_reassignment_error () =
   let source = {|
-pub fun test() do
+def test() do
   x = 42
   x = 100
 end

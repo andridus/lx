@@ -350,3 +350,87 @@ pub fun extract_data() {
 This implementation provides Lx developers with a powerful and type-safe error handling mechanism that compiles efficiently to Erlang while maintaining clean and readable source code.
 
 ---
+
+## Syntax Standardization and Test Suite Fixes
+
+### Overview
+Standardized the Lx language syntax to use consistent keywords and fixed the test suite to ensure all functionality works correctly with the current syntax.
+
+### Key Changes
+
+#### 1. Function Definition Keywords
+- **Standardized**: `def` for public functions, `defp` for private functions
+- **Removed**: `fun` keyword (was causing parser conflicts)
+- **Maintained**: `fn` for anonymous function expressions
+- **Consistency**: All function definitions now use the same pattern
+
+#### 2. Syntax Updates
+- **Function definitions**: `def name() do body end` and `defp name() do body end`
+- **Anonymous functions**: `fn(params) do body end`
+- **Multiple clauses**: `def name do (params) do body end end`
+- **OTP components**: `worker name do def init(_) do ... end end`
+
+#### 3. Test Suite Corrections
+- **Fixed**: Multiple functions parsing test to use `def`/`defp`
+- **Fixed**: Multiple arities compilation test to use `def`
+- **Fixed**: Multiple expressions example test to use `def`
+- **Validated**: All 225 tests now pass successfully
+
+### Usage Examples
+
+#### Function Definitions
+```lx
+# Public function
+def greet(name) do "Hello, " ++ name end
+
+# Private function
+defp internal_helper(x) do x * 2 end
+
+# Multiple clauses
+def factorial do
+  (0) do 1 end
+  (N) when N > 0 do N * factorial(N - 1) end
+end
+```
+
+#### Anonymous Functions
+```lx
+# Simple anonymous function
+add = fn(x, y) do x + y end
+
+# Multi-clause anonymous function
+process = fn do
+  (:ok) do "Success" end
+  (:error) do "Failed" end
+  (_) do "Unknown" end
+end
+```
+
+#### OTP Components
+```lx
+worker my_worker do
+  def init(_) do .{:ok, []} end
+  def handle_call(:get, _from, state) do .{:reply, state, state} end
+end
+
+supervisor top_sup do
+  strategy one_for_one
+  children [my_worker]
+end
+```
+
+### Benefits
+- **Consistency**: Uniform syntax across all function types
+- **Clarity**: Clear distinction between public and private functions
+- **Reliability**: All tests pass, ensuring language stability
+- **Maintainability**: Easier to understand and maintain code
+
+### Testing and Validation
+- **Complete test suite**: 225 tests all passing
+- **Parser validation**: All syntax constructs properly parsed
+- **Compiler validation**: All code generation working correctly
+- **Type checking**: Full type system integration maintained
+
+This standardization ensures that Lx has a consistent and reliable syntax that developers can depend on for building robust OTP applications.
+
+---

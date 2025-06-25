@@ -13,7 +13,7 @@ let string_contains_substring s sub =
 
 (* Test simple guard parsing *)
 let test_simple_guard_parsing () =
-  let input = "pub fun test(x) when x > 0 do x end" in
+  let input = "def test(x) when x > 0 do x end" in
   let program = Compiler.parse_string input in
   match program.items with
   | [ Function { clauses = [ { guard = Some _; _ } ]; _ } ] ->
@@ -22,7 +22,7 @@ let test_simple_guard_parsing () =
 
 (* Test guard compilation *)
 let test_guard_compilation () =
-  let input = "pub fun test(x) when x > 0 do x end" in
+  let input = "def test(x) when x > 0 do x end" in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string_for_tests program in
   let contains_when = string_contains_substring result " when " in
@@ -32,7 +32,7 @@ let test_guard_compilation () =
 
 (* Test guard with type test *)
 let test_guard_with_type_test () =
-  let input = "pub fun test(x) when is_atom(x) do x end" in
+  let input = "def test(x) when is_atom(x) do x end" in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string_for_tests program in
   let contains_is_atom = string_contains_substring result "is_atom" in
@@ -40,7 +40,7 @@ let test_guard_with_type_test () =
 
 (* Test guard with and operator *)
 let test_guard_with_and () =
-  let input = "pub fun test(x, y) when x > 0 and y < 10 do x + y end" in
+  let input = "def test(x, y) when x > 0 and y < 10 do x + y end" in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string_for_tests program in
   let contains_comma = string_contains_substring result ", " in
@@ -48,7 +48,7 @@ let test_guard_with_and () =
 
 (* Test guard with or operator *)
 let test_guard_with_or () =
-  let input = "pub fun test(x) when x > 0 or x < -10 do x end" in
+  let input = "def test(x) when x > 0 or x < -10 do x end" in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string_for_tests program in
   let contains_semicolon = string_contains_substring result "; " in
@@ -56,7 +56,7 @@ let test_guard_with_or () =
 
 (* Test guard with not operator *)
 let test_guard_with_not () =
-  let input = "pub fun test(x) when not is_atom(x) do x end" in
+  let input = "def test(x) when not is_atom(x) do x end" in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string_for_tests program in
   let contains_not = string_contains_substring result "not " in
@@ -65,7 +65,7 @@ let test_guard_with_not () =
 (* Test case guard *)
 let test_case_guard () =
   let input =
-    "pub fun test(x) do case x do n when n > 0 -> :positive _ -> :other end end"
+    "def test(x) do case x do n when n > 0 -> :positive _ -> :other end end"
   in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string_for_tests program in
@@ -74,7 +74,7 @@ let test_case_guard () =
 
 (* Test operator conversion *)
 let test_operator_conversion () =
-  let input = "pub fun test(x) when x != 5 and x <= 10 do x end" in
+  let input = "def test(x) when x != 5 and x <= 10 do x end" in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string_for_tests program in
   let contains_not_equal = string_contains_substring result "/=" in
@@ -83,14 +83,14 @@ let test_operator_conversion () =
   check bool "converts <= to =<" true contains_less_equal
 
 let test_guard_andalso () =
-  let input = "pub fun test(x, y) when x > 0 andalso y < 100 do :valid end" in
+  let input = "def test(x, y) when x > 0 andalso y < 100 do :valid end" in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string_for_tests program in
   let contains_andalso = string_contains_substring result "andalso" in
   check bool "guard with andalso" true contains_andalso
 
 let test_guard_orelse () =
-  let input = "pub fun test(x, y) when x > 100 orelse y < 0 do :valid end" in
+  let input = "def test(x, y) when x > 100 orelse y < 0 do :valid end" in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string_for_tests program in
   let contains_orelse = string_contains_substring result "orelse" in
@@ -98,7 +98,7 @@ let test_guard_orelse () =
 
 let test_guard_mixed_operators () =
   let input =
-    "pub fun test(x, y, z) when x > 0 and (y < 10 orelse z > 100) do :valid end"
+    "def test(x, y, z) when x > 0 and (y < 10 orelse z > 100) do :valid end"
   in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string_for_tests program in

@@ -16,9 +16,9 @@ let string_contains_substring s sub =
 let test_tuple_expressions () =
   let test_cases =
     [
-      ("pub fun num() do (42, \"hello\") end", [ "{42, \"hello\"}" ]);
-      ("pub fun num() do (1, 2, 3) end", [ "{1, 2, 3}" ]);
-      ("pub fun num() do () end", [ "{}" ]);
+      ("def num() do (42, \"hello\") end", [ "{42, \"hello\"}" ]);
+      ("def num() do (1, 2, 3) end", [ "{1, 2, 3}" ]);
+      ("def num() do () end", [ "{}" ]);
     ]
   in
 
@@ -39,9 +39,9 @@ let test_tuple_expressions () =
 let test_list_expressions () =
   let test_cases =
     [
-      ("pub fun num() do [1, 2, 3] end", [ "[1, 2, 3]" ]);
-      ("pub fun str() do [\"a\", \"b\"] end", [ "[\"a\", \"b\"]" ]);
-      ("pub fun num() do [] end", [ "[]" ]);
+      ("def num() do [1, 2, 3] end", [ "[1, 2, 3]" ]);
+      ("def str() do [\"a\", \"b\"] end", [ "[\"a\", \"b\"]" ]);
+      ("def num() do [] end", [ "[]" ]);
     ]
   in
 
@@ -62,9 +62,9 @@ let test_list_expressions () =
 let test_if_expressions () =
   let test_cases =
     [
-      ( "pub fun boolean() do if true do 42 else 0 end end",
+      ( "def boolean() do if true do 42 else 0 end end",
         [ "case true of true -> 42; _ -> 0" ] );
-      ( "pub fun boolean() do if false do \"no\" else \"yes\" end end",
+      ( "def boolean() do if false do \"no\" else \"yes\" end end",
         [ "case false of true -> \"no\"; _ -> \"yes\"" ] );
     ]
   in
@@ -87,11 +87,11 @@ let test_if_expressions () =
 let test_case_expressions () =
   let test_cases =
     [
-      ( "pub fun num() do case 42 do 42 -> \"found\" end end",
+      ( "def num() do case 42 do 42 -> \"found\" end end",
         [ "case 42 of 42 -> \"found\"" ] );
-      ( "pub fun str(x) do case x do _ -> \"default\" end end",
+      ( "def str(x) do case x do _ -> \"default\" end end",
         [ "case X_[a-z0-9]+ of _ -> \"default\"" ] );
-      ( "pub fun atom(a) do case a do :hello -> \"hi\" end end",
+      ( "def atom(a) do case a do :hello -> \"hi\" end end",
         [ "case A_[a-z0-9]+ of hello -> \"hi\"" ] );
     ]
   in
@@ -121,7 +121,7 @@ let test_case_expressions () =
 let test_pattern_types () =
   let program =
     Compiler.parse_string
-      "pub fun num() do\n\
+      "def num() do\n\
       \  case x do\n\
       \    _ -> 1\n\
       \    y -> 2\n\
@@ -165,7 +165,7 @@ let test_test_blocks () =
 let test_mixed_module_items () =
   let input =
     "\n\
-    \    pub fun hello() do \"world\" end\n\
+    \    def hello() do \"world\" end\n\
     \    spec hello do end\n\
     \    describe \"Tests\" do test \"hello test\" do hello() end end\n\
     \  "
@@ -179,12 +179,12 @@ let test_mixed_module_items () =
 let test_all_literal_types () =
   let test_cases =
     [
-      ("pub fun num() do 42 end", LInt 42);
-      ("pub fun num() do 3.14 end", LFloat 3.14);
-      ("pub fun str() do \"hello\" end", LString "hello");
-      ("pub fun bool() do true end", LBool true);
-      ("pub fun bool() do false end", LBool false);
-      ("pub fun atom() do :atom end", LAtom "atom");
+      ("def num() do 42 end", LInt 42);
+      ("def num() do 3.14 end", LFloat 3.14);
+      ("def str() do \"hello\" end", LString "hello");
+      ("def bool() do true end", LBool true);
+      ("def bool() do false end", LBool false);
+      ("def atom() do :atom end", LAtom "atom");
     ]
   in
 

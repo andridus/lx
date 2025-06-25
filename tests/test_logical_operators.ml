@@ -15,9 +15,9 @@ let string_contains_substring s sub =
 let test_strict_logical_operators () =
   let test_cases =
     [
-      ("pub fun test(a, b) do a and b end", [ "and" ]);
-      ("pub fun test(a, b) do a or b end", [ "or" ]);
-      ("pub fun test(a) do not a end", [ "not" ]);
+      ("def test(a, b) do a and b end", [ "and" ]);
+      ("def test(a, b) do a or b end", [ "or" ]);
+      ("def test(a) do not a end", [ "not" ]);
     ]
   in
 
@@ -38,8 +38,8 @@ let test_strict_logical_operators () =
 let test_short_circuit_operators () =
   let test_cases =
     [
-      ("pub fun test(a, b) do a andalso b end", [ "andalso" ]);
-      ("pub fun test(a, b) do a orelse b end", [ "orelse" ]);
+      ("def test(a, b) do a andalso b end", [ "andalso" ]);
+      ("def test(a, b) do a orelse b end", [ "orelse" ]);
     ]
   in
 
@@ -58,7 +58,7 @@ let test_short_circuit_operators () =
 
 (* Test operator precedence *)
 let test_logical_precedence () =
-  let input = "pub fun test(a, b, c) do a orelse b andalso c end" in
+  let input = "def test(a, b, c) do a orelse b andalso c end" in
   let program = Compiler.parse_string input in
   match program.items with
   | [
@@ -75,11 +75,10 @@ let test_logical_precedence () =
 let test_complex_logical_expressions () =
   let test_cases =
     [
-      ("pub fun test(a, b, c) do a and b or c end", [ "and"; "or" ]);
-      ( "pub fun test(a, b, c) do a andalso b orelse c end",
-        [ "andalso"; "orelse" ] );
-      ("pub fun test(a, b) do not (a and b) end", [ "not"; "and" ]);
-      ("pub fun test(a, b, c, d) do (a or b) and (c or d) end", [ "or"; "and" ]);
+      ("def test(a, b, c) do a and b or c end", [ "and"; "or" ]);
+      ("def test(a, b, c) do a andalso b orelse c end", [ "andalso"; "orelse" ]);
+      ("def test(a, b) do not (a and b) end", [ "not"; "and" ]);
+      ("def test(a, b, c, d) do (a or b) and (c or d) end", [ "or"; "and" ]);
     ]
   in
 
@@ -100,10 +99,10 @@ let test_complex_logical_expressions () =
 let test_logical_with_comparisons () =
   let test_cases =
     [
-      ("pub fun test(x, y) do x > 0 and y < 10 end", [ ">"; "and"; "<" ]);
-      ("pub fun test(x, y) do x == 0 or y != 5 end", [ "=="; "or"; "/=" ]);
-      ("pub fun test(x) do not (x >= 100) end", [ "not"; ">=" ]);
-      ("pub fun test(x, y) do x > 0 andalso y < 10 end", [ ">"; "andalso"; "<" ]);
+      ("def test(x, y) do x > 0 and y < 10 end", [ ">"; "and"; "<" ]);
+      ("def test(x, y) do x == 0 or y != 5 end", [ "=="; "or"; "/=" ]);
+      ("def test(x) do not (x >= 100) end", [ "not"; ">=" ]);
+      ("def test(x, y) do x > 0 andalso y < 10 end", [ ">"; "andalso"; "<" ]);
     ]
   in
 
@@ -123,7 +122,7 @@ let test_logical_with_comparisons () =
 (* Test logical operators in if expressions *)
 let test_logical_in_if () =
   let input =
-    "pub fun test(x, y) do if x > 0 and y < 10 do :valid else :invalid end end"
+    "def test(x, y) do if x > 0 and y < 10 do :valid else :invalid end end"
   in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string_for_tests program in
@@ -136,12 +135,10 @@ let test_logical_in_if () =
 let test_logical_in_guards () =
   let test_cases =
     [
-      ( "pub fun test(x, y) when x > 0 and y < 10 do :valid end",
-        [ " when "; ", " ] );
-      ( "pub fun test(x, y) when x == 0 or y != 5 do :special end",
+      ("def test(x, y) when x > 0 and y < 10 do :valid end", [ " when "; ", " ]);
+      ( "def test(x, y) when x == 0 or y != 5 do :special end",
         [ " when "; "; " ] );
-      ( "pub fun test(x) when not is_atom(x) do :not_atom end",
-        [ " when "; "not" ] );
+      ("def test(x) when not is_atom(x) do :not_atom end", [ " when "; "not" ]);
     ]
   in
 
@@ -160,7 +157,7 @@ let test_logical_in_guards () =
 
 (* Test AST structure for logical operators *)
 let test_logical_ast () =
-  let program = Compiler.parse_string "pub fun test(a, b) do a and b end" in
+  let program = Compiler.parse_string "def test(a, b) do a and b end" in
   match program.items with
   | [
    Function { clauses = [ { body = BinOp (Var "a", "and", Var "b"); _ } ]; _ };
@@ -169,7 +166,7 @@ let test_logical_ast () =
   | _ -> Alcotest.fail "Expected BinOp with 'and' operator"
 
 let test_unary_ast () =
-  let program = Compiler.parse_string "pub fun test(a) do not a end" in
+  let program = Compiler.parse_string "def test(a) do not a end" in
   match program.items with
   | [ Function { clauses = [ { body = UnaryOp ("not", Var "a"); _ } ]; _ } ] ->
       check bool "not operator parsed correctly" true true

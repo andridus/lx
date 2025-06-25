@@ -30,7 +30,7 @@ let compile_lx_code code =
 let test_individual_match_rescue_parsing () =
   let code =
     {|
-pub fun test() do
+def test() do
   match .{:ok, 1} <- get_value() rescue :error end
   :continue
 end
@@ -72,7 +72,7 @@ end
 let test_block_match_rescue_parsing () =
   let code =
     {|
-pub fun test() do
+def test() do
   match .{:ok, 1} <- get_value() rescue :error1 end
   match .{:ok, 2} <- get_value2() rescue :error2 end
   :success
@@ -114,8 +114,8 @@ end
 let test_individual_match_rescue_codegen () =
   let code =
     {|
-pub fun c() do .{:ok, 1} end
-pub fun test() do
+def c() do .{:ok, 1} end
+def test() do
   match .{:ok, 1} <- c() rescue 1 end
   :done
 end
@@ -137,9 +137,9 @@ end
 let test_block_match_rescue_codegen () =
   let code =
     {|
-pub fun c() do .{:ok, 1} end
-pub fun e() do .{:ok, 2} end
-pub fun test() do
+def c() do .{:ok, 1} end
+def e() do .{:ok, 2} end
+def test() do
   match .{:ok, 1} <- c() rescue 1 end
   match .{:ok, 2} <- e() rescue 2 end
   :success
@@ -164,9 +164,9 @@ end
 let test_complex_match_rescue_sequence () =
   let code =
     {|
-pub fun get_user() do .{:ok, "alice"} end
-pub fun get_perms() do .{:ok, [:read, :write]} end
-pub fun process() do
+def get_user() do .{:ok, "alice"} end
+def get_perms() do .{:ok, [:read, :write]} end
+def process() do
   match .{:ok, user} <- get_user() rescue :user_error end
   :log_user
   :validate_user
@@ -196,7 +196,7 @@ end
 let test_match_rescue_patterns () =
   let code =
     {|
-pub fun test_patterns() do
+def test_patterns() do
   match [head | tail] <- get_list() rescue [] end
   match %{name: user_name} <- get_user() rescue %{name: "unknown"} end
   :done
@@ -226,13 +226,11 @@ end
 (* Test match rescue error handling *)
 let test_match_rescue_error_cases () =
   (* Test missing rescue clause *)
-  let invalid_code =
-    {|
-pub fun test() do
+  let invalid_code = {|
+def test() do
   match .{:ok, 1} <- get_value()
 end
-|}
-  in
+|} in
   (match parse_lx_code invalid_code with
   | Ok _ -> fail "Should fail without rescue clause"
   | Error _ -> check bool "Correctly failed without rescue clause" true true);
@@ -240,7 +238,7 @@ end
   (* Test invalid pattern *)
   let invalid_pattern =
     {|
-pub fun test() do
+def test() do
   match 123 <- get_value() rescue :error end
 end
 |}
@@ -253,7 +251,7 @@ end
 let test_match_rescue_no_guards () =
   let code =
     {|
-pub fun test() do
+def test() do
   match .{:ok, x} <- get_value() rescue :error end
   :done
 end
@@ -267,7 +265,7 @@ end
 let test_nested_match_rescue () =
   let code =
     {|
-pub fun test_nested() do
+def test_nested() do
   match .{:ok, _value1} <- erlang.system_time() rescue :error1 end
   match .{:ok, _value2} <- erlang.system_time() rescue :error2 end
   :success
@@ -286,7 +284,7 @@ end
 let test_match_rescue_return_values () =
   let code =
     {|
-pub fun test_returns() do
+def test_returns() do
   x = match .{:ok, _value} <- erlang.system_time() rescue 0 end
   y = match .{:error, _} <- erlang.system_time() rescue 1 end
   x + y

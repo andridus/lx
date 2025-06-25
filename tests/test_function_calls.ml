@@ -32,7 +32,7 @@ let debug_print_program program =
 
 let test_function_call_parsing () =
   let program =
-    Compiler.parse_string "pub fun validation() do io.format(\"hello\") end"
+    Compiler.parse_string "def validation() do io.format(\"hello\") end"
   in
   match program.items with
   | [
@@ -56,7 +56,7 @@ let test_function_call_parsing () =
 
 let test_external_function_call_parsing () =
   let program =
-    Compiler.parse_string "pub fun validation() do io.format(\"hello\") end"
+    Compiler.parse_string "def validation() do io.format(\"hello\") end"
   in
   match program.items with
   | [
@@ -79,7 +79,7 @@ let test_external_function_call_parsing () =
 let test_sequence_parsing () =
   let program =
     Compiler.parse_string
-      "pub fun validation() do io.format(\"hello\"); io.format(\"world\") end"
+      "def validation() do io.format(\"hello\"); io.format(\"world\") end"
   in
   match program.items with
   | [
@@ -107,7 +107,7 @@ let test_sequence_parsing () =
 
 let test_external_function_call_compilation () =
   let program =
-    Compiler.parse_string "pub fun validation() do io.format(\"hello\") end"
+    Compiler.parse_string "def validation() do io.format(\"hello\") end"
   in
   let result = Compiler.compile_to_string_for_tests program in
   let expected_parts = [ "validation() ->"; "io:format(\"hello\")" ] in
@@ -120,7 +120,7 @@ let test_external_function_call_compilation () =
 let test_multiple_arities_compilation () =
   let input =
     {|
-    fun a do
+    def a do
       () do nil end
       (x) do x end
       (x, y) do x + y end
@@ -150,7 +150,7 @@ let test_multiple_arities_compilation () =
 
 let test_function_call_compilation () =
   let program =
-    Compiler.parse_string "pub fun validation() do io.format(\"hello\") end"
+    Compiler.parse_string "def validation() do io.format(\"hello\") end"
   in
   let result = Compiler.compile_to_string_for_tests program in
   let expected_parts = [ "validation() ->"; "io:format(\"hello\")" ] in
@@ -163,7 +163,7 @@ let test_function_call_compilation () =
 let test_sequence_compilation () =
   let program =
     Compiler.parse_string
-      "pub fun validation() do io.format(\"hello\"); io.format(\"world\") end"
+      "def validation() do io.format(\"hello\"); io.format(\"world\") end"
   in
   let result = Compiler.compile_to_string_for_tests program in
   let expected_parts =
@@ -177,8 +177,7 @@ let test_sequence_compilation () =
 
 let test_function_with_args () =
   let program =
-    Compiler.parse_string
-      "pub fun validation(x) do io.format(\"hello\", [x]) end"
+    Compiler.parse_string "def validation(x) do io.format(\"hello\", [x]) end"
   in
   let result = Compiler.compile_to_string_for_tests program in
   let expected_parts =
@@ -196,7 +195,7 @@ let test_function_with_args () =
 let test_multiple_expressions_example () =
   let input =
     {|
-    fun b(x) do
+    def b(x) do
       io.format("olá mundo");
       io.format("olá mundo com args", [x])
     end
@@ -222,7 +221,7 @@ let test_multiple_expressions_example () =
 
 let test_backward_compatibility () =
   (* Test that old syntax still works *)
-  let program = Compiler.parse_string "pub fun old_style(x, y) do x + y end" in
+  let program = Compiler.parse_string "def old_style(x, y) do x + y end" in
   let result = Compiler.compile_to_string_for_tests program in
   let expected_parts =
     [
