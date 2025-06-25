@@ -681,10 +681,59 @@ let rec lint_expr ctx errors expr =
           let unused_errors = check_unused_variables case_ctx in
           acc @ unused_errors)
         errors cases
-  | If (cond, then_expr, else_expr) -> (
+  | If (cond, then_expr, else_branch) -> (
       let errors = lint_expr ctx errors cond in
       let errors = lint_expr ctx errors then_expr in
-      match else_expr with Some e -> lint_expr ctx errors e | None -> errors)
+      match else_branch with
+      | Some (SimpleElse e) -> lint_expr ctx errors e
+      | Some (ClauseElse clauses) ->
+          List.fold_left
+            (fun acc (pattern, guard_opt, clause_expr) ->
+              let clause_ctx = create_context (Some ctx) in
+              let acc = lint_pattern clause_ctx acc pattern in
+              let acc =
+                match guard_opt with
+                | Some guard -> lint_guard_expr clause_ctx acc guard
+                | None -> acc
+              in
+              let acc = lint_expr clause_ctx acc clause_expr in
+              (* Check for unused variables in this clause *)
+              let unused_errors = check_unused_variables clause_ctx in
+              acc @ unused_errors)
+            errors clauses
+      | None -> errors)
+  | With (steps, success_body, else_branch) -> (
+      (* Lint with expression steps *)
+      let errors, final_ctx =
+        List.fold_left
+          (fun (acc_errors, acc_ctx) (pattern, expr) ->
+            let step_errors = lint_expr acc_ctx acc_errors expr in
+            let step_ctx = create_context (Some acc_ctx) in
+            let pattern_errors = lint_pattern step_ctx step_errors pattern in
+            (pattern_errors, step_ctx))
+          (errors, ctx) steps
+      in
+      (* Lint success body with accumulated context *)
+      let errors = lint_expr final_ctx errors success_body in
+      (* Lint else branch *)
+      match else_branch with
+      | Some (SimpleElse e) -> lint_expr ctx errors e
+      | Some (ClauseElse clauses) ->
+          List.fold_left
+            (fun acc (pattern, guard_opt, clause_expr) ->
+              let clause_ctx = create_context (Some ctx) in
+              let acc = lint_pattern clause_ctx acc pattern in
+              let acc =
+                match guard_opt with
+                | Some guard -> lint_guard_expr clause_ctx acc guard
+                | None -> acc
+              in
+              let acc = lint_expr clause_ctx acc clause_expr in
+              (* Check for unused variables in this clause *)
+              let unused_errors = check_unused_variables clause_ctx in
+              acc @ unused_errors)
+            errors clauses
+      | None -> errors)
   | For (var, iter_expr, body_expr) ->
       let errors = lint_expr ctx errors iter_expr in
       let loop_ctx = create_context (Some ctx) in

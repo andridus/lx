@@ -145,9 +145,21 @@ let string_of_otp_error = function
 (* Check if an expression returns a tuple *)
 let rec returns_tuple = function
   | Tuple _ -> true
-  | If (_, then_expr, Some else_expr) ->
+  | If (_, then_expr, Some (SimpleElse else_expr)) ->
       returns_tuple then_expr && returns_tuple else_expr
+  | If (_, then_expr, Some (ClauseElse clauses)) ->
+      returns_tuple then_expr
+      && List.for_all (fun (_, _, expr) -> returns_tuple expr) clauses
   | If (_, then_expr, None) -> returns_tuple then_expr
+  | With (_, success_body, else_branch) -> (
+      let success_returns_tuple = returns_tuple success_body in
+      match else_branch with
+      | Some (SimpleElse else_expr) ->
+          success_returns_tuple && returns_tuple else_expr
+      | Some (ClauseElse clauses) ->
+          success_returns_tuple
+          && List.for_all (fun (_, _, expr) -> returns_tuple expr) clauses
+      | None -> success_returns_tuple)
   | Match (_, cases) ->
       List.for_all (fun (_, _, expr) -> returns_tuple expr) cases
   | Receive (clauses, timeout_opt) ->

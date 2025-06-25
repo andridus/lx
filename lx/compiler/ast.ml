@@ -80,7 +80,11 @@ and expr =
   | Tuple of expr list
   | List of expr list
   | Match of expr * (pattern * guard_expr option * expr) list
-  | If of expr * expr * expr option
+  | If of expr * expr * else_branch option
+  | With of
+      (pattern * expr) list
+      * expr
+      * else_branch option (* steps, success_body, else_branch *)
   | For of ident * expr * expr
   | Sequence of expr list (* Function body sequences *)
   | Block of expr list (* Explicit block expressions {} *)
@@ -100,6 +104,10 @@ and expr =
   (* Fun expression types *)
   | FunExpression of string list * expr (* Simple fun with parameter names *)
   | FunExpressionClauses of fun_clause list (* Multi-clause fun *)
+
+and else_branch =
+  | SimpleElse of expr
+  | ClauseElse of (pattern * guard_expr option * expr) list
 
 (* Pattern matching *)
 and pattern =

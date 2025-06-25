@@ -27,4 +27,5 @@ let () =
       ("Record Update Tests", Test_record_update.tests);
       ("Maps Tests", Test_maps.tests);
       ("Pattern Matching Tests", Test_pattern_matching.tests);
+      ("Control Flow Enhanced Tests", Test_control_flow_enhanced.tests);
     ]

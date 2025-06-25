@@ -144,7 +144,7 @@ let test_compile_if_then () =
 (* Test for if-else compilation *)
 let test_compile_if_then_else () =
   let if_expr =
-    If (Literal (LBool true), Literal (LInt 42), Some (Literal (LInt 0)))
+    If (Literal (LBool true), Literal (LInt 42), Some (SimpleElse (Literal (LInt 0))))
   in
   let func = make_single_clause_function "test_if_else" [] if_expr in
   let program = { deps = None; items = [ Function func ] } in
@@ -212,7 +212,7 @@ let test_compile_comparison_operators () =
 let test_compile_if_with_comparison () =
   let condition = BinOp (Var "x", "==", Literal (LInt 1)) in
   let if_expr =
-    If (condition, Literal (LAtom "ok"), Some (Literal (LAtom "error")))
+    If (condition, Literal (LAtom "ok"), Some (SimpleElse (Literal (LAtom "error"))))
   in
   let func = make_single_clause_function "test" [ "x" ] if_expr in
   let program = { deps = None; items = [ Function func ] } in

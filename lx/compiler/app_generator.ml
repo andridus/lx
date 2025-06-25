@@ -230,12 +230,54 @@ and emit_expr ctx (e : expr) : string =
       "{" ^ String.concat ", " (List.map (emit_expr ctx) exprs) ^ "}"
   | List exprs ->
       "[" ^ String.concat ", " (List.map (emit_expr ctx) exprs) ^ "]"
-  | If (cond, then_expr, else_expr) ->
+  | If (cond, then_expr, else_branch) ->
       "case " ^ emit_expr ctx cond ^ " of true -> " ^ emit_expr ctx then_expr
-      ^ (match else_expr with
-        | Some e -> "; _ -> " ^ emit_expr ctx e
+      ^ (match else_branch with
+        | Some (SimpleElse e) -> "; _ -> " ^ emit_expr ctx e
+        | Some (ClauseElse clauses) ->
+            "; _ -> case true of "
+            ^ String.concat "; "
+                (List.map
+                   (fun (p, guard_opt, e) ->
+                     let guard_str =
+                       match guard_opt with
+                       | Some guard -> " when " ^ emit_guard_expr ctx guard
+                       | None -> ""
+                     in
+                     emit_pattern ctx p ^ guard_str ^ " -> " ^ emit_expr ctx e)
+                   clauses)
+            ^ " end"
         | None -> "; _ -> nil")
       ^ " end"
+  | With (steps, success_body, else_branch) ->
+      (* Generate nested case expressions for with steps *)
+      let rec emit_with_steps remaining_steps =
+        match remaining_steps with
+        | [] -> emit_expr ctx success_body
+        | (pattern, expr) :: rest ->
+            "case " ^ emit_expr ctx expr ^ " of " ^ emit_pattern ctx pattern
+            ^ " -> " ^ emit_with_steps rest ^ "; _ -> "
+            ^ (match else_branch with
+              | Some (SimpleElse e) -> emit_expr ctx e
+              | Some (ClauseElse clauses) ->
+                  "case true of "
+                  ^ String.concat "; "
+                      (List.map
+                         (fun (p, guard_opt, e) ->
+                           let guard_str =
+                             match guard_opt with
+                             | Some guard ->
+                                 " when " ^ emit_guard_expr ctx guard
+                             | None -> ""
+                           in
+                           emit_pattern ctx p ^ guard_str ^ " -> "
+                           ^ emit_expr ctx e)
+                         clauses)
+                  ^ " end"
+              | None -> "nil")
+            ^ " end"
+      in
+      emit_with_steps steps
   | Match (value, cases) ->
       "case " ^ emit_expr ctx value ^ " of "
       ^ String.concat "; "

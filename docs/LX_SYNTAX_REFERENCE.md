@@ -34,7 +34,7 @@ Lx is a statically scoped, expression-based functional language designed for bui
 
 These reserved words define control flow, type contracts, concurrency, and OTP structure. They cannot be redefined.
 
-- **Core**: `fun`, `pub`, `case`, `if`, `else`, `for`, `when`, `receive`, `after`, `true`, `false`, `nil`, `unsafe`
+- **Core**: `fun`, `pub`, `case`, `if`, `else`, `with`, `for`, `when`, `receive`, `after`, `true`, `false`, `nil`, `unsafe`
 - **Data**: `record` — structured data type definitions
 - **OTP**: `worker`, `supervisor`, `strategy`, `children`, `one_for_one`, `one_for_all`, `rest_for_one`
 - **Specification**: `spec`, `requires`, `ensures`, `matches`
@@ -48,6 +48,7 @@ Syntax symbols used for operations, declarations, and structure:
 
 - **Assignment**: `=` — bind a value to a variable once
 - **Pattern matching**: `<-` — explicit pattern matching operator (recommended for maps)
+- **With expression binding**: `<=` — bind patterns in with expressions for monadic-style error handling
 - **Unsafe pattern matching**: `unsafe` — bypass all type checking and validation
 - **Pattern branching**: `->` — used in `case` and `receive`
 - **Message send**: `!` — send messages between processes
@@ -376,6 +377,65 @@ if flag {
 } else {
   do_b()
 }
+```
+
+#### `if` with `case` (pattern matching):
+
+```lx
+if condition {
+  success_value
+} case {
+  pattern1 -> handle_pattern1()
+  pattern2 when guard -> handle_pattern2()
+  _ -> default_case()
+}
+```
+
+#### `with` expressions (monadic-style error handling):
+
+The `with` expression provides elegant error handling and pattern matching for sequential operations that may fail.
+
+##### `with`/`else`:
+
+```lx
+with .{:ok, user} <= get_user(id) {
+  user.name
+} else {
+  "Unknown user"
+}
+```
+
+##### `with`/`case` (pattern matching):
+
+```lx
+with .{:ok, user} <= get_user(id) {
+  user.name
+} case {
+  .{:error, :not_found} -> "User not found"
+  .{:error, reason} when reason == :timeout -> "Request timeout"
+  .{:error, _} -> "Unknown error"
+  _ -> "Unexpected result"
+}
+```
+
+##### Multiple `with` steps:
+
+```lx
+with .{:ok, user} <= get_user(id),
+     .{:ok, role} <= get_role(user) {
+  .{user.name, role}
+} else {
+  .{:error, "Failed to get user or role"}
+}
+```
+
+##### `with` without else/case (returns optional):
+
+```lx
+with .{:ok, user} <= get_user(id) {
+  user.name
+}
+# Returns the value on success, or nil on failure
 ```
 
 #### `case`:

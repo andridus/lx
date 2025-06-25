@@ -1444,7 +1444,7 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
           (subst1, env) cases
       in
       (apply_subst final_subst result_type, final_subst)
-  | If (cond, then_expr, else_expr) -> (
+  | If (cond, then_expr, else_branch) -> (
       let cond_type, subst1 = infer_expr env cond in
       let bool_unify = unify cond_type TBool in
       let combined_subst1 = compose_subst subst1 bool_unify in
@@ -1452,8 +1452,8 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
         infer_expr (apply_subst_env combined_subst1 env) then_expr
       in
       let combined_subst2 = compose_subst combined_subst1 subst2 in
-      match else_expr with
-      | Some else_expr ->
+      match else_branch with
+      | Some (SimpleElse else_expr) ->
           let else_type, subst3 =
             infer_expr (apply_subst_env combined_subst2 env) else_expr
           in
@@ -1462,9 +1462,135 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
             compose_subst (compose_subst combined_subst2 subst3) else_unify
           in
           (apply_subst final_subst then_type, final_subst)
+      | Some (ClauseElse clauses) ->
+          (* Type check clauses like a match expression *)
+          let result_type = fresh_type_var () in
+          let final_subst, _ =
+            List.fold_left
+              (fun (subst_acc, env_acc) (pattern, guard, body) ->
+                let _pattern_type, pattern_env, pattern_subst =
+                  infer_pattern env_acc pattern
+                in
+                let guard_subst =
+                  match guard with
+                  | Some guard_expr -> infer_guard_expr pattern_env guard_expr
+                  | None -> []
+                in
+                let combined_pattern_subst =
+                  compose_subst pattern_subst guard_subst
+                in
+                let body_type, body_subst =
+                  infer_expr
+                    (apply_subst_env combined_pattern_subst pattern_env)
+                    body
+                in
+                let case_subst =
+                  compose_subst combined_pattern_subst body_subst
+                in
+                let result_unify =
+                  unify (apply_subst case_subst result_type) body_type
+                in
+                let unify_subst2 = compose_subst case_subst result_unify in
+                let final_subst = compose_subst subst_acc unify_subst2 in
+                (final_subst, apply_subst_env final_subst env_acc))
+              (combined_subst2, env) clauses
+          in
+          let else_unify =
+            unify
+              (apply_subst final_subst then_type)
+              (apply_subst final_subst result_type)
+          in
+          let complete_subst = compose_subst final_subst else_unify in
+          (apply_subst complete_subst then_type, complete_subst)
       | None ->
           (* If without else returns optional type: T | nil *)
           (TOption (apply_subst combined_subst2 then_type), combined_subst2))
+  | With (steps, success_body, else_branch) -> (
+      (* Type check with expression steps *)
+      let final_subst, final_env =
+        List.fold_left
+          (fun (subst_acc, env_acc) (pattern, expr) ->
+            let expr_type, expr_subst =
+              infer_expr (apply_subst_env subst_acc env_acc) expr
+            in
+            let pattern_type, pattern_env, pattern_subst =
+              infer_pattern env_acc pattern
+            in
+            let step_subst = compose_subst expr_subst pattern_subst in
+            let unify_subst =
+              unify
+                (apply_subst step_subst pattern_type)
+                (apply_subst step_subst expr_type)
+            in
+            let combined_subst =
+              compose_subst (compose_subst subst_acc step_subst) unify_subst
+            in
+            ( combined_subst,
+              pattern_env @ apply_subst_env combined_subst env_acc ))
+          ([], env) steps
+      in
+
+      (* Type check success body with accumulated environment *)
+      let success_type, success_subst =
+        infer_expr (apply_subst_env final_subst final_env) success_body
+      in
+      let combined_subst = compose_subst final_subst success_subst in
+
+      match else_branch with
+      | Some (SimpleElse else_expr) ->
+          let else_type, else_subst =
+            infer_expr (apply_subst_env combined_subst env) else_expr
+          in
+          let else_unify =
+            unify (apply_subst else_subst success_type) else_type
+          in
+          let complete_subst =
+            compose_subst (compose_subst combined_subst else_subst) else_unify
+          in
+          (apply_subst complete_subst success_type, complete_subst)
+      | Some (ClauseElse clauses) ->
+          (* Type check clauses like a match expression *)
+          let result_type = fresh_type_var () in
+          let clause_subst, _ =
+            List.fold_left
+              (fun (subst_acc, env_acc) (pattern, guard, body) ->
+                let _pattern_type, pattern_env, pattern_subst =
+                  infer_pattern env_acc pattern
+                in
+                let guard_subst =
+                  match guard with
+                  | Some guard_expr -> infer_guard_expr pattern_env guard_expr
+                  | None -> []
+                in
+                let combined_pattern_subst =
+                  compose_subst pattern_subst guard_subst
+                in
+                let body_type, body_subst =
+                  infer_expr
+                    (apply_subst_env combined_pattern_subst pattern_env)
+                    body
+                in
+                let case_subst =
+                  compose_subst combined_pattern_subst body_subst
+                in
+                let result_unify =
+                  unify (apply_subst case_subst result_type) body_type
+                in
+                let unify_subst = compose_subst case_subst result_unify in
+                let final_subst = compose_subst subst_acc unify_subst in
+                (final_subst, apply_subst_env final_subst env_acc))
+              (combined_subst, env) clauses
+          in
+          let else_unify =
+            unify
+              (apply_subst clause_subst success_type)
+              (apply_subst clause_subst result_type)
+          in
+          let complete_subst = compose_subst clause_subst else_unify in
+          (apply_subst complete_subst success_type, complete_subst)
+      | None ->
+          (* With without else returns optional type: T | nil *)
+          (TOption (apply_subst combined_subst success_type), combined_subst))
   | For (_, _, _) ->
       (* For expressions need more complex handling - simplified for now *)
       (TNil, [])

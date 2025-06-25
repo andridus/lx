@@ -27,7 +27,8 @@
   test_tuple_detection
   test_record_update
   test_maps
-  test_pattern_matching))
+  test_pattern_matching
+  test_control_flow_enhanced))
 
 (rule
  (alias runtest)

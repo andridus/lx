@@ -60,7 +60,7 @@ let string_of_simple_tuple_element = function
 
 (* Keywords *)
 %token PUB FUN CASE IF ELSE FOR WHEN IN AND OR NOT ANDALSO ORELSE RECEIVE AFTER MATCH_KEYWORD
-%token RECORD UNSAFE
+  %token RECORD UNSAFE WITH
 
 (* Module System Keywords *)
 %token DEPS PROJECT VERSION APPS GITHUB PATH HEX
@@ -401,7 +401,15 @@ expr:
         | [e] -> e
         | es -> Block es
       in
-      If (cond, then_expr, Some else_expr) }
+      If (cond, then_expr, Some (SimpleElse else_expr)) }
+  | IF cond = expr LBRACE then_statements = statement_list RBRACE CASE LBRACE case_clauses = nonempty_list(case_branch) RBRACE
+    { let then_expr = match then_statements with
+        | [e] -> e
+        | es -> Block es
+      in
+      If (cond, then_expr, Some (ClauseElse case_clauses)) }
+
+
   | IF cond = expr LBRACE then_statements = statement_list RBRACE
     { let then_expr = match then_statements with
         | [e] -> e
@@ -416,6 +424,16 @@ expr:
     { failwith "Enhanced:Missing condition after 'if' keyword|Suggestion:Add a boolean expression after 'if'|Context:if statement" }
   | CASE value = expr LBRACE cases = nonempty_list(case_branch) RBRACE
     { Match (value, cases) }
+  | WITH steps = with_steps LBRACE success_body = expr RBRACE
+    { With (steps, success_body, None) }
+  | WITH steps = with_steps LBRACE success_body = expr RBRACE ELSE LBRACE else_statements = statement_list RBRACE
+    { let else_expr = match else_statements with
+        | [e] -> e
+        | es -> Block es
+      in
+      With (steps, success_body, Some (SimpleElse else_expr)) }
+  | WITH steps = with_steps LBRACE success_body = expr RBRACE CASE LBRACE case_clauses = nonempty_list(case_branch) RBRACE
+    { With (steps, success_body, Some (ClauseElse case_clauses)) }
   | FOR var = IDENT IN iterable = expr LBRACE body = expr RBRACE
     { For (var, iterable, body) }
   | RECEIVE LBRACE clauses = nonempty_list(receive_clause) RBRACE
@@ -510,6 +528,10 @@ fun_expression_clause:
     { (params, Some guard, body) }
   | LPAREN params = separated_list(COMMA, IDENT) RPAREN LBRACE body = expr RBRACE
     { (params, None, body) }
+
+
+
+
 
 pattern:
   | p = simple_pattern { p }
@@ -736,6 +758,16 @@ binary_pattern_element:
     { SizedBinaryPattern (pattern, size, Some spec) }
   | pattern = simple_pattern DIV spec = binary_spec
     { TypedBinaryPattern (pattern, spec) }
+
+with_steps:
+  | step = with_step
+    { [step] }
+  | step = with_step COMMA steps = with_steps
+    { step :: steps }
+
+with_step:
+  | pattern = pattern LEQ expr = expr
+    { (pattern, expr) }
 
 (* Binary specifications *)
 binary_spec:

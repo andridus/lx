@@ -145,7 +145,7 @@ let test_if_with_comparison () =
                If
                  ( BinOp (Var "x", "==", Literal (LInt 1)),
                    Literal (LAtom "ok"),
-                   Some (Literal (LAtom "error")) );
+                   Some (SimpleElse (Literal (LAtom "error"))) );
              position = _;
              guard = _;
            };
@@ -209,6 +209,248 @@ let test_comparison_precedence () =
       ()
   | _ -> fail "Expected correct precedence: arithmetic before comparison"
 
+(* Test parsing of if with case *)
+let test_if_with_case () =
+  let result =
+    Compiler.parse_string {|
+      pub fun test(x) {
+        if x == 1 {
+          "one"
+        } case {
+          2 -> "two"
+          _ -> "other"
+        }
+      }
+    |}
+  in
+  match result.items with
+  | [
+   Function
+     {
+       name = "test";
+       clauses =
+         [
+           {
+             params = [ PVar "x" ];
+             body =
+               If
+                 ( BinOp (Var "x", "==", Literal (LInt 1)),
+                   Literal (LString "one"),
+                   Some (ClauseElse clauses) );
+             position = _;
+             guard = _;
+           };
+         ];
+       visibility = Public;
+       position = _;
+     };
+  ] ->
+      check int "case clauses count" 2 (List.length clauses)
+  | _ -> fail "Expected if-case expression"
+
+(* Test parsing of with with else *)
+let test_with_with_else () =
+  let result =
+    Compiler.parse_string "pub fun test() { with .{:ok, value} <= get_result() { value } else { \"failed\" } }"
+  in
+  match result.items with
+  | [
+   Function
+     {
+       name = "test";
+       clauses =
+         [
+           {
+             params = [];
+             body =
+               With
+                 ( steps,
+                   Var "value",
+                   Some (SimpleElse (Literal (LString "failed"))) );
+             position = _;
+             guard = _;
+           };
+         ];
+       visibility = Public;
+       position = _;
+     };
+  ] ->
+      check int "with steps count" 1 (List.length steps)
+  | _ -> fail "Expected with-else expression"
+
+(* Test parsing of with with case *)
+let test_with_with_case () =
+  let result =
+    Compiler.parse_string {|
+      pub fun test() {
+        with .{:ok, value} <= get_result() {
+          value
+        } case {
+          .{:error, _} -> "error"
+          _ -> "unknown"
+        }
+      }
+    |}
+  in
+  match result.items with
+  | [
+   Function
+     {
+       name = "test";
+       clauses =
+         [
+           {
+             params = [];
+             body =
+               With
+                 ( steps,
+                   Var "value",
+                   Some (ClauseElse clauses) );
+             position = _;
+             guard = _;
+           };
+         ];
+       visibility = Public;
+       position = _;
+     };
+  ] ->
+      check int "with steps count" 1 (List.length steps);
+      check int "case clauses count" 2 (List.length clauses)
+  | _ -> fail "Expected with-case expression"
+
+(* Test parsing of multiple with steps *)
+let test_with_multiple_steps () =
+  let result =
+    Compiler.parse_string "pub fun test() { with .{:ok, user} <= get_user(), .{:ok, role} <= get_role(user) { .{user, role} } else { .{:error, \"failed\"} } }"
+  in
+  match result.items with
+  | [
+   Function
+     {
+       name = "test";
+       clauses =
+         [
+           {
+             params = [];
+             body =
+               With
+                 ( steps,
+                   Tuple [Var "user"; Var "role"],
+                   Some (SimpleElse _) );
+             position = _;
+             guard = _;
+           };
+         ];
+       visibility = Public;
+       position = _;
+     };
+  ] ->
+      check int "with steps count" 2 (List.length steps)
+  | _ -> fail "Expected with multiple steps"
+
+(* Test parsing of with case with guards *)
+let test_with_case_with_guards () =
+  let result =
+    Compiler.parse_string {|
+      pub fun test() {
+        with .{:ok, value} <= get_result() {
+          value
+        } case {
+          .{:error, reason} when reason == :timeout -> "timeout"
+          _ -> "other"
+        }
+      }
+    |}
+  in
+  match result.items with
+  | [
+   Function
+     {
+       name = "test";
+       clauses =
+         [
+           {
+             params = [];
+             body =
+               With
+                 ( _,
+                   Var "value",
+                   Some (ClauseElse clauses) );
+             position = _;
+             guard = _;
+           };
+         ];
+       visibility = Public;
+       position = _;
+     };
+  ] ->
+      check int "case clauses count" 2 (List.length clauses);
+      (* Check that first clause has a guard *)
+      (match List.hd clauses with
+      | (_, Some _, _) -> ()
+      | _ -> fail "Expected guard in first clause")
+  | _ -> fail "Expected with-case with guards"
+
+(* Test parsing of if without else *)
+let test_if_without_else () =
+  let result =
+    Compiler.parse_string "pub fun test(x) { if x == 1 { \"one\" } }"
+  in
+  match result.items with
+  | [
+   Function
+     {
+       name = "test";
+       clauses =
+         [
+           {
+             params = [ PVar "x" ];
+             body =
+               If
+                 ( BinOp (Var "x", "==", Literal (LInt 1)),
+                   Literal (LString "one"),
+                   None );
+             position = _;
+             guard = _;
+           };
+         ];
+       visibility = Public;
+       position = _;
+     };
+  ] ->
+      ()
+  | _ -> fail "Expected if without else"
+
+(* Test parsing of with without else *)
+let test_with_without_else () =
+  let result =
+    Compiler.parse_string "pub fun test() { with .{:ok, value} <= get_result() { value } }"
+  in
+  match result.items with
+  | [
+   Function
+     {
+       name = "test";
+       clauses =
+         [
+           {
+             params = [];
+             body =
+               With
+                 ( steps,
+                   Var "value",
+                   None );
+             position = _;
+             guard = _;
+           };
+         ];
+       visibility = Public;
+       position = _;
+     };
+  ] ->
+      check int "with steps count" 1 (List.length steps)
+  | _ -> fail "Expected with without else"
+
 let tests =
   [
     ("simple function", `Quick, test_simple_function);
@@ -219,4 +461,11 @@ let tests =
     ("if with comparison", `Quick, test_if_with_comparison);
     ("complex comparison parsing", `Quick, test_complex_comparison_parsing);
     ("comparison precedence", `Quick, test_comparison_precedence);
+    ("if with case", `Quick, test_if_with_case);
+    ("with with else", `Quick, test_with_with_else);
+    ("with with case", `Quick, test_with_with_case);
+    ("with multiple steps", `Quick, test_with_multiple_steps);
+    ("with case with guards", `Quick, test_with_case_with_guards);
+    ("if without else", `Quick, test_if_without_else);
+    ("with without else", `Quick, test_with_without_else);
   ]

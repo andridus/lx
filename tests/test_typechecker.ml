@@ -148,7 +148,7 @@ let test_if_then_else_consistent () =
                (If
                   ( Literal (LBool true),
                     Literal (LInt 10),
-                    Some (Literal (LInt 20)) )));
+                    Some (SimpleElse (Literal (LInt 20))) )));
         ];
     }
   in
@@ -212,6 +212,275 @@ let test_tuple_types () =
   with TypeError error ->
     fail ("Tuple type test failed: " ^ string_of_type_error error)
 
+(* Test for if with case clauses *)
+let test_if_with_case () =
+  let program =
+    {
+      deps = None;
+      items =
+        [
+          Function
+            (make_single_clause_function "test_if_case" []
+               (If
+                  ( Literal (LBool true),
+                    Literal (LString "yes"),
+                    Some (ClauseElse [
+                      (PVar "x", None, Literal (LString "no"));
+                      (PWildcard, None, Literal (LString "default"));
+                    ]) )));
+        ];
+    }
+  in
+
+  try
+    let env = type_check_program program in
+    match List.assoc_opt "test_if_case" env with
+    | Some TString -> ()
+    | Some t ->
+        fail ("If-case test failed: expected TString, got " ^ string_of_type t)
+    | None -> fail "If-case test failed: function not found"
+  with TypeError error ->
+    fail ("If-case test failed: " ^ string_of_type_error error)
+
+(* Test for with expressions with else *)
+let test_with_else () =
+  let program =
+    {
+      deps = None;
+      items =
+        [
+          Function (make_single_clause_function "get_result" []
+            (Tuple [Literal (LAtom "ok"); Literal (LString "test")]));
+          Function
+            (make_single_clause_function "test_with_else" []
+               (With
+                  ( [(PTuple [PAtom "ok"; PVar "value"], App (Var "get_result", []))],
+                    Var "value",
+                    Some (SimpleElse (Literal (LString "failed"))) )));
+        ];
+    }
+  in
+
+  try
+    let env = type_check_program program in
+    match List.assoc_opt "test_with_else" env with
+    | Some TString -> ()
+    | Some t ->
+        fail ("With-else test failed: expected TString, got " ^ string_of_type t)
+    | None -> fail "With-else test failed: function not found"
+  with TypeError error ->
+    fail ("With-else test failed: " ^ string_of_type_error error)
+
+(* Test for with expressions with case *)
+let test_with_case () =
+  let program =
+    {
+      deps = None;
+      items =
+        [
+          Function (make_single_clause_function "get_result" []
+            (Tuple [Literal (LAtom "ok"); Literal (LString "test")]));
+          Function
+            (make_single_clause_function "test_with_case" []
+               (With
+                  ( [(PTuple [PAtom "ok"; PVar "value"], App (Var "get_result", []))],
+                    Var "value",
+                    Some (ClauseElse [
+                      (PTuple [PAtom "error"; PVar "reason"], None, Var "reason");
+                      (PWildcard, None, Literal (LString "unknown"));
+                    ]) )));
+        ];
+    }
+  in
+
+  try
+    let env = type_check_program program in
+    match List.assoc_opt "test_with_case" env with
+    | Some TString -> ()
+    | Some t ->
+        fail ("With-case test failed: expected TString, got " ^ string_of_type t)
+    | None -> fail "With-case test failed: function not found"
+  with TypeError error ->
+    fail ("With-case test failed: " ^ string_of_type_error error)
+
+(* Test for with expressions with guards *)
+let test_with_case_guards () =
+  let program =
+    {
+      deps = None;
+      items =
+        [
+          Function (make_single_clause_function "get_result" []
+            (Tuple [Literal (LAtom "error"); Literal (LString "timeout")]));
+          Function
+            (make_single_clause_function "test_with_guards" []
+               (With
+                  ( [(PTuple [PAtom "ok"; PVar "value"], App (Var "get_result", []))],
+                    Var "value",
+                    Some (ClauseElse [
+                      (PTuple [PAtom "error"; PVar "reason"],
+                       Some (GuardBinOp (GuardAtomValue (GuardVar "reason"), "==", GuardAtomValue (GuardLiteral (LString "timeout")))),
+                       Literal (LString "timeout"));
+                      (PWildcard, None, Literal (LString "other"));
+                    ]) )));
+        ];
+    }
+  in
+
+  try
+    let env = type_check_program program in
+    match List.assoc_opt "test_with_guards" env with
+    | Some TString -> ()
+    | Some t ->
+        fail ("With-guards test failed: expected TString, got " ^ string_of_type t)
+    | None -> fail "With-guards test failed: function not found"
+  with TypeError error ->
+    fail ("With-guards test failed: " ^ string_of_type_error error)
+
+(* Test for multiple with steps *)
+let test_with_multiple_steps () =
+  let program =
+    {
+      deps = None;
+      items =
+        [
+          Function (make_single_clause_function "get_user" []
+            (Tuple [Literal (LAtom "ok"); Literal (LString "john")]));
+          Function (make_single_clause_function "get_role" ["user"]
+            (Tuple [Literal (LAtom "ok"); Literal (LString "admin")]));
+          Function
+            (make_single_clause_function "test_with_multiple" []
+               (With
+                  ( [
+                      (PTuple [PAtom "ok"; PVar "user"], App (Var "get_user", []));
+                      (PTuple [PAtom "ok"; PVar "role"], App (Var "get_role", [Var "user"]));
+                    ],
+                    Tuple [Var "user"; Var "role"],
+                    Some (SimpleElse (Tuple [Literal (LString "error"); Literal (LString "failed")])) )));
+        ];
+    }
+  in
+
+  try
+    let env = type_check_program program in
+    match List.assoc_opt "test_with_multiple" env with
+    | Some (TTuple [TString; TString]) -> ()
+    | Some t ->
+        fail ("With-multiple test failed: expected TTuple [TString; TString], got " ^ string_of_type t)
+    | None -> fail "With-multiple test failed: function not found"
+  with TypeError error ->
+    fail ("With-multiple test failed: " ^ string_of_type_error error)
+
+(* Test type error for mismatched branch types in if-case *)
+let test_if_case_type_mismatch () =
+  let program =
+    {
+      deps = None;
+      items =
+        [
+          Function
+            (make_single_clause_function "test_mismatch" []
+               (If
+                  ( Literal (LBool true),
+                    Literal (LString "string"),
+                    Some (ClauseElse [
+                      (PVar "x", None, Literal (LInt 42));
+                      (PWildcard, None, Literal (LString "default"));
+                    ]) )));
+        ];
+    }
+  in
+
+  try
+    let _ = type_check_program program in
+    fail "Type mismatch test failed: should have thrown error"
+  with
+  | TypeError _ -> () (* Expected to fail *)
+
+(* Test type error for mismatched branch types in with-case *)
+let test_with_case_type_mismatch () =
+  let program =
+    {
+      deps = None;
+      items =
+        [
+          Function (make_single_clause_function "get_result" []
+            (Tuple [Literal (LAtom "ok"); Literal (LString "test")]));
+          Function
+            (make_single_clause_function "test_with_mismatch" []
+               (With
+                  ( [(PTuple [PAtom "ok"; PVar "value"], App (Var "get_result", []))],
+                    Var "value",
+                    Some (ClauseElse [
+                      (PTuple [PAtom "error"; PVar "reason"], None, Literal (LInt 42));
+                      (PWildcard, None, Literal (LString "unknown"));
+                    ]) )));
+        ];
+    }
+  in
+
+  try
+    let _ = type_check_program program in
+    fail "With type mismatch test failed: should have thrown error"
+  with
+  | TypeError _ -> () (* Expected to fail *)
+
+(* Test if-else with optional result *)
+let test_if_else_optional () =
+  let program =
+    {
+      deps = None;
+      items =
+        [
+          Function
+            (make_single_clause_function "test_optional" []
+               (If
+                  ( Literal (LBool true),
+                    Literal (LString "some"),
+                    None )));
+        ];
+    }
+  in
+
+  try
+    let env = type_check_program program in
+    match List.assoc_opt "test_optional" env with
+    | Some (TOption TString) -> ()
+    | Some t ->
+        fail ("Optional if test failed: expected TOption TString, got " ^ string_of_type t)
+    | None -> fail "Optional if test failed: function not found"
+  with TypeError error ->
+    fail ("Optional if test failed: " ^ string_of_type_error error)
+
+(* Test with-else with optional result *)
+let test_with_optional () =
+  let program =
+    {
+      deps = None;
+      items =
+        [
+          Function (make_single_clause_function "get_result" []
+            (Tuple [Literal (LAtom "ok"); Literal (LString "test")]));
+          Function
+            (make_single_clause_function "test_with_optional" []
+               (With
+                  ( [(PTuple [PAtom "ok"; PVar "value"], App (Var "get_result", []))],
+                    Var "value",
+                    None )));
+        ];
+    }
+  in
+
+  try
+    let env = type_check_program program in
+    match List.assoc_opt "test_with_optional" env with
+    | Some (TOption TString) -> ()
+    | Some t ->
+        fail ("Optional with test failed: expected TOption TString, got " ^ string_of_type t)
+    | None -> fail "Optional with test failed: function not found"
+  with TypeError error ->
+    fail ("Optional with test failed: " ^ string_of_type_error error)
+
 let tests =
   [
     ("basic types", `Quick, test_basic_types);
@@ -223,4 +492,13 @@ let tests =
     ("if-else consistent", `Quick, test_if_then_else_consistent);
     ("empty function body", `Quick, test_empty_function_body);
     ("tuple types", `Quick, test_tuple_types);
+    ("if with case", `Quick, test_if_with_case);
+    ("with else", `Quick, test_with_else);
+    ("with case", `Quick, test_with_case);
+    ("with case guards", `Quick, test_with_case_guards);
+    ("with multiple steps", `Quick, test_with_multiple_steps);
+    ("if case type mismatch", `Quick, test_if_case_type_mismatch);
+    ("with case type mismatch", `Quick, test_with_case_type_mismatch);
+    ("if else optional", `Quick, test_if_else_optional);
+    ("with optional", `Quick, test_with_optional);
   ]

@@ -63,7 +63,7 @@ rule read = parse
       (* Check if it's a reserved word first *)
       match id with
       | "pub" -> PUB | "fun" -> FUN | "case" -> CASE | "match" -> MATCH_KEYWORD
-      | "if" -> IF | "else" -> ELSE | "for" -> FOR | "when" -> WHEN | "in" -> IN
+      | "if" -> IF | "else" -> ELSE | "with" -> WITH | "for" -> FOR | "when" -> WHEN | "in" -> IN
       | "and" -> AND | "or" -> OR | "not" -> NOT
       | "andalso" -> ANDALSO | "orelse" -> ORELSE
       | "receive" -> RECEIVE | "after" -> AFTER
