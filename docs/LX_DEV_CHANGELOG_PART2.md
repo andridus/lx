@@ -434,3 +434,157 @@ end
 This standardization ensures that Lx has a consistent and reliable syntax that developers can depend on for building robust OTP applications.
 
 ---
+
+## Enhanced For Loop Implementation with Complex Pattern Matching
+
+### Overview
+Complete implementation of enhanced `for` loop syntax in Lx, supporting complex pattern matching, named variables, and sophisticated guard expressions. This enables powerful list comprehensions that compile efficiently to Erlang comprehensions while maintaining type safety and proper variable scoping.
+
+### Key Features
+
+#### 1. Complex Pattern Matching
+- **Map patterns**: `for %{name: name} = user in users do ... end`
+- **Tuple patterns**: `for {key, value} in pairs do ... end`
+- **List patterns**: `for [head | tail] in lists do ... end`
+- **Record patterns**: `for Person{name: name, age: age} in people do ... end`
+- **Binary patterns**: `for <<byte>> in binary_data do ... end`
+
+#### 2. Named Variable Support
+- **Syntax**: `pattern = variable_name` for accessing the entire matched value
+- **Example**: `for %{name: name1} = account in accounts do ... end`
+- **Scoping**: Both pattern variables and named variables properly scoped
+- **Code generation**: Named variables compile to `_` (underscore) in Erlang comprehensions
+
+#### 3. Enhanced Guard Expressions
+- **Field access in guards**: `when account.name == target_name`
+- **Map field access**: Supports `maps:get/2` for map field access in guards
+- **Complex conditions**: Full guard expression support with proper type checking
+- **Variable scoping**: All pattern variables available in guard expressions
+
+#### 4. Type Safety and Inference
+- **Pattern type extraction**: Automatic variable type inference from patterns
+- **Guard type checking**: Full type validation for guard expressions
+- **Scope management**: Proper variable scoping throughout the expression
+- **Error reporting**: Clear error messages for type mismatches
+
+### Usage Examples
+
+#### Simple For Loops
+```lx
+# Basic list comprehension
+numbers = for x in [1, 2, 3, 4, 5] do x * 2 end
+# Result: [2, 4, 6, 8, 10]
+
+# With guard condition
+evens = for x in [1, 2, 3, 4, 5] when x % 2 == 0 do x end
+# Result: [2, 4]
+```
+
+#### Complex Pattern Matching
+```lx
+# Map pattern matching
+user_ages = for %{name: name, age: age} in users when age >= 18 do
+  {name, age}
+end
+
+# Named variable with pattern
+valid_accounts = for %{name: name1} = account in map_values(accounts) when name1 == target_name do
+  account
+end
+
+# Tuple destructuring
+coordinates = for {x, y} in points when x > 0 and y > 0 do
+  {x * 2, y * 2}
+end
+
+# List pattern matching
+first_elements = for [head | _tail] in nested_lists do
+  head
+end
+```
+
+#### Record Pattern Matching
+```lx
+record Person { name :: string, age :: integer }
+
+# Record pattern in for loop
+adults = for Person{name: name, age: age} = person in people when age >= 18 do
+  person
+end
+```
+
+#### Binary Pattern Matching
+```lx
+# Binary pattern matching
+bytes = for <<byte>> in binary_data when byte > 128 do
+  byte - 128
+end
+```
+
+### Generated Erlang Code
+
+#### Simple For Loop
+```lx
+# Lx source
+for x in list when x > 0 do x * 2 end
+```
+```erlang
+% Generated Erlang
+[X * 2 || X <- List, X > 0]
+```
+
+#### Complex Pattern with Named Variable
+```lx
+# Lx source
+for %{name: name1} = account in accounts when name1 == target do
+  account.balance
+end
+```
+```erlang
+% Generated Erlang
+[maps:get(balance, _) || #{name := Name1} = _ <- Accounts, Name1 =:= Target]
+```
+
+### Implementation Details
+
+#### 1. AST Extensions
+- **Enhanced For constructor**: `For of pattern * string option * expr * guard_expr option * expr`
+- **Pattern support**: All pattern types (maps, tuples, lists, records, binaries)
+- **Named variable**: Optional string for accessing the entire matched value
+- **Guard integration**: Full guard expression support
+
+#### 2. Parser Implementation
+- **Complex patterns**: Support for all pattern types in for loops
+- **Named variable syntax**: `pattern = variable` parsing
+- **Guard expressions**: Enhanced guard parsing with field access
+- **Error handling**: Clear syntax error messages
+
+#### 3. Type System Integration
+- **Pattern type inference**: Automatic variable type extraction from patterns
+- **Guard type checking**: Full type validation for guard expressions
+- **Scope management**: Proper variable scoping and hash generation
+- **Field access validation**: Type-safe field access in guards
+
+#### 4. Code Generation
+- **Efficient comprehensions**: Optimal Erlang list comprehension generation
+- **Variable handling**: Proper variable renaming and scoping
+- **Guard compilation**: Direct guard expression compilation to Erlang
+- **Map field access**: Proper `maps:get/2` usage for map fields in guards
+
+### Benefits
+- **Expressive syntax**: Powerful pattern matching in list comprehensions
+- **Type safety**: Complete compile-time type checking
+- **Performance**: Efficient Erlang comprehension generation
+- **Flexibility**: Support for all pattern types and complex guards
+- **Ergonomic**: Clean and readable syntax for complex data processing
+
+### Testing and Validation
+- **Comprehensive tests**: All pattern types and guard combinations tested
+- **Code generation validation**: Erlang output verification for all cases
+- **Type checking tests**: Complete type system integration validation
+- **Error handling**: Edge cases and error conditions thoroughly tested
+- **Integration tests**: Full integration with existing language features
+
+This implementation provides Lx developers with powerful and flexible list comprehension capabilities that maintain the language's commitment to type safety while generating efficient Erlang code.
+
+---

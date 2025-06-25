@@ -746,13 +746,81 @@ let rec lint_expr ctx errors expr =
               acc @ unused_errors)
             errors clauses
       | None -> errors)
-  | For (var, iter_expr, body_expr, guard_opt) ->
+  | For (pattern, var_opt, iter_expr, body_expr, guard_opt) ->
       let errors = lint_expr ctx errors iter_expr in
       let loop_ctx = create_context (Some ctx) in
+      (* Função auxiliar para definir variáveis do pattern e checar shadowing *)
+      let rec define_pattern_vars pattern errors =
+        match pattern with
+        | PVar var_name when not (is_ignored_var var_name) ->
+            if lookup_variable ctx var_name then (
+              let pos = None in
+              let first_pos =
+                if Hashtbl.mem ctx.defined_vars var_name then
+                  Hashtbl.find ctx.defined_vars var_name
+                else None
+              in
+              let err =
+                create_lint_error
+                  (VariableShadowing (var_name, pos, first_pos))
+                  { line = 0; column = 0; filename = None }
+                  `Error
+              in
+              Hashtbl.replace loop_ctx.defined_vars var_name pos;
+              err :: errors)
+            else (
+              Hashtbl.replace loop_ctx.defined_vars var_name None;
+              errors)
+        | PVar _ | PWildcard -> errors
+        | PAtom _ | PLiteral _ -> errors
+        | PTuple ps | PList ps ->
+            List.fold_left (fun acc p -> define_pattern_vars p acc) errors ps
+        | PCons (h, t) -> define_pattern_vars t (define_pattern_vars h errors)
+        | PRecord (_, fields) ->
+            List.fold_left
+              (fun acc (_, p) -> define_pattern_vars p acc)
+              errors fields
+        | PMap fields ->
+            List.fold_left
+              (fun acc f ->
+                match f with
+                | AtomKeyPattern (_, p) | GeneralKeyPattern (_, p) ->
+                    define_pattern_vars p acc)
+              errors fields
+        | PBinary elems ->
+            List.fold_left
+              (fun acc e ->
+                match e with
+                | SimpleBinaryPattern p
+                | SizedBinaryPattern (p, _, _)
+                | TypedBinaryPattern (p, _) ->
+                    define_pattern_vars p acc)
+              errors elems
+      in
+      let errors = define_pattern_vars pattern errors in
+      (* Definir a variável nomeada, se houver, e checar shadowing *)
       let errors =
-        match define_variable loop_ctx var None with
-        | Some error -> error :: errors
-        | None -> errors
+        match var_opt with
+        | Some var_name when not (is_ignored_var var_name) ->
+            if lookup_variable ctx var_name then (
+              let pos = None in
+              let first_pos =
+                if Hashtbl.mem ctx.defined_vars var_name then
+                  Hashtbl.find ctx.defined_vars var_name
+                else None
+              in
+              let err =
+                create_lint_error
+                  (VariableShadowing (var_name, pos, first_pos))
+                  { line = 0; column = 0; filename = None }
+                  `Error
+              in
+              Hashtbl.replace loop_ctx.defined_vars var_name pos;
+              err :: errors)
+            else (
+              Hashtbl.replace loop_ctx.defined_vars var_name None;
+              errors)
+        | _ -> errors
       in
       let errors =
         match guard_opt with
@@ -917,6 +985,20 @@ and lint_guard_atom ctx errors atom =
         let error =
           create_lint_error
             (UndefinedVariable (var_name, None))
+            { line = 0; column = 0; filename = None }
+            `Error
+        in
+        error :: errors
+      else errors
+  | GuardRecordAccess (record_var, _field_name) ->
+      use_variable ctx record_var None;
+      if
+        (not (lookup_variable ctx record_var))
+        && not (is_ignored_var record_var)
+      then
+        let error =
+          create_lint_error
+            (UndefinedVariable (record_var, None))
             { line = 0; column = 0; filename = None }
             `Error
         in

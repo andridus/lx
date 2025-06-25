@@ -246,7 +246,11 @@ and emit_guard_expr ctx (guard : guard_expr) : string =
   | GuardNot g -> "not " ^ emit_guard_expr ctx g
   | GuardBinOp (left, op, right) ->
       let erlang_op =
-        match op with "!=" -> "/=" | "<=" -> "=<" | other -> other
+        match op with
+        | "!=" -> "/="
+        | "<=" -> "=<"
+        | "==" -> "=:="
+        | other -> other
       in
       emit_guard_value ctx left ^ " " ^ erlang_op ^ " "
       ^ emit_guard_value ctx right
@@ -270,6 +274,10 @@ and emit_guard_expr ctx (guard : guard_expr) : string =
 and emit_guard_atom ctx (atom : guard_atom) : string =
   match atom with
   | GuardVar var -> get_renamed_var ctx var
+  | GuardRecordAccess (record_var, field_name) ->
+      let renamed_var = get_renamed_var ctx record_var in
+      (* For maps, generate maps:get(field, map) instead of map#record.field *)
+      "maps:get(" ^ field_name ^ ", " ^ renamed_var ^ ")"
   | GuardLiteral lit -> emit_literal lit
   | GuardCallAtom (func, args) ->
       func ^ "("
@@ -299,6 +307,39 @@ and emit_guard_value ctx (value : guard_value) : string =
 and emit_binary_spec = function
   | BinaryType typ -> typ
   | BinaryTypeWithEndian (typ, endian) -> typ ^ "-" ^ endian
+
+(* Helper function to extract variables from a pattern and add them to scope *)
+and add_pattern_vars_to_scope ctx pattern =
+  match pattern with
+  | PWildcard -> ()
+  | PVar id -> ignore (add_var_to_scope ctx id)
+  | PAtom _ -> ()
+  | PLiteral _ -> ()
+  | PTuple patterns -> List.iter (add_pattern_vars_to_scope ctx) patterns
+  | PList patterns -> List.iter (add_pattern_vars_to_scope ctx) patterns
+  | PCons (head, tail) ->
+      add_pattern_vars_to_scope ctx head;
+      add_pattern_vars_to_scope ctx tail
+  | PRecord (_, field_patterns) ->
+      List.iter
+        (fun (_, field_pattern) -> add_pattern_vars_to_scope ctx field_pattern)
+        field_patterns
+  | PMap pattern_fields ->
+      List.iter
+        (function
+          | AtomKeyPattern (_, pattern) -> add_pattern_vars_to_scope ctx pattern
+          | GeneralKeyPattern (_, pattern) ->
+              add_pattern_vars_to_scope ctx pattern)
+        pattern_fields
+  | PBinary pattern_elements ->
+      List.iter
+        (function
+          | SimpleBinaryPattern pattern -> add_pattern_vars_to_scope ctx pattern
+          | SizedBinaryPattern (pattern, _, _) ->
+              add_pattern_vars_to_scope ctx pattern
+          | TypedBinaryPattern (pattern, _) ->
+              add_pattern_vars_to_scope ctx pattern)
+        pattern_elements
 
 and emit_expr ctx (e : expr) : string =
   (* Check for invalid colon syntax patterns in any expression *)
@@ -486,17 +527,33 @@ and emit_expr ctx (e : expr) : string =
       "case " ^ emit_expr ctx value ^ " of\n        " ^ emit_pattern ctx pattern
       ^ " ->\n            ok;\n        _ ->\n            "
       ^ emit_expr ctx rescue_expr ^ "\n    end"
-  | For (var, iter_expr, body_expr, guard_opt) ->
-      (* Generate Erlang list comprehension: [Body || Var <- List] or [Body || Var <- List, Guard] *)
-      let var_name = get_renamed_var ctx var in
-      let iter_str = emit_expr ctx iter_expr in
-      let body_str = emit_expr ctx body_expr in
-      let guard_str =
-        match guard_opt with
-        | Some guard -> ", " ^ emit_guard_expr ctx guard
-        | None -> ""
-      in
-      "[" ^ body_str ^ " || " ^ var_name ^ " <- " ^ iter_str ^ guard_str ^ "]"
+  | For (pattern, var_opt, iter_expr, body_expr, guard_opt) -> (
+      match var_opt with
+      | None ->
+          add_pattern_vars_to_scope ctx pattern;
+          let iter_str = emit_expr ctx iter_expr in
+          let body_str = emit_expr ctx body_expr in
+          let pattern_str = emit_pattern ctx pattern in
+          let guard_str =
+            match guard_opt with
+            | Some guard -> ", " ^ emit_guard_expr ctx guard
+            | None -> ""
+          in
+          "[" ^ body_str ^ " || " ^ pattern_str ^ " <- " ^ iter_str ^ guard_str
+          ^ "]"
+      | Some _var ->
+          add_pattern_vars_to_scope ctx pattern;
+          let iter_str = emit_expr ctx iter_expr in
+          let body_str = emit_expr ctx body_expr in
+          let var_str = "_" in
+          let pattern_str = emit_pattern ctx pattern in
+          let guard_str =
+            match guard_opt with
+            | Some guard -> ", " ^ emit_guard_expr ctx guard
+            | None -> ""
+          in
+          "[" ^ body_str ^ " || " ^ pattern_str ^ " = " ^ var_str ^ " <- "
+          ^ iter_str ^ guard_str ^ "]")
   | Sequence exprs ->
       (* Function body sequences - detect match rescue patterns *)
       let block_ctx = create_scope (Some ctx) in
@@ -1040,6 +1097,15 @@ let compile_to_string_with_module_name (program : program)
        failwith "OTP validation failed"
    with
   | Error.CompilationError _ as e -> raise e
+  | Typechecker.GuardError error ->
+      (* Handle guard errors *)
+      let error_msg = Typechecker.string_of_guard_error error in
+      let error_obj =
+        Error.make_error_with_position
+          (Error.TypeError (error_msg, None))
+          (Error.make_position 1 1) ""
+      in
+      raise (Error.CompilationError error_obj)
   | Typechecker.TypeError error ->
       (* Create a compilation error to stop the process immediately *)
       let error_obj =
@@ -1132,6 +1198,15 @@ let compile_to_string_for_tests (program : program) : string =
   (* Type checking phase *)
   (try ignore (Typechecker.type_check_program program) with
   | Error.CompilationError _ as e -> raise e
+  | Typechecker.GuardError error ->
+      (* Handle guard errors *)
+      let error_msg = Typechecker.string_of_guard_error error in
+      let error_obj =
+        Error.make_error_with_position
+          (Error.TypeError (error_msg, None))
+          (Error.make_position 1 1) ""
+      in
+      raise (Error.CompilationError error_obj)
   | Typechecker.TypeError error ->
       (* Create a compilation error to stop the process immediately *)
       let error_obj =
@@ -1200,6 +1275,15 @@ let type_check_program (program : program) : Typechecker.type_env =
     type_env
   with
   | Error.CompilationError _ as e -> raise e
+  | Typechecker.GuardError error ->
+      (* Handle guard errors *)
+      let error_msg = Typechecker.string_of_guard_error error in
+      let error_obj =
+        Error.make_error_with_position
+          (Error.TypeError (error_msg, None))
+          (Error.make_position 1 1) ""
+      in
+      raise (Error.CompilationError error_obj)
   | Typechecker.TypeError error ->
       (* Create a compilation error to stop the process immediately *)
       let error_obj =

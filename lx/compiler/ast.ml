@@ -53,6 +53,7 @@ and guard_value =
 
 and guard_atom =
   | GuardVar of string
+  | GuardRecordAccess of string * string (* record_var, field_name *)
   | GuardLiteral of literal
   | GuardCallAtom of string * guard_atom list
 
@@ -87,11 +88,8 @@ and expr =
       (pattern * expr) list
       * expr
       * else_branch option (* steps, success_body, else_branch *)
-  | For of
-      ident
-      * expr
-      * expr
-      * guard_expr option (* variable, iterable, body, optional guard *)
+  | For of pattern * ident option * expr * expr * guard_expr option
+    (* pattern, optional var, iterable, body, optional guard *)
   | Sequence of expr list (* Function body sequences *)
   | Block of expr list (* Explicit block expressions {} *)
   | BinOp of expr * string * expr (* Binary operations *)

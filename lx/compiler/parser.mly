@@ -430,10 +430,14 @@ expr:
       With (steps, success_body, Some (SimpleElse else_expr)) }
   | WITH steps = with_steps DO success_body = expr CASE case_clauses = nonempty_list(case_branch) END
     { With (steps, success_body, Some (ClauseElse case_clauses)) }
-  | FOR var = IDENT IN iterable = expr WHEN guard = guard_expr DO body = expr END
-    { For (var, iterable, body, Some guard) }
-  | FOR var = IDENT IN iterable = expr DO body = expr END
-    { For (var, iterable, body, None) }
+  | FOR pattern = pattern EQ var = IDENT IN iterable = expr WHEN guard = guard_expr DO body = expr END
+    { For (pattern, Some var, iterable, body, Some guard) }
+  | FOR pattern = pattern EQ var = IDENT IN iterable = expr DO body = expr END
+    { For (pattern, Some var, iterable, body, None) }
+  | FOR pattern = pattern IN iterable = expr WHEN guard = guard_expr DO body = expr END
+    { For (pattern, None, iterable, body, Some guard) }
+  | FOR pattern = pattern IN iterable = expr DO body = expr END
+    { For (pattern, None, iterable, body, None) }
   | RECEIVE DO clauses = nonempty_list(receive_clause) END
     { Receive (clauses, None) }
   | RECEIVE DO clauses = nonempty_list(receive_clause) END AFTER timeout = expr DO timeout_body = expr END
@@ -680,6 +684,7 @@ guard_value:
 
 guard_atom:
   | name = IDENT { GuardVar name }
+  | record_var = IDENT DOT field_name = IDENT { GuardRecordAccess (record_var, field_name) }
   | lit = literal { GuardLiteral lit }
   | MINUS lit = literal {
       match lit with

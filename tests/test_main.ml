@@ -29,4 +29,5 @@ let () =
       ("Pattern Matching Tests", Test_pattern_matching.tests);
       ("Control Flow Enhanced Tests", Test_control_flow_enhanced.tests);
       ("Match Rescue Tests", Test_match_rescue.tests);
+      ("For Loops Tests", Test_for_loops.tests);
     ]

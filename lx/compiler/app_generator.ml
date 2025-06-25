@@ -302,17 +302,28 @@ and emit_expr ctx (e : expr) : string =
       (* Generate a single case expression for individual match rescue *)
       "case " ^ emit_expr ctx value ^ " of " ^ emit_pattern ctx pattern
       ^ " -> ok; _ -> " ^ emit_expr ctx rescue_expr ^ " end"
-  | For (var, iter_expr, body_expr, guard_opt) ->
-      (* Generate Erlang list comprehension: [Body || Var <- List] or [Body || Var <- List, Guard] *)
-      let var_name = get_renamed_var ctx var in
+  | For (pattern, var_opt, iter_expr, body_expr, guard_opt) -> (
       let iter_str = emit_expr ctx iter_expr in
       let body_str = emit_expr ctx body_expr in
-      let guard_str =
-        match guard_opt with
-        | Some guard -> ", " ^ emit_guard_expr ctx guard
-        | None -> ""
-      in
-      "[" ^ body_str ^ " || " ^ var_name ^ " <- " ^ iter_str ^ guard_str ^ "]"
+      let pattern_str = emit_pattern ctx pattern in
+      match var_opt with
+      | None ->
+          let guard_str =
+            match guard_opt with
+            | Some guard -> ", " ^ emit_guard_expr ctx guard
+            | None -> ""
+          in
+          "[" ^ body_str ^ " || " ^ pattern_str ^ " <- " ^ iter_str ^ guard_str
+          ^ "]"
+      | Some var ->
+          let var_str = get_renamed_var ctx var in
+          let guard_str =
+            match guard_opt with
+            | Some guard -> ", " ^ emit_guard_expr ctx guard
+            | None -> ""
+          in
+          "[" ^ body_str ^ " || " ^ var_str ^ " <- " ^ iter_str ^ ", "
+          ^ pattern_str ^ " = " ^ var_str ^ guard_str ^ "]")
   | Sequence exprs ->
       let block_ctx = create_scope (Some ctx) in
       (* Check if this is a sequence with MatchRescueStep patterns *)
@@ -482,6 +493,10 @@ and emit_guard_expr ctx (guard : guard_expr) : string =
 and emit_guard_atom ctx (atom : guard_atom) : string =
   match atom with
   | GuardVar var -> get_renamed_var ctx var
+  | GuardRecordAccess (record_var, field_name) ->
+      let renamed_var = get_renamed_var ctx record_var in
+      (* For maps, generate maps:get(field, map) instead of map#record.field *)
+      "maps:get(" ^ field_name ^ ", " ^ renamed_var ^ ")"
   | GuardLiteral lit -> emit_literal lit
   | GuardCallAtom (func, args) ->
       func ^ "("

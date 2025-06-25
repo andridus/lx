@@ -530,12 +530,37 @@ end
 - **Efficient Compilation**: Generates optimal nested Erlang case expressions
 - **Sequential Processing**: Each step can depend on variables from previous steps
 
-#### `for` loop:
+#### `for` loop (List Comprehensions):
 
 ```lx
-for X in list when X > 0 {
-  double(X)
-}
+# Simple for loop
+for x in list do
+  x * 2
+end
+
+# For loop with guard
+for x in list when x > 0 do
+  x * 2
+end
+
+# Complex pattern matching in for loops
+for %{name: name} = user in users when name != nil do
+  user.age
+end
+
+# Named variable with pattern matching
+for %{name: name1} = account in map_values(accounts) when name1 == name do
+  true
+end
+
+# Multiple pattern types supported
+for {key, value} in pairs when value > 10 do
+  key
+end
+
+for [head | _tail] in lists do
+  head
+end
 ```
 
 ---

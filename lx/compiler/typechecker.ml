@@ -181,8 +181,28 @@ type guard_error =
   | InvalidGuardCall of
       string * int * int (* function, given arity, expected arity *)
   | UndefinedGuardVariable of string
+  | UndefinedRecordField of string * string (* record_var, field_name *)
+  | InvalidRecordAccess of string * string (* record_var, field_name *)
 
 exception GuardError of guard_error
+
+(* Convert guard error to string *)
+let string_of_guard_error = function
+  | InvalidGuardFunction func ->
+      Printf.sprintf "Invalid guard function: %s" func
+  | InvalidGuardCall (func, given, expected) ->
+      Printf.sprintf
+        "Guard function '%s' expects %d arguments, but %d were provided" func
+        expected given
+  | UndefinedGuardVariable var ->
+      Printf.sprintf "Undefined variable in guard: %s" var
+  | UndefinedRecordField (record_var, field_name) ->
+      Printf.sprintf "Undefined field '%s' in variable '%s'" field_name
+        record_var
+  | InvalidRecordAccess (record_var, field_name) ->
+      Printf.sprintf
+        "Cannot access field '%s' on variable '%s' (not a record or map)"
+        field_name record_var
 
 (* Find record definition function - moved here after TypeError is declared *)
 let find_record_def (name : string) : record_def =
@@ -215,6 +235,21 @@ let rec convert_type_expr (type_expr : type_expr) : lx_type =
   | TypeTuple types -> TTuple (List.map convert_type_expr types)
   | TypeUnion (t1, _t2) -> TOption (convert_type_expr t1)
 (* Simplified union handling *)
+
+(* Get the type of a specific field in a record *)
+let get_record_field_type (record_name : string) (field_name : string) : lx_type
+    =
+  let record_def = find_record_def record_name in
+  try
+    let field =
+      List.find (fun f -> f.field_name = field_name) record_def.fields
+    in
+    convert_type_expr field.field_type
+  with Not_found ->
+    let available_fields = List.map (fun f -> f.field_name) record_def.fields in
+    raise
+      (TypeError
+         (RecordFieldMismatch (field_name, record_name, available_fields)))
 
 (* Pretty printing for types *)
 let rec string_of_type = function
@@ -466,6 +501,31 @@ and infer_guard_atom (env : type_env) (atom : guard_atom) : lx_type =
   | GuardVar var -> (
       try List.assoc var env
       with Not_found -> raise (GuardError (UndefinedGuardVariable var)))
+  | GuardRecordAccess (record_var, field_name) -> (
+      try
+        let record_type = List.assoc record_var env in
+        match record_type with
+        | TNamedRecord record_name ->
+            (* Look up the field type in the record definition *)
+            let field_type = get_record_field_type record_name field_name in
+            field_type
+        | TRecord fields -> (
+            (* For anonymous records, look up the field in the fields list *)
+            try List.assoc field_name fields
+            with Not_found ->
+              raise (GuardError (UndefinedRecordField (record_var, field_name)))
+            )
+        | TConcreteMap fields -> (
+            (* For concrete maps, look up the field by key *)
+            try List.assoc field_name fields
+            with Not_found ->
+              raise (GuardError (UndefinedRecordField (record_var, field_name)))
+            )
+        | TMap (TAtom, value_type) ->
+            (* For generic atom-keyed maps, return the value type *)
+            value_type
+        | _ -> raise (GuardError (InvalidRecordAccess (record_var, field_name)))
+      with Not_found -> raise (GuardError (UndefinedGuardVariable record_var)))
   | GuardLiteral lit -> infer_literal lit
   | GuardCallAtom (func, args) -> (
       validate_guard_call func args;
@@ -1619,7 +1679,7 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
       | None ->
           (* With without else returns optional type: T | nil *)
           (TOption (apply_subst combined_subst success_type), combined_subst))
-  | For (var, iter_expr, body_expr, guard_opt) ->
+  | For (pattern, var_opt, iter_expr, body_expr, guard_opt) ->
       (* For expressions are list comprehensions that return a list *)
       let iter_type, iter_subst = infer_expr env iter_expr in
       let elem_type = fresh_type_var () in
@@ -1628,8 +1688,49 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
       in
       let combined_subst = compose_subst iter_subst list_unify in
 
-      (* Create new environment with loop variable *)
-      let loop_env = (var, elem_type) :: apply_subst_env combined_subst env in
+      (* Extract variables from pattern and create environment *)
+      let rec extract_pattern_vars = function
+        | PVar var_name -> [ (var_name, apply_subst combined_subst elem_type) ]
+        | PWildcard -> []
+        | PAtom _ | PLiteral _ -> []
+        | PTuple patterns ->
+            List.concat (List.map extract_pattern_vars patterns)
+        | PList patterns -> List.concat (List.map extract_pattern_vars patterns)
+        | PCons (head, tail) ->
+            extract_pattern_vars head @ extract_pattern_vars tail
+        | PRecord (_, field_patterns) ->
+            List.concat
+              (List.map
+                 (fun (_, pattern) -> extract_pattern_vars pattern)
+                 field_patterns)
+        | PMap pattern_fields ->
+            List.concat
+              (List.map
+                 (function
+                   | AtomKeyPattern (_, pattern) -> extract_pattern_vars pattern
+                   | GeneralKeyPattern (_, pattern) ->
+                       extract_pattern_vars pattern)
+                 pattern_fields)
+        | PBinary elements ->
+            List.concat
+              (List.map
+                 (function
+                   | SimpleBinaryPattern pattern -> extract_pattern_vars pattern
+                   | SizedBinaryPattern (pattern, _, _) ->
+                       extract_pattern_vars pattern
+                   | TypedBinaryPattern (pattern, _) ->
+                       extract_pattern_vars pattern)
+                 elements)
+      in
+      let pattern_vars = extract_pattern_vars pattern in
+      let var_binding =
+        match var_opt with
+        | Some var_name -> [ (var_name, apply_subst combined_subst elem_type) ]
+        | None -> []
+      in
+      let loop_env =
+        pattern_vars @ var_binding @ apply_subst_env combined_subst env
+      in
 
       (* Type check guard if present *)
       let guard_subst =
