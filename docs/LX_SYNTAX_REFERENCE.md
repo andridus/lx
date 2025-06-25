@@ -61,7 +61,7 @@ Syntax symbols used for operations, declarations, and structure:
 - **Math**: `+`, `-`, `*`, `/`
 - **Comparison**: `==`, `!=`, `<`, `>`, `<=`, `>=`
 - **Logic**: `and`, `or`, `not`, `andalso`, `orelse`
-- **Grouping and data**: `()`, `{}`, `.{}`, `[]`
+- **Grouping and data**: `()`, `{}`, `[]`
 - **Block delimiters**: `do`, `end` — define code blocks for functions and control flow
 - **Separators**: `,`, `;`
 
@@ -144,7 +144,7 @@ Used for destructuring and conditional logic based on shape:
 case msg do
   :ok -> handle_ok()
   [head | tail] -> handle_list(head, tail)
-  .{x, y} -> sum(x, y)
+  {x, y} -> sum(x, y)
   %{ name: user_name, age: user_age } -> process_user(user_name, user_age)
   _ -> :default
 end
@@ -235,9 +235,9 @@ end
 
 # Complex pattern matching with destructuring
 handle_message = fn do
-  (.{:user, name, age}) when age >= 18 do "Adult: " ++ name end
-  (.{:user, name, age}) when age < 18 do "Minor: " ++ name end
-  (.{:system, msg}) do "System: " ++ msg end
+  ({:user, name, age}) when age >= 18 do "Adult: " ++ name end
+  ({:user, name, age}) when age < 18 do "Minor: " ++ name end
+  ({:system, msg}) do "System: " ++ msg end
   (_) do "Unknown message" end
 end
 ```
@@ -348,7 +348,7 @@ Guards are pure boolean expressions. Avoid complex logic here.
 Send messages to processes using `!`:
 
 ```lx
-pid ! .{:log, "started"}
+pid ! {:log, "started"}
 ```
 
 Returns the sent message. Useful for fire-and-forget.
@@ -362,7 +362,7 @@ Blocking pattern match for process messages:
 ```lx
 receive do
   :ready -> proceed()
-  .{:data, D} -> handle(D)
+  {:data, D} -> handle(D)
 end after 5000 do
   :timeout
 end
@@ -403,7 +403,7 @@ The `with` expression provides elegant error handling and pattern matching for s
 ##### `with`/`else`:
 
 ```lx
-with .{:ok, user} <= get_user(id) do
+with {:ok, user} <= get_user(id) do
   user.name
 else
   "Unknown user"
@@ -413,12 +413,12 @@ end
 ##### `with`/`case` (pattern matching):
 
 ```lx
-with .{:ok, user} <= get_user(id) do
+with {:ok, user} <= get_user(id) do
   user.name
 case
-  .{:error, :not_found} -> "User not found"
-  .{:error, reason} when reason == :timeout -> "Request timeout"
-  .{:error, _} -> "Unknown error"
+  {:error, :not_found} -> "User not found"
+  {:error, reason} when reason == :timeout -> "Request timeout"
+  {:error, _} -> "Unknown error"
   _ -> "Unexpected result"
 end
 ```
@@ -426,18 +426,18 @@ end
 ##### Multiple `with` steps:
 
 ```lx
-with .{:ok, user} <= get_user(id),
-     .{:ok, role} <= get_role(user) do
-  .{user.name, role}
+with {:ok, user} <= get_user(id),
+     {:ok, role} <= get_role(user) do
+  {user.name, role}
 else
-  .{:error, "Failed to get user or role"}
+  {:error, "Failed to get user or role"}
 end
 ```
 
 ##### `with` without else/case (returns optional):
 
 ```lx
-with .{:ok, user} <= get_user(id) do
+with {:ok, user} <= get_user(id) do
   user.name
 end
 # Returns the value on success, or nil on failure
@@ -460,13 +460,13 @@ The `match ... rescue` construct provides elegant error handling for operations 
 
 ```lx
 # Single match rescue - if pattern doesn't match, execute rescue expression
-match .{:ok, user} <- get_user(id) rescue { :user_not_found }
+match {:ok, user} <- get_user(id) rescue { :user_not_found }
 :continue_processing
 
 # Multiple sequential match rescue steps
-match .{:ok, user} <- get_user(id) rescue { :user_error }
+match {:ok, user} <- get_user(id) rescue { :user_error }
 :log_user_retrieved
-match .{:ok, perms} <- get_permissions(user) rescue { :permission_error }
+match {:ok, perms} <- get_permissions(user) rescue { :permission_error }
 :log_permissions_retrieved
 :success
 ```
@@ -477,14 +477,14 @@ match .{:ok, perms} <- get_permissions(user) rescue { :permission_error }
 # Works with different pattern types
 match [head | tail] <- get_list() rescue { [] }
 match %{name: user_name, age: user_age} <- get_user_data() rescue { %{name: "unknown", age: 0} }
-match .{:ok, value} <- computation() rescue { .{:error, "failed"} }
+match {:ok, value} <- computation() rescue { {:error, "failed"} }
 ```
 
 ##### Generated Erlang Code:
 
 ```lx
 # Lx source
-match .{:ok, user} <- get_user() rescue { :error }
+match {:ok, user} <- get_user() rescue { :error }
 :continue
 ```
 
@@ -502,8 +502,8 @@ end
 
 ```lx
 # Multiple steps create nested case expressions
-match .{:ok, user} <- get_user() rescue { :user_error }
-match .{:ok, role} <- get_role(user) rescue { :role_error }
+match {:ok, user} <- get_user() rescue { :user_error }
+match {:ok, role} <- get_role(user) rescue { :role_error }
 :success
 ```
 
@@ -545,7 +545,7 @@ for X in list when X > 0 {
 #### Tuples:
 
 ```lx
-.{user_id, count}, .{}
+{user_id, count}, {}
 ```
 
 #### Lists:
@@ -580,7 +580,7 @@ empty = %{}
 complex = %{
   users: [%{ name: "Alice" }, %{ name: "Bob" }],
   config: %{ timeout: 5000 },
-  metadata: .{:version, "1.0.0"}
+  metadata: {:version, "1.0.0"}
 }
 ```
 
@@ -616,7 +616,7 @@ end
 def handle_response(response) do
   case response do
     %{ status: :ok, data: data } -> data
-    %{ status: :error, message: msg } -> .{:error, msg}
+    %{ status: :error, message: msg } -> {:error, msg}
     _ -> :unknown
   end
 end
@@ -723,7 +723,7 @@ data = <<42, 255:8, 1024:16, "hello"/binary>>
 
 case data {
     <<first, second:8, third:16, rest/binary>> ->
-        .{first, second, third, rest}
+        {first, second, third, rest}
     _ ->
         :error
 }
@@ -731,9 +731,9 @@ case data {
 # Advanced patterns with guards
 case binary_data {
     <<first, second, rest/binary>> when first > 0 ->
-        .{:valid, first, second, rest}
+        {:valid, first, second, rest}
     <<first/integer, _rest/binary>> ->
-        .{:invalid, first}
+        {:invalid, first}
     _ ->
         :unknown
 }
@@ -741,16 +741,16 @@ case binary_data {
 # Protocol parsing examples
 case packet {
     <<"HTTP/", version:2/binary, " ", status:3/binary, rest/binary>> ->
-        .{:http, version, status, rest}
+        {:http, version, status, rest}
     <<"GET ", path/binary>> ->
-        .{:get, path}
+        {:get, path}
     _ ->
         :unknown
 }
 
 # Binary patterns in function parameters
 def parse_header(<<version:8, length:16, data:length/binary>>) do
-  .{:ok, version, length, data}
+  {:ok, version, length, data}
 end
 
 def parse_header(_) do
@@ -760,7 +760,7 @@ end
 # Binary pattern matching in assignments
 def extract_header(packet) do
   <<version:8, length:16, flags:8>> = packet
-  .{version, length, flags}
+  {version, length, flags}
 end
 ```
 
@@ -799,7 +799,7 @@ length = 10
 ```lx
 # Network protocol parsing
 def parse_tcp_header(<<src_port:16, dst_port:16, seq:32, ack:32, rest/binary>>) do
-  .{:tcp_header, src_port, dst_port, seq, ack, rest}
+  {:tcp_header, src_port, dst_port, seq, ack, rest}
 end
 
 # Message encoding
@@ -814,7 +814,7 @@ end
 
 # File format handling
 def parse_png_chunk(<<length:32, type:4/binary, data:length/binary, crc:32>>) do
-  .{:png_chunk, type, data, crc}
+  {:png_chunk, type, data, crc}
 end
 
 # Binary assignment pattern matching
@@ -824,9 +824,9 @@ def process_packet(raw_data) do
 
   # Use extracted variables
   if version == 1 do
-    .{:v1, length, flags}
+    {:v1, length, flags}
   else
-    .{:unsupported, version}
+    {:unsupported, version}
   end
 end
 
@@ -836,7 +836,7 @@ def parse_network_frame(frame) do
   <<preamble:32, header:64/binary, payload_size:16, payload:payload_size/binary, checksum:32>> = frame
 
   # All variables are now available for use
-  .{preamble, header, payload_size, payload, checksum}
+  {preamble, header, payload_size, payload, checksum}
 end
 ```
 
@@ -912,17 +912,17 @@ end
 
 worker user_manager do
   def init(_) do
-    .{:ok, UserState{users: [], count: 0}}
+    {:ok, UserState{users: [], count: 0}}
   end
 
-  def handle_call(.{:add_user, user}, _from, state) do
+  def handle_call({:add_user, user}, _from, state) do
     new_users = [user | state.users]
     new_state = {state | users: new_users, count: state.count + 1}
-    .{:reply, :ok, new_state}
+    {:reply, :ok, new_state}
   end
 
   def handle_call(:get_count, _from, state) do
-    .{:reply, state.count, state}
+    {:reply, state.count, state}
   end
 end
 ```
@@ -934,10 +934,10 @@ worker session_manager do
   def init(_) do
     # Initialize state as a map
     initial_state = %{ sessions: %{}, active_count: 0 }
-    .{:ok, initial_state}
+    {:ok, initial_state}
   end
 
-  def handle_call(.{:create_session, user_id}, _from, state) do
+  def handle_call({:create_session, user_id}, _from, state) do
     # Extract current sessions and count using pattern matching
     %{ sessions: current_sessions, active_count: count } <- state
 
@@ -949,23 +949,23 @@ worker session_manager do
     new_sessions = %{ session_id => session_data | current_sessions }
     new_state = %{ sessions: new_sessions, active_count: count + 1 }
 
-    .{:reply, .{:ok, session_id}, new_state}
+    {:reply, {:ok, session_id}, new_state}
   end
 
-  def handle_call(.{:get_session, session_id}, _from, state) do
+  def handle_call({:get_session, session_id}, _from, state) do
     %{ sessions: sessions } <- state
 
     case sessions[session_id] do
-      nil -> .{:reply, .{:error, :not_found}, state}
-      session_data -> .{:reply, .{:ok, session_data}, state}
+      nil -> {:reply, {:error, :not_found}, state}
+      session_data -> {:reply, {:ok, session_data}, state}
     end
   end
 
-  def handle_call(.{:update_session, session_id, updates}, _from, state) do
+  def handle_call({:update_session, session_id, updates}, _from, state) do
     %{ sessions: sessions, active_count: count } <- state
 
     case sessions[session_id] do
-      nil -> .{:reply, .{:error, :not_found}, state}
+      nil -> {:reply, {:error, :not_found}, state}
       session_data ->
         # Pattern match to extract session fields and apply updates
         %{ user_id: user_id, created_at: created_at } <- session_data
@@ -977,7 +977,7 @@ worker session_manager do
         }
         new_sessions = %{ session_id => updated_session | sessions }
         new_state = %{ sessions: new_sessions, active_count: count }
-        .{:reply, :ok, new_state}
+        {:reply, :ok, new_state}
     end
   end
 end
@@ -991,8 +991,8 @@ end
 
 ```lx
 worker my_worker do
-  def init(_) do .{:ok, []} end
-  def handle_call(:get, _from, state) do .{:reply, state, state} end
+  def init(_) do {:ok, []} end
+  def handle_call(:get, _from, state) do {:reply, state, state} end
 end
 ```
 
@@ -1093,10 +1093,10 @@ project {
         :erlang,
         :kernel,
         :stdlib,
-        .{:crypto, "~> 5.0.0"},
-        .{:mnesia, "~> 4.15.0"},
-        .{:custom_lib, :github, "user/repo"},
-        .{:local_lib, :path, "./libs/local_lib"}
+        {:crypto, "~> 5.0.0"},
+        {:mnesia, "~> 4.15.0"},
+        {:custom_lib, :github, "user/repo"},
+        {:local_lib, :path, "./libs/local_lib"}
     ]
     apps ["web_server", "database_worker", "auth_service"]
 }
@@ -1110,19 +1110,19 @@ deps [:cowboy, :jsx]
 
 deps [
     :erlang,
-    .{:crypto, "~> 5.0.0"},
-    .{:custom_lib, :github, "user/repo"},
-    .{:local_lib, :path, "/path/to/lib"},
-    .{:hex_lib, :hex, "~> 2.1.0"}
+    {:crypto, "~> 5.0.0"},
+    {:custom_lib, :github, "user/repo"},
+    {:local_lib, :path, "/path/to/lib"},
+    {:hex_lib, :hex, "~> 2.1.0"}
 ]
 ```
 
 #### Supported Dependency Sources
 - **Simple**: `:erlang`, `:crypto` (built-in modules)
-- **Versioned**: `.{:crypto, "~> 5.0.0"}`
-- **GitHub**: `.{:custom_lib, :github, "user/repo"}`
-- **Local path**: `.{:local_lib, :path, "/path/to/lib"}`
-- **Hex**: `.{:hex_lib, :hex, "~> 2.1.0"}`
+- **Versioned**: `{:crypto, "~> 5.0.0"}`
+- **GitHub**: `{:custom_lib, :github, "user/repo"}`
+- **Local path**: `{:local_lib, :path, "/path/to/lib"}`
+- **Hex**: `{:hex_lib, :hex, "~> 2.1.0"}`
 
 #### Dependency Resolution
 - **Global**: The `lx.config` file defines global dependencies for the entire project
@@ -1143,7 +1143,7 @@ worker cart_manager do
   def init(_) do
     timestamp = erlang.system_time(:millisecond)
     uuid = crypto.strong_rand_bytes(16)
-    .{:ok, #{carts: #{}, created_at: timestamp, session_id: uuid}}
+    {:ok, #{carts: #{}, created_at: timestamp, session_id: uuid}}
   end
 end
 ```

@@ -33,7 +33,6 @@ rule read = parse
   | "_"             { WILDCARD }
   | "("             { LPAREN }
   | ")"             { RPAREN }
-  | ".{"            { DOT_LBRACE }
   | "{"             { LBRACE }
   | "}"             { RBRACE }
   | "%{"            { PERCENT_LBRACE }

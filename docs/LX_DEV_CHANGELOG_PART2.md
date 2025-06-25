@@ -59,7 +59,7 @@ pub fun categorize_number(x) {
 ```lx
 # Simple with-else
 pub fun get_user_name(id) {
-  with .{:ok, user} <= fetch_user(id) {
+  with {:ok, user} <= fetch_user(id) {
     user.name
   } else {
     "Unknown"
@@ -68,25 +68,25 @@ pub fun get_user_name(id) {
 
 # With case (pattern matching)
 pub fun process_user_result(id) {
-  with .{:ok, user} <= fetch_user(id) {
+  with {:ok, user} <= fetch_user(id) {
     user.name
   } case {
-    .{:error, :not_found} -> "User not found"
-    .{:error, :timeout} -> "Request timeout"
-    .{:error, reason} -> "Error: " ++ reason
+    {:error, :not_found} -> "User not found"
+    {:error, :timeout} -> "Request timeout"
+    {:error, reason} -> "Error: " ++ reason
     _ -> "Unknown error"
   }
 }
 
 # Multiple steps with error handling
 pub fun get_user_permissions(user_id) {
-  with .{:ok, user} <= get_user(user_id),
-       .{:ok, role} <= get_user_role(user) {
-    .{user.name, role.permissions}
+  with {:ok, user} <= get_user(user_id),
+       {:ok, role} <= get_user_role(user) {
+    {user.name, role.permissions}
   } case {
-    .{:error, :not_found} -> .{:error, "User not found"}
-    .{:error, :unauthorized} -> .{:error, "Access denied"}
-    _ -> .{:error, "Unknown error"}
+    {:error, :not_found} -> {:error, "User not found"}
+    {:error, :unauthorized} -> {:error, "Access denied"}
+    _ -> {:error, "Unknown error"}
   }
 }
 ```
@@ -106,7 +106,7 @@ case X == 1 of true -> "one"; _ -> "other" end
 #### With expressions
 ```lx
 # Lx source
-with .{:ok, value} <= get_result() { value } else { "failed" }
+with {:ok, value} <= get_result() { value } else { "failed" }
 ```
 ```erlang
 % Generated Erlang
@@ -161,7 +161,7 @@ Full implementation of the module system in Lx, enabling explicit dependency dec
 #### 1. Dependency Declaration
 - **Global configuration**: Support for `lx.config` for project-wide dependencies
 - **Per-file dependencies**: Each `.lx` file can declare its own dependencies
-- **Multiple sources**: Version (`.{:crypto, "~> 5.0.0"}`), GitHub, local path, hex
+- **Multiple sources**: Version (`{:crypto, "~> 5.0.0"}`), GitHub, local path, hex
 - **Smart resolution**: Merging and overriding of global/local dependencies
 - **Built-in modules**: Automatic support for standard Erlang modules (`:erlang`, `:kernel`, `:stdlib`)
 
@@ -172,10 +172,10 @@ Full implementation of the module system in Lx, enabling explicit dependency dec
 - **Clear error messages**: For missing functions, arity or type mismatches
 
 #### 3. Advanced Dependency Sources
-- **Version**: `.{:crypto, "~> 5.0.0"}`
-- **GitHub**: `.{:custom_lib, :github, "user/repo"}`
-- **Local path**: `.{:local_lib, :path, "/path/to/lib"}`
-- **Hex**: `.{:hex_lib, :hex, "~> 2.1.0"}`
+- **Version**: `{:crypto, "~> 5.0.0"}`
+- **GitHub**: `{:custom_lib, :github, "user/repo"}`
+- **Local path**: `{:local_lib, :path, "/path/to/lib"}`
+- **Hex**: `{:hex_lib, :hex, "~> 2.1.0"}`
 - **Simple**: `:erlang`, `:crypto`
 
 #### 4. Project Configuration
@@ -199,10 +199,10 @@ project {
         :erlang,
         :kernel,
         :stdlib,
-        .{:crypto, "~> 5.0.0"},
-        .{:mnesia, "~> 4.15.0"},
-        .{:custom_lib, :github, "user/repo"},
-        .{:local_lib, :path, "/libs/local_lib"}
+        {:crypto, "~> 5.0.0"},
+        {:mnesia, "~> 4.15.0"},
+        {:custom_lib, :github, "user/repo"},
+        {:local_lib, :path, "/libs/local_lib"}
     ]
     apps ["web_server", "database_worker", "auth_service"]
 }
@@ -213,10 +213,10 @@ project {
 deps [:cowboy, :jsx]
 deps [
     :erlang,
-    .{:crypto, "~> 5.0.0"},
-    .{:custom_lib, :github, "user/repo"},
-    .{:local_lib, :path, "/path/to/lib"},
-    .{:hex_lib, :hex, "~> 2.1.0"}
+    {:crypto, "~> 5.0.0"},
+    {:custom_lib, :github, "user/repo"},
+    {:local_lib, :path, "/path/to/lib"},
+    {:hex_lib, :hex, "~> 2.1.0"}
 ]
 ```
 
@@ -226,7 +226,7 @@ worker cart_manager {
     fun init(_) {
         timestamp = erlang.system_time(:millisecond)
         uuid = crypto.strong_rand_bytes(16)
-        .{:ok, #{carts: #{}, created_at: timestamp, session_id: uuid}}
+        {:ok, #{carts: #{}, created_at: timestamp, session_id: uuid}}
     }
 }
 ```
@@ -259,7 +259,7 @@ Complete implementation of the `match ... rescue` error handling construct in Lx
 - **Type safety**: Full type checking for all components
 
 #### 2. Pattern Matching Support
-- **Tuples**: `match .{:ok, value} <- operation() rescue { :error }`
+- **Tuples**: `match {:ok, value} <- operation() rescue { :error }`
 - **Maps**: `match %{name: user_name} <- get_user() rescue { %{name: "unknown"} }`
 - **Lists**: `match [head | tail] <- get_list() rescue { [] }`
 - **Complex patterns**: Nested structures and mixed pattern types
@@ -275,11 +275,11 @@ Complete implementation of the `match ... rescue` error handling construct in Lx
 #### Individual Steps
 ```lx
 pub fun process_user(id) {
-  match .{:ok, user} <- get_user(id) rescue { :user_not_found }
+  match {:ok, user} <- get_user(id) rescue { :user_not_found }
   :log_user_found
-  match .{:ok, perms} <- get_permissions(user) rescue { :no_permissions }
+  match {:ok, perms} <- get_permissions(user) rescue { :no_permissions }
   :log_permissions_found
-  .{user, perms}
+  {user, perms}
 }
 ```
 
@@ -306,7 +306,7 @@ process_user(Id) ->
 pub fun extract_data() {
   match %{status: :ok, data: %{items: items}} <- fetch_complex_data() rescue { [] }
   match [first | rest] <- items rescue { :empty_list }
-  .{first, length(rest)}
+  {first, length(rest)}
 }
 ```
 
@@ -409,8 +409,8 @@ end
 #### OTP Components
 ```lx
 worker my_worker do
-  def init(_) do .{:ok, []} end
-  def handle_call(:get, _from, state) do .{:reply, state, state} end
+  def init(_) do {:ok, []} end
+  def handle_call(:get, _from, state) do {:reply, state, state} end
 end
 
 supervisor top_sup do

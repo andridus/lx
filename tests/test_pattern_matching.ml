@@ -68,7 +68,7 @@ let test_pattern_matching_floats () =
 (* Test pattern matching with tuple literals *)
 let test_pattern_matching_tuples () =
   let input =
-    "def test_tuples(t) do case t do .{x, y} -> x + y _ -> 0 end end"
+    "def test_tuples(t) do case t do {x, y} -> x + y _ -> 0 end end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in
@@ -105,7 +105,7 @@ let test_pattern_matching_wildcard () =
 (* Test pattern matching with variable binding *)
 let test_pattern_matching_variables () =
   let input =
-    "def test_vars(data) do case data do .{x, y} -> x + y _ -> 0 end end"
+    "def test_vars(data) do case data do {x, y} -> x + y _ -> 0 end end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in
@@ -115,8 +115,8 @@ let test_pattern_matching_variables () =
 (* Test pattern matching with nested structures *)
 let test_pattern_matching_nested () =
   let input =
-    "def test_nested(data) do case data do .{:user, name} -> name _ -> \
-     :unknown end end"
+    "def test_nested(data) do case data do {:user, name} -> name _ -> :unknown \
+     end end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in
@@ -136,8 +136,8 @@ let test_pattern_matching_guards () =
 (* Test pattern matching in function parameters *)
 let test_pattern_matching_function_params () =
   let input =
-    "def process_empty([]) do :empty end def process_pair(.{x, y}) do x + y \
-     end def process_atom(:ok) do :success end"
+    "def process_empty([]) do :empty end def process_pair({x, y}) do x + y end \
+     def process_atom(:ok) do :success end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in
@@ -179,7 +179,7 @@ let test_pattern_matching_complex () =
 (* Test pattern matching with deep nesting *)
 let test_pattern_matching_deep_nesting () =
   let input =
-    "def test_deep(data) do case data do .{x, y} -> x + y _ -> 0 end end"
+    "def test_deep(data) do case data do {x, y} -> x + y _ -> 0 end end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in
@@ -189,7 +189,7 @@ let test_pattern_matching_deep_nesting () =
 (* Test pattern matching with repeated variables *)
 let test_pattern_matching_repeated_vars () =
   let input =
-    "def test_repeated(data) do case data do .{x, y} -> x + y _ -> 0 end end"
+    "def test_repeated(data) do case data do {x, y} -> x + y _ -> 0 end end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in
@@ -218,8 +218,8 @@ let test_pattern_matching_list_comprehensions () =
 (* Test pattern matching with multiple clauses *)
 let test_pattern_matching_multiple_clauses () =
   let input =
-    "def multi_clause([]) do :empty end def multi_clause([x]) do .{:single, x} \
-     end def multi_clause([x, y | rest]) do .{:multiple, x, y, rest} end"
+    "def multi_clause([]) do :empty end def multi_clause([x]) do {:single, x} \
+     end def multi_clause([x, y | rest]) do {:multiple, x, y, rest} end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in

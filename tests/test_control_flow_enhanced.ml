@@ -78,7 +78,7 @@ let test_with_else () =
   let input =
     {|
     defp test() do
-      with .{:ok, value} <= get_result() do
+      with {:ok, value} <= get_result() do
         value
       else
         "failed"
@@ -97,10 +97,10 @@ let test_with_case () =
   let input =
     {|
     defp test() do
-      with .{:ok, value} <= get_result() do
+      with {:ok, value} <= get_result() do
         value
       case
-        .{:error, reason} -> reason
+        {:error, reason} -> reason
         _ -> "unknown"
       end
     end
@@ -118,7 +118,7 @@ let test_with_no_else () =
   let input =
     {|
     defp test() do
-      with .{:ok, value} <= get_result() do
+      with {:ok, value} <= get_result() do
         value
       end
     end
@@ -135,11 +135,11 @@ let test_with_multiple_steps () =
   let input =
     {|
     defp test() do
-      with .{:ok, user} <= get_user(),
-           .{:ok, role} <= get_role(user) do
-        .{user, role}
+      with {:ok, user} <= get_user(),
+           {:ok, role} <= get_role(user) do
+        {user, role}
       else
-        .{:error, "failed"}
+        {:error, "failed"}
       end
     end
   |}
@@ -155,11 +155,11 @@ let test_with_case_guards () =
   let input =
     {|
     defp test() do
-      with .{:ok, value} <= get_result() do
+      with {:ok, value} <= get_result() do
         value
       case
-        .{:error, reason} when reason == :timeout -> "timeout"
-        .{:error, _} -> "other error"
+        {:error, reason} when reason == :timeout -> "timeout"
+        {:error, _} -> "other error"
         _ -> "unknown"
       end
     end
@@ -196,10 +196,10 @@ let test_if_compilation () =
 let test_with_compilation () =
   let input =
     {|
-    def get_result() do .{:ok, "test"} end
+    def get_result() do {:ok, "test"} end
 
     def test_with_else() do
-      with .{:ok, value} <= get_result() do
+      with {:ok, value} <= get_result() do
         value
       else
         "failed"
@@ -207,10 +207,10 @@ let test_with_compilation () =
     end
 
     def test_with_case() do
-      with .{:ok, value} <= get_result() do
+      with {:ok, value} <= get_result() do
         value
       case
-        .{:error, _} -> "error"
+        {:error, _} -> "error"
         _ -> "unknown"
       end
     end
@@ -246,10 +246,10 @@ let test_if_type_checking () =
 let test_with_type_checking () =
   let input =
     {|
-    defp get_result() do .{:ok, "test"} end
+    defp get_result() do {:ok, "test"} end
 
     defp test_with_else() do
-      with .{:ok, value} <= get_result() do
+      with {:ok, value} <= get_result() do
         value
       else
         "failed"

@@ -29,25 +29,6 @@ let rec expr_to_pattern = function
     PBinary (List.map convert_element elements)
   | _ -> failwith "Enhanced:Invalid pattern in assignment|Suggestion:Use valid pattern syntax for destructuring|Context:pattern matching assignment"
 
-(* Helper types and functions for tuple detection *)
-type simple_tuple_element =
-  | STEIdent of string
-  | STEAtom of string
-  | STELiteral of literal
-
-let string_of_literal = function
-  | LString s -> "\"" ^ s ^ "\""
-  | LInt i -> string_of_int i
-  | LFloat f -> string_of_float f
-  | LBool true -> "true"
-  | LBool false -> "false"
-  | LAtom a -> ":" ^ a
-  | LNil -> "nil"
-
-let string_of_simple_tuple_element = function
-  | STEIdent s -> s
-  | STEAtom a -> ":" ^ a
-  | STELiteral lit -> string_of_literal lit
 %}
 
 (* Tokens *)
@@ -82,7 +63,7 @@ let string_of_simple_tuple_element = function
 %token EQ ARROW PIPE WILDCARD
 %token EQEQ NEQ LT GT LEQ GEQ
 %token LPAREN RPAREN LBRACE RBRACE LBRACKET RBRACKET
-%token DOT_LBRACE PERCENT_LBRACE PERCENT_LT PERCENT
+%token PERCENT_LBRACE PERCENT_LT PERCENT
 %token COMMA SEMICOLON CONS COLON DOT
 %token CONCAT PLUS MINUS MULT DIV SEND
 %token ARROW_DOUBLE MATCH_ASSIGN PATTERN_MATCH
@@ -156,10 +137,10 @@ deps_declaration:
 
 dependency_spec:
   | atom = atom { Simple atom }
-  | DOT_LBRACE atom = atom COMMA version = STRING RBRACE { Version (atom, version) }
-  | DOT_LBRACE atom = atom COMMA COLON GITHUB COMMA repo = STRING RBRACE { GitHub (atom, repo) }
-  | DOT_LBRACE atom = atom COMMA COLON PATH COMMA path = STRING RBRACE { Path (atom, path) }
-  | DOT_LBRACE atom = atom COMMA COLON HEX COMMA version = STRING RBRACE { Hex (atom, version) }
+  | LBRACE atom = atom COMMA version = STRING RBRACE { Version (atom, version) }
+  | LBRACE atom = atom COMMA COLON GITHUB COMMA repo = STRING RBRACE { GitHub (atom, repo) }
+  | LBRACE atom = atom COMMA COLON PATH COMMA path = STRING RBRACE { Path (atom, path) }
+  | LBRACE atom = atom COMMA COLON HEX COMMA version = STRING RBRACE { Hex (atom, version) }
 
 atom:
   | COLON name = IDENT { name }
@@ -493,8 +474,8 @@ simple_expr:
       | [] -> Tuple []
       | [e] -> e  (* Single element in parentheses is just grouping *)
       | es -> Tuple es }
-  (* Tuple syntax with .{} *)
-  | DOT_LBRACE elements = separated_list(COMMA, expr) RBRACE
+  (* Tuple syntax with {} *)
+  | LBRACE elements = separated_list(COMMA, expr) RBRACE
     { Tuple elements }
   | LBRACKET elements = separated_list(COMMA, expr) RBRACKET
     { List elements }
@@ -504,29 +485,8 @@ simple_expr:
       | [e] -> e  (* Single expression block returns the expression directly *)
       | es -> Block es  (* Multiple expressions become a Block *)
     }
-  (* Smart error detection for potential tuple syntax misuse *)
-  | LBRACE first_var = IDENT COMMA rest_vars = separated_nonempty_list(COMMA, IDENT) RBRACE
-    { let all_vars = first_var :: rest_vars in
-      let vars_str = String.concat ", " all_vars in
-      let suggestion = ".{" ^ vars_str ^ "}" in
-      failwith ("Enhanced:Invalid syntax - looks like you're trying to create a tuple|Suggestion:Use '" ^ suggestion ^ "' for tuple syntax instead of '{" ^ vars_str ^ "}'|Context:In Lx, tuples are created with .{} syntax, not {} syntax. Curly braces {} are reserved for records, maps, and structured data") }
-  (* Detect tuple-like patterns with atoms and literals *)
-  | LBRACE first_atom = ATOM COMMA rest_elements = separated_nonempty_list(COMMA, simple_tuple_element) RBRACE
-    { let first_str = ":" ^ first_atom in
-      let rest_strs = List.map string_of_simple_tuple_element rest_elements in
-      let all_elements = first_str :: rest_strs in
-      let elements_str = String.concat ", " all_elements in
-      let suggestion = ".{" ^ elements_str ^ "}" in
-      failwith ("Enhanced:Invalid syntax - looks like you're trying to create a tuple|Suggestion:Use '" ^ suggestion ^ "' for tuple syntax instead of '{" ^ elements_str ^ "}'|Context:In Lx, tuples are created with .{} syntax, not {} syntax. Curly braces {} are reserved for records, maps, and structured data") }
-  (* Detect tuple-like patterns starting with literals *)
-  | LBRACE first_lit = literal COMMA rest_elements = separated_nonempty_list(COMMA, simple_tuple_element) RBRACE
-    { let first_str = string_of_literal first_lit in
-      let rest_strs = List.map string_of_simple_tuple_element rest_elements in
-      let all_elements = first_str :: rest_strs in
-      let elements_str = String.concat ", " all_elements in
-      let suggestion = ".{" ^ elements_str ^ "}" in
-      failwith ("Enhanced:Invalid syntax - looks like you're trying to create a tuple|Suggestion:Use '" ^ suggestion ^ "' for tuple syntax instead of '{" ^ elements_str ^ "}'|Context:In Lx, tuples are created with .{} syntax, not {} syntax. Curly braces {} are reserved for records, maps, and structured data") }
-
+  | LBRACE elements = separated_list(COMMA, expr) RBRACE
+    { Tuple elements }
 case_branch:
   | pattern = pattern WHEN guard = guard_expr ARROW body = expr
     { (pattern, Some guard, body) }
@@ -564,7 +524,7 @@ simple_pattern:
       | [p] -> p
       | ps -> PTuple ps }
   (* Tuple pattern syntax with .{} *)
-  | DOT_LBRACE patterns = separated_list(COMMA, pattern) RBRACE
+  | LBRACE patterns = separated_list(COMMA, pattern) RBRACE
     { PTuple patterns }
   | LBRACKET patterns = separated_list(COMMA, pattern) RBRACKET
     { PList patterns }

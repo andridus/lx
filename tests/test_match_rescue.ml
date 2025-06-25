@@ -31,7 +31,7 @@ let test_individual_match_rescue_parsing () =
   let code =
     {|
 def test() do
-  match .{:ok, 1} <- get_value() rescue :error end
+  match {:ok, 1} <- get_value() rescue :error end
   :continue
 end
 |}
@@ -73,8 +73,8 @@ let test_block_match_rescue_parsing () =
   let code =
     {|
 def test() do
-  match .{:ok, 1} <- get_value() rescue :error1 end
-  match .{:ok, 2} <- get_value2() rescue :error2 end
+  match {:ok, 1} <- get_value() rescue :error1 end
+  match {:ok, 2} <- get_value2() rescue :error2 end
   :success
 end
 |}
@@ -114,9 +114,9 @@ end
 let test_individual_match_rescue_codegen () =
   let code =
     {|
-def c() do .{:ok, 1} end
+def c() do {:ok, 1} end
 def test() do
-  match .{:ok, 1} <- c() rescue 1 end
+  match {:ok, 1} <- c() rescue 1 end
   :done
 end
 |}
@@ -137,11 +137,11 @@ end
 let test_block_match_rescue_codegen () =
   let code =
     {|
-def c() do .{:ok, 1} end
-def e() do .{:ok, 2} end
+def c() do {:ok, 1} end
+def e() do {:ok, 2} end
 def test() do
-  match .{:ok, 1} <- c() rescue 1 end
-  match .{:ok, 2} <- e() rescue 2 end
+  match {:ok, 1} <- c() rescue 1 end
+  match {:ok, 2} <- e() rescue 2 end
   :success
 end
 |}
@@ -164,13 +164,13 @@ end
 let test_complex_match_rescue_sequence () =
   let code =
     {|
-def get_user() do .{:ok, "alice"} end
-def get_perms() do .{:ok, [:read, :write]} end
+def get_user() do {:ok, "alice"} end
+def get_perms() do {:ok, [:read, :write]} end
 def process() do
-  match .{:ok, user} <- get_user() rescue :user_error end
+  match {:ok, user} <- get_user() rescue :user_error end
   :log_user
   :validate_user
-  match .{:ok, perms} <- get_perms() rescue :perm_error end
+  match {:ok, perms} <- get_perms() rescue :perm_error end
   :log_perms
   :final_result
 end
@@ -228,7 +228,7 @@ let test_match_rescue_error_cases () =
   (* Test missing rescue clause *)
   let invalid_code = {|
 def test() do
-  match .{:ok, 1} <- get_value()
+  match {:ok, 1} <- get_value()
 end
 |} in
   (match parse_lx_code invalid_code with
@@ -252,7 +252,7 @@ let test_match_rescue_no_guards () =
   let code =
     {|
 def test() do
-  match .{:ok, x} <- get_value() rescue :error end
+  match {:ok, x} <- get_value() rescue :error end
   :done
 end
 |}
@@ -266,8 +266,8 @@ let test_nested_match_rescue () =
   let code =
     {|
 def test_nested() do
-  match .{:ok, _value1} <- erlang.system_time() rescue :error1 end
-  match .{:ok, _value2} <- erlang.system_time() rescue :error2 end
+  match {:ok, _value1} <- erlang.system_time() rescue :error1 end
+  match {:ok, _value2} <- erlang.system_time() rescue :error2 end
   :success
 end
 |}
@@ -285,8 +285,8 @@ let test_match_rescue_return_values () =
   let code =
     {|
 def test_returns() do
-  x = match .{:ok, _value} <- erlang.system_time() rescue 0 end
-  y = match .{:error, _} <- erlang.system_time() rescue 1 end
+  x = match {:ok, _value} <- erlang.system_time() rescue 0 end
+  y = match {:error, _} <- erlang.system_time() rescue 1 end
   x + y
 end
 |}

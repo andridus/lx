@@ -213,7 +213,7 @@ let test_comparison_precedence () =
 let test_with_with_else () =
   let result =
     Compiler.parse_string
-      "def test() do with .{:ok, value} <= get_result() do value else \
+      "def test() do with {:ok, value} <= get_result() do value else \
        \"failed\" end end"
   in
   match result.items with
@@ -247,10 +247,10 @@ let test_with_with_case () =
     Compiler.parse_string
       {|
       def test() do
-        with .{:ok, value} <= get_result() do
+        with {:ok, value} <= get_result() do
           value
         case
-          .{:error, _} -> "error"
+          {:error, _} -> "error"
           _ -> "unknown"
         end
       end
@@ -282,8 +282,8 @@ let test_with_with_case () =
 let test_with_multiple_steps () =
   let result =
     Compiler.parse_string
-      "def test() do with .{:ok, user} <= get_user(), .{:ok, role} <= \
-       get_role(user) do .{user, role} else .{:error, \"failed\"} end end"
+      "def test() do with {:ok, user} <= get_user(), {:ok, role} <= \
+       get_role(user) do {user, role} else {:error, \"failed\"} end end"
   in
   match result.items with
   | [
@@ -314,10 +314,10 @@ let test_with_case_with_guards () =
     Compiler.parse_string
       {|
       def test() do
-        with .{:ok, value} <= get_result() do
+        with {:ok, value} <= get_result() do
           value
         case
-          .{:error, reason} when reason == :timeout -> "timeout"
+          {:error, reason} when reason == :timeout -> "timeout"
           _ -> "other"
         end
       end
@@ -382,7 +382,7 @@ let test_if_without_else () =
 let test_with_without_else () =
   let result =
     Compiler.parse_string
-      "def test() do with .{:ok, value} <= get_result() do value end end"
+      "def test() do with {:ok, value} <= get_result() do value end end"
   in
   match result.items with
   | [

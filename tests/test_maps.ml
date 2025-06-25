@@ -198,7 +198,7 @@ let test_map_pattern_in_function () =
 let test_map_pattern_in_case () =
   let input =
     "def handle_response(response) do case response do %{ status: :ok, data: \
-     data } -> data %{ status: :error, message: msg } -> .{:error, msg} _ -> \
+     data } -> data %{ status: :error, message: msg } -> {:error, msg} _ -> \
      :unknown end end"
   in
   try
@@ -260,7 +260,7 @@ let test_map_pattern_with_guards () =
 let test_complex_map_structures () =
   let input =
     "def test() do %{ users: [%{ name: \"Alice\" }, %{ name: \"Bob\" }], \
-     config: %{ timeout: 5000 }, metadata: .{:version, \"1.0.0\"} } end"
+     config: %{ timeout: 5000 }, metadata: {:version, \"1.0.0\"} } end"
   in
   try
     let program = parse_program_string input in

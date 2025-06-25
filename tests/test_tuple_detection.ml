@@ -12,83 +12,10 @@ let string_contains_substring s sub =
   in
   search 0
 
-let test_tuple_detection_variables_only () =
-  (* Test detection of {var1, var2, var3} pattern *)
-  try
-    ignore (Compiler.parse_string "def test() do result = {x, y, z} }");
-    fail "Expected parse error for incorrect tuple syntax"
-  with
-  | CompilationError error ->
-      check bool "Error message should mention tuple syntax" true
-        (string_contains_substring error.message "tuple");
-      check bool "Suggestion should show correct syntax" true
-        (string_contains_substring
-           (Option.value error.suggestion ~default:"")
-           ".{x, y, z}");
-      check bool "Context should explain tuple syntax" true
-        (string_contains_substring
-           (Option.value error.context ~default:"")
-           ".{} syntax")
-  | _ -> fail "Expected CompilationError"
-
-let test_tuple_detection_atom_literals () =
-  (* Test detection of {:atom, literal, var} pattern *)
-  try
-    ignore
-      (Compiler.parse_string "def test() do status = {:ok, 42, \"success\"} end");
-    fail "Expected parse error for incorrect tuple syntax"
-  with
-  | CompilationError error ->
-      check bool "Error message should mention tuple syntax" true
-        (string_contains_substring error.message "tuple");
-      check bool "Suggestion should show correct syntax with atom" true
-        (string_contains_substring
-           (Option.value error.suggestion ~default:"")
-           ".{:ok, 42, \"success\"}");
-      check bool "Context should explain tuple syntax" true
-        (string_contains_substring
-           (Option.value error.context ~default:"")
-           ".{} syntax")
-  | _ -> fail "Expected CompilationError"
-
-let test_tuple_detection_mixed_content () =
-  (* Test detection of atom-first tuple pattern *)
-  try
-    ignore (Compiler.parse_string "def test() do status = {:error, 500} end");
-    fail "Expected parse error for incorrect tuple syntax"
-  with
-  | CompilationError error ->
-      check bool "Error message should mention invalid block syntax" true
-        (string_contains_substring error.message "Invalid syntax");
-      check bool "Suggestion should show correct atom tuple syntax" true
-        (string_contains_substring
-           (Option.value error.suggestion ~default:"")
-           ".{:error, 500}");
-      check bool "Context should explain the difference" true
-        (string_contains_substring
-           (Option.value error.context ~default:"")
-           ".{} syntax")
-  | _ -> fail "Expected CompilationError"
-
-let test_tuple_detection_in_receive () =
-  (* Test detection in a simpler assignment context *)
-  try
-    ignore (Compiler.parse_string "def test() do result = {x, y, z} end");
-    fail "Expected parse error for incorrect tuple syntax"
-  with
-  | CompilationError error ->
-      check bool "Error message should mention tuple syntax" true
-        (string_contains_substring error.message "tuple");
-      check bool "Suggestion should show correct syntax" true
-        (string_contains_substring
-           (Option.value error.suggestion ~default:"")
-           ".{x, y, z}")
-  | _ -> fail "Expected CompilationError"
-
 let test_correct_tuple_syntax_works () =
   (* Test that correct tuple syntax compiles successfully *)
   let result =
-    Compiler.parse_string "def test() do .{:result, 200, \"done\"} end"
+    Compiler.parse_string "def test() do {:result, 200, \"done\"} end"
   in
   match result.items with
   | [
@@ -141,21 +68,6 @@ let test_correct_block_syntax_works () =
       () (* Success - correct block syntax works *)
   | _ -> fail "Expected correct block syntax to work"
 
-let test_position_accuracy () =
-  (* Test that error positions are accurate - simpler case *)
-  try
-    ignore
-      (Compiler.parse_string ~filename:(Some "test.lx")
-         "def test() do\n  result = {x, y}\nend");
-    fail "Expected parse error with position"
-  with
-  | CompilationError error ->
-      check int "Should report line 3" 3 error.position.line;
-      check (option string) "Should include filename" (Some "test.lx")
-        error.position.filename;
-      check bool "Column should be reasonable" true (error.position.column > 0)
-  | _ -> fail "Expected CompilationError"
-
 let test_no_false_positives () =
   (* Test that legitimate block expressions don't trigger tuple detection *)
   let legitimate_blocks =
@@ -180,18 +92,9 @@ let test_no_false_positives () =
 
 let tests =
   [
-    test_case "tuple_detection_variables_only" `Quick
-      test_tuple_detection_variables_only;
-    test_case "tuple_detection_atom_literals" `Quick
-      test_tuple_detection_atom_literals;
-    test_case "tuple_detection_mixed_content" `Quick
-      test_tuple_detection_mixed_content;
-    test_case "tuple_detection_in_receive" `Quick
-      test_tuple_detection_in_receive;
     test_case "correct_tuple_syntax_works" `Quick
       test_correct_tuple_syntax_works;
     test_case "correct_block_syntax_works" `Quick
       test_correct_block_syntax_works;
-    test_case "position_accuracy" `Quick test_position_accuracy;
     test_case "no_false_positives" `Quick test_no_false_positives;
   ]
