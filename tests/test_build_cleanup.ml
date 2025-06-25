@@ -56,14 +56,14 @@ let test_cleanup_application_to_non_application () =
     let test_file = Filename.concat temp_dir "test_app.lx" in
     let app_content =
       {|
-application {
+application do
   description "Test cleanup application"
   vsn "1.0.0"
-}
+end
 
-pub fun hello() {
+pub fun hello() do
   "Hello from app!"
-}
+end
 |}
     in
     write_file test_file app_content;
@@ -88,13 +88,13 @@ pub fun hello() {
     (* Now change to non-application *)
     let non_app_content =
       {|
-pub fun hello() {
+pub fun hello() do
   "Hello from module!"
-}
+end
 
-pub fun add(a, b) {
+pub fun add(a, b) do
   a + b
-}
+end
 |}
     in
     write_file test_file non_app_content;
@@ -132,13 +132,13 @@ let test_cleanup_non_application_to_application () =
     let test_file = Filename.concat temp_dir "test_module.lx" in
     let non_app_content =
       {|
-pub fun greet(name) {
+pub fun greet(name) do
   name
-}
+end
 
-pub fun calculate(x, y) {
+pub fun calculate(x, y) do
   x + y
-}
+end
 |}
     in
     write_file test_file non_app_content;
@@ -160,18 +160,18 @@ pub fun calculate(x, y) {
     (* Now change to application *)
     let app_content =
       {|
-application {
+application do
   description "Test module converted to app"
   vsn "2.0.0"
-}
+end
 
-pub fun greet(name) {
+pub fun greet(name) do
   name
-}
+end
 
-pub fun calculate(x, y) {
+pub fun calculate(x, y) do
   x + y
-}
+end
 |}
     in
     write_file test_file app_content;
@@ -213,14 +213,14 @@ let test_cleanup_same_type_recompilation () =
     let test_file = Filename.concat temp_dir "test_same.lx" in
     let app_content_v1 =
       {|
-application {
+application do
   description "Version 1"
   vsn "1.0.0"
-}
+end
 
-pub fun version() {
+pub fun version() do
   "v1"
-}
+end
 |}
     in
     write_file test_file app_content_v1;
@@ -239,18 +239,18 @@ pub fun version() {
     (* Modify the application and recompile *)
     let app_content_v2 =
       {|
-application {
+application do
   description "Version 2"
   vsn "2.0.0"
-}
+end
 
-pub fun version() {
+pub fun version() do
   "v2"
-}
+end
 
-pub fun new_feature() {
+pub fun new_feature() do
   "added in v2"
-}
+end
 |}
     in
     write_file test_file app_content_v2;
@@ -287,9 +287,9 @@ let test_cleanup_handles_missing_directory () =
     (* Create a test file *)
     let test_file = Filename.concat temp_dir "test_missing.lx" in
     let content = {|
-pub fun test() {
+pub fun test() do
   "test"
-}
+end
 |} in
     write_file test_file content;
 

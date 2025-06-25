@@ -59,7 +59,7 @@ let string_of_simple_tuple_element = function
 %token MODULE_MACRO
 
 (* Keywords *)
-%token PUB FUN CASE IF ELSE FOR WHEN IN AND OR NOT ANDALSO ORELSE RECEIVE AFTER MATCH_KEYWORD
+%token PUB FUN CASE IF ELSE DO END FOR WHEN IN AND OR NOT ANDALSO ORELSE RECEIVE AFTER MATCH_KEYWORD
   %token RECORD UNSAFE WITH RESCUE
 
 (* Module System Keywords *)
@@ -176,111 +176,111 @@ module_item:
 
 function_def:
   (* Public functions - new syntax for multiple arities *)
-  | PUB FUN name = IDENT LBRACE clauses = function_clause+ RBRACE
+  | PUB FUN name = IDENT DO clauses = function_clause+ END
     { let pos = make_position $startpos in { name; clauses; visibility = Public; position = Some pos } }
   (* Public functions - backward compatibility: single clause with pattern support *)
-  | PUB FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr LBRACE body = function_body RBRACE
+  | PUB FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr DO body = function_body END
     { let pos = make_position $startpos in
       let clause = { params; body; position = Some pos; guard = Some guard } in
       { name; clauses = [clause]; visibility = Public; position = Some pos } }
-  | PUB FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN LBRACE body = function_body RBRACE
+  | PUB FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN DO body = function_body END
     { let pos = make_position $startpos in
       let clause = { params; body; position = Some pos; guard = None } in
       { name; clauses = [clause]; visibility = Public; position = Some pos } }
-  | PUB FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr LBRACE RBRACE
+  | PUB FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr DO END
     { let pos = make_position $startpos in
       let clause = { params; body = Literal LNil; position = Some pos; guard = Some guard } in
       { name; clauses = [clause]; visibility = Public; position = Some pos } }
-  | PUB FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN LBRACE RBRACE
+  | PUB FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN DO END
     { let pos = make_position $startpos in
       let clause = { params; body = Literal LNil; position = Some pos; guard = None } in
       { name; clauses = [clause]; visibility = Public; position = Some pos } }
   (* Private functions (default) - new syntax for multiple arities *)
-  | FUN name = IDENT LBRACE clauses = function_clause+ RBRACE
+  | FUN name = IDENT DO clauses = function_clause+ END
     { let pos = make_position $startpos in { name; clauses; visibility = Private; position = Some pos } }
   (* Private functions (default) - backward compatibility: single clause with pattern support *)
-  | FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr LBRACE body = function_body RBRACE
+  | FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr DO body = function_body END
     { let pos = make_position $startpos in
       let clause = { params; body; position = Some pos; guard = Some guard } in
       { name; clauses = [clause]; visibility = Private; position = Some pos } }
-  | FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN LBRACE body = function_body RBRACE
+  | FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN DO body = function_body END
     { let pos = make_position $startpos in
       let clause = { params; body; position = Some pos; guard = None } in
       { name; clauses = [clause]; visibility = Private; position = Some pos } }
-  | FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr LBRACE RBRACE
+  | FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr DO END
     { let pos = make_position $startpos in
       let clause = { params; body = Literal LNil; position = Some pos; guard = Some guard } in
       { name; clauses = [clause]; visibility = Private; position = Some pos } }
-  | FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN LBRACE RBRACE
+  | FUN name = IDENT LPAREN params = separated_list(COMMA, pattern) RPAREN DO END
     { let pos = make_position $startpos in
       let clause = { params; body = Literal LNil; position = Some pos; guard = None } in
       { name; clauses = [clause]; visibility = Private; position = Some pos } }
   | FUN _name = IDENT LPAREN _params = separated_list(COMMA, pattern) RPAREN error
-    { failwith "Enhanced:Missing function body - expected '{' after parameter list|Suggestion:Add '{' and '}' to define the function body|Context:function definition" }
+    { failwith "Enhanced:Missing function body - expected 'do' after parameter list|Suggestion:Add 'do' and 'end' to define the function body|Context:function definition" }
   | FUN _name = IDENT error
-    { failwith "Enhanced:Missing parameter list or clause block - expected '(' or '{' after function name|Suggestion:Use 'fun name() { body }' for single clause functions or 'fun name { (params) { body } }' for multiple clause functions|Context:function definition" }
+    { failwith "Enhanced:Missing parameter list or clause block - expected '(' or 'do' after function name|Suggestion:Use 'fun name() do body end' for single clause functions or 'fun name do (params) do body end end' for multiple clause functions|Context:function definition" }
   | FUN error
     { failwith "Enhanced:Missing function name after 'fun' keyword|Suggestion:Provide a valid identifier name for the function|Context:function definition" }
 
 function_clause:
-  | LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr LBRACE body = function_body RBRACE
+  | LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr DO body = function_body END
     { let pos = make_position $startpos in { params; body; position = Some pos; guard = Some guard } }
-  | LPAREN params = separated_list(COMMA, pattern) RPAREN LBRACE body = function_body RBRACE
+  | LPAREN params = separated_list(COMMA, pattern) RPAREN DO body = function_body END
     { let pos = make_position $startpos in { params; body; position = Some pos; guard = None } }
-  | LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr LBRACE RBRACE
+  | LPAREN params = separated_list(COMMA, pattern) RPAREN WHEN guard = guard_expr DO END
     { let pos = make_position $startpos in { params; body = Literal LNil; position = Some pos; guard = Some guard } }
-  | LPAREN params = separated_list(COMMA, pattern) RPAREN LBRACE RBRACE
+  | LPAREN params = separated_list(COMMA, pattern) RPAREN DO END
     { let pos = make_position $startpos in { params; body = Literal LNil; position = Some pos; guard = None } }
   | error
-    { failwith "Enhanced:Invalid function clause syntax - expected parameter list in parentheses|Suggestion:For single clause functions use 'fun name() { body }', for multiple clause functions use 'fun name { (params) { body } }'|Context:function clause definition" }
+    { failwith "Enhanced:Invalid function clause syntax - expected parameter list in parentheses|Suggestion:For single clause functions use 'fun name() do body end', for multiple clause functions use 'fun name do (params) do body end end'|Context:function clause definition" }
 
 otp_component:
   | w = worker_def { w }
   | s = supervisor_def { s }
 
 worker_def:
-  | WORKER name = IDENT LBRACE functions = function_def* specs = spec_def* RBRACE
+  | WORKER name = IDENT DO functions = function_def* specs = spec_def* END
     { let pos = make_position $startpos in
       Worker { name; functions; specs; position = Some pos } }
 
 supervisor_def:
-  | SUPERVISOR name = IDENT LBRACE
+  | SUPERVISOR name = IDENT DO
       STRATEGY strategy = otp_strategy
       CHILDREN LBRACKET children = separated_list(COMMA, IDENT) RBRACKET
-    RBRACE
+    END
     { let pos = make_position $startpos in
       Supervisor { name = Some name; strategy; children = SimpleChildren children; position = Some pos } }
 
-  | SUPERVISOR name = IDENT LBRACE
+  | SUPERVISOR name = IDENT DO
       STRATEGY strategy = otp_strategy
       CHILDREN LBRACE children_spec = children_specification RBRACE
-    RBRACE
+    END
     { let pos = make_position $startpos in
       Supervisor { name = Some name; strategy; children = children_spec; position = Some pos } }
 
-  | SUPERVISOR LBRACE
+  | SUPERVISOR DO
       STRATEGY strategy = otp_strategy
       CHILDREN LBRACKET children = separated_list(COMMA, IDENT) RBRACKET
-    RBRACE
+    END
     { let pos = make_position $startpos in
       Supervisor { name = None; strategy; children = SimpleChildren children; position = Some pos } }
 
-  | SUPERVISOR LBRACE
+  | SUPERVISOR DO
       STRATEGY strategy = otp_strategy
       CHILDREN LBRACE children_spec = children_specification RBRACE
-    RBRACE
+    END
     { let pos = make_position $startpos in
       Supervisor { name = None; strategy; children = children_spec; position = Some pos } }
 
   (* Error cases *)
-  | SUPERVISOR name = IDENT LBRACE
+  | SUPERVISOR name = IDENT DO
       STRATEGY strategy = otp_strategy
       CHILDREN _first_child = IDENT error
-    { failwith ("Enhanced:Invalid supervisor children field - brackets are required around the children list|Suggestion:Change 'children " ^ _first_child ^ ", ...' to 'children [" ^ _first_child ^ ", ...]'|Context:Supervisor children must always be enclosed in brackets for consistency with list syntax|Example:supervisor " ^ name ^ " {\n  strategy " ^ (match strategy with OneForOne -> "one_for_one" | OneForAll -> "one_for_all" | RestForOne -> "rest_for_one") ^ "\n  children [" ^ _first_child ^ "]\n}") }
-  | SUPERVISOR name = IDENT LBRACE
+    { failwith ("Enhanced:Invalid supervisor children field - brackets are required around the children list|Suggestion:Change 'children " ^ _first_child ^ ", ...' to 'children [" ^ _first_child ^ ", ...]'|Context:Supervisor children must always be enclosed in brackets for consistency with list syntax|Example:supervisor " ^ name ^ " do\n  strategy " ^ (match strategy with OneForOne -> "one_for_one" | OneForAll -> "one_for_all" | RestForOne -> "rest_for_one") ^ "\n  children [" ^ _first_child ^ "]\nend") }
+  | SUPERVISOR name = IDENT DO
       STRATEGY _strategy = otp_strategy
       CHILDREN error
-    { failwith ("Enhanced:Invalid supervisor children field - expected '[' or '{' after 'children' keyword|Suggestion:Use 'children [worker1, worker2]' or 'children { worker [worker1], supervisor [supervisor1] }'|Context:Supervisor children must be enclosed in brackets or braces|Example:supervisor " ^ name ^ " {\n  strategy one_for_one\n  children [worker1, worker2]\n}") }
+    { failwith ("Enhanced:Invalid supervisor children field - expected '[' or '{' after 'children' keyword|Suggestion:Use 'children [worker1, worker2]' or 'children { worker [worker1], supervisor [supervisor1] }'|Context:Supervisor children must be enclosed in brackets or braces|Example:supervisor " ^ name ^ " do\n  strategy one_for_one\n  children [worker1, worker2]\nend") }
 
 otp_strategy:
   | ONE_FOR_ONE { OneForOne }
@@ -288,37 +288,37 @@ otp_strategy:
   | REST_FOR_ONE { RestForOne }
 
 spec_def:
-  | SPEC name = IDENT LBRACE RBRACE
+  | SPEC name = IDENT DO END
     { { name; requires = []; ensures = [] } }
-  | SPEC name = IDENT LBRACE REQUIRES requires = separated_list(COMMA, spec_expr) RBRACE
+  | SPEC name = IDENT DO REQUIRES requires = separated_list(COMMA, spec_expr) END
     { { name; requires; ensures = [] } }
-  | SPEC name = IDENT LBRACE ENSURES ensures = separated_list(COMMA, spec_expr) RBRACE
+  | SPEC name = IDENT DO ENSURES ensures = separated_list(COMMA, spec_expr) END
     { { name; requires = []; ensures } }
-  | SPEC name = IDENT LBRACE
+  | SPEC name = IDENT DO
       REQUIRES requires = separated_list(COMMA, spec_expr)
       ENSURES ensures = separated_list(COMMA, spec_expr)
-    RBRACE
+    END
     { { name; requires; ensures } }
 
 spec_expr:
   | e = expr { e }
 
 test_block:
-  | IDENT LBRACE tests = test_def* RBRACE
+  | IDENT DO tests = test_def* END
     { if $1 = "describe" then { name = ""; tests } else failwith "Expected 'describe' keyword" }
-  | IDENT name = STRING LBRACE tests = test_def* RBRACE
+  | IDENT name = STRING DO tests = test_def* END
     { if $1 = "describe" then { name; tests } else failwith "Expected 'describe' keyword" }
   | IDENT error
     { if $1 = "describe" then
-        failwith "Enhanced:The describe block must be followed by a description string|Suggestion:Use 'describe \"description\" { ... }'|Context:test block definition"
+        failwith "Enhanced:The describe block must be followed by a description string|Suggestion:Use 'describe \"description\" do ... end'|Context:test block definition"
       else failwith "Expected 'describe' keyword" }
 
 test_def:
-  | IDENT name = STRING LBRACE body = expr RBRACE
+  | IDENT name = STRING DO body = expr END
     { if $1 = "test" then { name; body } else failwith "Expected 'test' keyword" }
   | IDENT error
     { if $1 = "test" then
-        failwith "Enhanced:The test block must be followed by a description string|Suggestion:Use 'test \"description\" { ... }'|Context:test definition"
+        failwith "Enhanced:The test block must be followed by a description string|Suggestion:Use 'test \"description\" do ... end'|Context:test definition"
       else failwith "Expected 'test' keyword" }
 
 expr:
@@ -392,7 +392,7 @@ expr:
     { Send (left, right) }
   | NOT right = expr
     { UnaryOp ("not", right) }
-  | IF cond = expr LBRACE then_statements = statement_list RBRACE ELSE LBRACE else_statements = statement_list RBRACE
+  | IF cond = expr DO then_statements = statement_list ELSE else_statements = statement_list END
     { let then_expr = match then_statements with
         | [e] -> e
         | es -> Block es
@@ -402,7 +402,7 @@ expr:
         | es -> Block es
       in
       If (cond, then_expr, Some (SimpleElse else_expr)) }
-  | IF cond = expr LBRACE then_statements = statement_list RBRACE CASE LBRACE case_clauses = nonempty_list(case_branch) RBRACE
+  | IF cond = expr DO then_statements = statement_list CASE case_clauses = nonempty_list(case_branch) END
     { let then_expr = match then_statements with
         | [e] -> e
         | es -> Block es
@@ -410,39 +410,41 @@ expr:
       If (cond, then_expr, Some (ClauseElse case_clauses)) }
 
 
-  | IF cond = expr LBRACE then_statements = statement_list RBRACE
+  | IF cond = expr DO then_statements = statement_list END
     { let then_expr = match then_statements with
         | [e] -> e
         | es -> Block es
       in
       If (cond, then_expr, None) }
-  | IF _cond = expr LBRACE error
-    { failwith "Enhanced:Missing expression in if block|Suggestion:Add an expression inside the braces|Context:if statement" }
+  | IF _cond = expr DO error
+    { failwith "Enhanced:Missing expression in if block|Suggestion:Add an expression after 'do'|Context:if statement" }
   | IF _cond = expr error
-    { failwith "Enhanced:Missing opening brace in if statement|Suggestion:Add '{' after the condition|Context:if statement" }
+    { failwith "Enhanced:Missing 'do' keyword in if statement|Suggestion:Add 'do' after the condition|Context:if statement" }
   | IF error
     { failwith "Enhanced:Missing condition after 'if' keyword|Suggestion:Add a boolean expression after 'if'|Context:if statement" }
-  | CASE value = expr LBRACE cases = nonempty_list(case_branch) RBRACE
+  | CASE value = expr DO cases = nonempty_list(case_branch) END
     { Match (value, cases) }
-  | MATCH_KEYWORD steps = match_rescue_steps LBRACE success_body = expr RBRACE
+  | MATCH_KEYWORD steps = match_rescue_steps DO success_body = expr END
     { MatchRescue (steps, success_body) }
-  | MATCH_KEYWORD pattern = pattern PATTERN_MATCH expr = expr RESCUE rescue_expr = expr
+  | MATCH_KEYWORD pattern = pattern PATTERN_MATCH expr = expr RESCUE rescue_expr = expr END
     { MatchRescueStep (pattern, expr, rescue_expr) }
-  | WITH steps = with_steps LBRACE success_body = expr RBRACE
+  | WITH steps = with_steps DO success_body = expr END
     { With (steps, success_body, None) }
-  | WITH steps = with_steps LBRACE success_body = expr RBRACE ELSE LBRACE else_statements = statement_list RBRACE
+  | WITH steps = with_steps DO success_body = expr ELSE else_statements = statement_list END
     { let else_expr = match else_statements with
         | [e] -> e
         | es -> Block es
       in
       With (steps, success_body, Some (SimpleElse else_expr)) }
-  | WITH steps = with_steps LBRACE success_body = expr RBRACE CASE LBRACE case_clauses = nonempty_list(case_branch) RBRACE
+  | WITH steps = with_steps DO success_body = expr CASE case_clauses = nonempty_list(case_branch) END
     { With (steps, success_body, Some (ClauseElse case_clauses)) }
-  | FOR var = IDENT IN iterable = expr LBRACE body = expr RBRACE
-    { For (var, iterable, body) }
-  | RECEIVE LBRACE clauses = nonempty_list(receive_clause) RBRACE
+  | FOR var = IDENT IN iterable = expr WHEN guard = guard_expr DO body = expr END
+    { For (var, iterable, body, Some guard) }
+  | FOR var = IDENT IN iterable = expr DO body = expr END
+    { For (var, iterable, body, None) }
+  | RECEIVE DO clauses = nonempty_list(receive_clause) END
     { Receive (clauses, None) }
-  | RECEIVE LBRACE clauses = nonempty_list(receive_clause) RBRACE AFTER timeout = expr LBRACE timeout_body = expr RBRACE
+  | RECEIVE DO clauses = nonempty_list(receive_clause) END AFTER timeout = expr DO timeout_body = expr END
     { Receive (clauses, Some (timeout, timeout_body)) }
   (* Record expressions *)
   | record_name = UPPER_IDENT LBRACE fields = separated_list(COMMA, record_field_init) RBRACE
@@ -470,9 +472,9 @@ simple_expr:
   | RECORD DOT field_name = IDENT
     { RecordAccess (Var "record", field_name) }
   (* Fun expressions *)
-  | FUN LPAREN params = separated_list(COMMA, IDENT) RPAREN LBRACE body = expr RBRACE
+  | FUN LPAREN params = separated_list(COMMA, IDENT) RPAREN DO body = expr END
     { FunExpression (params, body) }
-  | FUN LBRACE clauses = fun_expression_clause+ RBRACE
+  | FUN DO clauses = fun_expression_clause+ END
     { FunExpressionClauses clauses }
   | LPAREN e = expr RPAREN { e }
   | LPAREN elements = separated_list(COMMA, expr) RPAREN
@@ -485,19 +487,18 @@ simple_expr:
     { Tuple elements }
   | LBRACKET elements = separated_list(COMMA, expr) RBRACKET
     { List elements }
-  (* Block expressions *)
-  | LBRACE statements = statement_list RBRACE
+  (* Block expressions with do/end syntax *)
+  | DO statements = statement_list END
     { match statements with
-      | [e] -> e
-      | es -> Block es }
-  | LBRACE RBRACE
-    { Literal LNil }
+      | [e] -> e  (* Single expression block returns the expression directly *)
+      | es -> Block es  (* Multiple expressions become a Block *)
+    }
   (* Smart error detection for potential tuple syntax misuse *)
   | LBRACE first_var = IDENT COMMA rest_vars = separated_nonempty_list(COMMA, IDENT) RBRACE
     { let all_vars = first_var :: rest_vars in
       let vars_str = String.concat ", " all_vars in
       let suggestion = ".{" ^ vars_str ^ "}" in
-      failwith ("Enhanced:Invalid block syntax - looks like you're trying to create a tuple|Suggestion:Use '" ^ suggestion ^ "' for tuple syntax instead of '{" ^ vars_str ^ "}'|Context:In Lx, tuples are created with .{} syntax, not {} syntax. Curly braces {} are used for code blocks and function bodies") }
+      failwith ("Enhanced:Invalid syntax - looks like you're trying to create a tuple|Suggestion:Use '" ^ suggestion ^ "' for tuple syntax instead of '{" ^ vars_str ^ "}'|Context:In Lx, tuples are created with .{} syntax, not {} syntax. Curly braces {} are reserved for records, maps, and structured data") }
   (* Detect tuple-like patterns with atoms and literals *)
   | LBRACE first_atom = ATOM COMMA rest_elements = separated_nonempty_list(COMMA, simple_tuple_element) RBRACE
     { let first_str = ":" ^ first_atom in
@@ -505,7 +506,7 @@ simple_expr:
       let all_elements = first_str :: rest_strs in
       let elements_str = String.concat ", " all_elements in
       let suggestion = ".{" ^ elements_str ^ "}" in
-      failwith ("Enhanced:Invalid block syntax - looks like you're trying to create a tuple|Suggestion:Use '" ^ suggestion ^ "' for tuple syntax instead of '{" ^ elements_str ^ "}'|Context:In Lx, tuples are created with .{} syntax, not {} syntax. Curly braces {} are used for code blocks and function bodies") }
+      failwith ("Enhanced:Invalid syntax - looks like you're trying to create a tuple|Suggestion:Use '" ^ suggestion ^ "' for tuple syntax instead of '{" ^ elements_str ^ "}'|Context:In Lx, tuples are created with .{} syntax, not {} syntax. Curly braces {} are reserved for records, maps, and structured data") }
   (* Detect tuple-like patterns starting with literals *)
   | LBRACE first_lit = literal COMMA rest_elements = separated_nonempty_list(COMMA, simple_tuple_element) RBRACE
     { let first_str = string_of_literal first_lit in
@@ -513,7 +514,7 @@ simple_expr:
       let all_elements = first_str :: rest_strs in
       let elements_str = String.concat ", " all_elements in
       let suggestion = ".{" ^ elements_str ^ "}" in
-      failwith ("Enhanced:Invalid block syntax - looks like you're trying to create a tuple|Suggestion:Use '" ^ suggestion ^ "' for tuple syntax instead of '{" ^ elements_str ^ "}'|Context:In Lx, tuples are created with .{} syntax, not {} syntax. Curly braces {} are used for code blocks and function bodies") }
+      failwith ("Enhanced:Invalid syntax - looks like you're trying to create a tuple|Suggestion:Use '" ^ suggestion ^ "' for tuple syntax instead of '{" ^ elements_str ^ "}'|Context:In Lx, tuples are created with .{} syntax, not {} syntax. Curly braces {} are reserved for records, maps, and structured data") }
 
 case_branch:
   | pattern = pattern WHEN guard = guard_expr ARROW body = expr
@@ -528,9 +529,9 @@ receive_clause:
     { (pattern, None, body) }
 
 fun_expression_clause:
-  | LPAREN params = separated_list(COMMA, IDENT) RPAREN WHEN guard = guard_expr LBRACE body = expr RBRACE
+  | LPAREN params = separated_list(COMMA, IDENT) RPAREN WHEN guard = guard_expr DO body = expr END
     { (params, Some guard, body) }
-  | LPAREN params = separated_list(COMMA, IDENT) RPAREN LBRACE body = expr RBRACE
+  | LPAREN params = separated_list(COMMA, IDENT) RPAREN DO body = expr END
     { (params, None, body) }
 
 
@@ -585,7 +586,7 @@ simple_tuple_element:
   | lit = literal { STELiteral lit }
 
 standalone_test_def:
-  | IDENT name = STRING LBRACE body = expr RBRACE
+  | IDENT name = STRING DO body = expr END
     { if $1 = "test" then { name; body } else failwith "Expected 'test' keyword" }
 
 function_body:
@@ -607,7 +608,22 @@ statement:
   | e = expr { e }
 
 application_def:
-  | APPLICATION LBRACE fields = application_field* RBRACE
+  | APPLICATION DO fields = application_field* END
+    { let description = ref "Generated with LX" in
+      let vsn = ref "0.1.0" in
+      let applications = ref None in
+      let registered = ref None in
+      let env = ref None in
+      List.iter (function
+        | `Description s -> description := s
+        | `Vsn s -> vsn := s
+        | `Applications apps -> applications := Some apps
+        | `Registered regs -> registered := Some regs
+        | `Env envs -> env := Some envs
+      ) fields;
+      { description = !description; vsn = !vsn; applications = !applications;
+        registered = !registered; env = !env } }
+  | APPLICATION DO fields = application_field* END
     { let description = ref "Generated with LX" in
       let vsn = ref "0.1.0" in
       let applications = ref None in
@@ -771,6 +787,8 @@ with_steps:
 
 with_step:
   | pattern = pattern LEQ expr = expr
+    { (pattern, expr) }
+  | pattern = pattern PATTERN_MATCH expr = expr
     { (pattern, expr) }
 
 match_rescue_steps:

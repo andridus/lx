@@ -16,9 +16,9 @@ let string_contains_substring s sub =
 let test_tuple_expressions () =
   let test_cases =
     [
-      ("pub fun num() { (42, \"hello\") }", [ "{42, \"hello\"}" ]);
-      ("pub fun num() { (1, 2, 3) }", [ "{1, 2, 3}" ]);
-      ("pub fun num() { () }", [ "{}" ]);
+      ("pub fun num() do (42, \"hello\") end", [ "{42, \"hello\"}" ]);
+      ("pub fun num() do (1, 2, 3) end", [ "{1, 2, 3}" ]);
+      ("pub fun num() do () end", [ "{}" ]);
     ]
   in
 
@@ -39,9 +39,9 @@ let test_tuple_expressions () =
 let test_list_expressions () =
   let test_cases =
     [
-      ("pub fun num() { [1, 2, 3] }", [ "[1, 2, 3]" ]);
-      ("pub fun str() { [\"a\", \"b\"] }", [ "[\"a\", \"b\"]" ]);
-      ("pub fun num() { [] }", [ "[]" ]);
+      ("pub fun num() do [1, 2, 3] end", [ "[1, 2, 3]" ]);
+      ("pub fun str() do [\"a\", \"b\"] end", [ "[\"a\", \"b\"]" ]);
+      ("pub fun num() do [] end", [ "[]" ]);
     ]
   in
 
@@ -62,9 +62,9 @@ let test_list_expressions () =
 let test_if_expressions () =
   let test_cases =
     [
-      ( "pub fun boolean() { if true { 42 } else { 0 } }",
+      ( "pub fun boolean() do if true do 42 else 0 end end",
         [ "case true of true -> 42; _ -> 0" ] );
-      ( "pub fun boolean() { if false { \"no\" } else { \"yes\" } }",
+      ( "pub fun boolean() do if false do \"no\" else \"yes\" end end",
         [ "case false of true -> \"no\"; _ -> \"yes\"" ] );
     ]
   in
@@ -87,11 +87,11 @@ let test_if_expressions () =
 let test_case_expressions () =
   let test_cases =
     [
-      ( "pub fun num() { case 42 { 42 -> \"found\" } }",
+      ( "pub fun num() do case 42 do 42 -> \"found\" end end",
         [ "case 42 of 42 -> \"found\"" ] );
-      ( "pub fun str(x) { case x { _ -> \"default\" } }",
+      ( "pub fun str(x) do case x do _ -> \"default\" end end",
         [ "case X_[a-z0-9]+ of _ -> \"default\"" ] );
-      ( "pub fun atom(a) { case a { :hello -> \"hi\" } }",
+      ( "pub fun atom(a) do case a do :hello -> \"hi\" end end",
         [ "case A_[a-z0-9]+ of hello -> \"hi\"" ] );
     ]
   in
@@ -121,13 +121,13 @@ let test_case_expressions () =
 let test_pattern_types () =
   let program =
     Compiler.parse_string
-      "pub fun num() {\n\
-      \  case x {\n\
+      "pub fun num() do\n\
+      \  case x do\n\
       \    _ -> 1\n\
       \    y -> 2\n\
       \    :atom -> 3\n\
-      \    }\n\
-      \  }"
+      \  end\n\
+      \ end"
   in
   match program.items with
   | [ Function { clauses = [ { body = Match (_, cases); _ } ]; _ } ] -> (
@@ -139,7 +139,7 @@ let test_pattern_types () =
 
 (* Test Spec definitions *)
 let test_spec_definitions () =
-  let program = Compiler.parse_string "spec my_function {}" in
+  let program = Compiler.parse_string "spec my_function do end" in
   match program.items with
   | [ Spec { name = "my_function"; requires = []; ensures = [] } ] -> ()
   | _ -> Alcotest.fail "Expected spec definition"
@@ -148,7 +148,7 @@ let test_spec_definitions () =
 let test_test_blocks () =
   let program =
     Compiler.parse_string
-      "describe \"My Tests\" { test \"should work\" { true } }"
+      "describe \"My Tests\" do test \"should work\" do true end end"
   in
   match program.items with
   | [
@@ -165,9 +165,9 @@ let test_test_blocks () =
 let test_mixed_module_items () =
   let input =
     "\n\
-    \    pub fun hello() { \"world\" }\n\
-    \    spec hello {}\n\
-    \    describe \"Tests\" { test \"hello test\" { hello() } }\n\
+    \    pub fun hello() do \"world\" end\n\
+    \    spec hello do end\n\
+    \    describe \"Tests\" do test \"hello test\" do hello() end end\n\
     \  "
   in
   let program = Compiler.parse_string input in
@@ -179,12 +179,12 @@ let test_mixed_module_items () =
 let test_all_literal_types () =
   let test_cases =
     [
-      ("pub fun num() { 42 }", LInt 42);
-      ("pub fun num() { 3.14 }", LFloat 3.14);
-      ("pub fun str() { \"hello\" }", LString "hello");
-      ("pub fun bool() { true }", LBool true);
-      ("pub fun bool() { false }", LBool false);
-      ("pub fun atom() { :atom }", LAtom "atom");
+      ("pub fun num() do 42 end", LInt 42);
+      ("pub fun num() do 3.14 end", LFloat 3.14);
+      ("pub fun str() do \"hello\" end", LString "hello");
+      ("pub fun bool() do true end", LBool true);
+      ("pub fun bool() do false end", LBool false);
+      ("pub fun atom() do :atom end", LAtom "atom");
     ]
   in
 

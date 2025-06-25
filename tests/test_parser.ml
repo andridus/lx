@@ -2,7 +2,7 @@ open Alcotest
 open Compiler.Ast
 
 let test_simple_function () =
-  let result = Compiler.parse_string "pub fun num() { 42 }" in
+  let result = Compiler.parse_string "pub fun num() do 42 end" in
   match result.items with
   | [
    Function
@@ -18,7 +18,7 @@ let test_simple_function () =
   | _ -> fail "Expected single function with correct structure"
 
 let test_function_with_params () =
-  let result = Compiler.parse_string "pub fun add(x, y) { x }" in
+  let result = Compiler.parse_string "pub fun add(x, y) do x end" in
   match result.items with
   | [
    Function
@@ -42,7 +42,7 @@ let test_function_with_params () =
 
 let test_multiple_functions () =
   let result =
-    Compiler.parse_string "pub fun first() { 1 } fun second() { 2 }"
+    Compiler.parse_string "pub fun first() do 1 end fun second() do 2 end"
   in
   match result.items with
   | [
@@ -67,7 +67,7 @@ let test_multiple_functions () =
   | _ -> fail "Expected two functions"
 
 let test_public_function () =
-  let result = Compiler.parse_string "pub fun hello() { \"world\" }" in
+  let result = Compiler.parse_string "pub fun hello() do \"world\" end" in
   match result.items with
   | [
    Function
@@ -103,7 +103,7 @@ let test_comparison_operators () =
   in
   List.iter
     (fun (expr_str, op) ->
-      let code = "pub fun test() { " ^ expr_str ^ " }" in
+      let code = "pub fun test() do " ^ expr_str ^ " end" in
       let result = Compiler.parse_string code in
       match result.items with
       | [
@@ -130,7 +130,8 @@ let test_comparison_operators () =
 (* Test parsing of if condition with comparison *)
 let test_if_with_comparison () =
   let result =
-    Compiler.parse_string "pub fun test() { if x == 1 { :ok } else { :error } }"
+    Compiler.parse_string
+      "pub fun test() do if x == 1 do :ok else :error end end"
   in
   match result.items with
   | [
@@ -159,7 +160,7 @@ let test_if_with_comparison () =
 
 (* Test parsing of complex comparison expressions *)
 let test_complex_comparison_parsing () =
-  let result = Compiler.parse_string "pub fun test(x, y) { x >= y }" in
+  let result = Compiler.parse_string "pub fun test(x, y) do x >= y end" in
   match result.items with
   | [
    Function
@@ -183,7 +184,7 @@ let test_complex_comparison_parsing () =
 
 (* Test parsing precedence of comparison operators *)
 let test_comparison_precedence () =
-  let result = Compiler.parse_string "pub fun test() { x + 1 == y * 2 }" in
+  let result = Compiler.parse_string "pub fun test() do x + 1 == y * 2 end" in
   match result.items with
   | [
    Function
@@ -209,52 +210,12 @@ let test_comparison_precedence () =
       ()
   | _ -> fail "Expected correct precedence: arithmetic before comparison"
 
-(* Test parsing of if with case *)
-let test_if_with_case () =
-  let result =
-    Compiler.parse_string
-      {|
-      pub fun test(x) {
-        if x == 1 {
-          "one"
-        } case {
-          2 -> "two"
-          _ -> "other"
-        }
-      }
-    |}
-  in
-  match result.items with
-  | [
-   Function
-     {
-       name = "test";
-       clauses =
-         [
-           {
-             params = [ PVar "x" ];
-             body =
-               If
-                 ( BinOp (Var "x", "==", Literal (LInt 1)),
-                   Literal (LString "one"),
-                   Some (ClauseElse clauses) );
-             position = _;
-             guard = _;
-           };
-         ];
-       visibility = Public;
-       position = _;
-     };
-  ] ->
-      check int "case clauses count" 2 (List.length clauses)
-  | _ -> fail "Expected if-case expression"
-
 (* Test parsing of with with else *)
 let test_with_with_else () =
   let result =
     Compiler.parse_string
-      "pub fun test() { with .{:ok, value} <= get_result() { value } else { \
-       \"failed\" } }"
+      "pub fun test() do with .{:ok, value} <= get_result() do value else \
+       \"failed\" end end"
   in
   match result.items with
   | [
@@ -286,14 +247,14 @@ let test_with_with_case () =
   let result =
     Compiler.parse_string
       {|
-      pub fun test() {
-        with .{:ok, value} <= get_result() {
+      pub fun test() do
+        with .{:ok, value} <= get_result() do
           value
-        } case {
+        case
           .{:error, _} -> "error"
           _ -> "unknown"
-        }
-      }
+        end
+      end
     |}
   in
   match result.items with
@@ -322,8 +283,8 @@ let test_with_with_case () =
 let test_with_multiple_steps () =
   let result =
     Compiler.parse_string
-      "pub fun test() { with .{:ok, user} <= get_user(), .{:ok, role} <= \
-       get_role(user) { .{user, role} } else { .{:error, \"failed\"} } }"
+      "pub fun test() do with .{:ok, user} <= get_user(), .{:ok, role} <= \
+       get_role(user) do .{user, role} else .{:error, \"failed\"} end end"
   in
   match result.items with
   | [
@@ -353,14 +314,14 @@ let test_with_case_with_guards () =
   let result =
     Compiler.parse_string
       {|
-      pub fun test() {
-        with .{:ok, value} <= get_result() {
+      pub fun test() do
+        with .{:ok, value} <= get_result() do
           value
-        } case {
+        case
           .{:error, reason} when reason == :timeout -> "timeout"
           _ -> "other"
-        }
-      }
+        end
+      end
     |}
   in
   match result.items with
@@ -391,7 +352,7 @@ let test_with_case_with_guards () =
 (* Test parsing of if without else *)
 let test_if_without_else () =
   let result =
-    Compiler.parse_string "pub fun test(x) { if x == 1 { \"one\" } }"
+    Compiler.parse_string "pub fun test(x) do if x == 1 do \"one\" end end"
   in
   match result.items with
   | [
@@ -422,7 +383,7 @@ let test_if_without_else () =
 let test_with_without_else () =
   let result =
     Compiler.parse_string
-      "pub fun test() { with .{:ok, value} <= get_result() { value } }"
+      "pub fun test() do with .{:ok, value} <= get_result() do value end end"
   in
   match result.items with
   | [
@@ -455,7 +416,6 @@ let tests =
     ("if with comparison", `Quick, test_if_with_comparison);
     ("complex comparison parsing", `Quick, test_complex_comparison_parsing);
     ("comparison precedence", `Quick, test_comparison_precedence);
-    ("if with case", `Quick, test_if_with_case);
     ("with with else", `Quick, test_with_with_else);
     ("with with case", `Quick, test_with_with_case);
     ("with multiple steps", `Quick, test_with_multiple_steps);

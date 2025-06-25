@@ -52,7 +52,7 @@ let test_parse_error_with_position () =
   try
     ignore
       (Compiler.parse_string ~filename:(Some "test.lx")
-         "pub fun test() { if true }");
+         "pub fun test() do if true end");
     fail "Expected parse error"
   with
   | CompilationError error ->
@@ -65,22 +65,22 @@ let test_correct_test_usage () =
   (* Test that 'test' can be used correctly in test blocks *)
   let code =
     {|
-    pub fun hello() { "world" }
-    describe "Tests" {
-      test "hello test" {
+    pub fun hello() do "world" end
+    describe "Tests" do
+      test "hello test" do
         hello()
-      }
-    }
-    test "standalone test" {
+      end
+    end
+    test "standalone test" do
       42
-    }
+    end
   |}
   in
   let program = Compiler.parse_string code in
   check int "Should parse 3 items" 3 (List.length program.items)
 
 let test_function_call_not_capitalized () =
-  let source = "pub fun test(x, _y) { x }" in
+  let source = "pub fun test(x, _y) do x end" in
   let program = Compiler.parse_string source in
   let result = Compiler.compile_to_string_for_tests program in
   let expected_parts = [ "test(X_"; ", _) ->" ] in
@@ -94,10 +94,10 @@ let test_variables_still_capitalized () =
   (* Test that variables are still properly capitalized *)
   let code =
     {|
-    pub fun test_vars(param) {
+    pub fun test_vars(param) do
       x = param
       x
-    }
+    end
   |}
   in
   let program = Compiler.parse_string code in

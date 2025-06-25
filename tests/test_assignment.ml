@@ -14,10 +14,10 @@ let string_matches_pattern s pattern =
 
 let test_simple_assignment () =
   let source = {|
-pub fun test() {
+pub fun test() do
   x = 42
   x
-}
+end
 |} in
   let lexbuf = Lexing.from_string source in
   let ast = Compiler.Parser.main Compiler.Lexer.read lexbuf in
@@ -37,12 +37,12 @@ pub fun test() {
 let test_multiple_assignments () =
   let source =
     {|
-pub fun test() {
+pub fun test() do
   x = 42
   y = 43
   z = 44
   x + y + z
-}
+end
 |}
   in
   let lexbuf = Lexing.from_string source in
@@ -72,10 +72,10 @@ pub fun test() {
 
 let test_reassignment_error () =
   let source = {|
-pub fun test() {
+pub fun test() do
   x = 42
   x = 100
-}
+end
 |} in
   let lexbuf = Lexing.from_string source in
   let ast = Compiler.Parser.main Compiler.Lexer.read lexbuf in

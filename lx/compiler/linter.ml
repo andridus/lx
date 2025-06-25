@@ -703,18 +703,30 @@ let rec lint_expr ctx errors expr =
             errors clauses
       | None -> errors)
   | With (steps, success_body, else_branch) -> (
-      (* Lint with expression steps *)
-      let errors, final_ctx =
+      (* Lint with expression steps and accumulate contexts *)
+      let errors, step_contexts, final_ctx =
         List.fold_left
-          (fun (acc_errors, acc_ctx) (pattern, expr) ->
+          (fun (acc_errors, acc_contexts, acc_ctx) (pattern, expr) ->
+            (* Lint the expression with the accumulated context (has access to previous step variables) *)
             let step_errors = lint_expr acc_ctx acc_errors expr in
             let step_ctx = create_context (Some acc_ctx) in
             let pattern_errors = lint_pattern step_ctx step_errors pattern in
-            (pattern_errors, step_ctx))
-          (errors, ctx) steps
+            (pattern_errors, step_ctx :: acc_contexts, step_ctx))
+          (errors, [], ctx) steps
       in
-      (* Lint success body with accumulated context *)
+      (* Lint success body with accumulated context that includes pattern variables *)
       let errors = lint_expr final_ctx errors success_body in
+      (* Mark variables used in success body as used in their defining step contexts *)
+      List.iter
+        (fun step_ctx ->
+          Hashtbl.iter
+            (fun var _pos ->
+              if
+                Hashtbl.mem step_ctx.defined_vars var
+                && Hashtbl.mem final_ctx.used_vars var
+              then use_variable step_ctx var None)
+            final_ctx.used_vars)
+        step_contexts;
       (* Lint else branch *)
       match else_branch with
       | Some (SimpleElse e) -> lint_expr ctx errors e
@@ -734,7 +746,7 @@ let rec lint_expr ctx errors expr =
               acc @ unused_errors)
             errors clauses
       | None -> errors)
-  | For (var, iter_expr, body_expr) ->
+  | For (var, iter_expr, body_expr, guard_opt) ->
       let errors = lint_expr ctx errors iter_expr in
       let loop_ctx = create_context (Some ctx) in
       let errors =
@@ -742,7 +754,19 @@ let rec lint_expr ctx errors expr =
         | Some error -> error :: errors
         | None -> errors
       in
-      lint_expr loop_ctx errors body_expr
+      let errors =
+        match guard_opt with
+        | Some guard -> lint_guard_expr loop_ctx errors guard
+        | None -> errors
+      in
+      let body_errors = lint_expr loop_ctx errors body_expr in
+      (* Copy used variables from loop_ctx back to parent ctx to capture closures *)
+      Hashtbl.iter
+        (fun var pos ->
+          if not (Hashtbl.mem loop_ctx.defined_vars var) then
+            use_variable ctx var pos)
+        loop_ctx.used_vars;
+      body_errors
   | BinOp (left, _, right) ->
       let errors = lint_expr ctx errors left in
       lint_expr ctx errors right
@@ -811,7 +835,15 @@ let rec lint_expr ctx errors expr =
             | None -> acc)
           errors params
       in
-      lint_expr func_ctx errors body
+      (* Lint the body with func_ctx but propagate variable usage to parent context *)
+      let body_errors = lint_expr func_ctx errors body in
+      (* Copy used variables from func_ctx back to parent ctx to capture closures *)
+      Hashtbl.iter
+        (fun var pos ->
+          if not (Hashtbl.mem func_ctx.defined_vars var) then
+            use_variable ctx var pos)
+        func_ctx.used_vars;
+      body_errors
   | FunExpressionClauses clauses ->
       (* Lint each clause in the fun expression *)
       List.fold_left
@@ -831,6 +863,12 @@ let rec lint_expr ctx errors expr =
             | None -> acc
           in
           let acc = lint_expr clause_ctx acc body in
+          (* Copy used variables from clause_ctx back to parent ctx to capture closures *)
+          Hashtbl.iter
+            (fun var pos ->
+              if not (Hashtbl.mem clause_ctx.defined_vars var) then
+                use_variable ctx var pos)
+            clause_ctx.used_vars;
           (* Check for unused variables in this clause *)
           let unused_errors = check_unused_variables clause_ctx in
           acc @ unused_errors)

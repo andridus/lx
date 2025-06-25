@@ -486,7 +486,17 @@ and emit_expr ctx (e : expr) : string =
       "case " ^ emit_expr ctx value ^ " of\n        " ^ emit_pattern ctx pattern
       ^ " ->\n            ok;\n        _ ->\n            "
       ^ emit_expr ctx rescue_expr ^ "\n    end"
-  | For (_, _, _) -> "% For expressions not yet implemented"
+  | For (var, iter_expr, body_expr, guard_opt) ->
+      (* Generate Erlang list comprehension: [Body || Var <- List] or [Body || Var <- List, Guard] *)
+      let var_name = get_renamed_var ctx var in
+      let iter_str = emit_expr ctx iter_expr in
+      let body_str = emit_expr ctx body_expr in
+      let guard_str =
+        match guard_opt with
+        | Some guard -> ", " ^ emit_guard_expr ctx guard
+        | None -> ""
+      in
+      "[" ^ body_str ^ " || " ^ var_name ^ " <- " ^ iter_str ^ guard_str ^ "]"
   | Sequence exprs ->
       (* Function body sequences - detect match rescue patterns *)
       let block_ctx = create_scope (Some ctx) in
@@ -1045,9 +1055,8 @@ let compile_to_string_with_module_name (program : program)
             }
         | _ ->
             Error.make_error_with_position
-              (Error.TypeError ("Type checking failed", None))
-              (Error.make_position 1 1)
-              (Typechecker.string_of_type_error error)
+              (Error.TypeError (Typechecker.string_of_type_error error, None))
+              (Error.make_position 1 1) ""
       in
       raise (Error.CompilationError error_obj));
 
@@ -1138,9 +1147,8 @@ let compile_to_string_for_tests (program : program) : string =
             }
         | _ ->
             Error.make_error_with_position
-              (Error.TypeError ("Type checking failed", None))
-              (Error.make_position 1 1)
-              (Typechecker.string_of_type_error error)
+              (Error.TypeError (Typechecker.string_of_type_error error, None))
+              (Error.make_position 1 1) ""
       in
       raise (Error.CompilationError error_obj));
 
@@ -1207,9 +1215,8 @@ let type_check_program (program : program) : Typechecker.type_env =
             }
         | _ ->
             Error.make_error_with_position
-              (Error.TypeError ("Type checking failed", None))
-              (Error.make_position 1 1)
-              (Typechecker.string_of_type_error error)
+              (Error.TypeError (Typechecker.string_of_type_error error, None))
+              (Error.make_position 1 1) ""
       in
       raise (Error.CompilationError error_obj)
 

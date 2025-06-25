@@ -34,7 +34,7 @@ Lx is a statically scoped, expression-based functional language designed for bui
 
 These reserved words define control flow, type contracts, concurrency, and OTP structure. They cannot be redefined.
 
-- **Core**: `fun`, `pub`, `case`, `if`, `else`, `with`, `for`, `when`, `receive`, `after`, `true`, `false`, `nil`, `unsafe`
+- **Core**: `fun`, `pub`, `case`, `if`, `else`, `do`, `end`, `with`, `for`, `when`, `receive`, `after`, `true`, `false`, `nil`, `unsafe`
 - **Data**: `record` — structured data type definitions
 - **OTP**: `worker`, `supervisor`, `strategy`, `children`, `one_for_one`, `one_for_all`, `rest_for_one`
 - **Specification**: `spec`, `requires`, `ensures`, `matches`
@@ -62,6 +62,7 @@ Syntax symbols used for operations, declarations, and structure:
 - **Comparison**: `==`, `!=`, `<`, `>`, `<=`, `>=`
 - **Logic**: `and`, `or`, `not`, `andalso`, `orelse`
 - **Grouping and data**: `()`, `{}`, `.{}`, `[]`
+- **Block delimiters**: `do`, `end` — define code blocks for functions and control flow
 - **Separators**: `,`, `;`
 
 ---
@@ -116,12 +117,14 @@ x = 20  # Error: reassignment not allowed
 
 #### Block expressions:
 
+Code blocks are now defined using `do` and `end` keywords:
+
 ```lx
-result = {
+result = do
   a = 1
   b = 2
   a + b  # Last expression is returned
-}
+end
 ```
 
 #### Function calls:
@@ -138,13 +141,13 @@ math.pow(2, 8)
 Used for destructuring and conditional logic based on shape:
 
 ```lx
-case msg {
+case msg do
   :ok -> handle_ok()
   [head | tail] -> handle_list(head, tail)
   .{x, y} -> sum(x, y)
   %{ name: user_name, age: user_age } -> process_user(user_name, user_age)
   _ -> :default
-}
+end
 ```
 
 #### Pattern Matching with Maps:
@@ -170,42 +173,44 @@ case msg {
 
 ### 8. Function Definitions
 
+Functions now use `do`/`end` syntax instead of curly braces:
+
 #### Single clause:
 
 ```lx
-fun greet(name) { "Hello, " ++ name }
-pub fun ping() { :pong }
+fun greet(name) do "Hello, " ++ name end
+pub fun ping() do :pong end
 ```
 
 #### Multiple clauses:
 
 ```lx
-fun factorial {
-  (0) { 1 }
-  (N) when N > 0 { N * factorial(N - 1) }
-}
+fun factorial do
+  (0) do 1 end
+  (N) when N > 0 do N * factorial(N - 1) end
+end
 ```
 
 ---
 
 ### 8.1. Fun Expressions (Anonymous Functions)
 
-Fun expressions create anonymous functions that can be assigned to variables, passed as arguments, or returned from functions. They support closures, pattern matching, and guards.
+Fun expressions create anonymous functions using `do`/`end` syntax:
 
 #### Simple Fun Expressions:
 
 ```lx
 # Basic anonymous function
-add = fun(x, y) { x + y }
+add = fun(x, y) do x + y end
 result = add(3, 4)  # Returns 7
 
 # Fun expression as argument to higher-order function
 numbers = [1, 2, 3, 4, 5]
-doubled = map(numbers, fun(x) { x * 2 })
+doubled = map(numbers, fun(x) do x * 2 end)
 
 # Fun expression with closure (captures variables from enclosing scope)
 multiplier = 3
-scale = fun(x) { x * multiplier }
+scale = fun(x) do x * multiplier end
 scaled_value = scale(10)  # Returns 30
 ```
 
@@ -215,26 +220,26 @@ Fun expressions can have multiple clauses with pattern matching and optional gua
 
 ```lx
 # Pattern matching fun expression
-process = fun {
-  (:ok) { "Success" }
-  (:error) { "Failed" }
-  (_) { "Unknown" }
-}
+process = fun do
+  (:ok) do "Success" end
+  (:error) do "Failed" end
+  (_) do "Unknown" end
+end
 
 # Fun expression with guards
-validate = fun {
-  (x) when x > 0 { :positive }
-  (x) when x < 0 { :negative }
-  (0) { :zero }
-}
+validate = fun do
+  (x) when x > 0 do :positive end
+  (x) when x < 0 do :negative end
+  (0) do :zero end
+end
 
 # Complex pattern matching with destructuring
-handle_message = fun {
-  (.{:user, name, age}) when age >= 18 { "Adult: " ++ name }
-  (.{:user, name, age}) when age < 18 { "Minor: " ++ name }
-  (.{:system, msg}) { "System: " ++ msg }
-  (_) { "Unknown message" }
-}
+handle_message = fun do
+  (.{:user, name, age}) when age >= 18 do "Adult: " ++ name end
+  (.{:user, name, age}) when age < 18 do "Minor: " ++ name end
+  (.{:system, msg}) do "System: " ++ msg end
+  (_) do "Unknown message" end
+end
 ```
 
 #### Higher-Order Functions:
@@ -243,28 +248,28 @@ Fun expressions enable powerful functional programming patterns:
 
 ```lx
 # Function that returns a function
-make_adder = fun(n) {
-  fun(x) { x + n }
-}
+make_adder = fun(n) do
+  fun(x) do x + n end
+end
 
 add5 = make_adder(5)
 result = add5(10)  # Returns 15
 
 # Function that takes a function as argument
-apply_twice = fun(f, x) {
+apply_twice = fun(f, x) do
   f(f(x))
-}
+end
 
-double = fun(x) { x * 2 }
+double = fun(x) do x * 2 end
 result = apply_twice(double, 3)  # Returns 12
 
 # Functional composition
-compose = fun(f, g) {
-  fun(x) { f(g(x)) }
-}
+compose = fun(f, g) do
+  fun(x) do f(g(x)) end
+end
 
-add_one = fun(x) { x + 1 }
-multiply_two = fun(x) { x * 2 }
+add_one = fun(x) do x + 1 end
+multiply_two = fun(x) do x * 2 end
 add_then_multiply = compose(multiply_two, add_one)
 result = add_then_multiply(5)  # Returns 12 ((5 + 1) * 2)
 ```
@@ -329,9 +334,9 @@ async_operation(my_data, fun(result) {
 Conditions to refine pattern matching:
 
 ```lx
-fun is_non_empty_list(x) when is_list(x) andalso length(x) > 0 {
+fun is_non_empty_list(x) when is_list(x) andalso length(x) > 0 do
   :yes
-}
+end
 ```
 
 Guards are pure boolean expressions. Avoid complex logic here.
@@ -355,12 +360,12 @@ Returns the sent message. Useful for fire-and-forget.
 Blocking pattern match for process messages:
 
 ```lx
-receive {
+receive do
   :ready -> proceed()
   .{:data, D} -> handle(D)
-} after 5000 {
+end after 5000 do
   :timeout
-}
+end
 ```
 
 Supports guards and default cases.
@@ -372,23 +377,23 @@ Supports guards and default cases.
 #### `if`/`else`:
 
 ```lx
-if flag {
+if flag do
   do_a()
-} else {
+else
   do_b()
-}
+end
 ```
 
 #### `if` with `case` (pattern matching):
 
 ```lx
-if condition {
+if condition do
   success_value
-} case {
+case
   pattern1 -> handle_pattern1()
   pattern2 when guard -> handle_pattern2()
   _ -> default_case()
-}
+end
 ```
 
 #### `with` expressions (monadic-style error handling):
@@ -398,53 +403,53 @@ The `with` expression provides elegant error handling and pattern matching for s
 ##### `with`/`else`:
 
 ```lx
-with .{:ok, user} <= get_user(id) {
+with .{:ok, user} <= get_user(id) do
   user.name
-} else {
+else
   "Unknown user"
-}
+end
 ```
 
 ##### `with`/`case` (pattern matching):
 
 ```lx
-with .{:ok, user} <= get_user(id) {
+with .{:ok, user} <= get_user(id) do
   user.name
-} case {
+case
   .{:error, :not_found} -> "User not found"
   .{:error, reason} when reason == :timeout -> "Request timeout"
   .{:error, _} -> "Unknown error"
   _ -> "Unexpected result"
-}
+end
 ```
 
 ##### Multiple `with` steps:
 
 ```lx
 with .{:ok, user} <= get_user(id),
-     .{:ok, role} <= get_role(user) {
+     .{:ok, role} <= get_role(user) do
   .{user.name, role}
-} else {
+else
   .{:error, "Failed to get user or role"}
-}
+end
 ```
 
 ##### `with` without else/case (returns optional):
 
 ```lx
-with .{:ok, user} <= get_user(id) {
+with .{:ok, user} <= get_user(id) do
   user.name
-}
+end
 # Returns the value on success, or nil on failure
 ```
 
 #### `case`:
 
 ```lx
-case input {
+case input do
   :ok -> handle()
   _ -> fallback()
-}
+end
 ```
 
 #### `match ... rescue` (Error Handling):

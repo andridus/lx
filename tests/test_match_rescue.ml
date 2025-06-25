@@ -30,10 +30,10 @@ let compile_lx_code code =
 let test_individual_match_rescue_parsing () =
   let code =
     {|
-pub fun test() {
-  match .{:ok, 1} <- get_value() rescue { :error }
+pub fun test() do
+  match .{:ok, 1} <- get_value() rescue :error end
   :continue
-}
+end
 |}
   in
   match parse_lx_code code with
@@ -72,11 +72,11 @@ pub fun test() {
 let test_block_match_rescue_parsing () =
   let code =
     {|
-pub fun test() {
-  match .{:ok, 1} <- get_value() rescue { :error1 }
-  match .{:ok, 2} <- get_value2() rescue { :error2 }
+pub fun test() do
+  match .{:ok, 1} <- get_value() rescue :error1 end
+  match .{:ok, 2} <- get_value2() rescue :error2 end
   :success
-}
+end
 |}
   in
   match parse_lx_code code with
@@ -114,11 +114,11 @@ pub fun test() {
 let test_individual_match_rescue_codegen () =
   let code =
     {|
-pub fun c() { .{:ok, 1} }
-pub fun test() {
-  match .{:ok, 1} <- c() rescue { 1 }
+pub fun c() do .{:ok, 1} end
+pub fun test() do
+  match .{:ok, 1} <- c() rescue 1 end
   :done
-}
+end
 |}
   in
   match compile_lx_code code with
@@ -137,13 +137,13 @@ pub fun test() {
 let test_block_match_rescue_codegen () =
   let code =
     {|
-pub fun c() { .{:ok, 1} }
-pub fun e() { .{:ok, 2} }
-pub fun test() {
-  match .{:ok, 1} <- c() rescue { 1 }
-  match .{:ok, 2} <- e() rescue { 2 }
+pub fun c() do .{:ok, 1} end
+pub fun e() do .{:ok, 2} end
+pub fun test() do
+  match .{:ok, 1} <- c() rescue 1 end
+  match .{:ok, 2} <- e() rescue 2 end
   :success
-}
+end
 |}
   in
   match compile_lx_code code with
@@ -164,16 +164,16 @@ pub fun test() {
 let test_complex_match_rescue_sequence () =
   let code =
     {|
-pub fun get_user() { .{:ok, "alice"} }
-pub fun get_perms() { .{:ok, [:read, :write]} }
-pub fun process() {
-  match .{:ok, user} <- get_user() rescue { :user_error }
+pub fun get_user() do .{:ok, "alice"} end
+pub fun get_perms() do .{:ok, [:read, :write]} end
+pub fun process() do
+  match .{:ok, user} <- get_user() rescue :user_error end
   :log_user
   :validate_user
-  match .{:ok, perms} <- get_perms() rescue { :perm_error }
+  match .{:ok, perms} <- get_perms() rescue :perm_error end
   :log_perms
   :final_result
-}
+end
 |}
   in
   match compile_lx_code code with
@@ -196,11 +196,11 @@ pub fun process() {
 let test_match_rescue_patterns () =
   let code =
     {|
-pub fun test_patterns() {
-  match [head | tail] <- get_list() rescue { [] }
-  match %{name: user_name} <- get_user() rescue { %{name: "unknown"} }
+pub fun test_patterns() do
+  match [head | tail] <- get_list() rescue [] end
+  match %{name: user_name} <- get_user() rescue %{name: "unknown"} end
   :done
-}
+end
 |}
   in
   match parse_lx_code code with
@@ -228,9 +228,9 @@ let test_match_rescue_error_cases () =
   (* Test missing rescue clause *)
   let invalid_code =
     {|
-pub fun test() {
+pub fun test() do
   match .{:ok, 1} <- get_value()
-}
+end
 |}
   in
   (match parse_lx_code invalid_code with
@@ -240,9 +240,9 @@ pub fun test() {
   (* Test invalid pattern *)
   let invalid_pattern =
     {|
-pub fun test() {
-  match 123 <- get_value() rescue { :error }
-}
+pub fun test() do
+  match 123 <- get_value() rescue :error end
+end
 |}
   in
   match parse_lx_code invalid_pattern with
@@ -253,10 +253,10 @@ pub fun test() {
 let test_match_rescue_no_guards () =
   let code =
     {|
-pub fun test() {
-  match .{:ok, x} <- get_value() rescue { :error }
+pub fun test() do
+  match .{:ok, x} <- get_value() rescue :error end
   :done
-}
+end
 |}
   in
   match parse_lx_code code with
@@ -267,11 +267,11 @@ pub fun test() {
 let test_nested_match_rescue () =
   let code =
     {|
-pub fun test_nested() {
-  match .{:ok, _value1} <- erlang.system_time() rescue { :error1 }
-  match .{:ok, _value2} <- erlang.system_time() rescue { :error2 }
+pub fun test_nested() do
+  match .{:ok, _value1} <- erlang.system_time() rescue :error1 end
+  match .{:ok, _value2} <- erlang.system_time() rescue :error2 end
   :success
-}
+end
 |}
   in
   match compile_lx_code code with
@@ -286,11 +286,11 @@ pub fun test_nested() {
 let test_match_rescue_return_values () =
   let code =
     {|
-pub fun test_returns() {
-  x = match .{:ok, _value} <- erlang.system_time() rescue { 0 }
-  y = match .{:error, _} <- erlang.system_time() rescue { 1 }
+pub fun test_returns() do
+  x = match .{:ok, _value} <- erlang.system_time() rescue 0 end
+  y = match .{:error, _} <- erlang.system_time() rescue 1 end
   x + y
-}
+end
 |}
   in
   match compile_lx_code code with

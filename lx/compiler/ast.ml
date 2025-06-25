@@ -87,7 +87,11 @@ and expr =
       (pattern * expr) list
       * expr
       * else_branch option (* steps, success_body, else_branch *)
-  | For of ident * expr * expr
+  | For of
+      ident
+      * expr
+      * expr
+      * guard_expr option (* variable, iterable, body, optional guard *)
   | Sequence of expr list (* Function body sequences *)
   | Block of expr list (* Explicit block expressions {} *)
   | BinOp of expr * string * expr (* Binary operations *)

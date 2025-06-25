@@ -19,7 +19,7 @@ let string_matches_pattern s pattern =
   with Not_found -> false
 
 let test_simple_function_example () =
-  let program = Compiler.parse_string "pub fun hello() { \"world\" }" in
+  let program = Compiler.parse_string "pub fun hello() do \"world\" end" in
   let result = Compiler.compile_to_string_for_tests program in
   let expected_parts = [ "-module(generated)"; "hello() ->"; "\"world\"." ] in
   List.iter
@@ -29,7 +29,7 @@ let test_simple_function_example () =
     expected_parts
 
 let test_function_with_parameters () =
-  let program = Compiler.parse_string "pub fun add(x, y) { x + y }" in
+  let program = Compiler.parse_string "pub fun add(x, y) do x + y end" in
   let result = Compiler.compile_to_string_for_tests program in
   let expected_parts =
     [ "add(X_[a-z0-9]+, Y_[a-z0-9]+) ->"; "X_[a-z0-9]+ \\+ Y_[a-z0-9]+\\." ]
@@ -41,7 +41,7 @@ let test_function_with_parameters () =
     expected_parts
 
 let test_multiple_functions () =
-  let input = "pub fun first() { 1 } fun second() { 2 }" in
+  let input = "pub fun first() do 1 end pub fun second() do 2 end" in
   let program = Compiler.parse_string input in
   let result = Compiler.compile_to_string_for_tests program in
   let expected_parts = [ "first() ->"; "1."; "second() ->"; "2." ] in
@@ -54,11 +54,11 @@ let test_multiple_functions () =
 let test_various_literals () =
   let test_cases =
     [
-      ("pub fun test_int() { 42 }", [ "42" ]);
-      ("pub fun test_float() { 3.14 }", [ "3.14" ]);
-      ("pub fun test_bool() { true }", [ "true" ]);
-      ("pub fun test_atom() { :hello }", [ "hello" ]);
-      ("pub fun test_string() { \"world\" }", [ "\"world\"" ]);
+      ("pub fun test_int() do 42 end", [ "42" ]);
+      ("pub fun test_float() do 3.14 end", [ "3.14" ]);
+      ("pub fun test_bool() do true end", [ "true" ]);
+      ("pub fun test_atom() do :hello end", [ "hello" ]);
+      ("pub fun test_string() do \"world\" end", [ "\"world\"" ]);
     ]
   in
 

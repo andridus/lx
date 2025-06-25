@@ -37,13 +37,13 @@ let contains_substring s ~substring =
 let test_if_else () =
   let input =
     {|
-    fun test(x) {
-      if x == 1 {
+    fun test(x) do
+      if x == 1 do
         "one"
-      } else {
+      else
         "other"
-      }
-    }
+      end
+    end
   |}
   in
   let expr = parse_expr_helper input in
@@ -55,38 +55,15 @@ let test_if_else () =
       ()
   | _ -> Alcotest.fail "Expected if-else expression"
 
-(* Test if expressions with case *)
-let test_if_case () =
-  let input =
-    {|
-    fun test(x) {
-      if x == 1 {
-        "one"
-      } case {
-        2 -> "two"
-        _ -> "other"
-      }
-    }
-  |}
-  in
-  let expr = parse_expr_helper input in
-  match expr with
-  | If
-      ( BinOp (Var "x", "==", Literal (LInt 1)),
-        Literal (LString "one"),
-        Some (ClauseElse clauses) ) ->
-      check int "case clauses count" 2 (List.length clauses)
-  | _ -> Alcotest.fail "Expected if-case expression"
-
 (* Test if expressions without else/case *)
 let test_if_no_else () =
   let input =
     {|
-    fun test(x) {
-      if x == 1 {
+    fun test(x) do
+      if x == 1 do
         "one"
-      }
-    }
+      end
+    end
   |}
   in
   let expr = parse_expr_helper input in
@@ -100,13 +77,13 @@ let test_if_no_else () =
 let test_with_else () =
   let input =
     {|
-    fun test() {
-      with .{:ok, value} <= get_result() {
+    fun test() do
+      with .{:ok, value} <= get_result() do
         value
-      } else {
+      else
         "failed"
-      }
-    }
+      end
+    end
   |}
   in
   let expr = parse_expr_helper input in
@@ -119,14 +96,14 @@ let test_with_else () =
 let test_with_case () =
   let input =
     {|
-    fun test() {
-      with .{:ok, value} <= get_result() {
+    fun test() do
+      with .{:ok, value} <= get_result() do
         value
-      } case {
+      case
         .{:error, reason} -> reason
         _ -> "unknown"
-      }
-    }
+      end
+    end
   |}
   in
   let expr = parse_expr_helper input in
@@ -140,11 +117,11 @@ let test_with_case () =
 let test_with_no_else () =
   let input =
     {|
-    fun test() {
-      with .{:ok, value} <= get_result() {
+    fun test() do
+      with .{:ok, value} <= get_result() do
         value
-      }
-    }
+      end
+    end
   |}
   in
   let expr = parse_expr_helper input in
@@ -157,14 +134,14 @@ let test_with_no_else () =
 let test_with_multiple_steps () =
   let input =
     {|
-    fun test() {
+    fun test() do
       with .{:ok, user} <= get_user(),
-           .{:ok, role} <= get_role(user) {
+           .{:ok, role} <= get_role(user) do
         .{user, role}
-      } else {
+      else
         .{:error, "failed"}
-      }
-    }
+      end
+    end
   |}
   in
   let expr = parse_expr_helper input in
@@ -177,15 +154,15 @@ let test_with_multiple_steps () =
 let test_with_case_guards () =
   let input =
     {|
-    fun test() {
-      with .{:ok, value} <= get_result() {
+    fun test() do
+      with .{:ok, value} <= get_result() do
         value
-      } case {
+      case
         .{:error, reason} when reason == :timeout -> "timeout"
         .{:error, _} -> "other error"
         _ -> "unknown"
-      }
-    }
+      end
+    end
   |}
   in
   let expr = parse_expr_helper input in
@@ -202,52 +179,41 @@ let test_with_case_guards () =
 let test_if_compilation () =
   let input =
     {|
-    pub fun test_if_else(x) {
-      if x == 1 {
+    pub fun test_if_else(x) do
+      if x == 1 do
         "one"
-      } else {
+      else
         "other"
-      }
-    }
-
-    pub fun test_if_case(x) {
-      if x > 0 {
-        "positive"
-      } case {
-        0 -> "zero"
-        _ -> "negative"
-      }
-    }
+      end
+    end
   |}
   in
   let compiled = parse_and_compile input in
   check bool "contains if-else pattern" true
-    (contains_substring compiled ~substring:"case");
-  check bool "contains case pattern" true
-    (contains_substring compiled ~substring:"case true of")
+    (contains_substring compiled ~substring:"case")
 
 (* Test with compilation to Erlang *)
 let test_with_compilation () =
   let input =
     {|
-    pub fun get_result() { .{:ok, "test"} }
+    pub fun get_result() do .{:ok, "test"} end
 
-    pub fun test_with_else() {
-      with .{:ok, value} <= get_result() {
+    pub fun test_with_else() do
+      with .{:ok, value} <= get_result() do
         value
-      } else {
+      else
         "failed"
-      }
-    }
+      end
+    end
 
-    pub fun test_with_case() {
-      with .{:ok, value} <= get_result() {
+    pub fun test_with_case() do
+      with .{:ok, value} <= get_result() do
         value
-      } case {
+      case
         .{:error, _} -> "error"
         _ -> "unknown"
-      }
-    }
+      end
+    end
   |}
   in
   let compiled = parse_and_compile input in
@@ -260,13 +226,13 @@ let test_with_compilation () =
 let test_if_type_checking () =
   let input =
     {|
-    fun test_if_else(x) {
-      if x == 1 {
+    fun test_if_else(x) do
+      if x == 1 do
         "one"
-      } else {
+      else
         "other"
-      }
-    }
+      end
+    end
   |}
   in
   let lexbuf = Lexing.from_string input in
@@ -280,15 +246,15 @@ let test_if_type_checking () =
 let test_with_type_checking () =
   let input =
     {|
-    fun get_result() { .{:ok, "test"} }
+    fun get_result() do .{:ok, "test"} end
 
-    fun test_with_else() {
-      with .{:ok, value} <= get_result() {
+    fun test_with_else() do
+      with .{:ok, value} <= get_result() do
         value
-      } else {
+      else
         "failed"
-      }
-    }
+      end
+    end
   |}
   in
   let lexbuf = Lexing.from_string input in
@@ -302,13 +268,13 @@ let test_with_type_checking () =
 let test_type_error_mismatched_branches () =
   let input =
     {|
-    fun test_bad_types(x) {
-      if x == 1 {
+    fun test_bad_types(x) do
+      if x == 1 do
         "string"
-      } else {
+      else
         42
-      }
-    }
+      end
+    end
   |}
   in
   let lexbuf = Lexing.from_string input in
@@ -322,7 +288,6 @@ let test_type_error_mismatched_branches () =
 let tests =
   [
     ("if with else", `Quick, test_if_else);
-    ("if with case", `Quick, test_if_case);
     ("if without else", `Quick, test_if_no_else);
     ("with with else", `Quick, test_with_else);
     ("with with case", `Quick, test_with_case);

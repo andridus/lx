@@ -5,10 +5,10 @@ let test_supervisor_missing_brackets_multiple_children () =
   (* Test error message when supervisor children are specified without brackets *)
   let code =
     {|
-supervisor cart_sup {
+supervisor cart_sup do
   strategy one_for_one
   children cart, inventory, payment
-}
+end
 |}
   in
   try
@@ -31,10 +31,10 @@ let test_supervisor_missing_brackets_single_child () =
   (* Test error message when supervisor has single child without brackets *)
   let code =
     {|
-supervisor my_sup {
+supervisor my_sup do
   strategy one_for_all
   children worker1
-}
+end
 |}
   in
   try
@@ -57,10 +57,10 @@ let test_supervisor_invalid_children_syntax () =
   (* Test error message when children field has completely invalid syntax *)
   let code =
     {|
-supervisor test_sup {
+supervisor test_sup do
   strategy rest_for_one
   children invalid_syntax_here
-}
+end
 |}
   in
   try
@@ -77,22 +77,22 @@ let test_supervisor_correct_syntax_with_brackets () =
   (* Test that correct syntax with brackets parses successfully *)
   let code =
     {|
-supervisor cart_sup {
+supervisor cart_sup do
   strategy one_for_one
   children [cart, inventory, payment]
-}
+end
 
-worker cart {
-  fun init(_) { .{:ok, []} }
-}
+worker cart do
+  fun init(_) do .{:ok, []} end
+end
 
-worker inventory {
-  fun init(_) { .{:ok, .{}} }
-}
+worker inventory do
+  fun init(_) do .{:ok, .{}} end
+end
 
-worker payment {
-  fun init(_) { .{:ok, []} }
-}
+worker payment do
+  fun init(_) do .{:ok, []} end
+end
 |}
   in
   try
@@ -108,10 +108,10 @@ let test_supervisor_empty_children_with_brackets () =
   (* Test that empty children list with brackets works *)
   let code =
     {|
-supervisor empty_sup {
+supervisor empty_sup do
   strategy one_for_one
   children []
-}
+end
 |}
   in
   try
@@ -126,10 +126,10 @@ let test_supervisor_error_message_contains_suggestion () =
   (* Test that error messages contain helpful suggestions *)
   let code =
     {|
-supervisor my_sup {
+supervisor my_sup do
   strategy one_for_one
   children worker1, worker2
-}
+end
 |}
   in
   try
@@ -149,10 +149,10 @@ let test_supervisor_error_message_educational () =
   (* Test that error messages are educational about why brackets are needed *)
   let code =
     {|
-supervisor cart_sup {
+supervisor cart_sup do
   strategy one_for_one
   children cart
-}
+end
 |}
   in
   try

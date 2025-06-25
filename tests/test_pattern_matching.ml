@@ -12,8 +12,8 @@ let compile_program program = Compiler.compile_to_string_for_tests program
 (* Test pattern matching with integer literals *)
 let test_pattern_matching_integers () =
   let input =
-    "pub fun test_numbers(x) { case x { 0 -> :zero 1 -> :one 42 -> :answer _ \
-     -> :other } }"
+    "pub fun test_numbers(x) do case x do 0 -> :zero 1 -> :one 42 -> :answer _ \
+     -> :other end end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in
@@ -23,8 +23,8 @@ let test_pattern_matching_integers () =
 (* Test pattern matching with string literals *)
 let test_pattern_matching_strings () =
   let input =
-    "pub fun test_strings(s) { case s { \"hello\" -> :greeting \"world\" -> \
-     :place \"\" -> :empty _ -> :other } }"
+    "pub fun test_strings(s) do case s do \"hello\" -> :greeting \"world\" -> \
+     :place \"\" -> :empty _ -> :other end end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in
@@ -34,8 +34,8 @@ let test_pattern_matching_strings () =
 (* Test pattern matching with atom literals *)
 let test_pattern_matching_atoms () =
   let input =
-    "pub fun test_atoms(a) { case a { :ok -> :success :error -> :failure \
-     :timeout -> :expired _ -> :unknown } }"
+    "pub fun test_atoms(a) do case a do :ok -> :success :error -> :failure \
+     :timeout -> :expired _ -> :unknown end end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in
@@ -47,8 +47,8 @@ let test_pattern_matching_atoms () =
 (* Test pattern matching with boolean literals *)
 let test_pattern_matching_booleans () =
   let input =
-    "pub fun test_booleans(b) { case b { true -> :yes false -> :no _ -> \
-     :invalid } }"
+    "pub fun test_booleans(b) do case b do true -> :yes false -> :no _ -> \
+     :invalid end end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in
@@ -58,8 +58,8 @@ let test_pattern_matching_booleans () =
 (* Test pattern matching with float literals *)
 let test_pattern_matching_floats () =
   let input =
-    "pub fun test_floats(f) { case f { 0.0 -> :zero 3.14 -> :pi 2.71 -> :euler \
-     _ -> :other } }"
+    "pub fun test_floats(f) do case f do 0.0 -> :zero 3.14 -> :pi 2.71 -> \
+     :euler _ -> :other end end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in
@@ -67,7 +67,9 @@ let test_pattern_matching_floats () =
 
 (* Test pattern matching with tuple literals *)
 let test_pattern_matching_tuples () =
-  let input = "pub fun test_tuples(t) { case t { .{x, y} -> x + y _ -> 0 } }" in
+  let input =
+    "pub fun test_tuples(t) do case t do .{x, y} -> x + y _ -> 0 end end"
+  in
   let program = parse_program_string input in
   let compiled = compile_program program in
   check bool "Should compile tuple patterns successfully" true
@@ -75,7 +77,9 @@ let test_pattern_matching_tuples () =
 
 (* Test pattern matching with list literals *)
 let test_pattern_matching_lists () =
-  let input = "pub fun test_lists(l) { case l { [] -> 0 [x] -> x _ -> 1 } }" in
+  let input =
+    "pub fun test_lists(l) do case l do [] -> 0 [x] -> x _ -> 1 end end"
+  in
   let program = parse_program_string input in
   let compiled = compile_program program in
   check bool "Should compile list patterns successfully" true
@@ -84,7 +88,8 @@ let test_pattern_matching_lists () =
 (* Test pattern matching with map literals *)
 let test_pattern_matching_maps () =
   let input =
-    "pub fun test_maps(m) { case m { %{ name: n } -> n _ -> \"unknown\" } }"
+    "pub fun test_maps(m) do case m do %{ name: n } -> n _ -> \"unknown\" end \
+     end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in
@@ -93,7 +98,7 @@ let test_pattern_matching_maps () =
 
 (* Test pattern matching with wildcard *)
 let test_pattern_matching_wildcard () =
-  let input = "pub fun test_wildcard(x) { case x { _ -> :anything } }" in
+  let input = "pub fun test_wildcard(x) do case x do _ -> :anything end end" in
   let program = parse_program_string input in
   let compiled = compile_program program in
   check bool "Should compile wildcard patterns" true (String.length compiled > 0)
@@ -101,7 +106,7 @@ let test_pattern_matching_wildcard () =
 (* Test pattern matching with variable binding *)
 let test_pattern_matching_variables () =
   let input =
-    "pub fun test_vars(data) { case data { .{x, y} -> x + y _ -> 0 } }"
+    "pub fun test_vars(data) do case data do .{x, y} -> x + y _ -> 0 end end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in
@@ -111,8 +116,8 @@ let test_pattern_matching_variables () =
 (* Test pattern matching with nested structures *)
 let test_pattern_matching_nested () =
   let input =
-    "pub fun test_nested(data) { case data { .{:user, name} -> name _ -> \
-     :unknown } }"
+    "pub fun test_nested(data) do case data do .{:user, name} -> name _ -> \
+     :unknown end end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in
@@ -122,8 +127,8 @@ let test_pattern_matching_nested () =
 (* Test pattern matching with guards *)
 let test_pattern_matching_guards () =
   let input =
-    "pub fun test_guards(x) { case x { n when n > 0 -> :positive n when n < 0 \
-     -> :negative 0 -> :zero _ -> :other } }"
+    "pub fun test_guards(x) do case x do n when n > 0 -> :positive n when n < \
+     0 -> :negative 0 -> :zero _ -> :other end end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in
@@ -132,8 +137,8 @@ let test_pattern_matching_guards () =
 (* Test pattern matching in function parameters *)
 let test_pattern_matching_function_params () =
   let input =
-    "pub fun process_empty([]) { :empty } pub fun process_pair(.{x, y}) { x + \
-     y } pub fun process_atom(:ok) { :success }"
+    "pub fun process_empty([]) do :empty end pub fun process_pair(.{x, y}) do \
+     x + y end pub fun process_atom(:ok) do :success end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in
@@ -142,7 +147,9 @@ let test_pattern_matching_function_params () =
 
 (* Test pattern matching with mixed literal types *)
 let test_pattern_matching_mixed_literals () =
-  let input = "pub fun test_mixed(value) { case value { 42 -> 42 _ -> 0 } }" in
+  let input =
+    "pub fun test_mixed(value) do case value do 42 -> 42 _ -> 0 end end"
+  in
   let program = parse_program_string input in
   let compiled = compile_program program in
   check bool "Should compile mixed literal patterns successfully" true
@@ -151,7 +158,8 @@ let test_pattern_matching_mixed_literals () =
 (* Test pattern matching with nil *)
 let test_pattern_matching_nil () =
   let input =
-    "pub fun test_nil(value) { case value { nil -> :nothing _ -> :something } }"
+    "pub fun test_nil(value) do case value do nil -> :nothing _ -> :something \
+     end end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in
@@ -161,8 +169,8 @@ let test_pattern_matching_nil () =
 (* Test complex pattern matching scenarios *)
 let test_pattern_matching_complex () =
   let input =
-    "pub fun analyze_data(data) { case data { %{ name: user } -> user _ -> \
-     :unknown } }"
+    "pub fun analyze_data(data) do case data do %{ name: user } -> user _ -> \
+     :unknown end end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in
@@ -172,7 +180,7 @@ let test_pattern_matching_complex () =
 (* Test pattern matching with deep nesting *)
 let test_pattern_matching_deep_nesting () =
   let input =
-    "pub fun test_deep(data) { case data { .{x, y} -> x + y _ -> 0 } }"
+    "pub fun test_deep(data) do case data do .{x, y} -> x + y _ -> 0 end end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in
@@ -182,7 +190,8 @@ let test_pattern_matching_deep_nesting () =
 (* Test pattern matching with repeated variables *)
 let test_pattern_matching_repeated_vars () =
   let input =
-    "pub fun test_repeated(data) { case data { .{x, y} -> x + y _ -> 0 } }"
+    "pub fun test_repeated(data) do case data do .{x, y} -> x + y _ -> 0 end \
+     end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in
@@ -192,8 +201,8 @@ let test_pattern_matching_repeated_vars () =
 (* Test pattern matching exhaustiveness *)
 let test_pattern_matching_exhaustiveness () =
   let input =
-    "pub fun test_exhaustive(bool_val) { case bool_val { true -> :yes false -> \
-     :no } }"
+    "pub fun test_exhaustive(bool_val) do case bool_val do true -> :yes false \
+     -> :no end end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in
@@ -202,7 +211,7 @@ let test_pattern_matching_exhaustiveness () =
 
 (* Test pattern matching with list comprehensions *)
 let test_pattern_matching_list_comprehensions () =
-  let input = "pub fun test_list_comp() { result = [1, 2, 3]; result }" in
+  let input = "pub fun test_list_comp() do result = [1, 2, 3]; result end" in
   let program = parse_program_string input in
   let compiled = compile_program program in
   check bool "Should compile list comprehensions successfully" true
@@ -211,9 +220,9 @@ let test_pattern_matching_list_comprehensions () =
 (* Test pattern matching with multiple clauses *)
 let test_pattern_matching_multiple_clauses () =
   let input =
-    "pub fun multi_clause([]) { :empty } pub fun multi_clause([x]) { \
-     .{:single, x} } pub fun multi_clause([x, y | rest]) { .{:multiple, x, y, \
-     rest} }"
+    "pub fun multi_clause([]) do :empty end pub fun multi_clause([x]) do \
+     .{:single, x} end pub fun multi_clause([x, y | rest]) do .{:multiple, x, \
+     y, rest} end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in
@@ -223,8 +232,8 @@ let test_pattern_matching_multiple_clauses () =
 (* Test pattern matching with binary operators in patterns *)
 let test_pattern_matching_binary_ops () =
   let input =
-    "pub fun test_binary(x) { case x { n when n == 42 -> :answer n when n != 0 \
-     -> :nonzero _ -> :other } }"
+    "pub fun test_binary(x) do case x do n when n == 42 -> :answer n when n != \
+     0 -> :nonzero _ -> :other end end"
   in
   let program = parse_program_string input in
   let compiled = compile_program program in

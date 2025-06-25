@@ -1542,7 +1542,22 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
             infer_expr (apply_subst_env combined_subst env) else_expr
           in
           let else_unify =
-            unify (apply_subst else_subst success_type) else_type
+            try unify (apply_subst else_subst success_type) else_type
+            with TypeError (UnificationError (t1, t2, _)) ->
+              let context = "with expression" in
+              let detailed_msg =
+                Printf.sprintf
+                  "Type mismatch in with expression: success branch returns %s \
+                   but else branch returns %s.\n\
+                   Suggestion: Both branches of a with expression must return \
+                   the same type. Consider:\n\
+                   - Using a union type (e.g., Result.ok/Result.error pattern)\n\
+                   - Converting both branches to return the same type\n\
+                   - Using an option type (?T) if one branch might fail"
+                  (string_of_type t1) (string_of_type t2)
+              in
+              raise
+                (TypeError (ContextualTypeError (detailed_msg, context, None)))
           in
           let complete_subst =
             compose_subst (compose_subst combined_subst else_subst) else_unify
@@ -1582,18 +1597,56 @@ and infer_expr_original (env : type_env) (expr : expr) : lx_type * substitution
               (combined_subst, env) clauses
           in
           let else_unify =
-            unify
-              (apply_subst clause_subst success_type)
-              (apply_subst clause_subst result_type)
+            try
+              unify
+                (apply_subst clause_subst success_type)
+                (apply_subst clause_subst result_type)
+            with TypeError (UnificationError (t1, t2, _)) ->
+              let context = "with expression with clauses" in
+              let detailed_msg =
+                Printf.sprintf
+                  "Type mismatch in with expression: success branch returns %s \
+                   but else clauses return %s.\n\
+                   Suggestion: All branches of a with expression must return \
+                   the same type."
+                  (string_of_type t1) (string_of_type t2)
+              in
+              raise
+                (TypeError (ContextualTypeError (detailed_msg, context, None)))
           in
           let complete_subst = compose_subst clause_subst else_unify in
           (apply_subst complete_subst success_type, complete_subst)
       | None ->
           (* With without else returns optional type: T | nil *)
           (TOption (apply_subst combined_subst success_type), combined_subst))
-  | For (_, _, _) ->
-      (* For expressions need more complex handling - simplified for now *)
-      (TNil, [])
+  | For (var, iter_expr, body_expr, guard_opt) ->
+      (* For expressions are list comprehensions that return a list *)
+      let iter_type, iter_subst = infer_expr env iter_expr in
+      let elem_type = fresh_type_var () in
+      let list_unify =
+        unify (apply_subst iter_subst iter_type) (TList elem_type)
+      in
+      let combined_subst = compose_subst iter_subst list_unify in
+
+      (* Create new environment with loop variable *)
+      let loop_env = (var, elem_type) :: apply_subst_env combined_subst env in
+
+      (* Type check guard if present *)
+      let guard_subst =
+        match guard_opt with
+        | Some guard -> infer_guard_expr loop_env guard
+        | None -> []
+      in
+      let guard_combined_subst = compose_subst combined_subst guard_subst in
+
+      (* Type check body *)
+      let body_type, body_subst =
+        infer_expr (apply_subst_env guard_combined_subst loop_env) body_expr
+      in
+      let final_subst = compose_subst guard_combined_subst body_subst in
+
+      (* Return list of body type *)
+      (TList (apply_subst final_subst body_type), final_subst)
   | Sequence exprs -> (
       (* Sequence expressions have the same type behavior as blocks *)
       match List.rev exprs with

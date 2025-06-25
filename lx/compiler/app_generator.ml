@@ -302,7 +302,17 @@ and emit_expr ctx (e : expr) : string =
       (* Generate a single case expression for individual match rescue *)
       "case " ^ emit_expr ctx value ^ " of " ^ emit_pattern ctx pattern
       ^ " -> ok; _ -> " ^ emit_expr ctx rescue_expr ^ " end"
-  | For (_, _, _) -> "% For expressions not yet implemented"
+  | For (var, iter_expr, body_expr, guard_opt) ->
+      (* Generate Erlang list comprehension: [Body || Var <- List] or [Body || Var <- List, Guard] *)
+      let var_name = get_renamed_var ctx var in
+      let iter_str = emit_expr ctx iter_expr in
+      let body_str = emit_expr ctx body_expr in
+      let guard_str =
+        match guard_opt with
+        | Some guard -> ", " ^ emit_guard_expr ctx guard
+        | None -> ""
+      in
+      "[" ^ body_str ^ " || " ^ var_name ^ " <- " ^ iter_str ^ guard_str ^ "]"
   | Sequence exprs ->
       let block_ctx = create_scope (Some ctx) in
       (* Check if this is a sequence with MatchRescueStep patterns *)
@@ -1054,9 +1064,8 @@ let generate_application_files ?(skip_rebar = false) output_dir filename program
             }
         | _ ->
             Error.make_error_with_position
-              (Error.TypeError ("Type checking failed", None))
-              (Error.make_position 1 1)
-              (Typechecker.string_of_type_error error)
+              (Error.TypeError (Typechecker.string_of_type_error error, None))
+              (Error.make_position 1 1) ""
       in
       raise (Error.CompilationError error_obj)
   | Error.CompilationError _ as e -> raise e);
