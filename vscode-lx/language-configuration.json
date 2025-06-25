@@ -1,0 +1,42 @@
+{
+  "comments": {
+    "lineComment": "#"
+  },
+  "brackets": [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"],
+    ["<<", ">>"],
+    ["%{", "}"],
+    [".{", "}"]
+  ],
+  "autoClosingPairs": [
+    { "open": "{", "close": "}" },
+    { "open": "[", "close": "]" },
+    { "open": "(", "close": ")" },
+    { "open": "\"", "close": "\"", "notIn": ["string"] },
+    { "open": "<<", "close": ">>" },
+    { "open": "%{", "close": "}" },
+    { "open": ".{", "close": "}" }
+  ],
+  "surroundingPairs": [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"],
+    ["\"", "\""],
+    ["<<", ">>"],
+    ["%{", "}"],
+    [".{", "}"]
+  ],
+  "folding": {
+    "markers": {
+      "start": "^\\s*#\\s*region\\b",
+      "end": "^\\s*#\\s*endregion\\b"
+    }
+  },
+  "wordPattern": "(-?\\b\\d+\\.\\d+\\b)|(-?\\b\\d+\\b)|(\\b[a-zA-Z_][a-zA-Z0-9_]*\\b)|(:[a-zA-Z_][a-zA-Z0-9_]*)|(\"[^\"]*\")",
+  "indentationRules": {
+    "increaseIndentPattern": "^(.*\\bdo\\b.*)$|^(.*\\bif\\b.*)$|^(.*\\bcase\\b.*)$|^(.*\\bwith\\b.*)$|^(.*\\bfor\\b.*)$|^(.*\\bworker\\b.*)$|^(.*\\bsupervisor\\b.*)$|^(.*\\brecord\\b.*)$|^(.*\\bspec\\b.*)$|^(.*\\bdescribe\\b.*)$|^(.*\\btest\\b.*)$|^(.*\\bapplication\\b.*)$|^(.*\\bdeps\\b.*)$|^(.*\\{.*)$|^(.*\\[.*)$|^(.*\\(.*)$|^(.*<<.*)$|^(.*%\\{.*)$|^(.*\\.\\{.*)$",
+    "decreaseIndentPattern": "^(.*\\bend\\b.*)$|^(.*\\belse\\b.*)$|^(.*\\}.*)$|^(.*\\].*)$|^(.*\\).*)$|^(.*>>.*)$"
+  }
+}

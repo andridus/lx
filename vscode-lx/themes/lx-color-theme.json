@@ -28,6 +28,55 @@
       }
     },
     {
+      "name": "Binary",
+      "scope": "constant.other.binary.lx",
+      "settings": {
+        "foreground": "#FFD700"
+      }
+    },
+    {
+      "name": "Binary Types",
+      "scope": "constant.other.binary.type.lx",
+      "settings": {
+        "foreground": "#FF69B4"
+      }
+    },
+    {
+      "name": "Binary Size",
+      "scope": "constant.other.binary.size.lx",
+      "settings": {
+        "foreground": "#00CED1"
+      }
+    },
+    {
+      "name": "Maps",
+      "scope": "constant.other.map.lx",
+      "settings": {
+        "foreground": "#FF6347"
+      }
+    },
+    {
+      "name": "Records",
+      "scope": "constant.other.record.lx",
+      "settings": {
+        "foreground": "#98FB98"
+      }
+    },
+    {
+      "name": "Tuples",
+      "scope": "constant.other.tuple.lx",
+      "settings": {
+        "foreground": "#DDA0DD"
+      }
+    },
+    {
+      "name": "Lists",
+      "scope": "constant.other.list.lx",
+      "settings": {
+        "foreground": "#F0E68C"
+      }
+    },
+    {
       "name": "Keywords Function",
       "scope": "keyword.control.function.lx",
       "settings": {
@@ -77,13 +126,6 @@
       }
     },
     {
-      "name": "Keywords Project",
-      "scope": "keyword.control.project.lx",
-      "settings": {
-        "foreground": "#FF6347"
-      }
-    },
-    {
       "name": "Keywords Other",
       "scope": "keyword.control.other.lx",
       "settings": {
@@ -126,6 +168,13 @@
       }
     },
     {
+      "name": "Record Types",
+      "scope": "entity.name.type.record.lx",
+      "settings": {
+        "foreground": "#4EC9B0"
+      }
+    },
+    {
       "name": "Types",
       "scope": "entity.name.type.lx",
       "settings": {
@@ -140,6 +189,34 @@
       }
     },
     {
+      "name": "Send Operator",
+      "scope": "keyword.operator.send.lx",
+      "settings": {
+        "foreground": "#FF6347"
+      }
+    },
+    {
+      "name": "Pattern Match Operator",
+      "scope": "keyword.operator.pattern.lx",
+      "settings": {
+        "foreground": "#FFD700"
+      }
+    },
+    {
+      "name": "With Bind Operator",
+      "scope": "keyword.operator.with-bind.lx",
+      "settings": {
+        "foreground": "#00CED1"
+      }
+    },
+    {
+      "name": "List Cons Operator",
+      "scope": "keyword.operator.list-cons.lx",
+      "settings": {
+        "foreground": "#FF69B4"
+      }
+    },
+    {
       "name": "Variables",
       "scope": "variable.other.lx",
       "settings": {
@@ -147,10 +224,66 @@
       }
     },
     {
+      "name": "Map Keys",
+      "scope": "variable.other.map-key-atom.lx",
+      "settings": {
+        "foreground": "#FFD700"
+      }
+    },
+    {
+      "name": "Map Keys String",
+      "scope": "variable.other.map-key-string.lx",
+      "settings": {
+        "foreground": "#CE9178"
+      }
+    },
+    {
+      "name": "Record Fields",
+      "scope": "variable.other.record-field.lx",
+      "settings": {
+        "foreground": "#98FB98"
+      }
+    },
+    {
       "name": "Punctuation",
       "scope": "punctuation.lx",
       "settings": {
         "foreground": "#D4D4D4"
+      }
+    },
+    {
+      "name": "Binary Punctuation",
+      "scope": "punctuation.definition.binary.lx",
+      "settings": {
+        "foreground": "#FFD700"
+      }
+    },
+    {
+      "name": "Map Punctuation",
+      "scope": "punctuation.definition.map.lx",
+      "settings": {
+        "foreground": "#FF6347"
+      }
+    },
+    {
+      "name": "Record Punctuation",
+      "scope": "punctuation.definition.record.lx",
+      "settings": {
+        "foreground": "#98FB98"
+      }
+    },
+    {
+      "name": "Tuple Punctuation",
+      "scope": "punctuation.definition.tuple.lx",
+      "settings": {
+        "foreground": "#DDA0DD"
+      }
+    },
+    {
+      "name": "List Punctuation",
+      "scope": "punctuation.definition.list.lx",
+      "settings": {
+        "foreground": "#F0E68C"
       }
     }
   ]

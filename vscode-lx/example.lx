@@ -1,0 +1,221 @@
+# Example Lx file demonstrating all syntax features
+
+deps [:erlang, :kernel, :stdlib, :crypto]
+
+# Record definition
+record Person do
+    name :: string,
+    age :: integer,
+    email :: string
+end
+
+record Config do
+    debug :: boolean,
+    timeout :: integer,
+    max_retries :: integer
+end
+
+# Application definition
+application do
+    description "Example Application"
+    vsn "1.0.0"
+    applications [kernel, stdlib]
+    registered [example_supervisor, example_worker]
+    env [debug: true, timeout: 5000]
+end
+
+# Supervisor
+supervisor example_supervisor do
+    strategy one_for_one
+    children [example_worker]
+end
+
+# Worker
+worker example_worker do
+    def init(_) do
+        .{:ok, %{count: 0, config: Config{debug: true, timeout: 1000, max_retries: 3}}}
+    end
+
+    def handle_call(:increment, _from, state) do
+        %{count: count, config: config} <- state
+        new_count = count + 1
+        new_state = %{count: new_count, config: config | state}
+        .{:reply, new_count, new_state}
+    end
+
+    def handle_call(.{:set_config, new_config}, _from, state) do
+        %{count: count} <- state
+        new_state = %{count: count, config: new_config | state}
+        .{:reply, :ok, new_state}
+    end
+
+    def handle_call(:get_state, _from, state) do
+        .{:reply, state, state}
+    end
+end
+
+# Function definitions
+def create_person(name, age, email) do
+    Person{name: name, age: age, email: email}
+end
+
+def validate_person(person) do
+    case person do
+        Person{age: age, name: name} when age >= 18 ->
+            .{:ok, "Adult: " ++ name}
+        Person{age: age, name: name} when age < 18 ->
+            .{:error, "Minor: " ++ name}
+        _ ->
+            .{:error, "Invalid person"}
+    end
+end
+
+# Fun expressions
+def create_adder(n) do
+    fn(x) do x + n end
+end
+
+def apply_twice(f, x) do
+    f(f(x))
+end
+
+# Map operations
+def process_user_data(user_data) do
+    with .{:ok, user} <= extract_user(user_data),
+         .{:ok, profile} <= get_profile(user.id) do
+        %{user: user, profile: profile, processed: true}
+    else
+        .{:error, reason} -> .{:error, "Failed: " ++ reason}
+    end
+end
+
+def extract_user(data) do
+    case data do
+        %{id: user_id, name: user_name, "email" => email} ->
+            .{:ok, %{id: user_id, name: user_name, email: email}}
+        _ ->
+            .{:error, "Invalid user data"}
+    end
+end
+
+# Binary operations
+def parse_packet(packet) do
+    case packet do
+        <<version:8, length:16, data:length/binary>> ->
+            .{:ok, %{version: version, length: length, data: data}}
+        <<"HTTP/", version:2/binary, " ", status:3/binary, rest/binary>> ->
+            .{:http, version, status, rest}
+        _ ->
+            .{:error, "Unknown packet format"}
+    end
+end
+
+def create_binary_data() do
+    <<1:8, 2:16, "hello"/binary, 42:32/integer>>
+end
+
+# List comprehensions and operations
+def filter_and_transform(list) do
+    for item in list when item > 0 do
+        item * 2
+    end
+end
+
+def process_list_with_fun(list, fun) do
+    for item in list do
+        fun(item)
+    end
+end
+
+# Pattern matching examples
+def handle_message(message) do
+    case message do
+        .{:user, name, age} when age >= 18 ->
+            "Adult user: " ++ name
+        .{:user, name, age} when age < 18 ->
+            "Minor user: " ++ name
+        .{:system, msg} ->
+            "System: " ++ msg
+        [head | tail] ->
+            "List with " ++ integer_to_string(length([head | tail])) ++ " items"
+        %{type: "alert", message: msg} ->
+            "Alert: " ++ msg
+        _ ->
+            "Unknown message"
+    end
+end
+
+# Receive expression
+def wait_for_message(timeout) do
+    receive do
+        .{:data, data} -> .{:ok, data}
+        .{:error, reason} -> .{:error, reason}
+        :timeout -> .{:error, "Timeout"}
+    after timeout do
+        .{:error, "No message received"}
+    end
+end
+
+# Message passing
+def send_message(pid, message) do
+    pid ! message
+end
+
+# With expressions
+def complex_operation(data) do
+    with .{:ok, user} <= validate_user(data),
+         .{:ok, permissions} <= get_permissions(user),
+         .{:ok, result} <= process_with_permissions(user, permissions) do
+        .{:ok, result}
+    else
+        .{:error, :invalid_user} -> .{:error, "Invalid user"}
+        .{:error, :no_permissions} -> .{:error, "No permissions"}
+        .{:error, reason} -> .{:error, "Processing failed: " ++ reason}
+    end
+end
+
+# Match rescue expressions
+def safe_operation(data) do
+    match .{:ok, result} <- risky_operation(data) rescue { .{:error, "Operation failed"} }
+    result
+end
+
+# Testing
+describe "Example Tests" do
+    test "create person" do
+        person = create_person("John", 30, "john@example.com")
+        assert person.name == "John"
+        assert person.age == 30
+    end
+
+    test "validate adult person" do
+        person = create_person("Alice", 25, "alice@example.com")
+        result = validate_person(person)
+        case result do
+            .{:ok, message} -> assert string_contains(message, "Adult")
+            _ -> assert false
+        end
+    end
+
+    test "fun expression" do
+        add5 = create_adder(5)
+        result = add5(10)
+        assert result == 15
+    end
+
+    test "list comprehension" do
+        numbers = [1, 2, 3, 4, 5]
+        result = filter_and_transform(numbers)
+        assert result == [2, 4, 6, 8, 10]
+    end
+end
+
+# Helper functions
+def string_contains(string, substring) do
+    # Implementation would go here
+    true
+end
+
+def integer_to_string(integer) do
+    integer_to_list(integer)
+end
