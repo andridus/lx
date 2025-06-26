@@ -27,6 +27,9 @@ test: build
 run: build
 	dune exec lx my/test1.lx
 
+run1: build
+	dune exec lx my/test2.lx
+
 # Development mode - build and run with example
 dev: build run
 

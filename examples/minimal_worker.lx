@@ -1,5 +1,0 @@
-worker test_worker {
-  fun init(args) {
-    nil
-  }
-}

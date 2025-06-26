@@ -1,0 +1,7 @@
+defp get_value() do
+  .{:ok, 42}
+end
+
+def test() do
+  42
+end
