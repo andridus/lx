@@ -1,7 +1,7 @@
 module lexer
 
 import ast
-import error
+import errors
 
 // Lexer represents the lexical analyzer for LX language
 pub struct Lexer {
@@ -14,7 +14,7 @@ mut:
 	state     LexerState
 	buffer    string
 	start_pos ast.Position
-	errors    []error.CompilationError
+	errors    []errors.CompilationError
 	had_error bool
 }
 
@@ -419,7 +419,7 @@ fn (l Lexer) get_current_position() ast.Position {
 
 // add_error adds an error to the lexer's error collection
 fn (mut l Lexer) add_error(message string, position ast.Position) {
-	err := error.new_compilation_error(error.LexicalError{ message: message }, position,
+	err := errors.new_compilation_error(errors.LexicalError{ message: message }, position,
 		message)
 	l.errors << err
 }
@@ -430,7 +430,7 @@ pub fn (l Lexer) has_errors() bool {
 }
 
 // get_errors returns all errors encountered by the lexer
-pub fn (l Lexer) get_errors() []error.CompilationError {
+pub fn (l Lexer) get_errors() []errors.CompilationError {
 	return l.errors
 }
 

@@ -1,4 +1,4 @@
-module error
+module errors
 
 import ast
 

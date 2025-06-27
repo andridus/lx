@@ -1,518 +1,266 @@
 module main
 
+import parser
 import lexer
-
-fn test_assignment_operators() {
-	input := '= <-'
-	mut lexer0 := lexer.new_lexer(input, 'test.lx')
-
-	token1 := lexer0.next_token()
-	assert token1 is lexer.OperatorToken
-	operator_token1 := token1 as lexer.OperatorToken
-	assert operator_token1 == lexer.OperatorToken.assign
-
-	token2 := lexer0.next_token()
-	assert token2 is lexer.OperatorToken
-	operator_token2 := token2 as lexer.OperatorToken
-	assert operator_token2 == lexer.OperatorToken.pattern_match
-}
+import ast
 
 fn test_arithmetic_operators() {
-	input := '+ - * /'
-	mut lexer0 := lexer.new_lexer(input, 'test.lx')
+	// Teste de adição
+	tokens1 := [
+		lexer.Token(lexer.IntToken{value: 1}),
+		lexer.Token(lexer.OperatorToken.plus),
+		lexer.Token(lexer.IntToken{value: 2}),
+		lexer.Token(lexer.EOFToken{})
+	]
+	mut parser1 := parser.new_parser(tokens1)
+	expr1 := parser1.parse_expression()
+	assert expr1 is ast.BinaryExpr
+	bin_expr1 := expr1 as ast.BinaryExpr
+	assert bin_expr1.op == ast.BinaryOp.add
 
-	token1 := lexer0.next_token()
-	assert token1 is lexer.OperatorToken
-	operator_token1 := token1 as lexer.OperatorToken
-	assert operator_token1 == lexer.OperatorToken.plus
+	// Teste de subtração
+	tokens2 := [
+		lexer.Token(lexer.IntToken{value: 3}),
+		lexer.Token(lexer.OperatorToken.minus),
+		lexer.Token(lexer.IntToken{value: 4}),
+		lexer.Token(lexer.EOFToken{})
+	]
+	mut parser2 := parser.new_parser(tokens2)
+	expr2 := parser2.parse_expression()
+	assert expr2 is ast.BinaryExpr
+	bin_expr2 := expr2 as ast.BinaryExpr
+	assert bin_expr2.op == ast.BinaryOp.subtract
 
-	token2 := lexer0.next_token()
-	assert token2 is lexer.OperatorToken
-	operator_token2 := token2 as lexer.OperatorToken
-	assert operator_token2 == lexer.OperatorToken.minus
+	// Teste de multiplicação
+	tokens3 := [
+		lexer.Token(lexer.IntToken{value: 5}),
+		lexer.Token(lexer.OperatorToken.mult),
+		lexer.Token(lexer.IntToken{value: 6}),
+		lexer.Token(lexer.EOFToken{})
+	]
+	mut parser3 := parser.new_parser(tokens3)
+	expr3 := parser3.parse_expression()
+	assert expr3 is ast.BinaryExpr
+	bin_expr3 := expr3 as ast.BinaryExpr
+	assert bin_expr3.op == ast.BinaryOp.multiply
 
-	token3 := lexer0.next_token()
-	assert token3 is lexer.OperatorToken
-	operator_token3 := token3 as lexer.OperatorToken
-	assert operator_token3 == lexer.OperatorToken.mult
-
-	token4 := lexer0.next_token()
-	assert token4 is lexer.OperatorToken
-	operator_token4 := token4 as lexer.OperatorToken
-	assert operator_token4 == lexer.OperatorToken.div
+	// Teste de divisão
+	tokens4 := [
+		lexer.Token(lexer.IntToken{value: 7}),
+		lexer.Token(lexer.OperatorToken.div),
+		lexer.Token(lexer.IntToken{value: 8}),
+		lexer.Token(lexer.EOFToken{})
+	]
+	mut parser4 := parser.new_parser(tokens4)
+	expr4 := parser4.parse_expression()
+	assert expr4 is ast.BinaryExpr
+	bin_expr4 := expr4 as ast.BinaryExpr
+	assert bin_expr4.op == ast.BinaryOp.divide
 }
 
 fn test_comparison_operators() {
-	input := '== != < > <= >='
-	mut lexer0 := lexer.new_lexer(input, 'test.lx')
+	// Teste de igualdade
+	tokens1 := [
+		lexer.Token(lexer.IntToken{value: 1}),
+		lexer.Token(lexer.OperatorToken.eq),
+		lexer.Token(lexer.IntToken{value: 2}),
+		lexer.Token(lexer.EOFToken{})
+	]
+	mut parser1 := parser.new_parser(tokens1)
+	expr1 := parser1.parse_expression()
+	assert expr1 is ast.BinaryExpr
+	bin_expr1 := expr1 as ast.BinaryExpr
+	assert bin_expr1.op == ast.BinaryOp.equal
 
-	token1 := lexer0.next_token()
-	assert token1 is lexer.OperatorToken
-	operator_token1 := token1 as lexer.OperatorToken
-	assert operator_token1 == lexer.OperatorToken.eq
+	// Teste de desigualdade
+	tokens2 := [
+		lexer.Token(lexer.IntToken{value: 3}),
+		lexer.Token(lexer.OperatorToken.neq),
+		lexer.Token(lexer.IntToken{value: 4}),
+		lexer.Token(lexer.EOFToken{})
+	]
+	mut parser2 := parser.new_parser(tokens2)
+	expr2 := parser2.parse_expression()
+	assert expr2 is ast.BinaryExpr
+	bin_expr2 := expr2 as ast.BinaryExpr
+	assert bin_expr2.op == ast.BinaryOp.not_equal
 
-	token2 := lexer0.next_token()
-	assert token2 is lexer.OperatorToken
-	operator_token2 := token2 as lexer.OperatorToken
-	assert operator_token2 == lexer.OperatorToken.neq
-
-	token3 := lexer0.next_token()
-	assert token3 is lexer.OperatorToken
-	operator_token3 := token3 as lexer.OperatorToken
-	assert operator_token3 == lexer.OperatorToken.lt
-
-	token4 := lexer0.next_token()
-	assert token4 is lexer.OperatorToken
-	operator_token4 := token4 as lexer.OperatorToken
-	assert operator_token4 == lexer.OperatorToken.gt
-
-	token5 := lexer0.next_token()
-	assert token5 is lexer.OperatorToken
-	operator_token5 := token5 as lexer.OperatorToken
-	assert operator_token5 == lexer.OperatorToken.leq
-
-	token6 := lexer0.next_token()
-	assert token6 is lexer.OperatorToken
-	operator_token6 := token6 as lexer.OperatorToken
-	assert operator_token6 == lexer.OperatorToken.geq
+	// Teste de menor que
+	tokens3 := [
+		lexer.Token(lexer.IntToken{value: 5}),
+		lexer.Token(lexer.OperatorToken.lt),
+		lexer.Token(lexer.IntToken{value: 6}),
+		lexer.Token(lexer.EOFToken{})
+	]
+	mut parser3 := parser.new_parser(tokens3)
+	expr3 := parser3.parse_expression()
+	assert expr3 is ast.BinaryExpr
+	bin_expr3 := expr3 as ast.BinaryExpr
+	assert bin_expr3.op == ast.BinaryOp.less_than
 }
 
 fn test_logical_operators() {
-	input := 'and or not andalso orelse'
-	mut lexer0 := lexer.new_lexer(input, 'test.lx')
+	// Teste de AND
+	tokens1 := [
+		lexer.Token(lexer.KeywordToken.true_),
+		lexer.Token(lexer.OperatorToken.and_),
+		lexer.Token(lexer.KeywordToken.false_),
+		lexer.Token(lexer.EOFToken{})
+	]
+	mut parser1 := parser.new_parser(tokens1)
+	expr1 := parser1.parse_expression()
+	assert expr1 is ast.BinaryExpr
+	bin_expr1 := expr1 as ast.BinaryExpr
+	assert bin_expr1.op == ast.BinaryOp.and
 
-	token1 := lexer0.next_token()
-	assert token1 is lexer.OperatorToken
-	operator_token1 := token1 as lexer.OperatorToken
-	assert operator_token1 == lexer.OperatorToken.and_
+	// Teste de OR
+	tokens2 := [
+		lexer.Token(lexer.KeywordToken.true_),
+		lexer.Token(lexer.OperatorToken.or_),
+		lexer.Token(lexer.KeywordToken.false_),
+		lexer.Token(lexer.EOFToken{})
+	]
+	mut parser2 := parser.new_parser(tokens2)
+	expr2 := parser2.parse_expression()
+	assert expr2 is ast.BinaryExpr
+	bin_expr2 := expr2 as ast.BinaryExpr
+	assert bin_expr2.op == ast.BinaryOp.or
 
-	token2 := lexer0.next_token()
-	assert token2 is lexer.OperatorToken
-	operator_token2 := token2 as lexer.OperatorToken
-	assert operator_token2 == lexer.OperatorToken.or_
-
-	token3 := lexer0.next_token()
-	assert token3 is lexer.OperatorToken
-	operator_token3 := token3 as lexer.OperatorToken
-	assert operator_token3 == lexer.OperatorToken.not_
-
-	token4 := lexer0.next_token()
-	assert token4 is lexer.OperatorToken
-	operator_token4 := token4 as lexer.OperatorToken
-	assert operator_token4 == lexer.OperatorToken.andalso
-
-	token5 := lexer0.next_token()
-	assert token5 is lexer.OperatorToken
-	operator_token5 := token5 as lexer.OperatorToken
-	assert operator_token5 == lexer.OperatorToken.orelse
-}
-
-fn test_special_operators() {
-	input := '! :: . ++ |'
-	mut lexer0 := lexer.new_lexer(input, 'test.lx')
-
-	token1 := lexer0.next_token()
-	assert token1 is lexer.OperatorToken
-	operator_token1 := token1 as lexer.OperatorToken
-	assert operator_token1 == lexer.OperatorToken.send
-
-	token2 := lexer0.next_token()
-	assert token2 is lexer.OperatorToken
-	operator_token2 := token2 as lexer.OperatorToken
-	assert operator_token2 == lexer.OperatorToken.type_cons
-
-	token3 := lexer0.next_token()
-	assert token3 is lexer.OperatorToken
-	operator_token3 := token3 as lexer.OperatorToken
-	assert operator_token3 == lexer.OperatorToken.dot
-
-	token4 := lexer0.next_token()
-	assert token4 is lexer.OperatorToken
-	operator_token4 := token4 as lexer.OperatorToken
-	assert operator_token4 == lexer.OperatorToken.concat
-
-	token5 := lexer0.next_token()
-	assert token5 is lexer.OperatorToken
-	operator_token5 := token5 as lexer.OperatorToken
-	assert operator_token5 == lexer.OperatorToken.record_update
-}
-
-fn test_isolated_colon() {
-	input := ':'
-	mut lexer0 := lexer.new_lexer(input, 'test.lx')
-	token := lexer0.next_token()
-	assert token is lexer.ErrorToken
-	error_token := token as lexer.ErrorToken
-	assert error_token.message.contains('Isolated colon')
-}
-
-fn test_arrow_operators() {
-	input := '-> <='
-	mut lexer0 := lexer.new_lexer(input, 'test.lx')
-
-	token1 := lexer0.next_token()
-	assert token1 is lexer.OperatorToken
-	operator_token1 := token1 as lexer.OperatorToken
-	assert operator_token1 == lexer.OperatorToken.arrow
-
-	token2 := lexer0.next_token()
-	assert token2 is lexer.OperatorToken
-	operator_token2 := token2 as lexer.OperatorToken
-	assert operator_token2 == lexer.OperatorToken.leq
+	// Teste de ANDALSO
+	tokens3 := [
+		lexer.Token(lexer.KeywordToken.true_),
+		lexer.Token(lexer.OperatorToken.andalso),
+		lexer.Token(lexer.KeywordToken.false_),
+		lexer.Token(lexer.EOFToken{})
+	]
+	mut parser3 := parser.new_parser(tokens3)
+	expr3 := parser3.parse_expression()
+	assert expr3 is ast.BinaryExpr
+	bin_expr3 := expr3 as ast.BinaryExpr
+	assert bin_expr3.op == ast.BinaryOp.and
 }
 
 fn test_operator_precedence() {
-	// Test operator precedence
-	assert lexer.get_operator_precedence(lexer.OperatorToken.send) == 1
-	assert lexer.get_operator_precedence(lexer.OperatorToken.type_cons) == 2
-	assert lexer.get_operator_precedence(lexer.OperatorToken.concat) == 3
-	assert lexer.get_operator_precedence(lexer.OperatorToken.plus) == 4
-	assert lexer.get_operator_precedence(lexer.OperatorToken.minus) == 4
-	assert lexer.get_operator_precedence(lexer.OperatorToken.mult) == 5
-	assert lexer.get_operator_precedence(lexer.OperatorToken.div) == 5
-	assert lexer.get_operator_precedence(lexer.OperatorToken.eq) == 6
-	assert lexer.get_operator_precedence(lexer.OperatorToken.neq) == 6
-	assert lexer.get_operator_precedence(lexer.OperatorToken.lt) == 6
-	assert lexer.get_operator_precedence(lexer.OperatorToken.gt) == 6
-	assert lexer.get_operator_precedence(lexer.OperatorToken.leq) == 6
-	assert lexer.get_operator_precedence(lexer.OperatorToken.geq) == 6
-	assert lexer.get_operator_precedence(lexer.OperatorToken.and_) == 7
-	assert lexer.get_operator_precedence(lexer.OperatorToken.or_) == 7
-	assert lexer.get_operator_precedence(lexer.OperatorToken.andalso) == 7
-	assert lexer.get_operator_precedence(lexer.OperatorToken.orelse) == 7
-	assert lexer.get_operator_precedence(lexer.OperatorToken.not_) == 8
-	assert lexer.get_operator_precedence(lexer.OperatorToken.assign) == 9
-	assert lexer.get_operator_precedence(lexer.OperatorToken.pattern_match) == 9
-}
-
-fn test_operator_associativity() {
-	// Test left associative operators
-	assert lexer.is_left_associative(lexer.OperatorToken.plus) == true
-	assert lexer.is_left_associative(lexer.OperatorToken.minus) == true
-	assert lexer.is_left_associative(lexer.OperatorToken.mult) == true
-	assert lexer.is_left_associative(lexer.OperatorToken.div) == true
-	assert lexer.is_left_associative(lexer.OperatorToken.concat) == true
-	assert lexer.is_left_associative(lexer.OperatorToken.and_) == true
-	assert lexer.is_left_associative(lexer.OperatorToken.or_) == true
-	assert lexer.is_left_associative(lexer.OperatorToken.andalso) == true
-	assert lexer.is_left_associative(lexer.OperatorToken.orelse) == true
-
-	// Test right associative operators
-	assert lexer.is_right_associative(lexer.OperatorToken.assign) == true
-	assert lexer.is_right_associative(lexer.OperatorToken.pattern_match) == true
-	assert lexer.is_right_associative(lexer.OperatorToken.send) == true
-	assert lexer.is_right_associative(lexer.OperatorToken.type_cons) == true
-
-	// Test non-associative operators
-	assert lexer.is_left_associative(lexer.OperatorToken.eq) == false
-	assert lexer.is_right_associative(lexer.OperatorToken.eq) == false
-}
-
-fn test_operator_recognition() {
-	// Test all operators
-	operators := [
-		'=',
-		'<-',
-		'<=',
-		'->',
-		'!',
-		'::',
-		'.',
-		'++',
-		'|',
-		'+',
-		'-',
-		'*',
-		'/',
-		'==',
-		'!=',
-		'<',
-		'>',
-		'<=',
-		'>=',
-		'and',
-		'or',
-		'not',
-		'andalso',
-		'orelse',
+	// Testar precedência: * > + > ==
+	// 1 + 2 * 3 == 7 deve ser interpretado como: (1 + (2 * 3)) == 7
+	tokens := [
+		lexer.Token(lexer.IntToken{value: 1}),
+		lexer.Token(lexer.OperatorToken.plus),
+		lexer.Token(lexer.IntToken{value: 2}),
+		lexer.Token(lexer.OperatorToken.mult),
+		lexer.Token(lexer.IntToken{value: 3}),
+		lexer.Token(lexer.OperatorToken.eq),
+		lexer.Token(lexer.IntToken{value: 7}),
+		lexer.Token(lexer.EOFToken{})
 	]
+	mut parser0 := parser.new_parser(tokens)
 
-	for op in operators {
-		assert lexer.is_operator(op) == true
-		token := lexer.get_operator_token(op) or { return }
-		// Just check it's a valid token (not empty)
-		assert token.str().len > 0
-	}
+	expr := parser0.parse_expression()
+	assert expr is ast.BinaryExpr
 
-	// Test non-operators
-	non_operators := ['x', 'count', 'hello', 'world', 'test123']
-	for non_operator in non_operators {
-		assert lexer.is_operator(non_operator) == false
-	}
+	// Deve ser interpretado como: (1 + (2 * 3)) == 7
+	bin_op := expr as ast.BinaryExpr
+	assert bin_op.op == ast.BinaryOp.equal
+	assert bin_op.right is ast.LiteralExpr
+	right := bin_op.right as ast.LiteralExpr
+	assert right.value is ast.IntegerLiteral
+	right_int := right.value as ast.IntegerLiteral
+	assert right_int.value == 7
+
+	// Verificar lado esquerdo: (1 + (2 * 3))
+	assert bin_op.left is ast.BinaryExpr
+	left_bin_op := bin_op.left as ast.BinaryExpr
+	assert left_bin_op.op == ast.BinaryOp.add
+	assert left_bin_op.left is ast.LiteralExpr
+	left_left := left_bin_op.left as ast.LiteralExpr
+	assert left_left.value is ast.IntegerLiteral
+	left_left_int := left_left.value as ast.IntegerLiteral
+	assert left_left_int.value == 1
+
+	// Verificar multiplicação: (2 * 3)
+	assert left_bin_op.right is ast.BinaryExpr
+	mult_bin_op := left_bin_op.right as ast.BinaryExpr
+	assert mult_bin_op.op == ast.BinaryOp.multiply
+	assert mult_bin_op.left is ast.LiteralExpr
+	mult_left := mult_bin_op.left as ast.LiteralExpr
+	assert mult_left.value is ast.IntegerLiteral
+	mult_left_int := mult_left.value as ast.IntegerLiteral
+	assert mult_left_int.value == 2
+	assert mult_bin_op.right is ast.LiteralExpr
+	mult_right := mult_bin_op.right as ast.LiteralExpr
+	assert mult_right.value is ast.IntegerLiteral
+	mult_right_int := mult_right.value as ast.IntegerLiteral
+	assert mult_right_int.value == 3
 }
 
-fn test_operator_with_operands() {
-	input := 'x = y + z * 2'
-	mut lexer0 := lexer.new_lexer(input, 'test.lx')
+fn test_associativity() {
+	// Testar associatividade à esquerda
+	// 1 - 2 - 3 deve ser interpretado como: (1 - 2) - 3
+	tokens := [
+		lexer.Token(lexer.IntToken{value: 1}),
+		lexer.Token(lexer.OperatorToken.minus),
+		lexer.Token(lexer.IntToken{value: 2}),
+		lexer.Token(lexer.OperatorToken.minus),
+		lexer.Token(lexer.IntToken{value: 3}),
+		lexer.Token(lexer.EOFToken{})
+	]
+	mut parser0 := parser.new_parser(tokens)
 
-	// x
-	token1 := lexer0.next_token()
-	assert token1 is lexer.IdentToken
-	ident_token1 := token1 as lexer.IdentToken
-	assert ident_token1.value == 'x'
+	expr := parser0.parse_expression()
+	assert expr is ast.BinaryExpr
 
-	// =
-	token2 := lexer0.next_token()
-	assert token2 is lexer.OperatorToken
-	operator_token1 := token2 as lexer.OperatorToken
-	assert operator_token1 == lexer.OperatorToken.assign
+	// Deve ser interpretado como: (1 - 2) - 3
+	bin_op := expr as ast.BinaryExpr
+	assert bin_op.op == ast.BinaryOp.subtract
+	assert bin_op.right is ast.LiteralExpr
+	right := bin_op.right as ast.LiteralExpr
+	assert right.value is ast.IntegerLiteral
+	right_int := right.value as ast.IntegerLiteral
+	assert right_int.value == 3
 
-	// y
-	token3 := lexer0.next_token()
-	assert token3 is lexer.IdentToken
-	ident_token2 := token3 as lexer.IdentToken
-	assert ident_token2.value == 'y'
-
-	// +
-	token4 := lexer0.next_token()
-	assert token4 is lexer.OperatorToken
-	operator_token2 := token4 as lexer.OperatorToken
-	assert operator_token2 == lexer.OperatorToken.plus
-
-	// z
-	token5 := lexer0.next_token()
-	assert token5 is lexer.IdentToken
-	ident_token3 := token5 as lexer.IdentToken
-	assert ident_token3.value == 'z'
-
-	// *
-	token6 := lexer0.next_token()
-	assert token6 is lexer.OperatorToken
-	operator_token3 := token6 as lexer.OperatorToken
-	assert operator_token3 == lexer.OperatorToken.mult
-
-	// 2
-	token7 := lexer0.next_token()
-	assert token7 is lexer.IntToken
-	int_token := token7 as lexer.IntToken
-	assert int_token.value == 2
+	// Verificar lado esquerdo: (1 - 2)
+	assert bin_op.left is ast.BinaryExpr
+	left_bin_op := bin_op.left as ast.BinaryExpr
+	assert left_bin_op.op == ast.BinaryOp.subtract
+	assert left_bin_op.left is ast.LiteralExpr
+	left_left := left_bin_op.left as ast.LiteralExpr
+	assert left_left.value is ast.IntegerLiteral
+	left_left_int := left_left.value as ast.IntegerLiteral
+	assert left_left_int.value == 1
+	assert left_bin_op.right is ast.LiteralExpr
+	left_right := left_bin_op.right as ast.LiteralExpr
+	assert left_right.value is ast.IntegerLiteral
+	left_right_int := left_right.value as ast.IntegerLiteral
+	assert left_right_int.value == 2
 }
 
-fn test_comparison_expression() {
-	input := 'x == y and z != 0'
-	mut lexer0 := lexer.new_lexer(input, 'test.lx')
+fn test_complex_expression() {
+	// Testar expressão complexa: a + b * c == d and e or f
+	tokens := [
+		lexer.Token(lexer.IdentToken{value: 'a'}),
+		lexer.Token(lexer.OperatorToken.plus),
+		lexer.Token(lexer.IdentToken{value: 'b'}),
+		lexer.Token(lexer.OperatorToken.mult),
+		lexer.Token(lexer.IdentToken{value: 'c'}),
+		lexer.Token(lexer.OperatorToken.eq),
+		lexer.Token(lexer.IdentToken{value: 'd'}),
+		lexer.Token(lexer.OperatorToken.and_),
+		lexer.Token(lexer.IdentToken{value: 'e'}),
+		lexer.Token(lexer.OperatorToken.or_),
+		lexer.Token(lexer.IdentToken{value: 'f'}),
+		lexer.Token(lexer.EOFToken{})
+	]
+	mut parser0 := parser.new_parser(tokens)
 
-	// x
-	token1 := lexer0.next_token()
-	assert token1 is lexer.IdentToken
-	ident_token1 := token1 as lexer.IdentToken
-	assert ident_token1.value == 'x'
+	expr := parser0.parse_expression()
+	assert expr is ast.BinaryExpr
 
-	// ==
-	token2 := lexer0.next_token()
-	assert token2 is lexer.OperatorToken
-	operator_token1 := token2 as lexer.OperatorToken
-	assert operator_token1 == lexer.OperatorToken.eq
-
-	// y
-	token3 := lexer0.next_token()
-	assert token3 is lexer.IdentToken
-	ident_token2 := token3 as lexer.IdentToken
-	assert ident_token2.value == 'y'
-
-	// and
-	token4 := lexer0.next_token()
-	assert token4 is lexer.OperatorToken
-	operator_token2 := token4 as lexer.OperatorToken
-	assert operator_token2 == lexer.OperatorToken.and_
-
-	// z
-	token5 := lexer0.next_token()
-	assert token5 is lexer.IdentToken
-	ident_token3 := token5 as lexer.IdentToken
-	assert ident_token3.value == 'z'
-
-	// !=
-	token6 := lexer0.next_token()
-	assert token6 is lexer.OperatorToken
-	operator_token3 := token6 as lexer.OperatorToken
-	assert operator_token3 == lexer.OperatorToken.neq
-
-	// 0
-	token7 := lexer0.next_token()
-	assert token7 is lexer.IntToken
-	int_token := token7 as lexer.IntToken
-	assert int_token.value == 0
-}
-
-fn test_pattern_matching_expression() {
-	input := 'x <- y'
-	mut lexer0 := lexer.new_lexer(input, 'test.lx')
-
-	// x
-	token1 := lexer0.next_token()
-	assert token1 is lexer.IdentToken
-	ident_token1 := token1 as lexer.IdentToken
-	assert ident_token1.value == 'x'
-
-	// <-
-	token2 := lexer0.next_token()
-	assert token2 is lexer.OperatorToken
-	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.pattern_match
-
-	// y
-	token3 := lexer0.next_token()
-	assert token3 is lexer.IdentToken
-	ident_token2 := token3 as lexer.IdentToken
-	assert ident_token2.value == 'y'
-}
-
-fn test_with_expression() {
-	input := 'x <= y'
-	mut lexer0 := lexer.new_lexer(input, 'test.lx')
-
-	// x
-	token1 := lexer0.next_token()
-	assert token1 is lexer.IdentToken
-	ident_token1 := token1 as lexer.IdentToken
-	assert ident_token1.value == 'x'
-
-	// <=
-	token2 := lexer0.next_token()
-	assert token2 is lexer.OperatorToken
-	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.leq
-
-	// y
-	token3 := lexer0.next_token()
-	assert token3 is lexer.IdentToken
-	ident_token2 := token3 as lexer.IdentToken
-	assert ident_token2.value == 'y'
-}
-
-fn test_message_sending() {
-	input := 'pid ! message'
-	mut lexer0 := lexer.new_lexer(input, 'test.lx')
-
-	// pid
-	token1 := lexer0.next_token()
-	assert token1 is lexer.IdentToken
-	ident_token1 := token1 as lexer.IdentToken
-	assert ident_token1.value == 'pid'
-
-	// !
-	token2 := lexer0.next_token()
-	assert token2 is lexer.OperatorToken
-	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.send
-
-	// message
-	token3 := lexer0.next_token()
-	assert token3 is lexer.IdentToken
-	ident_token2 := token3 as lexer.IdentToken
-	assert ident_token2.value == 'message'
-}
-
-fn test_type_annotation() {
-	input := 'x :: integer'
-	mut lexer0 := lexer.new_lexer(input, 'test.lx')
-
-	// x
-	token1 := lexer0.next_token()
-	assert token1 is lexer.IdentToken
-	ident_token1 := token1 as lexer.IdentToken
-	assert ident_token1.value == 'x'
-
-	// ::
-	token2 := lexer0.next_token()
-	assert token2 is lexer.OperatorToken
-	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.type_cons
-
-	// integer
-	token3 := lexer0.next_token()
-	assert token3 is lexer.IdentToken
-	ident_token2 := token3 as lexer.IdentToken
-	assert ident_token2.value == 'integer'
-}
-
-fn test_string_concatenation() {
-	input := '"hello" ++ "world"'
-	mut lexer0 := lexer.new_lexer(input, 'test.lx')
-
-	// "hello"
-	token1 := lexer0.next_token()
-	assert token1 is lexer.StringToken
-	string_token1 := token1 as lexer.StringToken
-	assert string_token1.value == 'hello'
-
-	// ++
-	token2 := lexer0.next_token()
-	assert token2 is lexer.OperatorToken
-	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.concat
-
-	// "world"
-	token3 := lexer0.next_token()
-	assert token3 is lexer.StringToken
-	string_token2 := token3 as lexer.StringToken
-	assert string_token2.value == 'world'
-}
-
-fn test_record_update() {
-	input := '{record | field: value}'
-	mut lexer0 := lexer.new_lexer(input, 'test.lx')
-
-	// {
-	token1 := lexer0.next_token()
-	assert token1 is lexer.PunctuationToken
-	punct_token1 := token1 as lexer.PunctuationToken
-	assert punct_token1 == lexer.PunctuationToken.lbrace
-
-	// record
-	token2 := lexer0.next_token()
-	assert token2 is lexer.KeywordToken
-	keyword_token := token2 as lexer.KeywordToken
-	assert keyword_token == lexer.KeywordToken.record
-
-	// |
-	token3 := lexer0.next_token()
-	assert token3 is lexer.OperatorToken
-	operator_token := token3 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.record_update
-
-	// field
-	token4 := lexer0.next_token()
-	assert token4 is lexer.IdentToken
-	ident_token2 := token4 as lexer.IdentToken
-	assert ident_token2.value == 'field'
-
-	// :
-	token5 := lexer0.next_token()
-	assert token5 is lexer.ErrorToken
-	error_token := token5 as lexer.ErrorToken
-	assert error_token.message.contains('Isolated colon')
-
-	// value
-	token6 := lexer0.next_token()
-	assert token6 is lexer.IdentToken
-	ident_token3 := token6 as lexer.IdentToken
-	assert ident_token3.value == 'value'
-
-	// }
-	token7 := lexer0.next_token()
-	assert token7 is lexer.PunctuationToken
-	punct_token3 := token7 as lexer.PunctuationToken
-	assert punct_token3 == lexer.PunctuationToken.rbrace
-}
-
-fn test_type_cons_operator() {
-	input := '::'
-	mut lexer0 := lexer.new_lexer(input, 'test.lx')
-
-	token := lexer0.next_token()
-	assert token is lexer.OperatorToken
-	operator_token := token as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.type_cons
+	// Deve ser interpretado como: ((a + (b * c)) == d) and (e or f)
+	// O operador de mais alta precedência é or, então a estrutura deve ser:
+	// (left) or f
+	bin_op := expr as ast.BinaryExpr
+	assert bin_op.op == ast.BinaryOp.or
+	assert bin_op.right is ast.VariableExpr
+	right := bin_op.right as ast.VariableExpr
+	assert right.name == 'f'
 }

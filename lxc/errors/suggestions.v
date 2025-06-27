@@ -1,4 +1,4 @@
-module error
+module errors
 
 // Suggestion represents a suggestion for fixing an error
 pub struct Suggestion {

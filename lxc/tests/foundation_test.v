@@ -1,7 +1,7 @@
 module main
 
 import ast
-import error
+import errors
 import utils
 
 fn test_position_creation() {
@@ -165,27 +165,27 @@ fn test_binary_operators() {
 
 fn test_error_kinds() {
 	// Test all error kinds
-	syntax_err := error.SyntaxError{
+	syntax_err := errors.SyntaxError{
 		message:  'Unexpected token'
 		expected: 'identifier'
 		found:    '='
 	}
-	type_err := error.TypeError{
+	type_err := errors.TypeError{
 		message:    'Type mismatch'
 		expected:   'integer'
 		actual:     'string'
 		suggestion: 'Use integer instead of string'
 	}
-	unbound_err := error.UnboundVariableError{
+	unbound_err := errors.UnboundVariableError{
 		variable:   'undefined_var'
 		similar:    ['defined_var', 'other_var']
 		suggestion: 'Did you mean defined_var?'
 	}
 
 	// Convert to ErrorKind sum type
-	syntax_error := error.ErrorKind(syntax_err)
-	type_error := error.ErrorKind(type_err)
-	unbound_error := error.ErrorKind(unbound_err)
+	syntax_error := errors.ErrorKind(syntax_err)
+	type_error := errors.ErrorKind(type_err)
+	unbound_error := errors.ErrorKind(unbound_err)
 
 	assert syntax_error.str().contains('SyntaxError')
 	assert type_error.str().contains('TypeError')
@@ -194,7 +194,7 @@ fn test_error_kinds() {
 
 fn test_error_positioning() {
 	pos := ast.new_position(5, 10, 'test.lx')
-	comp_error := error.new_compilation_error(error.ErrorKind(error.SyntaxError{
+	comp_error := errors.new_compilation_error(errors.ErrorKind(errors.SyntaxError{
 		message:  'Test error'
 		expected: ''
 		found:    ''
@@ -204,14 +204,14 @@ fn test_error_positioning() {
 	assert comp_error.position.column == 10
 	assert comp_error.position.filename == 'test.lx'
 	assert comp_error.message == 'Test message'
-	assert comp_error.severity == error.ErrorSeverity.error
+	assert comp_error.severity == errors.ErrorSeverity.error
 }
 
 fn test_error_collection() {
-	mut collection := error.new_error_collection()
+	mut collection := errors.new_error_collection()
 
 	// Add errors
-	error1 := error.new_compilation_error(error.ErrorKind(error.SyntaxError{
+	error1 := errors.new_compilation_error(errors.ErrorKind(errors.SyntaxError{
 		message:  'Error 1'
 		expected: ''
 		found:    ''
@@ -219,7 +219,7 @@ fn test_error_collection() {
 		line:   1
 		column: 1
 	}, 'First error')
-	error2 := error.new_compilation_error_with_severity(error.ErrorKind(error.TypeError{
+	error2 := errors.new_compilation_error_with_severity(errors.ErrorKind(errors.TypeError{
 		message:    'Error 2'
 		expected:   ''
 		actual:     ''
@@ -227,7 +227,7 @@ fn test_error_collection() {
 	}), ast.Position{
 		line:   2
 		column: 1
-	}, 'Second error', error.ErrorSeverity.warning)
+	}, 'Second error', errors.ErrorSeverity.warning)
 
 	collection.add_error(error1)
 	collection.add_warning(error2)
@@ -325,50 +325,50 @@ fn test_debug_utilities() {
 }
 
 fn test_error_formatter() {
-	formatter := error.new_error_formatter()
+	formatter := errors.new_error_formatter()
 
-	comp_error := error.new_compilation_error(error.ErrorKind(error.SyntaxError{
+	comp_error := errors.new_compilation_error(errors.ErrorKind(errors.SyntaxError{
 		message:  'Test error'
 		expected: 'identifier'
 		found:    '='
 	}), ast.new_position(1, 1, 'test.lx'), 'Unexpected token =')
 
 	// Test simple formatting
-	simple_formatted := error.format_error_simple(comp_error)
+	simple_formatted := errors.format_error_simple(comp_error)
 	assert simple_formatted.contains('test.lx:1:1')
 	assert simple_formatted.contains('Unexpected token =')
 }
 
 fn test_error_suggestions() {
 	// Test syntax error suggestions
-	syntax_error := error.new_compilation_error(error.ErrorKind(error.SyntaxError{
+	syntax_error := errors.new_compilation_error(errors.ErrorKind(errors.SyntaxError{
 		message:  'Test'
 		expected: 'identifier'
 		found:    '='
 	}), ast.Position{}, 'Test error')
 
-	suggestions := error.generate_suggestions(syntax_error)
+	suggestions := errors.generate_suggestions(syntax_error)
 	assert suggestions.len > 0
 
 	// Test type error suggestions
-	type_error := error.new_compilation_error(error.ErrorKind(error.TypeError{
+	type_error := errors.new_compilation_error(errors.ErrorKind(errors.TypeError{
 		message:    'Test'
 		expected:   'integer'
 		actual:     'string'
 		suggestion: 'Convert string to integer'
 	}), ast.Position{}, 'Type error')
 
-	type_suggestions := error.generate_suggestions(type_error)
+	type_suggestions := errors.generate_suggestions(type_error)
 	assert type_suggestions.len > 0
 
 	// Test unbound variable suggestions
-	unbound_error := error.new_compilation_error(error.ErrorKind(error.UnboundVariableError{
+	unbound_error := errors.new_compilation_error(errors.ErrorKind(errors.UnboundVariableError{
 		variable:   'count'
 		similar:    ['counter', 'counts']
 		suggestion: 'Did you mean counter?'
 	}), ast.Position{}, 'Undefined variable')
 
-	unbound_suggestions := error.generate_suggestions(unbound_error)
+	unbound_suggestions := errors.generate_suggestions(unbound_error)
 	assert unbound_suggestions.len > 0
 }
 
