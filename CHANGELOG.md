@@ -38,3 +38,4 @@
 - Fixed binary pattern matching to handle complex specifications and size expressions
 - Fixed OTP validator to properly check required callbacks and component structure
 - Fixed module generation to handle dependencies and generate correct Erlang module structure
+- Fixed typechecker types tests: corrected module imports, updated usage to match the current typechecker API, and fixed string assertion for function type representation in list context (now expects 'list((T1) -> T2)'). All type system tests now pass.
