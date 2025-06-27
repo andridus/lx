@@ -5,15 +5,15 @@ import lexer
 // Precedence levels for operators
 pub enum Precedence {
 	none
-	assignment    // =
-	or_          // or, orelse
-	and_         // and, andalso
-	equality     // ==, !=
-	comparison   // <, >, <=, >=
-	term         // +, -
-	factor       // *, /
-	unary        // -, not
-	call         // ., ()
+	assignment // =
+	or_        // or, orelse
+	and_       // and, andalso
+	equality   // ==, !=
+	comparison // <, >, <=, >=
+	term       // +, -
+	factor     // *, /
+	unary      // -, not
+	call       // ., ()
 	primary
 }
 

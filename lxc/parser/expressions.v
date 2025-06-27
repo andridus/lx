@@ -33,29 +33,25 @@ pub fn (mut p Parser) parse_assignment() ast.Expr {
 		if expr is ast.VariableExpr {
 			ve := expr as ast.VariableExpr
 			return ast.AssignExpr{
-				name: ve.name
-				value: value
+				name:     ve.name
+				value:    value
 				position: ast.Position{
-					line: 1
+					line:   1
 					column: p.position
 				}
 			}
 		}
 
 		pos := ast.Position{
-			line: 1
+			line:   1
 			column: p.position
 		}
 
-		comp_error := errors.new_compilation_error(
-			errors.ErrorKind(errors.SyntaxError{
-				message: 'Invalid assignment target'
-				expected: 'variable'
-				found: expr.str()
-			}),
-			pos,
-			'Invalid assignment target'
-		)
+		comp_error := errors.new_compilation_error(errors.ErrorKind(errors.SyntaxError{
+			message:  'Invalid assignment target'
+			expected: 'variable'
+			found:    expr.str()
+		}), pos, 'Invalid assignment target')
 
 		p.errors << comp_error
 	}
@@ -83,11 +79,11 @@ pub fn (mut p Parser) parse_or() ast.Expr {
 		}
 
 		expr = ast.BinaryExpr{
-			left: expr
-			op: op
-			right: right
+			left:     expr
+			op:       op
+			right:    right
 			position: ast.Position{
-				line: 1
+				line:   1
 				column: p.position
 			}
 		}
@@ -116,11 +112,11 @@ pub fn (mut p Parser) parse_and() ast.Expr {
 		}
 
 		expr = ast.BinaryExpr{
-			left: expr
-			op: op
-			right: right
+			left:     expr
+			op:       op
+			right:    right
 			position: ast.Position{
-				line: 1
+				line:   1
 				column: p.position
 			}
 		}
@@ -151,11 +147,11 @@ pub fn (mut p Parser) parse_equality() ast.Expr {
 		}
 
 		expr = ast.BinaryExpr{
-			left: expr
-			op: op
-			right: right
+			left:     expr
+			op:       op
+			right:    right
 			position: ast.Position{
-				line: 1
+				line:   1
 				column: p.position
 			}
 		}
@@ -172,8 +168,8 @@ pub fn (mut p Parser) parse_comparison() ast.Expr {
 	}
 	mut expr := p.parse_term()
 
-	for p.match(lexer.OperatorToken.gt) || p.match(lexer.OperatorToken.geq) ||
-		p.match(lexer.OperatorToken.lt) || p.match(lexer.OperatorToken.leq) {
+	for p.match(lexer.OperatorToken.gt) || p.match(lexer.OperatorToken.geq)
+		|| p.match(lexer.OperatorToken.lt) || p.match(lexer.OperatorToken.leq) {
 		operator := p.tokens[p.position - 1]
 		right := p.parse_term()
 
@@ -191,11 +187,11 @@ pub fn (mut p Parser) parse_comparison() ast.Expr {
 		}
 
 		expr = ast.BinaryExpr{
-			left: expr
-			op: op
-			right: right
+			left:     expr
+			op:       op
+			right:    right
 			position: ast.Position{
-				line: 1
+				line:   1
 				column: p.position
 			}
 		}
@@ -226,11 +222,11 @@ pub fn (mut p Parser) parse_term() ast.Expr {
 		}
 
 		expr = ast.BinaryExpr{
-			left: expr
-			op: op
-			right: right
+			left:     expr
+			op:       op
+			right:    right
 			position: ast.Position{
-				line: 1
+				line:   1
 				column: p.position
 			}
 		}
@@ -261,11 +257,11 @@ pub fn (mut p Parser) parse_factor() ast.Expr {
 		}
 
 		expr = ast.BinaryExpr{
-			left: expr
-			op: op
-			right: right
+			left:     expr
+			op:       op
+			right:    right
 			position: ast.Position{
-				line: 1
+				line:   1
 				column: p.position
 			}
 		}
@@ -292,15 +288,15 @@ pub fn (mut p Parser) parse_unary() ast.Expr {
 			ast.BinaryOp.and
 		}
 		return ast.BinaryExpr{
-			left: ast.LiteralExpr{
+			left:     ast.LiteralExpr{
 				value: ast.Literal(ast.BooleanLiteral{
 					value: true
 				})
 			}
-			op: op
-			right: right
+			op:       op
+			right:    right
 			position: ast.Position{
-				line: 1
+				line:   1
 				column: p.position
 			}
 		}

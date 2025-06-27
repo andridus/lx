@@ -27,7 +27,7 @@ pub:
 pub fn success(substitution Substitution) UnificationResult {
 	return UnificationResult{
 		substitution: substitution
-		error: none
+		error:        none
 	}
 }
 
@@ -35,7 +35,7 @@ pub fn success(substitution Substitution) UnificationResult {
 pub fn failure(error UnificationError) UnificationResult {
 	return UnificationResult{
 		substitution: new_substitution()
-		error: error
+		error:        error
 	}
 }
 
@@ -56,7 +56,7 @@ pub fn new_unifier() Unifier {
 pub fn (mut un Unifier) fresh_var() TypeVar {
 	un.var_counter++
 	return TypeVar{
-		id: 'T${un.var_counter}'
+		id:   'T${un.var_counter}'
 		name: ''
 	}
 }
@@ -65,7 +65,7 @@ pub fn (mut un Unifier) fresh_var() TypeVar {
 pub fn (mut un Unifier) fresh_var_named(name string) TypeVar {
 	un.var_counter++
 	return TypeVar{
-		id: 'T${un.var_counter}'
+		id:   'T${un.var_counter}'
 		name: name
 	}
 }
@@ -115,10 +115,10 @@ pub fn (un &Unifier) unify_var(left TypeVar, right TypeExpr, position Position) 
 	// Check if the variable occurs in the right side (occurs check)
 	if un.occurs_check(left.id, right) {
 		return failure(UnificationError{
-			message: 'Occurs check failed: type variable ${left.id} occurs in ${right.str()}'
+			message:  'Occurs check failed: type variable ${left.id} occurs in ${right.str()}'
 			position: position
-			left: left
-			right: right
+			left:     left
+			right:    right
 		})
 	}
 
@@ -140,20 +140,20 @@ pub fn (un &Unifier) unify_constructor(left TypeConstructor, right TypeExpr, pos
 			// Check if constructors are the same
 			if left.name != right.name {
 				return failure(UnificationError{
-					message: 'Cannot unify different type constructors: ${left.name} and ${right.name}'
+					message:  'Cannot unify different type constructors: ${left.name} and ${right.name}'
 					position: position
-					left: left
-					right: right
+					left:     left
+					right:    right
 				})
 			}
 
 			// Check if parameter counts match
 			if left.parameters.len != right.parameters.len {
 				return failure(UnificationError{
-					message: 'Type constructor ${left.name} has different parameter counts: ${left.parameters.len} vs ${right.parameters.len}'
+					message:  'Type constructor ${left.name} has different parameter counts: ${left.parameters.len} vs ${right.parameters.len}'
 					position: position
-					left: left
-					right: right
+					left:     left
+					right:    right
 				})
 			}
 
@@ -175,10 +175,10 @@ pub fn (un &Unifier) unify_constructor(left TypeConstructor, right TypeExpr, pos
 		}
 		else {
 			return failure(UnificationError{
-				message: 'Cannot unify type constructor with ${right.str()}'
+				message:  'Cannot unify type constructor with ${right.str()}'
 				position: position
-				left: left
-				right: right
+				left:     left
+				right:    right
 			})
 		}
 	}
@@ -195,10 +195,10 @@ pub fn (un &Unifier) unify_function(left FunctionType, right TypeExpr, position 
 			// Check if parameter counts match
 			if left.parameters.len != right.parameters.len {
 				return failure(UnificationError{
-					message: 'Function types have different parameter counts: ${left.parameters.len} vs ${right.parameters.len}'
+					message:  'Function types have different parameter counts: ${left.parameters.len} vs ${right.parameters.len}'
 					position: position
-					left: left
-					right: right
+					left:     left
+					right:    right
 				})
 			}
 
@@ -229,10 +229,10 @@ pub fn (un &Unifier) unify_function(left FunctionType, right TypeExpr, position 
 		}
 		else {
 			return failure(UnificationError{
-				message: 'Cannot unify function type with ${right.str()}'
+				message:  'Cannot unify function type with ${right.str()}'
 				position: position
-				left: left
-				right: right
+				left:     left
+				right:    right
 			})
 		}
 	}
@@ -249,10 +249,10 @@ pub fn (un &Unifier) unify_record(left RecordType, right TypeExpr, position Posi
 			// Check if record names match
 			if left.name != right.name {
 				return failure(UnificationError{
-					message: 'Cannot unify different record types: ${left.name} and ${right.name}'
+					message:  'Cannot unify different record types: ${left.name} and ${right.name}'
 					position: position
-					left: left
-					right: right
+					left:     left
+					right:    right
 				})
 			}
 
@@ -262,10 +262,10 @@ pub fn (un &Unifier) unify_record(left RecordType, right TypeExpr, position Posi
 
 			if left_fields.len != right_fields.len {
 				return failure(UnificationError{
-					message: 'Record types have different field counts: ${left_fields.len} vs ${right_fields.len}'
+					message:  'Record types have different field counts: ${left_fields.len} vs ${right_fields.len}'
 					position: position
-					left: left
-					right: right
+					left:     left
+					right:    right
 				})
 			}
 
@@ -273,10 +273,10 @@ pub fn (un &Unifier) unify_record(left RecordType, right TypeExpr, position Posi
 			for field_name in left_fields {
 				if !right_fields.contains(field_name) {
 					return failure(UnificationError{
-						message: 'Record type ${right.name} missing field: ${field_name}'
+						message:  'Record type ${right.name} missing field: ${field_name}'
 						position: position
-						left: left
-						right: right
+						left:     left
+						right:    right
 					})
 				}
 			}
@@ -284,12 +284,14 @@ pub fn (un &Unifier) unify_record(left RecordType, right TypeExpr, position Posi
 			// Unify field types
 			mut substitution := new_substitution()
 			for field_name, left_field_type in left.fields {
-				right_field_type := right.fields[field_name] or { return failure(UnificationError{
-					message: 'Field ${field_name} not found in right record type'
-					position: position
-					left: left
-					right: right
-				}) }
+				right_field_type := right.fields[field_name] or {
+					return failure(UnificationError{
+						message:  'Field ${field_name} not found in right record type'
+						position: position
+						left:     left
+						right:    right
+					})
+				}
 				result := un.unify(left_field_type, right_field_type, position)
 
 				if result.error != none {
@@ -304,10 +306,10 @@ pub fn (un &Unifier) unify_record(left RecordType, right TypeExpr, position Posi
 		}
 		else {
 			return failure(UnificationError{
-				message: 'Cannot unify record type with ${right.str()}'
+				message:  'Cannot unify record type with ${right.str()}'
 				position: position
-				left: left
-				right: right
+				left:     left
+				right:    right
 			})
 		}
 	}
@@ -340,10 +342,10 @@ pub fn (un &Unifier) unify_map(left MapType, right TypeExpr, position Position) 
 		}
 		else {
 			return failure(UnificationError{
-				message: 'Cannot unify map type with ${right.str()}'
+				message:  'Cannot unify map type with ${right.str()}'
 				position: position
-				left: left
-				right: right
+				left:     left
+				right:    right
 			})
 		}
 	}
@@ -360,10 +362,10 @@ pub fn (un &Unifier) unify_tuple(left TupleType, right TypeExpr, position Positi
 			// Check if element counts match
 			if left.element_types.len != right.element_types.len {
 				return failure(UnificationError{
-					message: 'Tuple types have different element counts: ${left.element_types.len} vs ${right.element_types.len}'
+					message:  'Tuple types have different element counts: ${left.element_types.len} vs ${right.element_types.len}'
 					position: position
-					left: left
-					right: right
+					left:     left
+					right:    right
 				})
 			}
 
@@ -385,10 +387,10 @@ pub fn (un &Unifier) unify_tuple(left TupleType, right TypeExpr, position Positi
 		}
 		else {
 			return failure(UnificationError{
-				message: 'Cannot unify tuple type with ${right.str()}'
+				message:  'Cannot unify tuple type with ${right.str()}'
 				position: position
-				left: left
-				right: right
+				left:     left
+				right:    right
 			})
 		}
 	}
@@ -407,10 +409,10 @@ pub fn (un &Unifier) unify_list(left ListType, right TypeExpr, position Position
 		}
 		else {
 			return failure(UnificationError{
-				message: 'Cannot unify list type with ${right.str()}'
+				message:  'Cannot unify list type with ${right.str()}'
 				position: position
-				left: left
-				right: right
+				left:     left
+				right:    right
 			})
 		}
 	}
@@ -429,19 +431,19 @@ pub fn (un &Unifier) unify_binary(left BinaryType, right TypeExpr, position Posi
 				return success(new_substitution())
 			} else {
 				return failure(UnificationError{
-					message: 'Cannot unify binary types with different unit sizes: ${left.unit_size} vs ${right.unit_size}'
+					message:  'Cannot unify binary types with different unit sizes: ${left.unit_size} vs ${right.unit_size}'
 					position: position
-					left: left
-					right: right
+					left:     left
+					right:    right
 				})
 			}
 		}
 		else {
 			return failure(UnificationError{
-				message: 'Cannot unify binary type with ${right.str()}'
+				message:  'Cannot unify binary type with ${right.str()}'
 				position: position
-				left: left
-				right: right
+				left:     left
+				right:    right
 			})
 		}
 	}

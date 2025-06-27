@@ -6,9 +6,12 @@ import ast { Position }
 fn test_type_binding() {
 	// Test type binding creation
 	binding := typechecker.TypeBinding{
-		name: 'x'
+		name:      'x'
 		type_expr: typechecker.integer_type
-		position: Position{ line: 1, column: 1 }
+		position:  Position{
+			line:   1
+			column: 1
+		}
 	}
 	assert binding.str() == 'x: integer'
 }
@@ -24,7 +27,10 @@ fn test_type_context_creation() {
 fn test_type_context_binding() {
 	// Test adding bindings to context
 	mut ctx := typechecker.new_context()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
 	ctx.bind('x', typechecker.integer_type, pos)
 	ctx.bind('y', typechecker.string_type, pos)
@@ -38,7 +44,10 @@ fn test_type_context_binding() {
 fn test_type_context_lookup() {
 	// Test looking up bindings
 	mut ctx := typechecker.new_context()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
 	ctx.bind('x', typechecker.integer_type, pos)
 
@@ -59,7 +68,10 @@ fn test_type_context_lookup() {
 fn test_type_context_lookup_local() {
 	// Test local lookup
 	mut ctx := typechecker.new_context()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
 	ctx.bind('x', typechecker.integer_type, pos)
 
@@ -90,7 +102,10 @@ fn test_type_context_child() {
 fn test_type_context_inheritance() {
 	// Test binding inheritance from parent context
 	mut parent := typechecker.new_context()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
 	parent.bind('x', typechecker.integer_type, pos)
 
@@ -109,7 +124,10 @@ fn test_type_context_shadowing() {
 	// Test binding shadowing
 	mut parent := typechecker.new_context()
 	mut child := parent.new_child_context()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
 	// Parent has x: integer
 	parent.bind('x', typechecker.integer_type, pos)
@@ -137,7 +155,10 @@ fn test_type_context_shadowing() {
 fn test_type_context_removal() {
 	// Test removing bindings
 	mut ctx := typechecker.new_context()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
 	ctx.bind('x', typechecker.integer_type, pos)
 	ctx.bind('y', typechecker.string_type, pos)
@@ -153,7 +174,10 @@ fn test_type_context_removal() {
 fn test_type_context_get_bindings() {
 	// Test getting all bindings
 	mut ctx := typechecker.new_context()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
 	ctx.bind('x', typechecker.integer_type, pos)
 	ctx.bind('y', typechecker.string_type, pos)
@@ -170,7 +194,10 @@ fn test_type_context_recursive_bindings() {
 	// Test getting recursive bindings
 	mut parent := typechecker.new_context()
 	mut child := parent.new_child_context()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
 	parent.bind('x', typechecker.integer_type, pos)
 	child.bind('y', typechecker.string_type, pos)
@@ -196,7 +223,10 @@ fn test_type_scope_creation() {
 fn test_type_scope_enter_exit() {
 	// Test entering and exiting scopes
 	mut scope := typechecker.new_scope()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
 	// Add binding in current scope
 	scope.bind('x', typechecker.integer_type, pos)
@@ -242,7 +272,10 @@ fn test_type_environment_registration() {
 	mut env := typechecker.new_environment()
 
 	// Add some custom types
-	custom_type := typechecker.TypeConstructor{ name: 'Custom', parameters: [] }
+	custom_type := typechecker.TypeConstructor{
+		name:       'Custom'
+		parameters: []
+	}
 	env.register_module_type('Custom', custom_type)
 
 	assert env.has_type('Custom') == true
@@ -253,10 +286,10 @@ fn test_type_environment_record_types() {
 	mut env := typechecker.new_environment()
 
 	person_record := typechecker.RecordType{
-		name: 'Person'
+		name:   'Person'
 		fields: {
 			'name': typechecker.string_type
-			'age': typechecker.integer_type
+			'age':  typechecker.integer_type
 		}
 	}
 	env.register_record_type('Person', person_record)

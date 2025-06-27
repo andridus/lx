@@ -31,7 +31,7 @@ pub fn (tc TypeConstructor) str() string {
 // FunctionType represents a function type
 pub struct FunctionType {
 pub:
-	parameters []TypeExpr
+	parameters  []TypeExpr
 	return_type TypeExpr
 }
 
@@ -148,7 +148,7 @@ pub fn (te TypeExpr) str() string {
 			for k, v in te.fields {
 				fields << '${k}: ${v.str()}'
 			}
-			'${te.name}{${fields.join(", ")}}'
+			'${te.name}{${fields.join(', ')}}'
 		}
 		MapType {
 			'map(${te.key_type.str()}, ${te.value_type.str()})'
@@ -173,7 +173,9 @@ pub fn (te TypeExpr) str() string {
 // is_monomorphic checks if a type is monomorphic (no type variables)
 pub fn (te TypeExpr) is_monomorphic() bool {
 	return match te {
-		TypeVar { false }
+		TypeVar {
+			false
+		}
 		TypeConstructor {
 			for param in te.parameters {
 				if !param.is_monomorphic() {
@@ -212,14 +214,18 @@ pub fn (te TypeExpr) is_monomorphic() bool {
 		ListType {
 			te.element_type.is_monomorphic()
 		}
-		BinaryType { true }
+		BinaryType {
+			true
+		}
 	}
 }
 
 // contains_type_var checks if a type contains a specific type variable
 pub fn (te TypeExpr) contains_type_var(var_id string) bool {
 	return match te {
-		TypeVar { te.id == var_id }
+		TypeVar {
+			te.id == var_id
+		}
 		TypeConstructor {
 			for param in te.parameters {
 				if param.contains_type_var(var_id) {
@@ -258,14 +264,18 @@ pub fn (te TypeExpr) contains_type_var(var_id string) bool {
 		ListType {
 			te.element_type.contains_type_var(var_id)
 		}
-		BinaryType { false }
+		BinaryType {
+			false
+		}
 	}
 }
 
 // get_type_vars returns all type variables in a type expression
 pub fn (te TypeExpr) get_type_vars() []string {
 	return match te {
-		TypeVar { [te.id] }
+		TypeVar {
+			[te.id]
+		}
 		TypeConstructor {
 			mut vars := []string{}
 			for param in te.parameters {
@@ -304,38 +314,74 @@ pub fn (te TypeExpr) get_type_vars() []string {
 		ListType {
 			te.element_type.get_type_vars()
 		}
-		BinaryType { []string{} }
+		BinaryType {
+			[]string{}
+		}
 	}
 }
 
 // Built-in type constructors
-pub const integer_type = TypeConstructor{ name: 'integer', parameters: [] }
-pub const float_type = TypeConstructor{ name: 'float', parameters: [] }
-pub const string_type = TypeConstructor{ name: 'string', parameters: [] }
-pub const boolean_type = TypeConstructor{ name: 'boolean', parameters: [] }
-pub const atom_type = TypeConstructor{ name: 'atom', parameters: [] }
-pub const nil_type = TypeConstructor{ name: 'nil', parameters: [] }
-pub const any_type = TypeConstructor{ name: 'any', parameters: [] }
-pub const unknown_type = TypeConstructor{ name: 'unknown', parameters: [] }
+pub const integer_type = TypeConstructor{
+	name:       'integer'
+	parameters: []
+}
+pub const float_type = TypeConstructor{
+	name:       'float'
+	parameters: []
+}
+pub const string_type = TypeConstructor{
+	name:       'string'
+	parameters: []
+}
+pub const boolean_type = TypeConstructor{
+	name:       'boolean'
+	parameters: []
+}
+pub const atom_type = TypeConstructor{
+	name:       'atom'
+	parameters: []
+}
+pub const nil_type = TypeConstructor{
+	name:       'nil'
+	parameters: []
+}
+pub const any_type = TypeConstructor{
+	name:       'any'
+	parameters: []
+}
+pub const unknown_type = TypeConstructor{
+	name:       'unknown'
+	parameters: []
+}
 
 // make_list_type creates a list type with the given element type
 pub fn make_list_type(element_type TypeExpr) ListType {
-	return ListType{ element_type: element_type }
+	return ListType{
+		element_type: element_type
+	}
 }
 
 // make_function_type creates a function type with the given parameters and return type
 pub fn make_function_type(parameters []TypeExpr, return_type TypeExpr) FunctionType {
-	return FunctionType{ parameters: parameters, return_type: return_type }
+	return FunctionType{
+		parameters:  parameters
+		return_type: return_type
+	}
 }
 
 // make_tuple_type creates a tuple type with the given element types
 pub fn make_tuple_type(element_types []TypeExpr) TupleType {
-	return TupleType{ element_types: element_types }
+	return TupleType{
+		element_types: element_types
+	}
 }
 
 // make_map_type creates a map type with the given key and value types
 pub fn make_map_type(key_type TypeExpr, value_type TypeExpr) MapType {
-	return MapType{ key_type: key_type, value_type: value_type }
+	return MapType{
+		key_type:   key_type
+		value_type: value_type
+	}
 }
 
 // Helper functions for testing - convert concrete types to TypeExpr and call methods

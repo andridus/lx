@@ -21,14 +21,15 @@ pub mut:
 	bindings map[string]TypeBinding
 	parent   ?&TypeContext
 	level    int // Scope level for shadowing
-} @[heap]
+}
 
 // new_context creates a new type context
+@[heap]
 pub fn new_context() &TypeContext {
 	return &TypeContext{
 		bindings: map[string]TypeBinding{}
-		parent: none
-		level: 0
+		parent:   none
+		level:    0
 	}
 }
 
@@ -37,8 +38,8 @@ pub fn (ctx &TypeContext) new_child_context() &TypeContext {
 	return unsafe {
 		&TypeContext{
 			bindings: map[string]TypeBinding{}
-			parent: ctx
-			level: ctx.level + 1
+			parent:   ctx
+			level:    ctx.level + 1
 		}
 	}
 }
@@ -46,9 +47,9 @@ pub fn (ctx &TypeContext) new_child_context() &TypeContext {
 // bind adds a type binding to the context
 pub fn (mut ctx TypeContext) bind(name string, type_expr TypeExpr, position Position) {
 	ctx.bindings[name] = TypeBinding{
-		name: name
+		name:      name
 		type_expr: type_expr
-		position: position
+		position:  position
 	}
 }
 
@@ -137,7 +138,7 @@ pub mut:
 pub fn new_scope() &TypeScope {
 	return &TypeScope{
 		context: new_context()
-		level: 0
+		level:   0
 	}
 }
 
@@ -192,8 +193,8 @@ pub mut:
 pub fn new_environment() &TypeEnvironment {
 	mut env := &TypeEnvironment{
 		builtin_types: map[string]TypeExpr{}
-		module_types: map[string]TypeExpr{}
-		record_types: map[string]RecordType{}
+		module_types:  map[string]TypeExpr{}
+		record_types:  map[string]RecordType{}
 	}
 
 	// Initialize built-in types
@@ -251,9 +252,7 @@ pub fn (env &TypeEnvironment) lookup_record_type(name string) ?RecordType {
 
 // has_type checks if a type exists
 pub fn (env &TypeEnvironment) has_type(name string) bool {
-	return (name in env.builtin_types) ||
-		   (name in env.module_types) ||
-		   (name in env.record_types)
+	return name in env.builtin_types || name in env.module_types || name in env.record_types
 }
 
 // str returns a string representation of the environment

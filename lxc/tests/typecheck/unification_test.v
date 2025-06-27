@@ -27,8 +27,14 @@ fn test_fresh_var_creation() {
 fn test_occurs_check() {
 	// Test occurs check
 	mut un := typechecker.new_unifier()
-	tv1 := typechecker.TypeVar{ id: 'T1', name: '' }
-	tv2 := typechecker.TypeVar{ id: 'T2', name: '' }
+	tv1 := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
+	tv2 := typechecker.TypeVar{
+		id:   'T2'
+		name: ''
+	}
 
 	// T1 should not occur in integer
 	assert un.occurs_check('T1', typechecker.integer_type) == false
@@ -49,10 +55,19 @@ fn test_occurs_check() {
 fn test_unify_type_variables() {
 	// Test unifying two type variables
 	mut un := typechecker.new_unifier()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
-	tv1 := typechecker.TypeVar{ id: 'T1', name: '' }
-	tv2 := typechecker.TypeVar{ id: 'T2', name: '' }
+	tv1 := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
+	tv2 := typechecker.TypeVar{
+		id:   'T2'
+		name: ''
+	}
 
 	// T1 = T2
 	result := un.unify(tv1, tv2, pos)
@@ -67,9 +82,15 @@ fn test_unify_type_variables() {
 fn test_unify_type_variable_with_type() {
 	// Test unifying type variable with concrete type
 	mut un := typechecker.new_unifier()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
-	tv := typechecker.TypeVar{ id: 'T1', name: '' }
+	tv := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
 
 	// T1 = integer
 	result := un.unify(tv, typechecker.integer_type, pos)
@@ -84,9 +105,15 @@ fn test_unify_type_variable_with_type() {
 fn test_unify_occurs_check_failure() {
 	// Test occurs check failure
 	mut un := typechecker.new_unifier()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
-	tv := typechecker.TypeVar{ id: 'T1', name: '' }
+	tv := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
 	list_tv := typechecker.make_list_type(tv)
 
 	// T1 = list(T1) should fail occurs check
@@ -97,7 +124,10 @@ fn test_unify_occurs_check_failure() {
 fn test_unify_type_constructors() {
 	// Test unifying type constructors
 	mut un := typechecker.new_unifier()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
 	// integer = integer should succeed
 	result := un.unify(typechecker.integer_type, typechecker.integer_type, pos)
@@ -112,9 +142,15 @@ fn test_unify_type_constructors() {
 fn test_unify_type_constructors_with_parameters() {
 	// Test unifying type constructors with parameters
 	mut un := typechecker.new_unifier()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
-	tv := typechecker.TypeVar{ id: 'T1', name: '' }
+	tv := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
 	list_int := typechecker.make_list_type(typechecker.integer_type)
 	list_tv := typechecker.make_list_type(tv)
 
@@ -131,10 +167,19 @@ fn test_unify_type_constructors_with_parameters() {
 fn test_unify_function_types() {
 	// Test unifying function types
 	mut un := typechecker.new_unifier()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
-	tv1 := typechecker.TypeVar{ id: 'T1', name: '' }
-	tv2 := typechecker.TypeVar{ id: 'T2', name: '' }
+	tv1 := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
+	tv2 := typechecker.TypeVar{
+		id:   'T2'
+		name: ''
+	}
 
 	fn1 := typechecker.make_function_type([tv1], tv2)
 	fn2 := typechecker.make_function_type([typechecker.integer_type], typechecker.string_type)
@@ -156,12 +201,15 @@ fn test_unify_function_types() {
 fn test_unify_function_types_different_arity() {
 	// Test unifying function types with different arity
 	mut un := typechecker.new_unifier()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
 	fn1 := typechecker.make_function_type([typechecker.integer_type], typechecker.string_type)
 	fn2 := typechecker.make_function_type([
 		typechecker.integer_type,
-		typechecker.string_type
+		typechecker.string_type,
 	], typechecker.boolean_type)
 
 	// Different arity should fail
@@ -172,23 +220,29 @@ fn test_unify_function_types_different_arity() {
 fn test_unify_record_types() {
 	// Test unifying record types
 	mut un := typechecker.new_unifier()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
-	tv := typechecker.TypeVar{ id: 'T1', name: '' }
+	tv := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
 
 	record1 := typechecker.RecordType{
-		name: 'Person'
+		name:   'Person'
 		fields: {
 			'name': typechecker.string_type
-			'age': tv
+			'age':  tv
 		}
 	}
 
 	record2 := typechecker.RecordType{
-		name: 'Person'
+		name:   'Person'
 		fields: {
 			'name': typechecker.string_type
-			'age': typechecker.integer_type
+			'age':  typechecker.integer_type
 		}
 	}
 
@@ -205,17 +259,20 @@ fn test_unify_record_types() {
 fn test_unify_record_types_different_names() {
 	// Test unifying record types with different names
 	mut un := typechecker.new_unifier()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
 	record1 := typechecker.RecordType{
-		name: 'Person'
+		name:   'Person'
 		fields: {
 			'name': typechecker.string_type
 		}
 	}
 
 	record2 := typechecker.RecordType{
-		name: 'Employee'
+		name:   'Employee'
 		fields: {
 			'name': typechecker.string_type
 		}
@@ -229,10 +286,19 @@ fn test_unify_record_types_different_names() {
 fn test_unify_map_types() {
 	// Test unifying map types
 	mut un := typechecker.new_unifier()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
-	tv1 := typechecker.TypeVar{ id: 'T1', name: '' }
-	tv2 := typechecker.TypeVar{ id: 'T2', name: '' }
+	tv1 := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
+	tv2 := typechecker.TypeVar{
+		id:   'T2'
+		name: ''
+	}
 
 	map1 := typechecker.make_map_type(tv1, tv2)
 	map2 := typechecker.make_map_type(typechecker.string_type, typechecker.integer_type)
@@ -254,9 +320,15 @@ fn test_unify_map_types() {
 fn test_unify_tuple_types() {
 	// Test unifying tuple types
 	mut un := typechecker.new_unifier()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
-	tv := typechecker.TypeVar{ id: 'T1', name: '' }
+	tv := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
 
 	tuple1 := typechecker.make_tuple_type([tv, typechecker.string_type])
 	tuple2 := typechecker.make_tuple_type([typechecker.integer_type, typechecker.string_type])
@@ -274,12 +346,15 @@ fn test_unify_tuple_types() {
 fn test_unify_tuple_types_different_lengths() {
 	// Test unifying tuple types with different lengths
 	mut un := typechecker.new_unifier()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
 	tuple1 := typechecker.make_tuple_type([typechecker.integer_type])
 	tuple2 := typechecker.make_tuple_type([
 		typechecker.integer_type,
-		typechecker.string_type
+		typechecker.string_type,
 	])
 
 	// Different lengths should fail
@@ -290,9 +365,15 @@ fn test_unify_tuple_types_different_lengths() {
 fn test_unify_list_types() {
 	// Test unifying list types
 	mut un := typechecker.new_unifier()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
-	tv := typechecker.TypeVar{ id: 'T1', name: '' }
+	tv := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
 
 	list1 := typechecker.make_list_type(tv)
 	list2 := typechecker.make_list_type(typechecker.integer_type)
@@ -310,10 +391,17 @@ fn test_unify_list_types() {
 fn test_unify_binary_types() {
 	// Test unifying binary types
 	mut un := typechecker.new_unifier()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
-	binary1 := typechecker.BinaryType{ unit_size: 0 }
-	binary2 := typechecker.BinaryType{ unit_size: 0 }
+	binary1 := typechecker.BinaryType{
+		unit_size: 0
+	}
+	binary2 := typechecker.BinaryType{
+		unit_size: 0
+	}
 
 	// Should unify successfully
 	result := un.unify(binary1, binary2, pos)
@@ -329,12 +417,22 @@ fn test_unify_binary_types() {
 fn test_unify_many() {
 	// Test unifying multiple types
 	mut un := typechecker.new_unifier()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
-	tv1 := typechecker.TypeVar{ id: 'T1', name: '' }
-	tv2 := typechecker.TypeVar{ id: 'T2', name: '' }
+	tv1 := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
+	tv2 := typechecker.TypeVar{
+		id:   'T2'
+		name: ''
+	}
 
-	types := [typechecker.TypeExpr(typechecker.integer_type), typechecker.TypeExpr(tv1), typechecker.TypeExpr(tv2)]
+	types := [typechecker.TypeExpr(typechecker.integer_type), typechecker.TypeExpr(tv1),
+		typechecker.TypeExpr(tv2)]
 
 	// integer = T1 = T2
 	result := un.unify_many(types, pos)
@@ -353,7 +451,10 @@ fn test_unify_many() {
 fn test_unify_many_single_type() {
 	// Test unifying single type
 	mut un := typechecker.new_unifier()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
 	types := [typechecker.integer_type]
 
@@ -365,7 +466,10 @@ fn test_unify_many_single_type() {
 fn test_unify_many_empty() {
 	// Test unifying empty list
 	mut un := typechecker.new_unifier()
-	pos := Position{ line: 1, column: 1 }
+	pos := Position{
+		line:   1
+		column: 1
+	}
 
 	types := []typechecker.TypeExpr{}
 
@@ -377,7 +481,10 @@ fn test_unify_many_empty() {
 fn test_unification_error_details() {
 	// Test unification error details
 	mut un := typechecker.new_unifier()
-	pos := Position{ line: 10, column: 5 }
+	pos := Position{
+		line:   10
+		column: 5
+	}
 
 	// Try to unify incompatible types
 	result := un.unify(typechecker.integer_type, typechecker.string_type, pos)

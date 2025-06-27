@@ -14,10 +14,10 @@ pub mut:
 
 pub fn new_parser(tokens []lexer.Token) Parser {
 	return Parser{
-		tokens: tokens
+		tokens:   tokens
 		position: 0
-		current: if tokens.len > 0 { tokens[0] } else { lexer.EOFToken{} }
-		errors: []
+		current:  if tokens.len > 0 { tokens[0] } else { lexer.EOFToken{} }
+		errors:   []
 	}
 }
 
@@ -70,19 +70,15 @@ pub fn (mut p Parser) consume(token_type lexer.Token, message string) ?lexer.Tok
 	}
 
 	pos := ast.Position{
-		line: 1
+		line:   1
 		column: p.position + 1
 	}
 
-	comp_error := errors.new_compilation_error(
-		errors.ErrorKind(errors.SyntaxError{
-			message: message
-			expected: token_type.str()
-			found: p.current.str()
-		}),
-		pos,
-		'Expected ${token_type.str()}, got ${p.current.str()}'
-	)
+	comp_error := errors.new_compilation_error(errors.ErrorKind(errors.SyntaxError{
+		message:  message
+		expected: token_type.str()
+		found:    p.current.str()
+	}), pos, 'Expected ${token_type.str()}, got ${p.current.str()}')
 
 	p.errors << comp_error
 	return none

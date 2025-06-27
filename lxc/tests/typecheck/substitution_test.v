@@ -13,7 +13,10 @@ fn test_substitution_creation() {
 fn test_substitution_add_get() {
 	// Test adding and getting from substitution
 	mut sub := typechecker.new_substitution()
-	tv := typechecker.TypeVar{ id: 'T1', name: '' }
+	tv := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
 
 	sub.add('T1', tv)
 	assert sub.has('T1') == true
@@ -28,7 +31,10 @@ fn test_substitution_add_get() {
 fn test_substitution_apply_basic() {
 	// Test basic substitution application
 	mut sub := typechecker.new_substitution()
-	tv := typechecker.TypeVar{ id: 'T1', name: 'a' }
+	tv := typechecker.TypeVar{
+		id:   'T1'
+		name: 'a'
+	}
 	sub.add('T1', typechecker.integer_type)
 
 	// Apply substitution to type variable
@@ -43,8 +49,14 @@ fn test_substitution_apply_basic() {
 fn test_substitution_apply_complex() {
 	// Test complex substitution application
 	mut sub := typechecker.new_substitution()
-	tv1 := typechecker.TypeVar{ id: 'T1', name: 'a' }
-	tv2 := typechecker.TypeVar{ id: 'T2', name: 'b' }
+	tv1 := typechecker.TypeVar{
+		id:   'T1'
+		name: 'a'
+	}
+	tv2 := typechecker.TypeVar{
+		id:   'T2'
+		name: 'b'
+	}
 
 	sub.add('T1', typechecker.integer_type)
 	sub.add('T2', typechecker.string_type)
@@ -59,8 +71,14 @@ fn test_substitution_apply_complex() {
 fn test_substitution_apply_recursive() {
 	// Test recursive substitution application
 	mut sub := typechecker.new_substitution()
-	tv1 := typechecker.TypeVar{ id: 'T1', name: 'a' }
-	tv2 := typechecker.TypeVar{ id: 'T2', name: 'b' }
+	tv1 := typechecker.TypeVar{
+		id:   'T1'
+		name: 'a'
+	}
+	tv2 := typechecker.TypeVar{
+		id:   'T2'
+		name: 'b'
+	}
 
 	// T1 -> T2, T2 -> integer
 	sub.add('T1', tv2)
@@ -75,8 +93,14 @@ fn test_substitution_compose() {
 	mut sub1 := typechecker.new_substitution()
 	mut sub2 := typechecker.new_substitution()
 
-	tv1 := typechecker.TypeVar{ id: 'T1', name: 'a' }
-	tv2 := typechecker.TypeVar{ id: 'T2', name: 'b' }
+	tv1 := typechecker.TypeVar{
+		id:   'T1'
+		name: 'a'
+	}
+	tv2 := typechecker.TypeVar{
+		id:   'T2'
+		name: 'b'
+	}
 
 	sub1.add('T1', tv2)
 	sub2.add('T2', typechecker.integer_type)
@@ -94,8 +118,14 @@ fn test_substitution_compose_overlap() {
 	mut sub1 := typechecker.new_substitution()
 	mut sub2 := typechecker.new_substitution()
 
-	tv1 := typechecker.TypeVar{ id: 'T1', name: 'a' }
-	tv2 := typechecker.TypeVar{ id: 'T2', name: 'b' }
+	tv1 := typechecker.TypeVar{
+		id:   'T1'
+		name: 'a'
+	}
+	tv2 := typechecker.TypeVar{
+		id:   'T2'
+		name: 'b'
+	}
 
 	sub1.add('T1', tv2)
 	sub2.add('T1', typechecker.integer_type) // Overlapping domain
@@ -110,8 +140,14 @@ fn test_substitution_compose_overlap() {
 fn test_substitution_domain_range() {
 	// Test domain and range operations
 	mut sub := typechecker.new_substitution()
-	tv1 := typechecker.TypeVar{ id: 'T1', name: 'a' }
-	tv2 := typechecker.TypeVar{ id: 'T2', name: 'b' }
+	tv1 := typechecker.TypeVar{
+		id:   'T1'
+		name: 'a'
+	}
+	tv2 := typechecker.TypeVar{
+		id:   'T2'
+		name: 'b'
+	}
 
 	sub.add('T1', typechecker.integer_type)
 	sub.add('T2', typechecker.string_type)
@@ -128,7 +164,10 @@ fn test_substitution_domain_range() {
 fn test_substitution_idempotent() {
 	// Test that applying a substitution twice is the same as applying it once
 	mut sub := typechecker.new_substitution()
-	tv := typechecker.TypeVar{ id: 'T1', name: 'a' }
+	tv := typechecker.TypeVar{
+		id:   'T1'
+		name: 'a'
+	}
 
 	sub.add('T1', typechecker.integer_type)
 
@@ -140,8 +179,14 @@ fn test_substitution_idempotent() {
 fn test_substitution_make_idempotent() {
 	// Test making a substitution idempotent
 	mut sub := typechecker.new_substitution()
-	tv1 := typechecker.TypeVar{ id: 'T1', name: 'a' }
-	tv2 := typechecker.TypeVar{ id: 'T2', name: 'b' }
+	tv1 := typechecker.TypeVar{
+		id:   'T1'
+		name: 'a'
+	}
+	tv2 := typechecker.TypeVar{
+		id:   'T2'
+		name: 'b'
+	}
 
 	// T1 -> T2, T2 -> integer
 	sub.add('T1', tv2)
@@ -158,7 +203,10 @@ fn test_substitution_make_idempotent() {
 fn test_substitution_copy() {
 	// Test substitution copying
 	mut sub1 := typechecker.new_substitution()
-	tv := typechecker.TypeVar{ id: 'T1', name: 'a' }
+	tv := typechecker.TypeVar{
+		id:   'T1'
+		name: 'a'
+	}
 	sub1.add('T1', typechecker.integer_type)
 
 	sub2 := sub1.copy()
@@ -181,7 +229,10 @@ fn test_substitution_equals() {
 	mut sub2 := typechecker.new_substitution()
 	mut sub3 := typechecker.new_substitution()
 
-	tv := typechecker.TypeVar{ id: 'T1', name: 'a' }
+	tv := typechecker.TypeVar{
+		id:   'T1'
+		name: 'a'
+	}
 	sub1.add('T1', typechecker.integer_type)
 	sub2.add('T1', typechecker.integer_type)
 	sub3.add('T1', typechecker.string_type)
@@ -198,8 +249,14 @@ fn test_substitution_merge() {
 	mut sub1 := typechecker.new_substitution()
 	mut sub2 := typechecker.new_substitution()
 
-	tv1 := typechecker.TypeVar{ id: 'T1', name: 'a' }
-	tv2 := typechecker.TypeVar{ id: 'T2', name: 'b' }
+	tv1 := typechecker.TypeVar{
+		id:   'T1'
+		name: 'a'
+	}
+	tv2 := typechecker.TypeVar{
+		id:   'T2'
+		name: 'b'
+	}
 
 	sub1.add('T1', typechecker.integer_type)
 	sub2.add('T2', typechecker.string_type)
@@ -223,7 +280,10 @@ fn test_substitution_merge_conflict() {
 	mut sub1 := typechecker.new_substitution()
 	mut sub2 := typechecker.new_substitution()
 
-	tv := typechecker.TypeVar{ id: 'T1', name: 'a' }
+	tv := typechecker.TypeVar{
+		id:   'T1'
+		name: 'a'
+	}
 
 	sub1.add('T1', typechecker.integer_type)
 	sub2.add('T1', typechecker.string_type) // Conflict
@@ -238,8 +298,14 @@ fn test_substitution_merge_conflict() {
 fn test_substitution_restrict() {
 	// Test substitution restriction
 	mut sub := typechecker.new_substitution()
-	tv1 := typechecker.TypeVar{ id: 'T1', name: 'a' }
-	tv2 := typechecker.TypeVar{ id: 'T2', name: 'b' }
+	tv1 := typechecker.TypeVar{
+		id:   'T1'
+		name: 'a'
+	}
+	tv2 := typechecker.TypeVar{
+		id:   'T2'
+		name: 'b'
+	}
 
 	sub.add('T1', typechecker.integer_type)
 	sub.add('T2', typechecker.string_type)
@@ -271,8 +337,14 @@ fn test_substitution_extend() {
 fn test_substitution_remove_clear() {
 	// Test substitution removal and clearing
 	mut sub := typechecker.new_substitution()
-	tv1 := typechecker.TypeVar{ id: 'T1', name: 'a' }
-	tv2 := typechecker.TypeVar{ id: 'T2', name: 'b' }
+	tv1 := typechecker.TypeVar{
+		id:   'T1'
+		name: 'a'
+	}
+	tv2 := typechecker.TypeVar{
+		id:   'T2'
+		name: 'b'
+	}
 
 	sub.add('T1', typechecker.integer_type)
 	sub.add('T2', typechecker.string_type)

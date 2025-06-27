@@ -71,18 +71,14 @@ pub fn (mut p Parser) parse_primary() ast.Expr {
 	}
 	if p.current is lexer.ErrorToken {
 		pos := ast.Position{
-			line: 1
+			line:   1
 			column: p.position + 1
 		}
-		comp_error := errors.new_compilation_error(
-			errors.ErrorKind(errors.SyntaxError{
-				message: (p.current as lexer.ErrorToken).message
-				expected: 'expression'
-				found: p.current.str()
-			}),
-			pos,
-			'Unexpected token ' + p.current.str()
-		)
+		comp_error := errors.new_compilation_error(errors.ErrorKind(errors.SyntaxError{
+			message:  (p.current as lexer.ErrorToken).message
+			expected: 'expression'
+			found:    p.current.str()
+		}), pos, 'Unexpected token ' + p.current.str())
 		p.errors << comp_error
 		p.advance()
 		return ast.LiteralExpr{
@@ -98,7 +94,8 @@ pub fn (mut p Parser) parse_primary() ast.Expr {
 		}
 	}
 	if p.match(lexer.PunctuationToken.lbracket) {
-		if p.peek() is lexer.OperatorToken && (p.peek() as lexer.OperatorToken) == lexer.OperatorToken.record_update {
+		if p.peek() is lexer.OperatorToken
+			&& (p.peek() as lexer.OperatorToken) == lexer.OperatorToken.record_update {
 			return p.parse_cons()
 		} else {
 			return p.parse_list()
@@ -106,24 +103,18 @@ pub fn (mut p Parser) parse_primary() ast.Expr {
 	}
 	if p.match(lexer.PunctuationToken.lparen) {
 		expr := p.parse_expression()
-		p.consume(lexer.PunctuationToken.rparen, 'Expect ")" after expression') or {
-			return expr
-		}
+		p.consume(lexer.PunctuationToken.rparen, 'Expect ")" after expression') or { return expr }
 		return expr
 	}
 	pos := ast.Position{
-		line: 1
+		line:   1
 		column: p.position + 1
 	}
-	comp_error := errors.new_compilation_error(
-		errors.ErrorKind(errors.SyntaxError{
-			message: 'Unexpected token'
-			expected: 'expression'
-			found: p.current.str()
-		}),
-		pos,
-		'Unexpected token ${p.current.str()}'
-	)
+	comp_error := errors.new_compilation_error(errors.ErrorKind(errors.SyntaxError{
+		message:  'Unexpected token'
+		expected: 'expression'
+		found:    p.current.str()
+	}), pos, 'Unexpected token ${p.current.str()}')
 	p.errors << comp_error
 	return ast.LiteralExpr{
 		value: ast.Literal(ast.NilLiteral{})

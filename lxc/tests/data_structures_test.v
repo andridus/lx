@@ -7,13 +7,19 @@ import ast
 fn test_tuple_parsing() {
 	tokens := [
 		lexer.Token(lexer.PunctuationToken.lbrace),
-		lexer.Token(lexer.IntToken{value: 1}),
+		lexer.Token(lexer.IntToken{
+			value: 1
+		}),
 		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IntToken{value: 2}),
+		lexer.Token(lexer.IntToken{
+			value: 2
+		}),
 		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IntToken{value: 3}),
+		lexer.Token(lexer.IntToken{
+			value: 3
+		}),
 		lexer.Token(lexer.PunctuationToken.rbrace),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser0 := parser.new_parser(tokens)
 
@@ -34,7 +40,7 @@ fn test_empty_tuple_parsing() {
 	tokens := [
 		lexer.Token(lexer.PunctuationToken.lbrace),
 		lexer.Token(lexer.PunctuationToken.rbrace),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser0 := parser.new_parser(tokens)
 
@@ -47,13 +53,19 @@ fn test_empty_tuple_parsing() {
 fn test_list_parsing() {
 	tokens := [
 		lexer.Token(lexer.PunctuationToken.lbracket),
-		lexer.Token(lexer.IntToken{value: 1}),
+		lexer.Token(lexer.IntToken{
+			value: 1
+		}),
 		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IntToken{value: 2}),
+		lexer.Token(lexer.IntToken{
+			value: 2
+		}),
 		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IntToken{value: 3}),
+		lexer.Token(lexer.IntToken{
+			value: 3
+		}),
 		lexer.Token(lexer.PunctuationToken.rbracket),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser0 := parser.new_parser(tokens)
 
@@ -74,7 +86,7 @@ fn test_empty_list_parsing() {
 	tokens := [
 		lexer.Token(lexer.PunctuationToken.lbracket),
 		lexer.Token(lexer.PunctuationToken.rbracket),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser0 := parser.new_parser(tokens)
 
@@ -87,11 +99,15 @@ fn test_empty_list_parsing() {
 fn test_cons_parsing() {
 	tokens := [
 		lexer.Token(lexer.PunctuationToken.lbracket),
-		lexer.Token(lexer.IdentToken{value: 'head'}),
+		lexer.Token(lexer.IdentToken{
+			value: 'head'
+		}),
 		lexer.Token(lexer.OperatorToken.record_update),
-		lexer.Token(lexer.IdentToken{value: 'tail'}),
+		lexer.Token(lexer.IdentToken{
+			value: 'tail'
+		}),
 		lexer.Token(lexer.PunctuationToken.rbracket),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser0 := parser.new_parser(tokens)
 
@@ -114,15 +130,23 @@ fn test_map_parsing_with_atom_keys() {
 	tokens := [
 		lexer.Token(lexer.PunctuationToken.lbrace),
 		lexer.Token(lexer.OperatorToken.record_update),
-		lexer.Token(lexer.AtomToken{value: 'name'}),
+		lexer.Token(lexer.AtomToken{
+			value: 'name'
+		}),
 		lexer.Token(lexer.PunctuationToken.colon),
-		lexer.Token(lexer.StringToken{value: 'Alice'}),
+		lexer.Token(lexer.StringToken{
+			value: 'Alice'
+		}),
 		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.AtomToken{value: 'age'}),
+		lexer.Token(lexer.AtomToken{
+			value: 'age'
+		}),
 		lexer.Token(lexer.PunctuationToken.colon),
-		lexer.Token(lexer.IntToken{value: 30}),
+		lexer.Token(lexer.IntToken{
+			value: 30
+		}),
 		lexer.Token(lexer.PunctuationToken.rbrace),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser0 := parser.new_parser(tokens)
 
@@ -150,15 +174,23 @@ fn test_map_parsing_with_string_keys() {
 	tokens := [
 		lexer.Token(lexer.PunctuationToken.lbrace),
 		lexer.Token(lexer.OperatorToken.record_update),
-		lexer.Token(lexer.StringToken{value: 'database_url'}),
+		lexer.Token(lexer.StringToken{
+			value: 'database_url'
+		}),
 		lexer.Token(lexer.OperatorToken.arrow),
-		lexer.Token(lexer.StringToken{value: 'localhost'}),
+		lexer.Token(lexer.StringToken{
+			value: 'localhost'
+		}),
 		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.StringToken{value: 'port'}),
+		lexer.Token(lexer.StringToken{
+			value: 'port'
+		}),
 		lexer.Token(lexer.OperatorToken.arrow),
-		lexer.Token(lexer.IntToken{value: 5432}),
+		lexer.Token(lexer.IntToken{
+			value: 5432
+		}),
 		lexer.Token(lexer.PunctuationToken.rbrace),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser0 := parser.new_parser(tokens)
 
@@ -185,21 +217,31 @@ fn test_map_parsing_with_string_keys() {
 fn test_nested_structures() {
 	tokens := [
 		lexer.Token(lexer.PunctuationToken.lbrace),
-		lexer.Token(lexer.IntToken{value: 1}),
+		lexer.Token(lexer.IntToken{
+			value: 1
+		}),
 		lexer.Token(lexer.PunctuationToken.comma),
 		lexer.Token(lexer.PunctuationToken.lbracket),
-		lexer.Token(lexer.IntToken{value: 2}),
+		lexer.Token(lexer.IntToken{
+			value: 2
+		}),
 		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IntToken{value: 3}),
+		lexer.Token(lexer.IntToken{
+			value: 3
+		}),
 		lexer.Token(lexer.PunctuationToken.rbracket),
 		lexer.Token(lexer.PunctuationToken.comma),
 		lexer.Token(lexer.PunctuationToken.lbrace),
-		lexer.Token(lexer.IntToken{value: 4}),
+		lexer.Token(lexer.IntToken{
+			value: 4
+		}),
 		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IntToken{value: 5}),
+		lexer.Token(lexer.IntToken{
+			value: 5
+		}),
 		lexer.Token(lexer.PunctuationToken.rbrace),
 		lexer.Token(lexer.PunctuationToken.rbrace),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser0 := parser.new_parser(tokens)
 

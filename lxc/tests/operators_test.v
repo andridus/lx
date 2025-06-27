@@ -7,10 +7,14 @@ import ast
 fn test_arithmetic_operators() {
 	// Teste de adição
 	tokens1 := [
-		lexer.Token(lexer.IntToken{value: 1}),
+		lexer.Token(lexer.IntToken{
+			value: 1
+		}),
 		lexer.Token(lexer.OperatorToken.plus),
-		lexer.Token(lexer.IntToken{value: 2}),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.IntToken{
+			value: 2
+		}),
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser1 := parser.new_parser(tokens1)
 	expr1 := parser1.parse_expression()
@@ -20,10 +24,14 @@ fn test_arithmetic_operators() {
 
 	// Teste de subtração
 	tokens2 := [
-		lexer.Token(lexer.IntToken{value: 3}),
+		lexer.Token(lexer.IntToken{
+			value: 3
+		}),
 		lexer.Token(lexer.OperatorToken.minus),
-		lexer.Token(lexer.IntToken{value: 4}),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.IntToken{
+			value: 4
+		}),
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser2 := parser.new_parser(tokens2)
 	expr2 := parser2.parse_expression()
@@ -33,10 +41,14 @@ fn test_arithmetic_operators() {
 
 	// Teste de multiplicação
 	tokens3 := [
-		lexer.Token(lexer.IntToken{value: 5}),
+		lexer.Token(lexer.IntToken{
+			value: 5
+		}),
 		lexer.Token(lexer.OperatorToken.mult),
-		lexer.Token(lexer.IntToken{value: 6}),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.IntToken{
+			value: 6
+		}),
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser3 := parser.new_parser(tokens3)
 	expr3 := parser3.parse_expression()
@@ -46,10 +58,14 @@ fn test_arithmetic_operators() {
 
 	// Teste de divisão
 	tokens4 := [
-		lexer.Token(lexer.IntToken{value: 7}),
+		lexer.Token(lexer.IntToken{
+			value: 7
+		}),
 		lexer.Token(lexer.OperatorToken.div),
-		lexer.Token(lexer.IntToken{value: 8}),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.IntToken{
+			value: 8
+		}),
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser4 := parser.new_parser(tokens4)
 	expr4 := parser4.parse_expression()
@@ -61,10 +77,14 @@ fn test_arithmetic_operators() {
 fn test_comparison_operators() {
 	// Teste de igualdade
 	tokens1 := [
-		lexer.Token(lexer.IntToken{value: 1}),
+		lexer.Token(lexer.IntToken{
+			value: 1
+		}),
 		lexer.Token(lexer.OperatorToken.eq),
-		lexer.Token(lexer.IntToken{value: 2}),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.IntToken{
+			value: 2
+		}),
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser1 := parser.new_parser(tokens1)
 	expr1 := parser1.parse_expression()
@@ -74,10 +94,14 @@ fn test_comparison_operators() {
 
 	// Teste de desigualdade
 	tokens2 := [
-		lexer.Token(lexer.IntToken{value: 3}),
+		lexer.Token(lexer.IntToken{
+			value: 3
+		}),
 		lexer.Token(lexer.OperatorToken.neq),
-		lexer.Token(lexer.IntToken{value: 4}),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.IntToken{
+			value: 4
+		}),
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser2 := parser.new_parser(tokens2)
 	expr2 := parser2.parse_expression()
@@ -87,10 +111,14 @@ fn test_comparison_operators() {
 
 	// Teste de menor que
 	tokens3 := [
-		lexer.Token(lexer.IntToken{value: 5}),
+		lexer.Token(lexer.IntToken{
+			value: 5
+		}),
 		lexer.Token(lexer.OperatorToken.lt),
-		lexer.Token(lexer.IntToken{value: 6}),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.IntToken{
+			value: 6
+		}),
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser3 := parser.new_parser(tokens3)
 	expr3 := parser3.parse_expression()
@@ -105,7 +133,7 @@ fn test_logical_operators() {
 		lexer.Token(lexer.KeywordToken.true_),
 		lexer.Token(lexer.OperatorToken.and_),
 		lexer.Token(lexer.KeywordToken.false_),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser1 := parser.new_parser(tokens1)
 	expr1 := parser1.parse_expression()
@@ -118,7 +146,7 @@ fn test_logical_operators() {
 		lexer.Token(lexer.KeywordToken.true_),
 		lexer.Token(lexer.OperatorToken.or_),
 		lexer.Token(lexer.KeywordToken.false_),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser2 := parser.new_parser(tokens2)
 	expr2 := parser2.parse_expression()
@@ -131,7 +159,7 @@ fn test_logical_operators() {
 		lexer.Token(lexer.KeywordToken.true_),
 		lexer.Token(lexer.OperatorToken.andalso),
 		lexer.Token(lexer.KeywordToken.false_),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser3 := parser.new_parser(tokens3)
 	expr3 := parser3.parse_expression()
@@ -144,14 +172,22 @@ fn test_operator_precedence() {
 	// Testar precedência: * > + > ==
 	// 1 + 2 * 3 == 7 deve ser interpretado como: (1 + (2 * 3)) == 7
 	tokens := [
-		lexer.Token(lexer.IntToken{value: 1}),
+		lexer.Token(lexer.IntToken{
+			value: 1
+		}),
 		lexer.Token(lexer.OperatorToken.plus),
-		lexer.Token(lexer.IntToken{value: 2}),
+		lexer.Token(lexer.IntToken{
+			value: 2
+		}),
 		lexer.Token(lexer.OperatorToken.mult),
-		lexer.Token(lexer.IntToken{value: 3}),
+		lexer.Token(lexer.IntToken{
+			value: 3
+		}),
 		lexer.Token(lexer.OperatorToken.eq),
-		lexer.Token(lexer.IntToken{value: 7}),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.IntToken{
+			value: 7
+		}),
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser0 := parser.new_parser(tokens)
 
@@ -197,12 +233,18 @@ fn test_associativity() {
 	// Testar associatividade à esquerda
 	// 1 - 2 - 3 deve ser interpretado como: (1 - 2) - 3
 	tokens := [
-		lexer.Token(lexer.IntToken{value: 1}),
+		lexer.Token(lexer.IntToken{
+			value: 1
+		}),
 		lexer.Token(lexer.OperatorToken.minus),
-		lexer.Token(lexer.IntToken{value: 2}),
+		lexer.Token(lexer.IntToken{
+			value: 2
+		}),
 		lexer.Token(lexer.OperatorToken.minus),
-		lexer.Token(lexer.IntToken{value: 3}),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.IntToken{
+			value: 3
+		}),
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser0 := parser.new_parser(tokens)
 
@@ -237,18 +279,30 @@ fn test_associativity() {
 fn test_complex_expression() {
 	// Testar expressão complexa: a + b * c == d and e or f
 	tokens := [
-		lexer.Token(lexer.IdentToken{value: 'a'}),
+		lexer.Token(lexer.IdentToken{
+			value: 'a'
+		}),
 		lexer.Token(lexer.OperatorToken.plus),
-		lexer.Token(lexer.IdentToken{value: 'b'}),
+		lexer.Token(lexer.IdentToken{
+			value: 'b'
+		}),
 		lexer.Token(lexer.OperatorToken.mult),
-		lexer.Token(lexer.IdentToken{value: 'c'}),
+		lexer.Token(lexer.IdentToken{
+			value: 'c'
+		}),
 		lexer.Token(lexer.OperatorToken.eq),
-		lexer.Token(lexer.IdentToken{value: 'd'}),
+		lexer.Token(lexer.IdentToken{
+			value: 'd'
+		}),
 		lexer.Token(lexer.OperatorToken.and_),
-		lexer.Token(lexer.IdentToken{value: 'e'}),
+		lexer.Token(lexer.IdentToken{
+			value: 'e'
+		}),
 		lexer.Token(lexer.OperatorToken.or_),
-		lexer.Token(lexer.IdentToken{value: 'f'}),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.IdentToken{
+			value: 'f'
+		}),
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser0 := parser.new_parser(tokens)
 

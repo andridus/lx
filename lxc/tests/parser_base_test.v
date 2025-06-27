@@ -6,36 +6,50 @@ import ast
 
 fn test_parser_initialization() {
 	tokens := [
-		lexer.Token(lexer.IdentToken{value: 'x'}),
+		lexer.Token(lexer.IdentToken{
+			value: 'x'
+		}),
 		lexer.Token(lexer.OperatorToken.assign),
-		lexer.Token(lexer.IntToken{value: 42}),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.IntToken{
+			value: 42
+		}),
+		lexer.Token(lexer.EOFToken{}),
 	]
 
 	mut parser0 := parser.new_parser(tokens)
 
 	assert parser0.tokens.len == 4
 	assert parser0.position == 0
-	assert parser0.current == lexer.Token(lexer.IdentToken{value: 'x'})
+	assert parser0.current == lexer.Token(lexer.IdentToken{
+		value: 'x'
+	})
 	assert parser0.errors.len == 0
 }
 
 fn test_token_advancement() {
 	tokens := [
-		lexer.Token(lexer.IdentToken{value: 'x'}),
+		lexer.Token(lexer.IdentToken{
+			value: 'x'
+		}),
 		lexer.Token(lexer.OperatorToken.assign),
-		lexer.Token(lexer.IntToken{value: 42}),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.IntToken{
+			value: 42
+		}),
+		lexer.Token(lexer.EOFToken{}),
 	]
 
 	mut parser0 := parser.new_parser(tokens)
 
-	assert parser0.current == lexer.Token(lexer.IdentToken{value: 'x'})
+	assert parser0.current == lexer.Token(lexer.IdentToken{
+		value: 'x'
+	})
 	parser0.advance()
 	assert parser0.position == 1
 	assert parser0.current == lexer.Token(lexer.OperatorToken.assign)
 	parser0.advance()
-	assert parser0.current == lexer.Token(lexer.IntToken{value: 42})
+	assert parser0.current == lexer.Token(lexer.IntToken{
+		value: 42
+	})
 }
 
 fn test_precedence_table() {
@@ -51,9 +65,13 @@ fn test_precedence_table() {
 
 fn test_parser_error_handling() {
 	tokens := [
-		lexer.Token(lexer.IdentToken{value: 'x'}),
-		lexer.Token(lexer.ErrorToken{message: 'Unexpected token'}),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.IdentToken{
+			value: 'x'
+		}),
+		lexer.Token(lexer.ErrorToken{
+			message: 'Unexpected token'
+		}),
+		lexer.Token(lexer.EOFToken{}),
 	]
 
 	mut parser0 := parser.new_parser(tokens)
@@ -70,11 +88,19 @@ fn test_parser_error_handling() {
 
 fn test_parser_error_recovery_with_multiple_errors() {
 	tokens := [
-		lexer.Token(lexer.IdentToken{value: 'x'}),
-		lexer.Token(lexer.ErrorToken{message: 'First error'}),
-		lexer.Token(lexer.IdentToken{value: 'y'}),
-		lexer.Token(lexer.ErrorToken{message: 'Second error'}),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.IdentToken{
+			value: 'x'
+		}),
+		lexer.Token(lexer.ErrorToken{
+			message: 'First error'
+		}),
+		lexer.Token(lexer.IdentToken{
+			value: 'y'
+		}),
+		lexer.Token(lexer.ErrorToken{
+			message: 'Second error'
+		}),
+		lexer.Token(lexer.EOFToken{}),
 	]
 
 	mut parser0 := parser.new_parser(tokens)
@@ -91,12 +117,20 @@ fn test_parser_error_recovery_with_multiple_errors() {
 
 fn test_parser_error_recovery_with_valid_code_after_error() {
 	tokens := [
-		lexer.Token(lexer.IdentToken{value: 'x'}),
-		lexer.Token(lexer.ErrorToken{message: 'Error in first expression'}),
-		lexer.Token(lexer.IdentToken{value: 'y'}),
+		lexer.Token(lexer.IdentToken{
+			value: 'x'
+		}),
+		lexer.Token(lexer.ErrorToken{
+			message: 'Error in first expression'
+		}),
+		lexer.Token(lexer.IdentToken{
+			value: 'y'
+		}),
 		lexer.Token(lexer.OperatorToken.assign),
-		lexer.Token(lexer.IntToken{value: 42}),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.IntToken{
+			value: 42
+		}),
+		lexer.Token(lexer.EOFToken{}),
 	]
 
 	mut parser0 := parser.new_parser(tokens)
@@ -113,7 +147,9 @@ fn test_parser_error_recovery_with_valid_code_after_error() {
 
 fn test_literal_parsing() {
 	// Test integer literal
-	tokens := [lexer.Token(lexer.IntToken{value: 42}), lexer.Token(lexer.EOFToken{})]
+	tokens := [lexer.Token(lexer.IntToken{
+		value: 42
+	}), lexer.Token(lexer.EOFToken{})]
 	mut parser0 := parser.new_parser(tokens)
 	expr := parser0.parse_expression()
 
@@ -124,7 +160,9 @@ fn test_literal_parsing() {
 	assert int_literal.value == 42
 
 	// Test string literal
-	tokens2 := [lexer.Token(lexer.StringToken{value: 'hello'}), lexer.Token(lexer.EOFToken{})]
+	tokens2 := [lexer.Token(lexer.StringToken{
+		value: 'hello'
+	}), lexer.Token(lexer.EOFToken{})]
 	mut parser2 := parser.new_parser(tokens2)
 	expr2 := parser2.parse_expression()
 
@@ -146,7 +184,9 @@ fn test_literal_parsing() {
 	assert bool_literal.value == true
 
 	// Test atom literal
-	tokens4 := [lexer.Token(lexer.AtomToken{value: 'ok'}), lexer.Token(lexer.EOFToken{})]
+	tokens4 := [lexer.Token(lexer.AtomToken{
+		value: 'ok'
+	}), lexer.Token(lexer.EOFToken{})]
 	mut parser4 := parser.new_parser(tokens4)
 	expr4 := parser4.parse_expression()
 
@@ -167,7 +207,9 @@ fn test_literal_parsing() {
 }
 
 fn test_variable_parsing() {
-	tokens := [lexer.Token(lexer.IdentToken{value: 'x'}), lexer.Token(lexer.EOFToken{})]
+	tokens := [lexer.Token(lexer.IdentToken{
+		value: 'x'
+	}), lexer.Token(lexer.EOFToken{})]
 	mut parser0 := parser.new_parser(tokens)
 
 	expr := parser0.parse_expression()
@@ -178,10 +220,14 @@ fn test_variable_parsing() {
 
 fn test_assignment_parsing() {
 	tokens := [
-		lexer.Token(lexer.IdentToken{value: 'x'}),
+		lexer.Token(lexer.IdentToken{
+			value: 'x'
+		}),
 		lexer.Token(lexer.OperatorToken.assign),
-		lexer.Token(lexer.IntToken{value: 42}),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.IntToken{
+			value: 42
+		}),
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser0 := parser.new_parser(tokens)
 
@@ -198,13 +244,19 @@ fn test_assignment_parsing() {
 
 fn test_function_call_parsing() {
 	tokens := [
-		lexer.Token(lexer.IdentToken{value: 'sum'}),
+		lexer.Token(lexer.IdentToken{
+			value: 'sum'
+		}),
 		lexer.Token(lexer.PunctuationToken.lparen),
-		lexer.Token(lexer.IntToken{value: 3}),
+		lexer.Token(lexer.IntToken{
+			value: 3
+		}),
 		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IntToken{value: 4}),
+		lexer.Token(lexer.IntToken{
+			value: 4
+		}),
 		lexer.Token(lexer.PunctuationToken.rparen),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser0 := parser.new_parser(tokens)
 
@@ -219,15 +271,23 @@ fn test_function_call_parsing() {
 
 fn test_external_call_parsing() {
 	tokens := [
-		lexer.Token(lexer.IdentToken{value: 'math'}),
+		lexer.Token(lexer.IdentToken{
+			value: 'math'
+		}),
 		lexer.Token(lexer.OperatorToken.dot),
-		lexer.Token(lexer.IdentToken{value: 'pow'}),
+		lexer.Token(lexer.IdentToken{
+			value: 'pow'
+		}),
 		lexer.Token(lexer.PunctuationToken.lparen),
-		lexer.Token(lexer.IntToken{value: 2}),
+		lexer.Token(lexer.IntToken{
+			value: 2
+		}),
 		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IntToken{value: 8}),
+		lexer.Token(lexer.IntToken{
+			value: 8
+		}),
 		lexer.Token(lexer.PunctuationToken.rparen),
-		lexer.Token(lexer.EOFToken{})
+		lexer.Token(lexer.EOFToken{}),
 	]
 	mut parser0 := parser.new_parser(tokens)
 

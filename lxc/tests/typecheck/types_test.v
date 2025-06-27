@@ -4,10 +4,16 @@ import typechecker
 
 fn test_type_variables() {
 	// Test type variable creation and string representation
-	tv1 := typechecker.TypeVar{ id: 'T1', name: '' }
+	tv1 := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
 	assert tv1.str() == 'T1'
 
-	tv2 := typechecker.TypeVar{ id: 'T2', name: '' }
+	tv2 := typechecker.TypeVar{
+		id:   'T2'
+		name: ''
+	}
 	assert tv2.str() == 'T2'
 
 	// Test type variable with type expressions
@@ -25,7 +31,7 @@ fn test_type_constructors() {
 
 	// Test type constructors with parameters
 	list_int := typechecker.TypeConstructor{
-		name: 'list'
+		name:       'list'
 		parameters: [typechecker.integer_type]
 	}
 	assert list_int.str() == 'list(integer)'
@@ -35,9 +41,12 @@ fn test_type_constructors() {
 	assert typechecker.is_monomorphic_type_constructor(list_int) == true
 
 	// Test type variable containment
-	tv := typechecker.TypeVar{ id: 'T1', name: '' }
+	tv := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
 	list_tv := typechecker.TypeConstructor{
-		name: 'list'
+		name:       'list'
 		parameters: [tv]
 	}
 	assert typechecker.is_monomorphic_type_constructor(list_tv) == false
@@ -47,15 +56,22 @@ fn test_type_constructors() {
 
 fn test_function_types() {
 	// Test function type creation
-	fn_type := typechecker.make_function_type([typechecker.integer_type, typechecker.string_type], typechecker.boolean_type)
+	fn_type := typechecker.make_function_type([typechecker.integer_type, typechecker.string_type],
+		typechecker.boolean_type)
 	assert fn_type.str() == '(integer, string) -> boolean'
 
 	// Test monomorphic check
 	assert typechecker.is_monomorphic_function_type(fn_type) == true
 
 	// Test with type variables
-	tv1 := typechecker.TypeVar{ id: 'T1', name: '' }
-	tv2 := typechecker.TypeVar{ id: 'T2', name: '' }
+	tv1 := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
+	tv2 := typechecker.TypeVar{
+		id:   'T2'
+		name: ''
+	}
 	polymorphic_fn := typechecker.make_function_type([tv1], tv2)
 	assert typechecker.is_monomorphic_function_type(polymorphic_fn) == false
 	assert typechecker.contains_type_var_function_type(polymorphic_fn, 'T1') == true
@@ -66,10 +82,10 @@ fn test_function_types() {
 fn test_record_types() {
 	// Test record type creation
 	person_record := typechecker.RecordType{
-		name: 'Person'
+		name:   'Person'
 		fields: {
 			'name': typechecker.string_type
-			'age': typechecker.integer_type
+			'age':  typechecker.integer_type
 		}
 	}
 	assert person_record.str() == 'Person{name: string, age: integer}'
@@ -78,9 +94,12 @@ fn test_record_types() {
 	assert typechecker.is_monomorphic_record_type(person_record) == true
 
 	// Test with type variables
-	tv := typechecker.TypeVar{ id: 'T1', name: '' }
+	tv := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
 	generic_record := typechecker.RecordType{
-		name: 'Container'
+		name:   'Container'
 		fields: {
 			'value': tv
 		}
@@ -99,8 +118,14 @@ fn test_map_types() {
 	assert typechecker.is_monomorphic_map_type(string_int_map) == true
 
 	// Test with type variables
-	tv1 := typechecker.TypeVar{ id: 'T1', name: '' }
-	tv2 := typechecker.TypeVar{ id: 'T2', name: '' }
+	tv1 := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
+	tv2 := typechecker.TypeVar{
+		id:   'T2'
+		name: ''
+	}
 	generic_map := typechecker.make_map_type(tv1, tv2)
 	assert typechecker.is_monomorphic_map_type(generic_map) == false
 	assert typechecker.contains_type_var_map_type(generic_map, 'T1') == true
@@ -110,14 +135,18 @@ fn test_map_types() {
 
 fn test_tuple_types() {
 	// Test tuple type creation
-	tuple_type := typechecker.make_tuple_type([typechecker.integer_type, typechecker.string_type, typechecker.boolean_type])
+	tuple_type := typechecker.make_tuple_type([typechecker.integer_type, typechecker.string_type,
+		typechecker.boolean_type])
 	assert tuple_type.str() == '(integer, string, boolean)'
 
 	// Test monomorphic check
 	assert typechecker.is_monomorphic_tuple_type(tuple_type) == true
 
 	// Test with type variables
-	tv := typechecker.TypeVar{ id: 'T1', name: '' }
+	tv := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
 	generic_tuple := typechecker.make_tuple_type([tv, typechecker.integer_type])
 	assert typechecker.is_monomorphic_tuple_type(generic_tuple) == false
 	assert typechecker.contains_type_var_tuple_type(generic_tuple, 'T1') == true
@@ -133,7 +162,10 @@ fn test_list_types() {
 	assert typechecker.is_monomorphic_list_type(int_list) == true
 
 	// Test with type variables
-	tv := typechecker.TypeVar{ id: 'T1', name: '' }
+	tv := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
 	generic_list := typechecker.make_list_type(tv)
 	assert typechecker.is_monomorphic_list_type(generic_list) == false
 	assert typechecker.contains_type_var_list_type(generic_list, 'T1') == true
@@ -142,10 +174,14 @@ fn test_list_types() {
 
 fn test_binary_types() {
 	// Test binary type creation
-	binary_type := typechecker.BinaryType{ unit_size: 0 }
+	binary_type := typechecker.BinaryType{
+		unit_size: 0
+	}
 	assert binary_type.str() == 'binary'
 
-	binary_8 := typechecker.BinaryType{ unit_size: 8 }
+	binary_8 := typechecker.BinaryType{
+		unit_size: 8
+	}
 	assert binary_8.str() == 'binary(8)'
 
 	// Test monomorphic check
@@ -159,8 +195,14 @@ fn test_binary_types() {
 
 fn test_complex_type_expressions() {
 	// Test complex nested type expressions
-	tv1 := typechecker.TypeVar{ id: 'T1', name: '' }
-	tv2 := typechecker.TypeVar{ id: 'T2', name: '' }
+	tv1 := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
+	tv2 := typechecker.TypeVar{
+		id:   'T2'
+		name: ''
+	}
 
 	// List of functions
 	list_of_fns := typechecker.make_list_type(typechecker.make_function_type([tv1], tv2))
@@ -170,17 +212,17 @@ fn test_complex_type_expressions() {
 
 	// Tuple with records
 	person_record := typechecker.RecordType{
-		name: 'Person'
+		name:   'Person'
 		fields: {
 			'name': typechecker.string_type
-			'age': typechecker.integer_type
+			'age':  typechecker.integer_type
 		}
 	}
 
 	complex_tuple := typechecker.make_tuple_type([
 		person_record,
 		typechecker.make_list_type(typechecker.string_type),
-		typechecker.make_map_type(typechecker.atom_type, typechecker.integer_type)
+		typechecker.make_map_type(typechecker.atom_type, typechecker.integer_type),
 	])
 	assert complex_tuple.str() == '(Person{name: string, age: integer}, list(string), map(atom, integer))'
 	assert typechecker.is_monomorphic_tuple_type(complex_tuple) == true
@@ -210,8 +252,14 @@ fn test_builtin_types() {
 
 fn test_type_equality() {
 	// Test type equality
-	tv1 := typechecker.TypeVar{ id: 'T1', name: '' }
-	tv2 := typechecker.TypeVar{ id: 'T2', name: '' }
+	tv1 := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
+	tv2 := typechecker.TypeVar{
+		id:   'T2'
+		name: ''
+	}
 
 	// Same type variables should be equal
 	assert typechecker.equals_type_var(tv1, tv1) == true
@@ -235,8 +283,14 @@ fn test_type_equality() {
 
 fn test_type_variables_in_types() {
 	// Test finding type variables in complex types
-	tv1 := typechecker.TypeVar{ id: 'T1', name: '' }
-	tv2 := typechecker.TypeVar{ id: 'T2', name: '' }
+	tv1 := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
+	tv2 := typechecker.TypeVar{
+		id:   'T2'
+		name: ''
+	}
 
 	// Simple type variable
 	assert typechecker.contains_type_var_type_var(tv1, 'T1') == true
@@ -256,8 +310,14 @@ fn test_type_variables_in_types() {
 
 fn test_type_variable_collection() {
 	// Test collecting all type variables from types
-	tv1 := typechecker.TypeVar{ id: 'T1', name: '' }
-	tv2 := typechecker.TypeVar{ id: 'T2', name: '' }
+	tv1 := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
+	tv2 := typechecker.TypeVar{
+		id:   'T2'
+		name: ''
+	}
 
 	// Simple type variable
 	assert typechecker.get_type_vars_type_var(tv1) == ['T1']
@@ -276,7 +336,10 @@ fn test_type_variable_collection() {
 
 fn test_type_monomorphism() {
 	// Test monomorphism checking
-	tv := typechecker.TypeVar{ id: 'T1', name: '' }
+	tv := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
 
 	// Type variables are not monomorphic
 	assert typechecker.is_monomorphic_type_var(tv) == false
@@ -296,7 +359,10 @@ fn test_type_monomorphism() {
 
 fn test_type_string_representations() {
 	// Test string representations of various types
-	tv := typechecker.TypeVar{ id: 'T1', name: '' }
+	tv := typechecker.TypeVar{
+		id:   'T1'
+		name: ''
+	}
 
 	// Type variable
 	assert tv.str() == 'T1'
@@ -310,10 +376,10 @@ fn test_type_string_representations() {
 
 	// Record type
 	record_type := typechecker.RecordType{
-		name: 'Person'
+		name:   'Person'
 		fields: {
 			'name': typechecker.string_type
-			'age': typechecker.integer_type
+			'age':  typechecker.integer_type
 		}
 	}
 	assert record_type.str() == 'Person{name: string, age: integer}'
@@ -325,7 +391,7 @@ fn test_type_string_representations() {
 	// Tuple type
 	tuple_type := typechecker.make_tuple_type([
 		typechecker.integer_type,
-		typechecker.string_type
+		typechecker.string_type,
 	])
 	assert tuple_type.str() == '(integer, string)'
 
@@ -334,7 +400,9 @@ fn test_type_string_representations() {
 	assert list_type.str() == 'list(integer)'
 
 	// Binary type
-	binary_type := typechecker.BinaryType{ unit_size: 8 }
+	binary_type := typechecker.BinaryType{
+		unit_size: 8
+	}
 	assert binary_type.str() == 'binary(8)'
 }
 

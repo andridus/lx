@@ -41,13 +41,13 @@ pub fn (sub &Substitution) apply(type_expr TypeExpr) TypeExpr {
 		}
 		TypeConstructor {
 			TypeConstructor{
-				name: type_expr.name
+				name:       type_expr.name
 				parameters: type_expr.parameters.map(sub.apply(it))
 			}
 		}
 		FunctionType {
 			FunctionType{
-				parameters: type_expr.parameters.map(sub.apply(it))
+				parameters:  type_expr.parameters.map(sub.apply(it))
 				return_type: sub.apply(type_expr.return_type)
 			}
 		}
@@ -57,13 +57,13 @@ pub fn (sub &Substitution) apply(type_expr TypeExpr) TypeExpr {
 				new_fields[field_name] = sub.apply(field_type)
 			}
 			RecordType{
-				name: type_expr.name
+				name:   type_expr.name
 				fields: new_fields
 			}
 		}
 		MapType {
 			MapType{
-				key_type: sub.apply(type_expr.key_type)
+				key_type:   sub.apply(type_expr.key_type)
 				value_type: sub.apply(type_expr.value_type)
 			}
 		}
@@ -77,7 +77,9 @@ pub fn (sub &Substitution) apply(type_expr TypeExpr) TypeExpr {
 				element_type: sub.apply(type_expr.element_type)
 			}
 		}
-		BinaryType { type_expr }
+		BinaryType {
+			type_expr
+		}
 	}
 }
 
