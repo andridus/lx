@@ -15,41 +15,41 @@ pub:
 // AssignExpr represents an assignment expression
 pub struct AssignExpr {
 pub:
-	name string
-	value Expr
+	name     string
+	value    Expr
 	position Position
 }
 
 // BinaryExpr represents a binary operation
 pub struct BinaryExpr {
 pub:
-	left Expr
-	op BinaryOp
-	right Expr
+	left     Expr
+	op       BinaryOp
+	right    Expr
 	position Position
 }
 
 // CallExpr represents a function call
 pub struct CallExpr {
 pub:
-	function Expr
+	function  Expr
 	arguments []Expr
-	position Position
+	position  Position
 }
 
 // MatchExpr represents pattern matching
 pub struct MatchExpr {
 pub:
-	value Expr
-	cases []MatchCase
+	value    Expr
+	cases    []MatchCase
 	position Position
 }
 
 // ListConsExpr represents list cons operation
 pub struct ListConsExpr {
 pub:
-	head Expr
-	tail Expr
+	head     Expr
+	tail     Expr
 	position Position
 }
 
@@ -74,23 +74,23 @@ pub:
 // MapLiteralExpr represents a map literal
 pub struct MapLiteralExpr {
 pub:
-	entries []MapEntry
+	entries  []MapEntry
 	position Position
 }
 
 // RecordLiteralExpr represents a record literal
 pub struct RecordLiteralExpr {
 pub:
-	name string
-	fields []RecordField
+	name     string
+	fields   []RecordField
 	position Position
 }
 
 // RecordAccessExpr represents record field access
 pub struct RecordAccessExpr {
 pub:
-	record Expr
-	field string
+	record   Expr
+	field    string
 	position Position
 }
 
@@ -98,23 +98,23 @@ pub:
 pub struct FunExpr {
 pub:
 	parameters []Pattern
-	body []Stmt
-	position Position
+	body       []Stmt
+	position   Position
 }
 
 // SendExpr represents message sending
 pub struct SendExpr {
 pub:
-	pid Expr
-	message Expr
+	pid      Expr
+	message  Expr
 	position Position
 }
 
 // ReceiveExpr represents message receiving
 pub struct ReceiveExpr {
 pub:
-	cases []ReceiveCase
-	timeout Expr
+	cases    []ReceiveCase
+	timeout  Expr
 	position Position
 }
 
@@ -122,11 +122,27 @@ pub:
 pub struct GuardExpr {
 pub:
 	condition Expr
-	position Position
+	position  Position
 }
 
 // Expr represents expressions in LX using sum types
-pub type Expr = VariableExpr | LiteralExpr | AssignExpr | BinaryExpr | CallExpr | MatchExpr | ListConsExpr | ListEmptyExpr | ListLiteralExpr | TupleExpr | MapLiteralExpr | RecordLiteralExpr | RecordAccessExpr | FunExpr | SendExpr | ReceiveExpr | GuardExpr
+pub type Expr = VariableExpr
+	| LiteralExpr
+	| AssignExpr
+	| BinaryExpr
+	| CallExpr
+	| MatchExpr
+	| ListConsExpr
+	| ListEmptyExpr
+	| ListLiteralExpr
+	| TupleExpr
+	| MapLiteralExpr
+	| RecordLiteralExpr
+	| RecordAccessExpr
+	| FunExpr
+	| SendExpr
+	| ReceiveExpr
+	| GuardExpr
 
 // BinaryOp represents binary operators
 pub enum BinaryOp {
@@ -224,7 +240,7 @@ pub:
 // RecordPattern represents a record pattern
 pub struct RecordPattern {
 pub:
-	name string
+	name   string
 	fields []RecordPatternField
 }
 
@@ -235,7 +251,17 @@ pub:
 }
 
 // Pattern represents patterns in LX using sum types
-pub type Pattern = WildcardPattern | VarPattern | LiteralPattern | AtomPattern | ListConsPattern | ListEmptyPattern | ListLiteralPattern | TuplePattern | MapPattern | RecordPattern | BinaryPattern
+pub type Pattern = WildcardPattern
+	| VarPattern
+	| LiteralPattern
+	| AtomPattern
+	| ListConsPattern
+	| ListEmptyPattern
+	| ListLiteralPattern
+	| TuplePattern
+	| MapPattern
+	| RecordPattern
+	| BinaryPattern
 
 // str returns a string representation of Pattern
 pub fn (p Pattern) str() string {
@@ -263,35 +289,35 @@ pub:
 // ModuleStmt represents a module statement
 pub struct ModuleStmt {
 pub:
-	name string
-	exports []string
-	imports []Import
+	name       string
+	exports    []string
+	imports    []Import
 	statements []Stmt
-	position Position
+	position   Position
 }
 
 // FunctionStmt represents a function statement
 pub struct FunctionStmt {
 pub:
-	name string
-	clauses []FunctionClause
+	name     string
+	clauses  []FunctionClause
 	position Position
 }
 
 // RecordDefStmt represents a record definition
 pub struct RecordDefStmt {
 pub:
-	name string
-	fields []RecordFieldDef
+	name     string
+	fields   []RecordFieldDef
 	position Position
 }
 
 // TypeDefStmt represents a type definition
 pub struct TypeDefStmt {
 pub:
-	name string
+	name       string
 	definition TypeDef
-	position Position
+	position   Position
 }
 
 // Stmt represents statements in LX using sum types
@@ -323,83 +349,83 @@ pub fn (e Expr) str() string {
 // MatchCase represents a match case
 pub struct MatchCase {
 pub:
-	pattern Pattern
-	guard Expr
-	body []Stmt
+	pattern  Pattern
+	guard    Expr
+	body     []Stmt
 	position Position
 }
 
 // ReceiveCase represents a receive case
 pub struct ReceiveCase {
 pub:
-	pattern Pattern
-	guard Expr
-	body []Stmt
+	pattern  Pattern
+	guard    Expr
+	body     []Stmt
 	position Position
 }
 
 // MapEntry represents a map entry
 pub struct MapEntry {
 pub:
-	key Expr
-	value Expr
+	key      Expr
+	value    Expr
 	position Position
 }
 
 // MapPatternEntry represents a map pattern entry
 pub struct MapPatternEntry {
 pub:
-	key Pattern
-	value Pattern
+	key      Pattern
+	value    Pattern
 	position Position
 }
 
 // RecordField represents a record field
 pub struct RecordField {
 pub:
-	name string
-	value Expr
+	name     string
+	value    Expr
 	position Position
 }
 
 // RecordPatternField represents a record pattern field
 pub struct RecordPatternField {
 pub:
-	name string
-	pattern Pattern
+	name     string
+	pattern  Pattern
 	position Position
 }
 
 // RecordFieldDef represents a record field definition
 pub struct RecordFieldDef {
 pub:
-	name string
+	name       string
 	field_type LXType
-	position Position
+	position   Position
 }
 
 // FunctionClause represents a function clause
 pub struct FunctionClause {
 pub:
 	parameters []Pattern
-	guard Expr
-	body []Stmt
-	position Position
+	guard      Expr
+	body       []Stmt
+	position   Position
 }
 
 // Import represents an import statement
 pub struct Import {
 pub:
-	module string
-	aliases []string
+	module   string
+	aliases  []string
 	position Position
 }
 
 // BinarySegment represents a binary segment
 pub struct BinarySegment {
 pub:
-	size int
-	unit string
+	size     int
+	unit     string
 	position Position
 }
 
@@ -427,6 +453,6 @@ pub:
 // FunctionTypeDef represents a function type definition
 pub struct FunctionTypeDef {
 pub:
-	parameters []LXType
+	parameters  []LXType
 	return_type LXType
 }

@@ -3,8 +3,8 @@ module ast
 // Position represents a specific location in source code
 pub struct Position {
 pub:
-	line    int    // 1-indexed line number
-	column  int    // 1-indexed column number
+	line     int    // 1-indexed line number
+	column   int    // 1-indexed column number
 	filename string // Source file name
 }
 
@@ -18,8 +18,8 @@ pub:
 // new_position creates a new Position
 pub fn new_position(line int, column int, filename string) Position {
 	return Position{
-		line: line
-		column: column
+		line:     line
+		column:   column
 		filename: filename
 	}
 }
@@ -28,7 +28,7 @@ pub fn new_position(line int, column int, filename string) Position {
 pub fn new_span(start Position, end Position) Span {
 	return Span{
 		start: start
-		end: end
+		end:   end
 	}
 }
 

@@ -7,42 +7,42 @@ import os
 // FileInfo represents information about a file
 pub struct FileInfo {
 pub:
-	path string
-	name string
-	extension string
-	size int
+	path          string
+	name          string
+	extension     string
+	size          int
 	modified_time i64
-	exists bool
+	exists        bool
 }
 
 // get_file_info gets information about a file
 pub fn get_file_info(path string) FileInfo {
 	if !os.exists(path) {
 		return FileInfo{
-			name: os.file_name(path)
-			extension: os.file_ext(path)
-			size: 0
+			name:          os.file_name(path)
+			extension:     os.file_ext(path)
+			size:          0
 			modified_time: 0
-			exists: false
+			exists:        false
 		}
 	}
 
 	stat := os.stat(path) or {
 		return FileInfo{
-			name: os.file_name(path)
-			extension: os.file_ext(path)
-			size: 0
+			name:          os.file_name(path)
+			extension:     os.file_ext(path)
+			size:          0
 			modified_time: 0
-			exists: false
+			exists:        false
 		}
 	}
 
 	return FileInfo{
-		name: os.file_name(path)
-		extension: os.file_ext(path)
-		size: int(stat.size)
+		name:          os.file_name(path)
+		extension:     os.file_ext(path)
+		size:          int(stat.size)
 		modified_time: stat.mtime
-		exists: true
+		exists:        true
 	}
 }
 
@@ -233,18 +233,18 @@ pub fn clean_temp_files(prefix string) {
 // FileWatcher watches for file changes
 pub struct FileWatcher {
 pub:
-	path string
-	callback fn(string)
+	path     string
+	callback ?fn (string)
 pub mut:
 	active bool
 }
 
 // new_file_watcher creates a new FileWatcher
-pub fn new_file_watcher(path string, callback fn(string)) FileWatcher {
+pub fn new_file_watcher(path string, callback fn (string)) FileWatcher {
 	return FileWatcher{
-		path: path
+		path:     path
 		callback: callback
-		active: false
+		active:   false
 	}
 }
 

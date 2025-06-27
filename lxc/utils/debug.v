@@ -29,38 +29,38 @@ pub fn (dl DebugLevel) str() string {
 // DebugInfo represents debug information
 pub struct DebugInfo {
 pub:
-	level DebugLevel
-	message string
-	context string
+	level     DebugLevel
+	message   string
+	context   string
 	timestamp time.Time
 	component string
-	file string
-	line int
+	file      string
+	line      int
 }
 
 // new_debug_info creates a new DebugInfo
 pub fn new_debug_info(level DebugLevel, message string, context string) DebugInfo {
 	return DebugInfo{
-		level: level
-		message: message
-		context: context
+		level:     level
+		message:   message
+		context:   context
 		timestamp: time.now()
 		component: ''
-		file: ''
-		line: 0
+		file:      ''
+		line:      0
 	}
 }
 
 // new_debug_info_with_location creates a new DebugInfo with location
 pub fn new_debug_info_with_location(level DebugLevel, message string, context string, component string, file string, line int) DebugInfo {
 	return DebugInfo{
-		level: level
-		message: message
-		context: context
+		level:     level
+		message:   message
+		context:   context
 		timestamp: time.now()
 		component: component
-		file: file
-		line: line
+		file:      file
+		line:      line
 	}
 }
 
@@ -88,18 +88,18 @@ pub fn (di DebugInfo) str() string {
 // DebugLogger handles debug logging
 pub struct DebugLogger {
 mut:
-	level DebugLevel
-	enabled bool
-	logs []DebugInfo
+	level    DebugLevel
+	enabled  bool
+	logs     []DebugInfo
 	max_logs int
 }
 
 // new_debug_logger creates a new DebugLogger
 pub fn new_debug_logger(level DebugLevel) DebugLogger {
 	return DebugLogger{
-		level: level
-		enabled: true
-		logs: []
+		level:    level
+		enabled:  true
+		logs:     []
 		max_logs: 1000
 	}
 }
@@ -135,7 +135,8 @@ pub fn (mut dl DebugLogger) log_with_location(level DebugLevel, message string, 
 		return
 	}
 
-	debug_info := new_debug_info_with_location(level, message, context, component, file, line)
+	debug_info := new_debug_info_with_location(level, message, context, component, file,
+		line)
 	dl.logs << debug_info
 }
 
@@ -193,19 +194,19 @@ pub fn format_debug(debug_info DebugInfo) string {
 // PerformanceTimer tracks performance metrics
 pub struct PerformanceTimer {
 mut:
-	name string
+	name       string
 	start_time time.Time
-	end_time time.Time
-	running bool
+	end_time   time.Time
+	running    bool
 }
 
 // new_performance_timer creates a new PerformanceTimer
 pub fn new_performance_timer(name string) PerformanceTimer {
 	return PerformanceTimer{
-		name: name
+		name:       name
 		start_time: time.Time{}
-		end_time: time.Time{}
-		running: false
+		end_time:   time.Time{}
+		running:    false
 	}
 }
 
@@ -313,18 +314,18 @@ pub fn (mut pt PerformanceTracker) clear_timers() {
 pub struct DebugContext {
 pub:
 	component string
-	file string
-	line int
-	function string
+	file      string
+	line      int
+	function  string
 }
 
 // new_debug_context creates a new DebugContext
 pub fn new_debug_context(component string, file string, line int, function string) DebugContext {
 	return DebugContext{
 		component: component
-		file: file
-		line: line
-		function: function
+		file:      file
+		line:      line
+		function:  function
 	}
 }
 

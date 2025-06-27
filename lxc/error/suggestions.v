@@ -1,43 +1,49 @@
 module error
 
-import ast
-
 // Suggestion represents a suggestion for fixing an error
 pub struct Suggestion {
 pub:
-	message string
-	code string
+	message     string
+	code        string
 	explanation string
-	priority int // Higher priority = more important
+	priority    int // Higher priority = more important
 }
 
 // new_suggestion creates a new Suggestion
 pub fn new_suggestion(message string, code string, explanation string) Suggestion {
 	return Suggestion{
-		message: message
-		code: code
+		message:     message
+		code:        code
 		explanation: explanation
-		priority: 1
+		priority:    1
 	}
 }
 
 // new_suggestion_with_priority creates a new Suggestion with custom priority
 pub fn new_suggestion_with_priority(message string, code string, explanation string, priority int) Suggestion {
 	return Suggestion{
-		message: message
-		code: code
+		message:     message
+		code:        code
 		explanation: explanation
-		priority: priority
+		priority:    priority
 	}
 }
 
 // generate_suggestions generates suggestions for fixing an error
 pub fn generate_suggestions(err CompilationError) []string {
 	return match err.kind {
-		SyntaxError { generate_syntax_suggestions(err.kind.expected, err.kind.found) }
-		TypeError { generate_type_suggestions(err.kind.expected, err.kind.actual) }
-		UnboundVariableError { generate_unbound_variable_suggestions(err.kind.variable, err.kind.similar) }
-		else { [] }
+		SyntaxError {
+			generate_syntax_suggestions(err.kind.expected, err.kind.found)
+		}
+		TypeError {
+			generate_type_suggestions(err.kind.expected, err.kind.actual)
+		}
+		UnboundVariableError {
+			generate_unbound_variable_suggestions(err.kind.variable, err.kind.similar)
+		}
+		else {
+			[]
+		}
 	}
 }
 
@@ -273,8 +279,16 @@ fn levenshtein_distance(s1 string, s2 string) int {
 		for j := 1; j <= len2; j++ {
 			cost := if s1[i - 1] == s2[j - 1] { 0 } else { 1 }
 			// Manual min function
-			min1 := if matrix[i - 1][j] + 1 < matrix[i][j - 1] + 1 { matrix[i - 1][j] + 1 } else { matrix[i][j - 1] + 1 }
-			min2 := if min1 < matrix[i - 1][j - 1] + cost { min1 } else { matrix[i - 1][j - 1] + cost }
+			min1 := if matrix[i - 1][j] + 1 < matrix[i][j - 1] + 1 {
+				matrix[i - 1][j] + 1
+			} else {
+				matrix[i][j - 1] + 1
+			}
+			min2 := if min1 < matrix[i - 1][j - 1] + cost {
+				min1
+			} else {
+				matrix[i - 1][j - 1] + cost
+			}
 			matrix[i][j] = min2
 		}
 	}

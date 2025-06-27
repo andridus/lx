@@ -11,7 +11,10 @@ fn test_position_creation() {
 	assert pos.filename == 'test.lx'
 	assert pos.is_valid() == true
 
-	invalid_pos := ast.Position{line: 0, column: 0}
+	invalid_pos := ast.Position{
+		line:   0
+		column: 0
+	}
 	assert invalid_pos.is_valid() == false
 }
 
@@ -29,11 +32,21 @@ fn test_span_creation() {
 
 fn test_literal_types() {
 	// Test all literal types
-	string_lit := ast.StringLiteral{value: 'hello'}
-	int_lit := ast.IntegerLiteral{value: 42}
-	float_lit := ast.FloatLiteral{value: 3.14}
-	bool_lit := ast.BooleanLiteral{value: true}
-	atom_lit := ast.AtomLiteral{value: 'ok'}
+	string_lit := ast.StringLiteral{
+		value: 'hello'
+	}
+	int_lit := ast.IntegerLiteral{
+		value: 42
+	}
+	float_lit := ast.FloatLiteral{
+		value: 3.14
+	}
+	bool_lit := ast.BooleanLiteral{
+		value: true
+	}
+	atom_lit := ast.AtomLiteral{
+		value: 'ok'
+	}
 	nil_lit := ast.NilLiteral{}
 
 	// Convert to Literal sum type
@@ -72,12 +85,25 @@ fn test_literal_types() {
 
 fn test_basic_expressions() {
 	// Test basic expressions
-	var_expr := ast.VariableExpr{name: 'x'}
-	literal_expr := ast.LiteralExpr{value: ast.Literal(ast.IntegerLiteral{value: 10})}
-	assign_expr := ast.AssignExpr{
+	var_expr := ast.VariableExpr{
 		name: 'x'
-		value: ast.Expr(ast.LiteralExpr{value: ast.Literal(ast.IntegerLiteral{value: 5})})
-		position: ast.Position{line: 1, column: 1}
+	}
+	literal_expr := ast.LiteralExpr{
+		value: ast.Literal(ast.IntegerLiteral{
+			value: 10
+		})
+	}
+	assign_expr := ast.AssignExpr{
+		name:     'x'
+		value:    ast.Expr(ast.LiteralExpr{
+			value: ast.Literal(ast.IntegerLiteral{
+				value: 5
+			})
+		})
+		position: ast.Position{
+			line:   1
+			column: 1
+		}
 	}
 
 	// Convert to Expr sum type
@@ -93,9 +119,17 @@ fn test_basic_expressions() {
 fn test_pattern_matching() {
 	// Test basic patterns
 	wildcard := ast.WildcardPattern{}
-	var_pattern := ast.VarPattern{name: 'x'}
-	atom_pattern := ast.AtomPattern{value: 'ok'}
-	literal_pattern := ast.LiteralPattern{value: ast.Literal(ast.IntegerLiteral{value: 42})}
+	var_pattern := ast.VarPattern{
+		name: 'x'
+	}
+	atom_pattern := ast.AtomPattern{
+		value: 'ok'
+	}
+	literal_pattern := ast.LiteralPattern{
+		value: ast.Literal(ast.IntegerLiteral{
+			value: 42
+		})
+	}
 
 	// Convert to Pattern sum type
 	wildcard_pat := ast.Pattern(wildcard)
@@ -132,19 +166,19 @@ fn test_binary_operators() {
 fn test_error_kinds() {
 	// Test all error kinds
 	syntax_err := error.SyntaxError{
-		message: 'Unexpected token'
+		message:  'Unexpected token'
 		expected: 'identifier'
-		found: '='
+		found:    '='
 	}
 	type_err := error.TypeError{
-		message: 'Type mismatch'
-		expected: 'integer'
-		actual: 'string'
+		message:    'Type mismatch'
+		expected:   'integer'
+		actual:     'string'
 		suggestion: 'Use integer instead of string'
 	}
 	unbound_err := error.UnboundVariableError{
-		variable: 'undefined_var'
-		similar: ['defined_var', 'other_var']
+		variable:   'undefined_var'
+		similar:    ['defined_var', 'other_var']
 		suggestion: 'Did you mean defined_var?'
 	}
 
@@ -160,15 +194,11 @@ fn test_error_kinds() {
 
 fn test_error_positioning() {
 	pos := ast.new_position(5, 10, 'test.lx')
-	comp_error := error.new_compilation_error(
-		error.ErrorKind(error.SyntaxError{
-			message: 'Test error'
-			expected: ''
-			found: ''
-		}),
-		pos,
-		'Test message'
-	)
+	comp_error := error.new_compilation_error(error.ErrorKind(error.SyntaxError{
+		message:  'Test error'
+		expected: ''
+		found:    ''
+	}), pos, 'Test message')
 
 	assert comp_error.position.line == 5
 	assert comp_error.position.column == 10
@@ -181,26 +211,23 @@ fn test_error_collection() {
 	mut collection := error.new_error_collection()
 
 	// Add errors
-	error1 := error.new_compilation_error(
-		error.ErrorKind(error.SyntaxError{
-			message: 'Error 1'
-			expected: ''
-			found: ''
-		}),
-		ast.Position{line: 1, column: 1},
-		'First error'
-	)
-	error2 := error.new_compilation_error_with_severity(
-		error.ErrorKind(error.TypeError{
-			message: 'Error 2'
-			expected: ''
-			actual: ''
-			suggestion: ''
-		}),
-		ast.Position{line: 2, column: 1},
-		'Second error',
-		error.ErrorSeverity.warning
-	)
+	error1 := error.new_compilation_error(error.ErrorKind(error.SyntaxError{
+		message:  'Error 1'
+		expected: ''
+		found:    ''
+	}), ast.Position{
+		line:   1
+		column: 1
+	}, 'First error')
+	error2 := error.new_compilation_error_with_severity(error.ErrorKind(error.TypeError{
+		message:    'Error 2'
+		expected:   ''
+		actual:     ''
+		suggestion: ''
+	}), ast.Position{
+		line:   2
+		column: 1
+	}, 'Second error', error.ErrorSeverity.warning)
 
 	collection.add_error(error1)
 	collection.add_warning(error2)
@@ -234,9 +261,9 @@ fn test_string_utilities() {
 	str2 := pool.intern('hello')
 	str3 := pool.intern('world')
 
-	assert str1 == str2  // Same reference
-	assert str1 != str3  // Different references
-	assert pool.size() == 2  // Only 2 unique strings
+	assert str1 == str2 // Same reference
+	assert str1 != str3 // Different references
+	assert pool.size() == 2 // Only 2 unique strings
 }
 
 fn test_string_pooling() {
@@ -246,9 +273,9 @@ fn test_string_pooling() {
 	str2 := pool.intern('hello')
 	str3 := pool.intern('world')
 
-	assert str1 == str2  // Same reference
-	assert str1 != str3  // Different references
-	assert pool.size() == 2  // Only 2 unique strings
+	assert str1 == str2 // Same reference
+	assert str1 != str3 // Different references
+	assert pool.size() == 2 // Only 2 unique strings
 	assert pool.contains('hello') == true
 	assert pool.contains('world') == true
 	assert pool.contains('missing') == false
@@ -300,15 +327,11 @@ fn test_debug_utilities() {
 fn test_error_formatter() {
 	formatter := error.new_error_formatter()
 
-	comp_error := error.new_compilation_error(
-		error.ErrorKind(error.SyntaxError{
-			message: 'Test error'
-			expected: 'identifier'
-			found: '='
-		}),
-		ast.new_position(1, 1, 'test.lx'),
-		'Unexpected token ='
-	)
+	comp_error := error.new_compilation_error(error.ErrorKind(error.SyntaxError{
+		message:  'Test error'
+		expected: 'identifier'
+		found:    '='
+	}), ast.new_position(1, 1, 'test.lx'), 'Unexpected token =')
 
 	// Test simple formatting
 	simple_formatted := error.format_error_simple(comp_error)
@@ -318,44 +341,32 @@ fn test_error_formatter() {
 
 fn test_error_suggestions() {
 	// Test syntax error suggestions
-	syntax_error := error.new_compilation_error(
-		error.ErrorKind(error.SyntaxError{
-			message: 'Test'
-			expected: 'identifier'
-			found: '='
-		}),
-		ast.Position{},
-		'Test error'
-	)
+	syntax_error := error.new_compilation_error(error.ErrorKind(error.SyntaxError{
+		message:  'Test'
+		expected: 'identifier'
+		found:    '='
+	}), ast.Position{}, 'Test error')
 
 	suggestions := error.generate_suggestions(syntax_error)
 	assert suggestions.len > 0
 
 	// Test type error suggestions
-	type_error := error.new_compilation_error(
-		error.ErrorKind(error.TypeError{
-			message: 'Test'
-			expected: 'integer'
-			actual: 'string'
-			suggestion: 'Convert string to integer'
-		}),
-		ast.Position{},
-		'Type error'
-	)
+	type_error := error.new_compilation_error(error.ErrorKind(error.TypeError{
+		message:    'Test'
+		expected:   'integer'
+		actual:     'string'
+		suggestion: 'Convert string to integer'
+	}), ast.Position{}, 'Type error')
 
 	type_suggestions := error.generate_suggestions(type_error)
 	assert type_suggestions.len > 0
 
 	// Test unbound variable suggestions
-	unbound_error := error.new_compilation_error(
-		error.ErrorKind(error.UnboundVariableError{
-			variable: 'count'
-			similar: ['counter', 'counts']
-			suggestion: 'Did you mean counter?'
-		}),
-		ast.Position{},
-		'Undefined variable'
-	)
+	unbound_error := error.new_compilation_error(error.ErrorKind(error.UnboundVariableError{
+		variable:   'count'
+		similar:    ['counter', 'counts']
+		suggestion: 'Did you mean counter?'
+	}), ast.Position{}, 'Undefined variable')
 
 	unbound_suggestions := error.generate_suggestions(unbound_error)
 	assert unbound_suggestions.len > 0

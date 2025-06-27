@@ -81,7 +81,12 @@ pub struct NilLiteral {
 }
 
 // Literal represents literal values in LX using sum types
-pub type Literal = StringLiteral | IntegerLiteral | FloatLiteral | BooleanLiteral | AtomLiteral | NilLiteral
+pub type Literal = StringLiteral
+	| IntegerLiteral
+	| FloatLiteral
+	| BooleanLiteral
+	| AtomLiteral
+	| NilLiteral
 
 // str returns a string representation of Literal
 pub fn (l Literal) str() string {

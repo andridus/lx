@@ -1,24 +1,23 @@
 module error
 
-import ast
 import os
 
 // ErrorFormatter handles formatting of compilation errors
 pub struct ErrorFormatter {
 pub:
-	show_source bool
+	show_source      bool
 	show_suggestions bool
-	colored_output bool
-	max_line_length int
+	colored_output   bool
+	max_line_length  int
 }
 
 // new_error_formatter creates a new ErrorFormatter
 pub fn new_error_formatter() ErrorFormatter {
 	return ErrorFormatter{
-		show_source: true
+		show_source:      true
 		show_suggestions: true
-		colored_output: true
-		max_line_length: 80
+		colored_output:   true
+		max_line_length:  80
 	}
 }
 
@@ -241,7 +240,7 @@ pub fn format_error_simple(err CompilationError) string {
 }
 
 // get_color_code returns the ANSI color code for a severity level
-fn get_color_code(severity error.ErrorSeverity) string {
+fn get_color_code(severity ErrorSeverity) string {
 	return match severity {
 		.info { '\x1b[36m' } // Cyan
 		.warning { '\x1b[33m' } // Yellow

@@ -11,25 +11,25 @@ pub:
 // SyntaxError represents a syntax error
 pub struct SyntaxError {
 pub:
-	message string
+	message  string
 	expected string
-	found string
+	found    string
 }
 
 // TypeError represents a type error
 pub struct TypeError {
 pub:
-	message string
-	expected string
-	actual string
+	message    string
+	expected   string
+	actual     string
 	suggestion string
 }
 
 // UnboundVariableError represents an unbound variable error
 pub struct UnboundVariableError {
 pub:
-	variable string
-	similar []string
+	variable   string
+	similar    []string
 	suggestion string
 }
 
@@ -57,18 +57,18 @@ pub enum ErrorSeverity {
 // CompilationError represents a compilation error
 pub struct CompilationError {
 pub:
-	kind ErrorKind
+	kind     ErrorKind
 	position ast.Position
-	message string
+	message  string
 	severity ErrorSeverity
 }
 
 // new_compilation_error creates a new compilation error with default severity
 pub fn new_compilation_error(kind ErrorKind, position ast.Position, message string) CompilationError {
 	return CompilationError{
-		kind: kind
+		kind:     kind
 		position: position
-		message: message
+		message:  message
 		severity: .error
 	}
 }
@@ -76,9 +76,9 @@ pub fn new_compilation_error(kind ErrorKind, position ast.Position, message stri
 // new_compilation_error_with_severity creates a new compilation error with specified severity
 pub fn new_compilation_error_with_severity(kind ErrorKind, position ast.Position, message string, severity ErrorSeverity) CompilationError {
 	return CompilationError{
-		kind: kind
+		kind:     kind
 		position: position
-		message: message
+		message:  message
 		severity: severity
 	}
 }
@@ -86,14 +86,14 @@ pub fn new_compilation_error_with_severity(kind ErrorKind, position ast.Position
 // ErrorCollection represents a collection of compilation errors
 pub struct ErrorCollection {
 mut:
-	errors []CompilationError
+	errors   []CompilationError
 	warnings []CompilationError
 }
 
 // new_error_collection creates a new error collection
 pub fn new_error_collection() ErrorCollection {
 	return ErrorCollection{
-		errors: []
+		errors:   []
 		warnings: []
 	}
 }

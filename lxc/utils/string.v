@@ -8,16 +8,36 @@ pub fn escape_string(s string) string {
 	for i := 0; i < s.len; i++ {
 		ch := s[i]
 		match ch {
-			`\\` { result += '\\\\' }
-			`"` { result += '\\"' }
-			`'` { result += "\\'" }
-			`\n` { result += '\\n' }
-			`\r` { result += '\\r' }
-			`\t` { result += '\\t' }
-			`\b` { result += '\\b' }
-			`\f` { result += '\\f' }
-			`\v` { result += '\\v' }
-			`\a` { result += '\\a' }
+			`\\` {
+				result += '\\\\'
+			}
+			`"` {
+				result += '\\"'
+			}
+			`'` {
+				result += "\\'"
+			}
+			`\n` {
+				result += '\\n'
+			}
+			`\r` {
+				result += '\\r'
+			}
+			`\t` {
+				result += '\\t'
+			}
+			`\b` {
+				result += '\\b'
+			}
+			`\f` {
+				result += '\\f'
+			}
+			`\v` {
+				result += '\\v'
+			}
+			`\a` {
+				result += '\\a'
+			}
 			else {
 				if ch < 32 || ch > 126 {
 					result += '\\x${ch:02x}'
@@ -38,16 +58,36 @@ pub fn unescape_string(s string) string {
 		if s[i] == `\\` && i + 1 < s.len {
 			next := s[i + 1]
 			match next {
-				`\\` { result += '\\' }
-				`"` { result += '"' }
-				`'` { result += "'" }
-				`n` { result += '\n' }
-				`r` { result += '\r' }
-				`t` { result += '\t' }
-				`b` { result += '\b' }
-				`f` { result += '\f' }
-				`v` { result += '\v' }
-				`a` { result += '\a' }
+				`\\` {
+					result += '\\'
+				}
+				`"` {
+					result += '"'
+				}
+				`'` {
+					result += "'"
+				}
+				`n` {
+					result += '\n'
+				}
+				`r` {
+					result += '\r'
+				}
+				`t` {
+					result += '\t'
+				}
+				`b` {
+					result += '\b'
+				}
+				`f` {
+					result += '\f'
+				}
+				`v` {
+					result += '\v'
+				}
+				`a` {
+					result += '\a'
+				}
 				`x` {
 					// Handle hex escape sequences
 					if i + 3 < s.len {
@@ -63,11 +103,13 @@ pub fn unescape_string(s string) string {
 						result += '\\x'
 					}
 				}
-				else { result += '\\${next}' }
+				else {
+					result += '\\${next}'
+				}
 			}
 			i++ // Skip the escaped character
 		} else {
-			result += s[i..i+1]
+			result += s[i..i + 1]
 		}
 	}
 
@@ -118,7 +160,8 @@ pub fn is_valid_identifier(s string) bool {
 	// Remaining characters must be letters, digits, or underscores
 	for i := 1; i < s.len; i++ {
 		ch := s[i]
-		if !((ch >= `a` && ch <= `z`) || (ch >= `A` && ch <= `Z`) || (ch >= `0` && ch <= `9`) || ch == `_`) {
+		if !((ch >= `a` && ch <= `z`) || (ch >= `A` && ch <= `Z`)
+			|| (ch >= `0` && ch <= `9`) || ch == `_`) {
 			return false
 		}
 	}
@@ -141,7 +184,8 @@ pub fn is_valid_atom(s string) bool {
 	// Remaining characters must be letters, digits, or underscores
 	for i := 1; i < s.len; i++ {
 		ch := s[i]
-		if !((ch >= `a` && ch <= `z`) || (ch >= `A` && ch <= `Z`) || (ch >= `0` && ch <= `9`) || ch == `_`) {
+		if !((ch >= `a` && ch <= `z`) || (ch >= `A` && ch <= `Z`)
+			|| (ch >= `0` && ch <= `9`) || ch == `_`) {
 			return false
 		}
 	}
@@ -164,7 +208,8 @@ pub fn is_valid_module_name(s string) bool {
 	// Remaining characters must be letters, digits, or underscores
 	for i := 1; i < s.len; i++ {
 		ch := s[i]
-		if !((ch >= `a` && ch <= `z`) || (ch >= `A` && ch <= `Z`) || (ch >= `0` && ch <= `9`) || ch == `_`) {
+		if !((ch >= `a` && ch <= `z`) || (ch >= `A` && ch <= `Z`)
+			|| (ch >= `0` && ch <= `9`) || ch == `_`) {
 			return false
 		}
 	}
