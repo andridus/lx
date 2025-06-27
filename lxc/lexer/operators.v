@@ -78,7 +78,7 @@ pub fn get_all_punctuation() []string {
 // is_single_char_operator checks if a character can be the start of an operator
 pub fn is_single_char_operator(c u8) bool {
 	return c == `=` || c == `<` || c == `>` || c == `!` || c == `:` || c == `+` || c == `-`
-		|| c == `*` || c == `/` || c == `|`
+		|| c == `*` || c == `/` || c == `|` || c == `.`
 }
 
 // is_operator_start checks if a character can be the start of an operator
@@ -97,7 +97,7 @@ pub fn get_operator_precedence(t OperatorToken) int {
 		.eq, .neq, .lt, .gt, .leq, .geq { 6 }
 		.and_, .or_, .andalso, .orelse { 7 }
 		.not_ { 8 }
-		.assign, .pattern_match, .with_bind { 9 }
+		.assign, .pattern_match { 9 }
 		else { 10 }
 	}
 }
@@ -113,7 +113,7 @@ pub fn is_left_associative(t OperatorToken) bool {
 // is_right_associative checks if an operator is right associative
 pub fn is_right_associative(t OperatorToken) bool {
 	return match t {
-		.assign, .pattern_match, .with_bind, .send, .type_cons { true }
+		.assign, .pattern_match, .send, .type_cons { true }
 		else { false }
 	}
 }

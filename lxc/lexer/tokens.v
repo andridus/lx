@@ -100,7 +100,6 @@ pub enum KeywordToken {
 pub enum OperatorToken {
 	assign        // =
 	pattern_match // <-
-	with_bind     // <=
 	arrow         // ->
 	send          // !
 	type_cons     // ::
@@ -208,7 +207,6 @@ pub fn (o OperatorToken) str() string {
 	return match o {
 		.assign { '=' }
 		.pattern_match { '<-' }
-		.with_bind { '<=' }
 		.arrow { '->' }
 		.send { '!' }
 		.type_cons { '::' }

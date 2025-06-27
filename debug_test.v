@@ -1,0 +1,1 @@
+fn test_debug_operator() { input := "::" mut lexer0 := lexer.new_lexer(input, "test.lx") token := lexer0.next_token() println("Token: ${token}") println("Buffer: ${lexer0.get_buffer()}") println("State: ${lexer0.get_state()}") }

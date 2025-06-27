@@ -3,6 +3,7 @@ module lexer
 // LexerState represents the current state of the lexer
 pub enum LexerState {
 	initial
+	atom_start
 	identifier
 	number
 	float
@@ -19,6 +20,7 @@ pub enum LexerState {
 pub fn (s LexerState) str() string {
 	return match s {
 		.initial { 'initial' }
+		.atom_start { 'atom_start' }
 		.identifier { 'identifier' }
 		.number { 'number' }
 		.float { 'float' }
@@ -35,7 +37,7 @@ pub fn (s LexerState) str() string {
 // is_final_state checks if a state is a final state (can emit a token)
 pub fn (s LexerState) is_final_state() bool {
 	return match s {
-		.identifier, .number, .float, .string, .atom, .operator, .error, .maybe_negative { true }
+		.identifier, .number, .float, .string, .atom, .error, .maybe_negative { true }
 		else { false }
 	}
 }
@@ -44,6 +46,17 @@ pub fn (s LexerState) is_final_state() bool {
 pub fn (current LexerState) can_transition_to(target LexerState) bool {
 	return match current {
 		.initial {
+			match target {
+				.identifier, .number, .string, .atom, .comment, .operator, .whitespace,
+				.maybe_negative {
+					true
+				}
+				else {
+					false
+				}
+			}
+		}
+		.atom_start {
 			match target {
 				.identifier, .number, .string, .atom, .comment, .operator, .whitespace,
 				.maybe_negative {
@@ -126,6 +139,7 @@ pub fn (current LexerState) can_transition_to(target LexerState) bool {
 pub fn (s LexerState) get_default_transition() LexerState {
 	return match s {
 		.initial { .initial }
+		.atom_start { .atom_start }
 		.identifier { .initial }
 		.number { .initial }
 		.float { .initial }
@@ -142,7 +156,7 @@ pub fn (s LexerState) get_default_transition() LexerState {
 // is_accepting_state checks if a state can accept more input
 pub fn (s LexerState) is_accepting_state() bool {
 	return match s {
-		.identifier, .number, .float, .string, .atom, .operator, .comment { true }
+		.identifier, .number, .float, .string, .atom, .operator, .comment, .atom_start { true }
 		else { false }
 	}
 }
@@ -150,7 +164,7 @@ pub fn (s LexerState) is_accepting_state() bool {
 // requires_lookahead checks if a state requires lookahead to determine the next state
 pub fn (s LexerState) requires_lookahead() bool {
 	return match s {
-		.operator { true }
+		.operator, .atom_start { true }
 		else { false }
 	}
 }

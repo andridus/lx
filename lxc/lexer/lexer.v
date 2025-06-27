@@ -56,6 +56,12 @@ pub fn (mut l Lexer) next_token() Token {
 
 		// Find transition for current state and character
 		transition := find_transition(l.state, ch, l.buffer) or {
+			if l.state == .operator && l.buffer.len > 0 {
+				token := l.create_token_from_buffer()
+				l.buffer = ''
+				l.state = .initial
+				return token
+			}
 			if l.state.is_final_state() {
 				token := l.create_token_from_buffer()
 				l.buffer = ''
@@ -145,11 +151,15 @@ pub fn (mut l Lexer) next_token() Token {
 			}
 			.emit_error {
 				// Após erro, parar e não consumir mais caracteres
-				l.add_error('Lexical error: Unexpected character', l.get_current_position())
+				mut error_message := 'Lexical error: Unexpected character'
+				if l.position < l.input.len && l.input[l.position] == `.` {
+					error_message = 'Lexical error: Float literals must start with a digit'
+				}
+				l.add_error(error_message, l.get_current_position())
 				l.state = transition.to_state
 				l.buffer = ''
 				return ErrorToken{
-					message: 'Lexical error: Unexpected character'
+					message: error_message
 				}
 			}
 			.backtrack {
@@ -203,6 +213,22 @@ pub fn (mut l Lexer) next_token() Token {
 				message: msg
 			}
 		}
+	}
+
+	// Handle operator state specifically
+	if l.buffer.len > 0 && l.state == .operator {
+		token := l.create_token_from_buffer()
+		l.buffer = ''
+		l.state = .initial
+		return token
+	}
+
+	// Handle atom_start state specifically
+	if l.buffer.len > 0 && l.state == .atom_start {
+		token := l.create_token_from_buffer()
+		l.buffer = ''
+		l.state = .initial
+		return token
 	}
 
 	// Emit pending token if buffer is not empty and state is final
@@ -285,15 +311,22 @@ fn (mut l Lexer) create_token_from_buffer() Token {
 				value: value
 			}
 		}
-		.comment {
-			EOFToken{}
-		}
-		.operator {
+		.atom_start {
+			// If we have only ':', it's an error
 			if l.buffer == ':' {
 				return ErrorToken{
 					message: 'Lexical error: Isolated colon is not allowed'
 				}
 			}
+			// This should not happen in normal flow, but just in case
+			ErrorToken{
+				message: 'Lexical error: Unexpected state in atom_start'
+			}
+		}
+		.comment {
+			EOFToken{}
+		}
+		.operator {
 			if is_punctuation(l.buffer) {
 				if ptok := get_punctuation_token(l.buffer) {
 					ptok
@@ -311,6 +344,13 @@ fn (mut l Lexer) create_token_from_buffer() Token {
 					}
 				}
 			} else {
+				// Only emit error for single colon if we're at the end of input
+				// or if the next character can't form a valid operator
+				if l.buffer == ':' && l.position >= l.input.len {
+					return ErrorToken{
+						message: 'Lexical error: Isolated colon is not allowed'
+					}
+				}
 				ErrorToken{
 					message: 'Lexical error: Unknown operator'
 				}

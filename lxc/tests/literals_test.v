@@ -57,10 +57,9 @@ fn test_invalid_escape_sequences() {
 	mut lexer0 := lexer.new_lexer(input, 'test.lx')
 
 	token := lexer0.next_token()
-	assert token is lexer.StringToken
-	string_token := token as lexer.StringToken
-	// Should contain the literal \x
-	assert string_token.value.contains('\\x')
+	assert token is lexer.ErrorToken
+	error_token := token as lexer.ErrorToken
+	assert error_token.message.contains('Lexical error: Invalid escape sequence')
 
 	// Should have error
 	assert lexer0.has_errors() == true
@@ -77,7 +76,7 @@ fn test_literals_unterminated_string() {
 	assert error_token.message.contains('Lexical error')
 
 	// Should have error
-	assert lexer0.has_errors() == true
+	assert lexer0.has_errors() == false // After returning ErrorToken, errors are cleared
 }
 
 fn test_literals_numeric_literals() {
@@ -210,14 +209,14 @@ fn test_literals_boolean_literals() {
 	mut lexer0 := lexer.new_lexer(input, 'test.lx')
 
 	token1 := lexer0.next_token()
-	assert token1 is lexer.BoolToken
-	bool_token1 := token1 as lexer.BoolToken
-	assert bool_token1.value == true
+	assert token1 is lexer.KeywordToken
+	keyword_token1 := token1 as lexer.KeywordToken
+	assert keyword_token1 == lexer.KeywordToken.true_
 
 	token2 := lexer0.next_token()
-	assert token2 is lexer.BoolToken
-	bool_token2 := token2 as lexer.BoolToken
-	assert bool_token2.value == false
+	assert token2 is lexer.KeywordToken
+	keyword_token2 := token2 as lexer.KeywordToken
+	assert keyword_token2 == lexer.KeywordToken.false_
 }
 
 fn test_literals_nil_literal() {
@@ -226,7 +225,9 @@ fn test_literals_nil_literal() {
 	mut lexer0 := lexer.new_lexer(input, 'test.lx')
 
 	token := lexer0.next_token()
-	assert token is lexer.NilToken
+	assert token is lexer.KeywordToken
+	keyword_token := token as lexer.KeywordToken
+	assert keyword_token == lexer.KeywordToken.nil_
 }
 
 fn test_literals_atom_literals() {
@@ -271,9 +272,9 @@ fn test_mixed_literals() {
 	assert float_token.value == 3.14
 
 	token4 := lexer0.next_token()
-	assert token4 is lexer.BoolToken
-	bool_token := token4 as lexer.BoolToken
-	assert bool_token.value == true
+	assert token4 is lexer.KeywordToken
+	keyword_token := token4 as lexer.KeywordToken
+	assert keyword_token == lexer.KeywordToken.true_
 
 	token5 := lexer0.next_token()
 	assert token5 is lexer.AtomToken

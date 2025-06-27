@@ -198,7 +198,15 @@ pub fn get_transitions() []Transition {
 		},
 		Transition{
 			from_state: .initial
-			to_state:   .atom
+			to_state:   .comment
+			condition:  CharacterClassCondition{
+				class: .hash
+			}
+			action:     .consume_character
+		},
+		Transition{
+			from_state: .initial
+			to_state:   .atom_start
 			condition:  CharacterCondition{
 				value: `:`
 			}
@@ -206,9 +214,17 @@ pub fn get_transitions() []Transition {
 		},
 		Transition{
 			from_state: .initial
-			to_state:   .comment
-			condition:  CharacterClassCondition{
-				class: .hash
+			to_state:   .error
+			condition:  CharacterCondition{
+				value: `.`
+			}
+			action:     .emit_error
+		},
+		Transition{
+			from_state: .initial
+			to_state:   .float
+			condition:  CharacterCondition{
+				value: `.`
 			}
 			action:     .consume_character
 		},
@@ -236,14 +252,6 @@ pub fn get_transitions() []Transition {
 			}
 			action:     .skip_character
 		},
-		Transition{
-			from_state: .initial
-			to_state:   .error
-			condition:  CharacterCondition{
-				value: `.`
-			}
-			action:     .emit_error
-		},
 		// Whitespace state transitions
 		Transition{
 			from_state: .whitespace
@@ -263,7 +271,7 @@ pub fn get_transitions() []Transition {
 		},
 		Transition{
 			from_state: .whitespace
-			to_state:   .atom
+			to_state:   .atom_start
 			condition:  CharacterCondition{
 				value: `:`
 			}
@@ -418,6 +426,29 @@ pub fn get_transitions() []Transition {
 		},
 		Transition{
 			from_state: .atom
+			to_state:   .initial
+			condition:  AlwaysCondition{}
+			action:     .emit_token
+		},
+		// Atom start state transitions
+		Transition{
+			from_state: .atom_start
+			to_state:   .operator
+			condition:  CharacterCondition{
+				value: `:`
+			}
+			action:     .consume_character
+		},
+		Transition{
+			from_state: .atom_start
+			to_state:   .atom
+			condition:  CharacterClassCondition{
+				class: .identifier_start
+			}
+			action:     .consume_character
+		},
+		Transition{
+			from_state: .atom_start
 			to_state:   .initial
 			condition:  AlwaysCondition{}
 			action:     .emit_token

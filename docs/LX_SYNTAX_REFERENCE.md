@@ -71,12 +71,39 @@ Syntax symbols used for operations, declarations, and structure:
 
 Immutable constant values available in source code:
 
-- Strings: `"hello"`, supports escapes (`\n`, `\t`, etc.)
-- Integers: `42`, `-3`, `0`
-- Floats: `3.14`, `-1.0`
-- Booleans: `true`, `false`
-- Atoms (symbols): `:ok`, `:error`, `:timeout`
-- Nil/null value: `nil`
+- **Strings**: `"hello"`, supports escapes (`\n`, `\t`, `\r`, `\"`, `\\`)
+- **Integers**: `42`, `-3`, `0`
+- **Floats**: `3.14`, `-1.0`
+- **Booleans**: `true`, `false`
+- **Atoms (symbols)**: `:ok`, `:error`, `:timeout`
+- **Nil/null value**: `nil`
+
+#### String Literals
+
+Strings are enclosed in double quotes and support escape sequences:
+
+```lx
+# Basic strings
+message = "Hello, world!"
+
+# Escape sequences
+newline = "Line 1\nLine 2"
+tab = "Column 1\tColumn 2"
+quote = "He said \"Hello\""
+backslash = "Path: C:\\Users\\Name"
+
+# Invalid characters in strings
+# "hello@world"  # Error: @ is not allowed in strings
+```
+
+**Supported escape sequences:**
+- `\n` - newline
+- `\t` - tab
+- `\r` - carriage return
+- `\"` - double quote
+- `\\` - backslash
+
+**Valid characters:** Only printable ASCII characters (32-126) are allowed in strings, excluding control characters and special symbols like `@`.
 
 ---
 

@@ -137,6 +137,15 @@ fn test_special_operators() {
 	assert operator_token5 == lexer.OperatorToken.record_update
 }
 
+fn test_isolated_colon() {
+	input := ':'
+	mut lexer0 := lexer.new_lexer(input, 'test.lx')
+	token := lexer0.next_token()
+	assert token is lexer.ErrorToken
+	error_token := token as lexer.ErrorToken
+	assert error_token.message.contains('Isolated colon')
+}
+
 fn test_arrow_operators() {
 	input := '-> <='
 	mut lexer0 := lexer.new_lexer(input, 'test.lx')
@@ -149,7 +158,7 @@ fn test_arrow_operators() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token2 := token2 as lexer.OperatorToken
-	assert operator_token2 == lexer.OperatorToken.with_bind
+	assert operator_token2 == lexer.OperatorToken.leq
 }
 
 fn test_operator_precedence() {
@@ -174,7 +183,6 @@ fn test_operator_precedence() {
 	assert lexer.get_operator_precedence(lexer.OperatorToken.not_) == 8
 	assert lexer.get_operator_precedence(lexer.OperatorToken.assign) == 9
 	assert lexer.get_operator_precedence(lexer.OperatorToken.pattern_match) == 9
-	assert lexer.get_operator_precedence(lexer.OperatorToken.with_bind) == 9
 }
 
 fn test_operator_associativity() {
@@ -192,7 +200,6 @@ fn test_operator_associativity() {
 	// Test right associative operators
 	assert lexer.is_right_associative(lexer.OperatorToken.assign) == true
 	assert lexer.is_right_associative(lexer.OperatorToken.pattern_match) == true
-	assert lexer.is_right_associative(lexer.OperatorToken.with_bind) == true
 	assert lexer.is_right_associative(lexer.OperatorToken.send) == true
 	assert lexer.is_right_associative(lexer.OperatorToken.type_cons) == true
 
@@ -233,7 +240,8 @@ fn test_operator_recognition() {
 	for op in operators {
 		assert lexer.is_operator(op) == true
 		token := lexer.get_operator_token(op) or { return }
-		assert token != lexer.OperatorToken.assign // Just check it's not empty
+		// Just check it's a valid token (not empty)
+		assert token.str().len > 0
 	}
 
 	// Test non-operators
@@ -374,7 +382,7 @@ fn test_with_expression() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.with_bind
+	assert operator_token == lexer.OperatorToken.leq
 
 	// y
 	token3 := lexer0.next_token()
@@ -464,9 +472,9 @@ fn test_record_update() {
 
 	// record
 	token2 := lexer0.next_token()
-	assert token2 is lexer.IdentToken
-	ident_token := token2 as lexer.IdentToken
-	assert ident_token.value == 'record'
+	assert token2 is lexer.KeywordToken
+	keyword_token := token2 as lexer.KeywordToken
+	assert keyword_token == lexer.KeywordToken.record
 
 	// |
 	token3 := lexer0.next_token()
@@ -482,9 +490,9 @@ fn test_record_update() {
 
 	// :
 	token5 := lexer0.next_token()
-	assert token5 is lexer.PunctuationToken
-	punct_token2 := token5 as lexer.PunctuationToken
-	assert punct_token2 == lexer.PunctuationToken.colon
+	assert token5 is lexer.ErrorToken
+	error_token := token5 as lexer.ErrorToken
+	assert error_token.message.contains('Isolated colon')
 
 	// value
 	token6 := lexer0.next_token()
@@ -497,4 +505,14 @@ fn test_record_update() {
 	assert token7 is lexer.PunctuationToken
 	punct_token3 := token7 as lexer.PunctuationToken
 	assert punct_token3 == lexer.PunctuationToken.rbrace
+}
+
+fn test_type_cons_operator() {
+	input := '::'
+	mut lexer0 := lexer.new_lexer(input, 'test.lx')
+
+	token := lexer0.next_token()
+	assert token is lexer.OperatorToken
+	operator_token := token as lexer.OperatorToken
+	assert operator_token == lexer.OperatorToken.type_cons
 }
