@@ -2,8 +2,6 @@ module compiler
 
 import lexer
 import parser
-import generate.erlang
-import typechecker
 import ast
 import os
 
@@ -23,9 +21,8 @@ pub struct Compiler {
 mut:
 	file_path   string
 	module_name string
-	lexer_instance  &lexer.Lexer = unsafe { nil }
-	parser_instance &parser.Parser = unsafe { nil }
-	generator       &erlang.ErlangGenerator = unsafe { nil }
+	lexer_instance  lexer.Lexer
+	parser_instance parser.MainParser
 }
 
 // new_compiler creates a new compiler instance
@@ -33,24 +30,20 @@ pub fn new_compiler() Compiler {
 	return Compiler{
 		module_name:     ''
 		file_path:       ''
-		lexer_instance:  unsafe { nil }
-		parser_instance: unsafe { nil }
-		generator:       &erlang.ErlangGenerator{}
 	}
 }
 
-// compile_file compiles a single LX file to Erlang
-pub fn (mut comp Compiler) compile_file(file_path string) CompilerResult {
-	// Read source file
-	source := os.read_file(file_path) or {
-		return comp.new_compiler_result(false, '', ['Failed to read file: ${err}'], [])
-	}
-	// Extract module name from filename
-	comp.module_name = os.file_name(file_path).replace('.lx', '')
+// compile_file compiles a single file
+pub fn (mut comp Compiler) compile_file(file_path string) !ast.ModuleStmt {
 	comp.file_path = file_path
-	lexer_instance := lexer.new_lexer(source, file_path)
-	comp.lexer_instance = &lexer_instance
 
+	// Read the source file
+	source := os.read_file(file_path) or {
+		return error('Failed to read file: ${file_path}: ${err}')
+	}
+
+	// Create lexer and tokenize
+	comp.lexer_instance = lexer.new_lexer(source, file_path)
 	mut tokens := []lexer.Token{}
 	for {
 		token := comp.lexer_instance.next_token()
@@ -58,7 +51,7 @@ pub fn (mut comp Compiler) compile_file(file_path string) CompilerResult {
 			break
 		}
 		if token is lexer.ErrorToken {
-			return comp.new_compiler_result(false, '', [token.message], [])
+			return error('Lexical error: ${token.message}')
 		}
 		tokens << token
 	}
@@ -68,56 +61,31 @@ pub fn (mut comp Compiler) compile_file(file_path string) CompilerResult {
 		for error in comp.lexer_instance.get_errors() {
 			errors << error.message
 		}
-		return comp.new_compiler_result(false, '', errors, [])
+		return error('Lexical errors: ${errors.join('\n')}')
 	}
 
-	// Create parser
-	comp.parser_instance = parser.new_parser(tokens)
-	// Parse the tokens into AST
-	statements := comp.parser_instance.parse()
-	println('statements: ${statements}')
+	// Create parser and parse the tokens into AST
+	comp.parser_instance = parser.new_main_parser(tokens)
+	module_stmt := comp.parser_instance.parse_module() or {
+		return error('Parsing failed: ${err}')
+	}
+
 	if comp.parser_instance.has_errors() {
 		mut errors := []string{}
 		for error in comp.parser_instance.get_errors() {
 			errors << error.message
 		}
-		return comp.new_compiler_result(false, '', errors, [])
+		return error('Parser errors: ${errors.join('\n')}')
 	}
 
-	// Create a simple module structure for now
-	module_stmt := ast.ModuleStmt{
-		name:       comp.module_name
-		exports:    []
-		imports:    []
-		statements: statements
-		position:   ast.new_position(1, 1, comp.file_path)
-	}
-
-	// Create type context (for now, empty)
-	type_ctx := typechecker.new_context()
-
-	// Generate Erlang code
-	codegen_result := comp.generator.generate_module(module_stmt, type_ctx)
-	if !codegen_result.success {
-		mut errors := []string{}
-		for error in codegen_result.errors {
-			errors << error.message
-		}
-		return comp.new_compiler_result(false, '', errors, [])
-	}
-
-	return comp.new_compiler_result(true, codegen_result.code, [], [])
+	println('Compiled ${file_path} successfully')
+	return module_stmt
 }
 
-// compile_string compiles LX source code from a string
-pub fn (mut comp Compiler) compile_string(source string, module_name string) CompilerResult {
-	// Create lexer
-	comp.lexer_instance = &lexer.Lexer{}
-	unsafe {
-		*comp.lexer_instance = lexer.new_lexer(source, 'string')
-	}
-
-	// Tokenize the source
+// compile_string compiles a string of source code
+pub fn (mut comp Compiler) compile_string(source string) !ast.ModuleStmt {
+	// Create lexer and tokenize
+	comp.lexer_instance = lexer.new_lexer(source, 'string')
 	mut tokens := []lexer.Token{}
 	for {
 		token := comp.lexer_instance.next_token()
@@ -125,7 +93,7 @@ pub fn (mut comp Compiler) compile_string(source string, module_name string) Com
 			break
 		}
 		if token is lexer.ErrorToken {
-			return comp.new_compiler_result(false, '', [token.message], [])
+			return error('Lexical error: ${token.message}')
 		}
 		tokens << token
 	}
@@ -135,46 +103,25 @@ pub fn (mut comp Compiler) compile_string(source string, module_name string) Com
 		for error in comp.lexer_instance.get_errors() {
 			errors << error.message
 		}
-		return comp.new_compiler_result(false, '', errors, [])
+		return error('Lexical errors: ${errors.join('\n')}')
 	}
 
-	// Create parser
-	comp.parser_instance = parser.new_parser(tokens)
+	// Create parser and parse the tokens into AST
+	comp.parser_instance = parser.new_main_parser(tokens)
+	module_stmt := comp.parser_instance.parse_module() or {
+		return error('Parsing failed: ${err}')
+	}
 
-	println('parser: ${comp.parser_instance}')
-	// Parse the tokens into AST
-	statements := comp.parser_instance.parse()
 	if comp.parser_instance.has_errors() {
 		mut errors := []string{}
 		for error in comp.parser_instance.get_errors() {
 			errors << error.message
 		}
-		return comp.new_compiler_result(false, '', errors, [])
+		return error('Parser errors: ${errors.join('\n')}')
 	}
 
-	// Create a simple module structure for now
-	module_stmt := ast.ModuleStmt{
-		name:       module_name
-		exports:    []
-		imports:    []
-		statements: statements
-		position:   ast.new_position(1, 1, 'string')
-	}
-
-	// Create type context (for now, empty)
-	type_ctx := typechecker.new_context()
-
-	// Generate Erlang code
-	codegen_result := comp.generator.generate_module(module_stmt, type_ctx)
-	if !codegen_result.success {
-		mut errors := []string{}
-		for error in codegen_result.errors {
-			errors << error.message
-		}
-		return comp.new_compiler_result(false, '', errors, [])
-	}
-
-	return comp.new_compiler_result(true, codegen_result.code, [], [])
+	println('Compiled string successfully')
+	return module_stmt
 }
 
 // new_compiler_result creates a new compiler result

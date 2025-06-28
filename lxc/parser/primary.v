@@ -102,7 +102,7 @@ pub fn (mut p Parser) parse_primary() ast.Expr {
 		}
 	}
 	if p.match(lexer.PunctuationToken.lparen) {
-		expr := p.parse_expression()
+		expr := p.parse_primary()
 		p.consume(lexer.PunctuationToken.rparen, 'Expect ")" after expression') or { return expr }
 		return expr
 	}
@@ -119,4 +119,23 @@ pub fn (mut p Parser) parse_primary() ast.Expr {
 	return ast.LiteralExpr{
 		value: ast.Literal(ast.NilLiteral{})
 	}
+}
+
+// parse_parenthesized parses parenthesized expressions
+pub fn (mut p Parser) parse_parenthesized() ast.Expr {
+	if p.match(lexer.PunctuationToken.lparen) {
+		mut expr_parser := new_expression_parser(p.tokens[p.position..])
+		expr_parser.position = 0
+		expr_parser.current = p.current
+		expr := expr_parser.parse_primary()
+		p.position += expr_parser.position
+		if p.position < p.tokens.len {
+			p.current = p.tokens[p.position]
+		} else {
+			p.current = lexer.EOFToken{}
+		}
+		p.consume(lexer.PunctuationToken.rparen, 'Expect ")" after expression') or { return expr }
+		return expr
+	}
+	return ast.LiteralExpr{ value: ast.NilLiteral{} }
 }

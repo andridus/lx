@@ -125,6 +125,58 @@ pub:
 	position  Position
 }
 
+// UnaryExpr represents a unary operation
+pub struct UnaryExpr {
+pub:
+	op       UnaryOp
+	operand  Expr
+	position Position
+}
+
+// MapAccessExpr represents map access expression
+pub struct MapAccessExpr {
+pub:
+	map_expr Expr
+	key      Expr
+	position Position
+}
+
+// IfExpr represents an if expression
+pub struct IfExpr {
+pub:
+	condition Expr
+	then_body []Stmt
+	else_body []Stmt
+	position  Position
+}
+
+// CaseExpr represents a case expression
+pub struct CaseExpr {
+pub:
+	value Expr
+	cases []MatchCase
+	position Position
+}
+
+// WithExpr represents a with expression
+pub struct WithExpr {
+pub:
+	bindings []WithBinding
+	body     []Stmt
+	else_body []Stmt
+	position  Position
+}
+
+// ForExpr represents a for expression (list comprehension)
+pub struct ForExpr {
+pub:
+	pattern Pattern
+	collection Expr
+	guard     Expr
+	body      []Stmt
+	position  Position
+}
+
 // Expr represents expressions in LX using sum types
 pub type Expr = VariableExpr
 	| LiteralExpr
@@ -143,6 +195,12 @@ pub type Expr = VariableExpr
 	| SendExpr
 	| ReceiveExpr
 	| GuardExpr
+	| UnaryExpr
+	| MapAccessExpr
+	| IfExpr
+	| CaseExpr
+	| WithExpr
+	| ForExpr
 
 // BinaryOp represents binary operators
 pub enum BinaryOp {
@@ -183,6 +241,20 @@ pub fn (op BinaryOp) str() string {
 		.or { '||' }
 		.cons { '::' }
 		.append { '++' }
+	}
+}
+
+// UnaryOp represents unary operators
+pub enum UnaryOp {
+	not
+	minus
+}
+
+// str returns a string representation of UnaryOp
+pub fn (op UnaryOp) str() string {
+	return match op {
+		.not { 'not' }
+		.minus { '-' }
 	}
 }
 
@@ -288,7 +360,7 @@ pub:
 
 // ModuleStmt represents a module statement
 pub struct ModuleStmt {
-pub:
+pub mut:
 	name       string
 	exports    []string
 	imports    []Import
@@ -343,6 +415,12 @@ pub fn (e Expr) str() string {
 		SendExpr { 'Send(${e.pid.str()}, ${e.message.str()})' }
 		ReceiveExpr { 'Receive([${e.cases.map(it.str()).join(', ')}], ${e.timeout.str()})' }
 		GuardExpr { 'Guard(${e.condition.str()})' }
+		UnaryExpr { 'Unary(${e.op.str()}, ${e.operand.str()})' }
+		MapAccessExpr { 'Access(${e.map_expr.str()}[${e.key.str()}])' }
+		IfExpr { 'If(${e.condition.str()}, [${e.then_body.map(it.str()).join(', ')}], [${e.else_body.map(it.str()).join(', ')}])' }
+		CaseExpr { 'Case(${e.value.str()}, [${e.cases.map(it.str()).join(', ')}])' }
+		WithExpr { 'With([${e.bindings.map(it.str()).join(', ')}], [${e.body.map(it.str()).join(', ')}], [${e.else_body.map(it.str()).join(', ')}])' }
+		ForExpr { 'For(${e.pattern.str()}, ${e.collection.str()}, ${e.guard.str()}, [${e.body.map(it.str()).join(', ')}])' }
 	}
 }
 
@@ -455,4 +533,12 @@ pub struct FunctionTypeDef {
 pub:
 	parameters  []LXType
 	return_type LXType
+}
+
+// WithBinding represents a binding in a with expression
+pub struct WithBinding {
+pub:
+	pattern Pattern
+	value   Expr
+	position Position
 }

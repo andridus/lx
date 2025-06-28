@@ -1,85 +1,114 @@
 module main
 
 import os
-import flag
-import compiler
+import lexer
+import parser
+import generate.erlang
+import typechecker
 
 fn main() {
-	mut fp := flag.new_flag_parser(os.args)
-	fp.application('lx_compiler')
-	fp.description('LX Language Compiler - Compiles LX code to Erlang')
-	fp.skip_executable()
-
-	help := fp.bool('help', `h`, false, 'Show this help message')
-	version := fp.bool('version', `v`, false, 'Show version information')
-	build := fp.bool('build', `b`, false, 'Build the project')
-	file := fp.string('file', `f`, '', 'Input LX file to compile')
-	output := fp.string('output', `o`, '_build', 'Output directory for generated files')
-	verbose := fp.bool('verbose', `V`, false, 'Enable verbose output')
-
-	additional_args := fp.finalize() or {
-		eprintln('Error: ${err}')
-		println(fp.usage())
+	args := os.args
+	if args.len < 2 {
+		eprintln('Usage: lxc <input_file>')
 		exit(1)
 	}
 
-	if help {
-		println(fp.usage())
-		return
+	input_file := args[1]
+
+	if !os.exists(input_file) {
+		eprintln('Input file not found: ${input_file}')
+		exit(1)
 	}
 
-	if version {
-		println('LX Compiler v0.1.0')
-		println('A functional programming language that compiles to Erlang')
-		return
+	// Check if file has .lx extension
+	if !input_file.ends_with('.lx') {
+		eprintln('Input file must have .lx extension: ${input_file}')
+		exit(1)
 	}
 
-	if build {
-		println('Building LX compiler...')
-		// TODO: Implement build logic for the compiler itself
-		println('Build completed successfully')
-		return
+	// Extract module name from file name (remove .lx extension)
+	module_name := os.file_name(input_file).replace('.lx', '')
+
+	// Read and parse the file
+	content := os.read_file(input_file) or {
+		eprintln('Failed to read file: ${err}')
+		exit(1)
 	}
 
-	// Determine input file
-	mut input_file := file
-	if input_file.len == 0 && additional_args.len > 0 {
-		input_file = additional_args[0]
-	}
+	eprintln('File content length: ${content.len}')
+	eprintln('First 100 chars: ${content[..if content.len > 100 { 100 } else { content.len }]}')
 
-	if input_file.len > 0 {
-		if !os.exists(input_file) {
-			eprintln('Error: File "${input_file}" not found')
+	// Create lexer and tokenize
+	mut lexer_instance := lexer.new_lexer(content, input_file)
+	mut tokens := []lexer.Token{}
+	for {
+		token := lexer_instance.next_token()
+		if token is lexer.EOFToken {
+			break
+		}
+		if token is lexer.ErrorToken {
+			eprintln('Lexical error: ${token.message}')
 			exit(1)
 		}
-
-		if !input_file.ends_with('.lx') {
-			eprintln('Error: Input file must have .lx extension')
-			exit(1)
-		}
-
-		if verbose {
-			println('Compiling ${input_file}...')
-		}
-
-		mut comp := compiler.new_compiler()
-		result := comp.compile_file(input_file)
-		if !result.success {
-			eprintln('Compilation failed:')
-			for err in result.errors {
-				eprintln(err)
-			}
-			exit(1)
-		}
-
-		output_path := result.write_erlang_file(output) or {
-			eprintln('Failed to write .erl file: ${err}')
-			exit(1)
-		}
-		println('Compilation successful! Output: ${output_path}')
-		return
+		tokens << token
 	}
 
-	// Default: show help
-	println(fp.usage())
+	if lexer_instance.has_errors() {
+		mut errors := []string{}
+		for error in lexer_instance.get_errors() {
+			errors << error.message
+		}
+		eprintln('Lexical errors: ${errors.join('\n')}')
+		exit(1)
+	}
+
+	// Create parser and parse the tokens into AST
+	mut parser_instance := parser.new_main_parser(tokens)
+	mut module_stmt := parser_instance.parse_module() or {
+		eprintln('Parsing failed: ${err}')
+		exit(1)
+	}
+
+	if parser_instance.has_errors() {
+		mut errors := []string{}
+		for error in parser_instance.get_errors() {
+			errors << error.message
+		}
+		eprintln('Parser errors: ${errors.join('\n')}')
+		exit(1)
+	}
+
+	// Override the module name with the file name
+	module_stmt.name = module_name
+
+	// Generate Erlang code
+	erlang_gen := erlang.new_erlang_generator()
+	type_ctx := typechecker.new_type_context()
+
+	codegen_result := erlang_gen.generate_module(module_stmt, type_ctx)
+
+	if !codegen_result.success {
+		eprintln('Code generation failed')
+		for error in codegen_result.errors {
+			eprintln('Error: ${error}')
+		}
+		exit(1)
+	}
+
+	// Get the directory of the input file
+	input_dir := os.dir(input_file)
+
+	// Generate output filename in the same directory
+	output_file := '${input_dir}/${module_name}.erl'
+
+	// Write the Erlang code to file
+	os.write_file(output_file, codegen_result.code) or {
+		eprintln('Failed to write output file: ${err}')
+		exit(1)
+	}
+
+	println('Compilation successful!')
+	println('Module: ${module_name}')
+	println('Generated: ${output_file}')
+	println('Statements: ${module_stmt.statements.len}')
 }

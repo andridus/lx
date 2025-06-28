@@ -276,3 +276,8 @@ pub fn (env &TypeEnvironment) str() string {
 
 	return result
 }
+
+// new_type_context creates a new type context for compilation
+pub fn new_type_context() &TypeContext {
+	return new_context()
+}

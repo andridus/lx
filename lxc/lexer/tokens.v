@@ -94,6 +94,9 @@ pub enum KeywordToken {
 	describe
 	test_
 	assert
+	module
+	import
+	in
 }
 
 // OperatorToken represents an operator token
@@ -199,6 +202,9 @@ pub fn (k KeywordToken) str() string {
 		.describe { 'describe' }
 		.test_ { 'test' }
 		.assert { 'assert' }
+		.module { 'module' }
+		.import { 'import' }
+		.in { 'in' }
 	}
 }
 
