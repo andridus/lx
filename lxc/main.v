@@ -2,6 +2,7 @@ module main
 
 import os
 import flag
+import compiler
 
 fn main() {
 	mut fp := flag.new_flag_parser(os.args)
@@ -13,6 +14,8 @@ fn main() {
 	version := fp.bool('version', `v`, false, 'Show version information')
 	build := fp.bool('build', `b`, false, 'Build the project')
 	file := fp.string('file', `f`, '', 'Input LX file to compile')
+	output := fp.string('output', `o`, '_build', 'Output directory for generated files')
+	verbose := fp.bool('verbose', `V`, false, 'Enable verbose output')
 
 	additional_args := fp.finalize() or {
 		eprintln('Error: ${err}')
@@ -27,37 +30,53 @@ fn main() {
 
 	if version {
 		println('LX Compiler v0.1.0')
+		println('A functional programming language that compiles to Erlang')
 		return
 	}
 
 	if build {
 		println('Building LX compiler...')
-		// TODO: Implement build logic
+		// TODO: Implement build logic for the compiler itself
 		println('Build completed successfully')
 		return
 	}
 
-	if file.len > 0 {
-		if !os.exists(file) {
-			eprintln('Error: File "${file}" not found')
-			exit(1)
-		}
-		println('Compiling ${file}...')
-		// TODO: Implement compilation logic
-		println('Compilation completed')
-		return
+	// Determine input file
+	mut input_file := file
+	if input_file.len == 0 && additional_args.len > 0 {
+		input_file = additional_args[0]
 	}
 
-	if additional_args.len > 0 {
-		// Treat first argument as file
-		file_path := additional_args[0]
-		if !os.exists(file_path) {
-			eprintln('Error: File "${file_path}" not found')
+	if input_file.len > 0 {
+		if !os.exists(input_file) {
+			eprintln('Error: File "${input_file}" not found')
 			exit(1)
 		}
-		println('Compiling ${file_path}...')
-		// TODO: Implement compilation logic
-		println('Compilation completed')
+
+		if !input_file.ends_with('.lx') {
+			eprintln('Error: Input file must have .lx extension')
+			exit(1)
+		}
+
+		if verbose {
+			println('Compiling ${input_file}...')
+		}
+
+		mut comp := compiler.new_compiler()
+		result := comp.compile_file(input_file)
+		if !result.success {
+			eprintln('Compilation failed:')
+			for err in result.errors {
+				eprintln(err)
+			}
+			exit(1)
+		}
+
+		output_path := result.write_erlang_file(output) or {
+			eprintln('Failed to write .erl file: ${err}')
+			exit(1)
+		}
+		println('Compilation successful! Output: ${output_path}')
 		return
 	}
 

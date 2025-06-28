@@ -4,6 +4,7 @@ import ast
 import lexer
 import errors
 
+@[heap]
 pub struct Parser {
 pub mut:
 	tokens   []lexer.Token
@@ -12,8 +13,8 @@ pub mut:
 	errors   []errors.CompilationError
 }
 
-pub fn new_parser(tokens []lexer.Token) Parser {
-	return Parser{
+pub fn new_parser(tokens []lexer.Token) &Parser {
+	return &Parser{
 		tokens:   tokens
 		position: 0
 		current:  if tokens.len > 0 { tokens[0] } else { lexer.EOFToken{} }

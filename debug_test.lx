@@ -1,9 +1,0 @@
-defp get_value() do
-  .{:ok, 42}
-end
-
-def test() do
-  42
-end
-
-x = 42 # This is a comment

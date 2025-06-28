@@ -4,6 +4,7 @@ import ast
 import errors
 
 // Lexer represents the lexical analyzer for LX language
+@[heap]
 pub struct Lexer {
 mut:
 	input     []u8

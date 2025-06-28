@@ -1,13 +1,10 @@
 module erlang
 
 import ast
-import typechecker.types
-import generate.context
-import generate
+import typechecker
 
-// ErlangGenerator implements the CodeGenerator interface for Erlang
+// ErlangGenerator generates Erlang code from LX AST
 pub struct ErlangGenerator {
-	generate.BaseCodeGenerator
 }
 
 // new_erlang_generator creates a new Erlang code generator
@@ -15,53 +12,62 @@ pub fn new_erlang_generator() ErlangGenerator {
 	return ErlangGenerator{}
 }
 
+// CodegenResult represents the result of code generation
+pub struct CodegenResult {
+pub:
+	success bool
+	code    string
+	errors  []CodegenError
+}
+
+// CodegenError represents an error during code generation
+pub struct CodegenError {
+pub:
+	message string
+}
+
 // generate_module generates a complete Erlang module
-pub fn (gen ErlangGenerator) generate_module(mod ast.Module, type_ctx &types.Context) generate.CodegenResult {
-	mut ctx := generate.context.new_context(mod.name, mod.path, type_ctx)
+pub fn (gen ErlangGenerator) generate_module(mod ast.ModuleStmt, type_ctx &typechecker.TypeContext) CodegenResult {
+	mut code := ''
 
 	// Generate module header
-	ctx.writeln(gen.get_module_header(mod.name))
+	code += '-module(${mod.name}).\n'
 
 	// Generate exports if there are functions
 	if mod.statements.len > 0 {
 		exports := gen.generate_exports(mod.statements)
 		if exports.len > 0 {
-			ctx.writeln('-export([${exports.join(', ')}]).')
-			ctx.writeln('')
+			code += '-export([${exports.join(', ')}]).\n\n'
 		}
 	}
 
 	// Generate each statement
 	for stmt in mod.statements {
-		generated := gen.generate_statement(stmt, mut ctx)
+		generated := gen.generate_statement(stmt)
 		if generated.len > 0 {
-			ctx.writeln(generated)
-			ctx.writeln('')
+			code += generated + '\n\n'
 		}
 	}
 
-	// Generate module footer
-	footer := gen.get_module_footer()
-	if footer.len > 0 {
-		ctx.writeln(footer)
+	return CodegenResult{
+		success: true
+		code:    code
+		errors:  []
 	}
-
-	success := !ctx.has_errors()
-	file_path := '${mod.name}${gen.get_file_extension()}'
-
-	return generate.codegen.new_result(success, ctx.get_code(), mod.name, file_path)
 }
 
 // generate_exports generates export declarations for functions
-pub fn (gen ErlangGenerator) generate_exports(statements []ast.Statement) []string {
+pub fn (gen ErlangGenerator) generate_exports(statements []ast.Stmt) []string {
 	mut exports := []string{}
 
 	for stmt in statements {
 		match stmt {
-			ast.FunctionDefinition {
-				function_name := stmt.function.name
-				arity := stmt.function.clauses[0].parameters.len
-				exports << '${function_name}/${arity}'
+			ast.FunctionStmt {
+				function_name := stmt.name
+				if stmt.clauses.len > 0 {
+					arity := stmt.clauses[0].parameters.len
+					exports << '${function_name}/${arity}'
+				}
 			}
 			else {}
 		}
@@ -70,50 +76,88 @@ pub fn (gen ErlangGenerator) generate_exports(statements []ast.Statement) []stri
 	return exports
 }
 
-// Override specific methods for Erlang-specific generation
-
-// generate_literal overrides base implementation for Erlang-specific literals
-pub fn (gen ErlangGenerator) generate_literal(literal ast.Literal) string {
-	match literal {
-		ast.IntegerLiteral {
-			return literal.value.str()
+// generate_statement generates code for a single statement
+pub fn (gen ErlangGenerator) generate_statement(stmt ast.Stmt) string {
+	match stmt {
+		ast.ExprStmt {
+			return gen.generate_expression(stmt.expr)
 		}
-		ast.FloatLiteral {
-			return literal.value.str()
+		ast.FunctionStmt {
+			return gen.generate_function(stmt)
 		}
-		ast.StringLiteral {
-			// Escape quotes and special characters for Erlang
-			escaped := literal.value.replace('\\', '\\\\').replace('"', '\\"')
-			return "\"${escaped}\""
+		ast.ModuleStmt {
+			// Module statements are handled at the top level
+			return ''
 		}
-		ast.BooleanLiteral {
-			return if literal.value { 'true' } else { 'false' }
+		ast.RecordDefStmt {
+			return gen.generate_record_definition(stmt)
 		}
-		ast.AtomLiteral {
-			// Erlang atoms don't need quotes unless they contain special characters
-			if literal.value.contains(' ') || literal.value.contains('-') {
-				return "'${literal.value}'"
-			}
-			return literal.value
-		}
-		ast.NilLiteral {
-			return 'nil'
+		ast.TypeDefStmt {
+			return gen.generate_type_definition(stmt)
 		}
 	}
 }
 
-// generate_identifier overrides base implementation for Erlang variable naming
-pub fn (gen ErlangGenerator) generate_identifier(ident ast.Identifier) string {
-	if gen.context == unsafe { nil } {
-		return gen.capitalize_variable(ident.name)
+// generate_expression generates code for a single expression
+pub fn (gen ErlangGenerator) generate_expression(expr ast.Expr) string {
+	match expr {
+		ast.VariableExpr {
+			return gen.generate_variable(expr.name)
+		}
+		ast.LiteralExpr {
+			return gen.generate_literal(expr.value)
+		}
+		ast.AssignExpr {
+			return gen.generate_assignment(expr)
+		}
+		ast.BinaryExpr {
+			return gen.generate_binary_expression(expr)
+		}
+		ast.CallExpr {
+			return gen.generate_function_call(expr)
+		}
+		ast.MatchExpr {
+			return gen.generate_match(expr)
+		}
+		ast.ListConsExpr {
+			return gen.generate_list_cons(expr)
+		}
+		ast.ListEmptyExpr {
+			return '[]'
+		}
+		ast.ListLiteralExpr {
+			return gen.generate_list_literal(expr)
+		}
+		ast.TupleExpr {
+			return gen.generate_tuple(expr)
+		}
+		ast.MapLiteralExpr {
+			return gen.generate_map_literal(expr)
+		}
+		ast.RecordLiteralExpr {
+			return gen.generate_record_literal(expr)
+		}
+		ast.RecordAccessExpr {
+			return gen.generate_record_access(expr)
+		}
+		ast.FunExpr {
+			return gen.generate_fun_expression(expr)
+		}
+		ast.SendExpr {
+			return gen.generate_send(expr)
+		}
+		ast.ReceiveExpr {
+			return gen.generate_receive(expr)
+		}
+		ast.GuardExpr {
+			return gen.generate_guard(expr)
+		}
 	}
+}
 
-	if variable := gen.context.find_variable(ident.name) {
-		return variable.generated_name
-	}
-
-	// Generate Erlang-style variable name
-	return gen.capitalize_variable(ident.name)
+// generate_variable generates code for a variable
+pub fn (gen ErlangGenerator) generate_variable(name string) string {
+	return gen.capitalize_variable(name)
 }
 
 // capitalize_variable capitalizes the first letter for Erlang variables
@@ -135,213 +179,259 @@ pub fn (gen ErlangGenerator) capitalize_variable(name string) string {
 	}
 }
 
-// generate_function_call overrides base implementation for Erlang module calls
-pub fn (gen ErlangGenerator) generate_function_call(call ast.FunctionCall) string {
-	match call.function {
-		ast.Identifier {
-			// Check if it's a module call (e.g., math.pow)
-			if call.function.name.contains('.') {
-				parts := call.function.name.split('.')
-				if parts.len == 2 {
-					mod_name := parts[0]
-					function := parts[1]
-					args := call.arguments.map(gen.generate_expression(it, mut gen.context))
-					return '${mod_name}:${function}(${args.join(', ')})'
-				}
+// generate_literal generates code for literals
+pub fn (gen ErlangGenerator) generate_literal(literal ast.Literal) string {
+	match literal {
+		ast.StringLiteral {
+			// Escape quotes and special characters for Erlang
+			escaped := literal.value.replace('\\', '\\\\').replace('"', '\\"')
+			return "\"${escaped}\""
+		}
+		ast.IntegerLiteral {
+			return literal.value.str()
+		}
+		ast.FloatLiteral {
+			return literal.value.str()
+		}
+		ast.BooleanLiteral {
+			return if literal.value { 'true' } else { 'false' }
+		}
+		ast.AtomLiteral {
+			// Erlang atoms don't need quotes unless they contain special characters
+			if literal.value.contains(' ') || literal.value.contains('-') {
+				return "'${literal.value}'"
 			}
+			return literal.value
 		}
-		else {}
-	}
-
-	// Fall back to base implementation
-	return gen.BaseCodeGenerator.generate_function_call(call)
-}
-
-// generate_if overrides base implementation for Erlang if syntax
-pub fn (gen ErlangGenerator) generate_if(if_expr ast.IfExpression) string {
-	condition := gen.generate_expression(if_expr.condition, mut gen.context)
-	then_body := gen.generate_expression(if_expr.then_body, mut gen.context)
-	else_body := gen.generate_expression(if_expr.else_body, mut gen.context)
-
-	// Erlang uses case for if expressions
-	return 'case ${condition} of\ntrue ->\n${then_body};\nfalse ->\n${else_body}\nend'
-}
-
-// generate_with overrides base implementation for Erlang with syntax
-pub fn (gen ErlangGenerator) generate_with(with_expr ast.WithExpression) string {
-	mut result := 'case '
-
-	for i, step in with_expr.steps {
-		if i > 0 {
-			result += ',\n'
+		ast.NilLiteral {
+			return 'nil'
 		}
-		pattern := gen.generate_pattern(step.pattern, mut gen.context)
-		expression := gen.generate_expression(step.expression, mut gen.context)
-		result += '${expression} of\n${pattern} ->'
 	}
-
-	result += '\n'
-	gen.context.indent()
-	result += gen.generate_expression(with_expr.body, mut gen.context)
-	gen.context.dedent()
-	result += '\nend'
-
-	return result
 }
 
-// generate_for overrides base implementation for Erlang list comprehensions
-pub fn (gen ErlangGenerator) generate_for(for_expr ast.ForExpression) string {
-	pattern := gen.generate_pattern(for_expr.pattern, mut gen.context)
-	collection := gen.generate_expression(for_expr.collection, mut gen.context)
-	guard := if for_expr.guard != ast.Expression(ast.EmptyExpression{}) {
-		', ' + gen.generate_expression(for_expr.guard, mut gen.context)
-	} else {
-		''
-	}
-	body := gen.generate_expression(for_expr.body, mut gen.context)
-
-	return '[${body} || ${pattern} <- ${collection}${guard}]'
+// generate_assignment generates code for assignments
+pub fn (gen ErlangGenerator) generate_assignment(assign ast.AssignExpr) string {
+	value := gen.generate_expression(assign.value)
+	return '${gen.capitalize_variable(assign.name)} = ${value}'
 }
 
-// generate_map overrides base implementation for Erlang map syntax
-pub fn (gen ErlangGenerator) generate_map(map_lit ast.MapLiteral) string {
-	mut pairs := []string{}
-
-	for pair in map_lit.pairs {
-		key := gen.generate_expression(pair.key, mut gen.context)
-		value := gen.generate_expression(pair.value, mut gen.context)
-
-		// Erlang maps use => for all keys
-		pairs << '${key} => ${value}'
-	}
-
-	return '#{${pairs.join(', ')}}'
+// generate_binary_expression generates code for binary expressions
+pub fn (gen ErlangGenerator) generate_binary_expression(expr ast.BinaryExpr) string {
+	left := gen.generate_expression(expr.left)
+	right := gen.generate_expression(expr.right)
+	op := gen.translate_operator(expr.op)
+	return '${left} ${op} ${right}'
 }
 
-// generate_record overrides base implementation for Erlang record syntax
-pub fn (gen ErlangGenerator) generate_record(record ast.RecordLiteral) string {
-	record_name := record.name.to_lower()
-	mut fields := []string{}
-
-	for field in record.fields {
-		value := gen.generate_expression(field.value, mut gen.context)
-		fields << '${field.name} = ${value}'
-	}
-
-	return '#${record_name}{${fields.join(', ')}}'
+// translate_operator translates LX operators to Erlang operators
+pub fn (gen ErlangGenerator) translate_operator(op ast.BinaryOp) string {
+	return op.str()
 }
 
-// generate_fun overrides base implementation for Erlang fun syntax
-pub fn (gen ErlangGenerator) generate_fun(fun_expr ast.FunExpression) string {
-	mut clauses := []string{}
+// generate_function_call generates code for function calls
+pub fn (gen ErlangGenerator) generate_function_call(call ast.CallExpr) string {
+	function := gen.generate_expression(call.function)
+	args := call.arguments.map(gen.generate_expression(it))
+	return '${function}(${args.join(', ')})'
+}
 
-	for clause in fun_expr.clauses {
-		params := clause.parameters.map(gen.generate_pattern(it, mut gen.context))
-		guard := if clause.guard != ast.Expression(ast.EmptyExpression{}) {
-			' when ' + gen.generate_expression(clause.guard, mut gen.context)
+// generate_match generates code for pattern matching
+pub fn (gen ErlangGenerator) generate_match(match_expr ast.MatchExpr) string {
+	value := gen.generate_expression(match_expr.value)
+	mut cases := []string{}
+
+	for case_item in match_expr.cases {
+		pattern := gen.generate_pattern(case_item.pattern)
+		guard := if case_item.guard != ast.Expr(ast.GuardExpr{}) {
+			' when ' + gen.generate_expression(case_item.guard)
 		} else {
 			''
 		}
-		body := gen.generate_expression(clause.body, mut gen.context)
-
-		clauses << '(${params.join(', ')})${guard} -> ${body}'
+		body := case_item.body.map(gen.generate_statement(it))
+		cases << '${pattern}${guard} ->\n${body.join(';\n')}'
 	}
 
-	return 'fun ${clauses.join('; ')} end'
+	return 'case ${value} of\n${cases.join(';\n')}\nend'
 }
 
-// generate_worker overrides base implementation for Erlang OTP workers
-pub fn (gen ErlangGenerator) generate_worker(worker ast.Worker) string {
-	mut result := '-module(${worker.name}).\n'
-	result += '-behaviour(gen_server).\n\n'
-
-	// Generate exports
-	result += '-export([start_link/0, init/1, handle_call/3, handle_cast/2, handle_info/2]).\n\n'
-
-	// Generate start_link
-	result += 'start_link() ->\n'
-	result += '    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).\n\n'
-
-	// Generate functions
-	for function in worker.functions {
-		result += gen.generate_function(function, mut gen.context)
-		result += '\n'
+// generate_pattern generates code for patterns
+pub fn (gen ErlangGenerator) generate_pattern(pattern ast.Pattern) string {
+	match pattern {
+		ast.WildcardPattern {
+			return '_'
+		}
+		ast.VarPattern {
+			return gen.capitalize_variable(pattern.name)
+		}
+		ast.LiteralPattern {
+			return gen.generate_literal(pattern.value)
+		}
+		ast.AtomPattern {
+			return pattern.value
+		}
+		ast.ListConsPattern {
+			head := gen.generate_pattern(pattern.head)
+			tail := gen.generate_pattern(pattern.tail)
+			return '[${head} | ${tail}]'
+		}
+		ast.ListEmptyPattern {
+			return '[]'
+		}
+		ast.ListLiteralPattern {
+			elements := pattern.elements.map(gen.generate_pattern(it))
+			return '[${elements.join(', ')}]'
+		}
+		ast.TuplePattern {
+			elements := pattern.elements.map(gen.generate_pattern(it))
+			return '{${elements.join(', ')}}'
+		}
+		ast.MapPattern {
+			mut entries := []string{}
+			for entry in pattern.entries {
+				key := gen.generate_pattern(entry.key)
+				value := gen.generate_pattern(entry.value)
+				entries << '${key} => ${value}'
+			}
+			return '#{${entries.join(', ')}}'
+		}
+		ast.RecordPattern {
+			mut fields := []string{}
+			for field in pattern.fields {
+				value := gen.generate_pattern(field.pattern)
+				fields << '${field.name}: ${value}'
+			}
+			return '#${pattern.name}{${fields.join(', ')}}'
+		}
+		ast.BinaryPattern {
+			mut segments := []string{}
+			for segment in pattern.segments {
+				segments << '${segment.size}:${segment.unit}'
+			}
+			return '<<${segments.join(', ')}>>'
+		}
 	}
-
-	return result
 }
 
-// generate_supervisor overrides base implementation for Erlang OTP supervisors
-pub fn (gen ErlangGenerator) generate_supervisor(supervisor ast.Supervisor) string {
-	mut result := '-module(${supervisor.name}).\n'
-	result += '-behaviour(supervisor).\n\n'
-
-	result += '-export([start_link/0, init/1]).\n\n'
-
-	// Generate start_link
-	result += 'start_link() ->\n'
-	result += '    supervisor:start_link({local, ?MODULE}, ?MODULE, []).\n\n'
-
-	// Generate init
-	result += 'init([]) ->\n'
-	result += '    Strategy = ${gen.translate_strategy(supervisor.strategy)},\n'
-	result += '    Children = [${gen.generate_children(supervisor.children)}],\n'
-	result += '    {ok, {Strategy, Children}}.\n'
-
-	return result
+// generate_list_cons generates code for list cons
+pub fn (gen ErlangGenerator) generate_list_cons(expr ast.ListConsExpr) string {
+	head := gen.generate_expression(expr.head)
+	tail := gen.generate_expression(expr.tail)
+	return '[${head} | ${tail}]'
 }
 
-// generate_record_definition overrides base implementation for Erlang records
-pub fn (gen ErlangGenerator) generate_record_definition(record_def ast.RecordDefinition) string {
-	record_name := record_def.name.to_lower()
+// generate_list_literal generates code for list literals
+pub fn (gen ErlangGenerator) generate_list_literal(expr ast.ListLiteralExpr) string {
+	elements := expr.elements.map(gen.generate_expression(it))
+	return '[${elements.join(', ')}]'
+}
+
+// generate_tuple generates code for tuples
+pub fn (gen ErlangGenerator) generate_tuple(expr ast.TupleExpr) string {
+	elements := expr.elements.map(gen.generate_expression(it))
+	return '{${elements.join(', ')}}'
+}
+
+// generate_map_literal generates code for map literals
+pub fn (gen ErlangGenerator) generate_map_literal(expr ast.MapLiteralExpr) string {
+	mut entries := []string{}
+	for entry in expr.entries {
+		key := gen.generate_expression(entry.key)
+		value := gen.generate_expression(entry.value)
+		entries << '${key} => ${value}'
+	}
+	return '#{${entries.join(', ')}}'
+}
+
+// generate_record_literal generates code for record literals
+pub fn (gen ErlangGenerator) generate_record_literal(expr ast.RecordLiteralExpr) string {
 	mut fields := []string{}
+	for field in expr.fields {
+		value := gen.generate_expression(field.value)
+		fields << '${field.name}: ${value}'
+	}
+	return '#${expr.name}{${fields.join(', ')}}'
+}
 
+// generate_record_access generates code for record access
+pub fn (gen ErlangGenerator) generate_record_access(expr ast.RecordAccessExpr) string {
+	record := gen.generate_expression(expr.record)
+	return '${record}#${expr.field}'
+}
+
+// generate_fun_expression generates code for fun expressions
+pub fn (gen ErlangGenerator) generate_fun_expression(expr ast.FunExpr) string {
+	mut clauses := []string{}
+	for clause in expr.parameters {
+		pattern := gen.generate_pattern(clause)
+		clauses << pattern
+	}
+	body := expr.body.map(gen.generate_statement(it))
+	return 'fun(${clauses.join(', ')}) ->\n${body.join(';\n')}\nend'
+}
+
+// generate_send generates code for message sending
+pub fn (gen ErlangGenerator) generate_send(expr ast.SendExpr) string {
+	pid := gen.generate_expression(expr.pid)
+	message := gen.generate_expression(expr.message)
+	return '${pid} ! ${message}'
+}
+
+// generate_receive generates code for receive expressions
+pub fn (gen ErlangGenerator) generate_receive(expr ast.ReceiveExpr) string {
+	mut cases := []string{}
+	for case_item in expr.cases {
+		pattern := gen.generate_pattern(case_item.pattern)
+		guard := if case_item.guard != ast.Expr(ast.GuardExpr{}) {
+			' when ' + gen.generate_expression(case_item.guard)
+		} else {
+			''
+		}
+		body := case_item.body.map(gen.generate_statement(it))
+		cases << '${pattern}${guard} ->\n${body.join(';\n')}'
+	}
+
+	timeout := if expr.timeout != ast.Expr(ast.GuardExpr{}) {
+		' after ${gen.generate_expression(expr.timeout)} ->\ntimeout'
+	} else {
+		''
+	}
+
+	return 'receive\n${cases.join(';\n')}${timeout}\nend'
+}
+
+// generate_guard generates code for guard expressions
+pub fn (gen ErlangGenerator) generate_guard(expr ast.GuardExpr) string {
+	return gen.generate_expression(expr.condition)
+}
+
+// generate_function generates code for function definitions
+pub fn (gen ErlangGenerator) generate_function(func ast.FunctionStmt) string {
+	mut clauses := []string{}
+
+	for clause in func.clauses {
+		parameters := clause.parameters.map(gen.generate_pattern(it))
+		guard := if clause.guard != ast.Expr(ast.GuardExpr{}) {
+			' when ' + gen.generate_expression(clause.guard)
+		} else {
+			''
+		}
+		body := clause.body.map(gen.generate_statement(it))
+		clauses << '${func.name}(${parameters.join(', ')})${guard} ->\n${body.join(';\n')}'
+	}
+
+	return clauses.join(';\n') + '.'
+}
+
+// generate_record_definition generates code for record definitions
+pub fn (gen ErlangGenerator) generate_record_definition(record_def ast.RecordDefStmt) string {
+	mut fields := []string{}
 	for field in record_def.fields {
 		fields << '${field.name}'
 	}
-
-	return '-record(${record_name}, {${fields.join(', ')}}).'
+	return '-record(${record_def.name}, {${fields.join(', ')}}).'
 }
 
-// generate_application overrides base implementation for Erlang applications
-pub fn (gen ErlangGenerator) generate_application(app_def ast.ApplicationDefinition) string {
-	mut result := '%% Application: ${app_def.name}\n'
-	result += '%% Version: ${app_def.version}\n'
-	result += '%% Description: ${app_def.description}\n'
-
-	if app_def.modules.len > 0 {
-		result += '%% Modules: ${app_def.modules.join(', ')}\n'
-	}
-
-	return result
-}
-
-// generate_test overrides base implementation for Erlang tests
-pub fn (gen ErlangGenerator) generate_test(test_def ast.TestDefinition) string {
-	return '%% Test: ${test_def.name}'
-}
-
-// generate_specification overrides base implementation for Erlang specs
-pub fn (gen ErlangGenerator) generate_specification(spec_def ast.SpecificationDefinition) string {
-	return '%% Specification: ${spec_def.name}'
-}
-
-// generate_dependency overrides base implementation for Erlang dependencies
-pub fn (gen ErlangGenerator) generate_dependency(dep_def ast.DependencyDefinition) string {
-	return '%% Dependency: ${dep_def.name}'
-}
-
-// get_file_extension returns the Erlang file extension
-pub fn (gen ErlangGenerator) get_file_extension() string {
-	return '.erl'
-}
-
-// get_module_header generates the Erlang module header
-pub fn (gen ErlangGenerator) get_module_header(module_name string) string {
-	return '-module(${module_name}).'
-}
-
-// get_module_footer generates the Erlang module footer
-pub fn (gen ErlangGenerator) get_module_footer() string {
-	return ''
+// generate_type_definition generates code for type definitions
+pub fn (gen ErlangGenerator) generate_type_definition(type_def ast.TypeDefStmt) string {
+	return '%% Type definition: ${type_def.name}'
 }
