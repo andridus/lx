@@ -7,16 +7,16 @@ import lexer
 @[heap]
 pub struct ModuleParser {
 	Parser
-	mut:
+mut:
 	statement_parser StatementParser
-	pub:
+pub:
 	module_name string
 }
 
 pub fn new_module_parser(tokens []lexer.Token, module_name string) &ModuleParser {
 	return &ModuleParser{
-		Parser: new_parser(tokens)
-		module_name: module_name
+		Parser:           new_parser(tokens)
+		module_name:      module_name
 		statement_parser: new_statement_parser(tokens)
 	}
 }

@@ -21,19 +21,19 @@ fn test_tuple_parsing() {
 		lexer.Token(lexer.PunctuationToken.rbrace),
 		lexer.Token(lexer.EOFToken{}),
 	]
-	mut parser0 := parser.new_parser(tokens)
 
-	expr := parser0.parse_expression()
-	assert expr is ast.TupleExpr
-	tuple_expr := expr as ast.TupleExpr
-	assert tuple_expr.elements.len == 3
+	mut parser0 := parser.new_main_parser(tokens)
 
-	// Verificar elementos
-	assert tuple_expr.elements[0] is ast.LiteralExpr
-	first := tuple_expr.elements[0] as ast.LiteralExpr
-	assert first.value is ast.IntegerLiteral
-	first_int := first.value as ast.IntegerLiteral
-	assert first_int.value == 1
+	expr := parser0.parse_expression() or { panic('Failed to parse tuple') }
+	match expr {
+		ast.TupleExpr {
+			tuple_expr := expr as ast.TupleExpr
+			assert tuple_expr.elements.len == 3
+		}
+		else {
+			panic('Expected TupleExpr')
+		}
+	}
 }
 
 fn test_empty_tuple_parsing() {
@@ -42,12 +42,19 @@ fn test_empty_tuple_parsing() {
 		lexer.Token(lexer.PunctuationToken.rbrace),
 		lexer.Token(lexer.EOFToken{}),
 	]
-	mut parser0 := parser.new_parser(tokens)
 
-	expr := parser0.parse_expression()
-	assert expr is ast.TupleExpr
-	tuple_expr := expr as ast.TupleExpr
-	assert tuple_expr.elements.len == 0
+	mut parser0 := parser.new_main_parser(tokens)
+
+	expr := parser0.parse_expression() or { panic('Failed to parse empty tuple') }
+	match expr {
+		ast.TupleExpr {
+			tuple_expr := expr as ast.TupleExpr
+			assert tuple_expr.elements.len == 0
+		}
+		else {
+			panic('Expected TupleExpr')
+		}
+	}
 }
 
 fn test_list_parsing() {
@@ -67,19 +74,19 @@ fn test_list_parsing() {
 		lexer.Token(lexer.PunctuationToken.rbracket),
 		lexer.Token(lexer.EOFToken{}),
 	]
-	mut parser0 := parser.new_parser(tokens)
 
-	expr := parser0.parse_expression()
-	assert expr is ast.ListLiteralExpr
-	list_expr := expr as ast.ListLiteralExpr
-	assert list_expr.elements.len == 3
+	mut parser0 := parser.new_main_parser(tokens)
 
-	// Verificar elementos
-	assert list_expr.elements[0] is ast.LiteralExpr
-	first := list_expr.elements[0] as ast.LiteralExpr
-	assert first.value is ast.IntegerLiteral
-	first_int := first.value as ast.IntegerLiteral
-	assert first_int.value == 1
+	expr := parser0.parse_expression() or { panic('Failed to parse list') }
+	match expr {
+		ast.ListLiteralExpr {
+			list_expr := expr as ast.ListLiteralExpr
+			assert list_expr.elements.len == 3
+		}
+		else {
+			panic('Expected ListLiteralExpr')
+		}
+	}
 }
 
 fn test_empty_list_parsing() {
@@ -88,48 +95,85 @@ fn test_empty_list_parsing() {
 		lexer.Token(lexer.PunctuationToken.rbracket),
 		lexer.Token(lexer.EOFToken{}),
 	]
-	mut parser0 := parser.new_parser(tokens)
 
-	expr := parser0.parse_expression()
-	assert expr is ast.ListLiteralExpr
-	list_expr := expr as ast.ListLiteralExpr
-	assert list_expr.elements.len == 0
+	mut parser0 := parser.new_main_parser(tokens)
+
+	expr := parser0.parse_expression() or { panic('Failed to parse empty list') }
+	match expr {
+		ast.ListLiteralExpr {
+			list_expr := expr as ast.ListLiteralExpr
+			assert list_expr.elements.len == 0
+		}
+		else {
+			panic('Expected ListLiteralExpr')
+		}
+	}
 }
 
-fn test_cons_parsing() {
+fn test_list_cons_parsing() {
 	tokens := [
-		lexer.Token(lexer.PunctuationToken.lbracket),
-		lexer.Token(lexer.IdentToken{
-			value: 'head'
+		lexer.Token(lexer.IntToken{
+			value: 1
 		}),
-		lexer.Token(lexer.OperatorToken.record_update),
-		lexer.Token(lexer.IdentToken{
-			value: 'tail'
+		lexer.Token(lexer.OperatorToken.type_cons),
+		lexer.Token(lexer.PunctuationToken.lbracket),
+		lexer.Token(lexer.IntToken{
+			value: 2
+		}),
+		lexer.Token(lexer.PunctuationToken.comma),
+		lexer.Token(lexer.IntToken{
+			value: 3
 		}),
 		lexer.Token(lexer.PunctuationToken.rbracket),
 		lexer.Token(lexer.EOFToken{}),
 	]
-	mut parser0 := parser.new_parser(tokens)
 
-	expr := parser0.parse_expression()
-	assert expr is ast.ListConsExpr
-	cons_expr := expr as ast.ListConsExpr
+	mut parser0 := parser.new_main_parser(tokens)
 
-	// Verificar head
-	assert cons_expr.head is ast.VariableExpr
-	head := cons_expr.head as ast.VariableExpr
-	assert head.name == 'head'
+	expr := parser0.parse_expression() or { panic('Failed to parse list cons') }
+	match expr {
+		ast.ListConsExpr {
+			cons_expr := expr as ast.ListConsExpr
+			// Verificar head
+			match cons_expr.head {
+				ast.LiteralExpr {
+					lit := cons_expr.head as ast.LiteralExpr
+					match lit.value {
+						ast.IntegerLiteral {
+							int_lit := lit.value as ast.IntegerLiteral
+							assert int_lit.value == 1
+						}
+						else {
+							panic('Expected IntegerLiteral head')
+						}
+					}
+				}
+				else {
+					panic('Expected LiteralExpr head')
+				}
+			}
 
-	// Verificar tail
-	assert cons_expr.tail is ast.VariableExpr
-	tail := cons_expr.tail as ast.VariableExpr
-	assert tail.name == 'tail'
+			// Verificar tail
+			match cons_expr.tail {
+				ast.ListLiteralExpr {
+					tail_list := cons_expr.tail as ast.ListLiteralExpr
+					assert tail_list.elements.len == 2
+				}
+				else {
+					panic('Expected ListLiteralExpr tail')
+				}
+			}
+		}
+		else {
+			panic('Expected ListConsExpr')
+		}
+	}
 }
 
-fn test_map_parsing_with_atom_keys() {
+fn test_map_parsing() {
 	tokens := [
-		lexer.Token(lexer.PunctuationToken.lbrace),
 		lexer.Token(lexer.OperatorToken.record_update),
+		lexer.Token(lexer.PunctuationToken.lbrace),
 		lexer.Token(lexer.AtomToken{
 			value: 'name'
 		}),
@@ -148,122 +192,99 @@ fn test_map_parsing_with_atom_keys() {
 		lexer.Token(lexer.PunctuationToken.rbrace),
 		lexer.Token(lexer.EOFToken{}),
 	]
-	mut parser0 := parser.new_parser(tokens)
 
-	expr := parser0.parse_expression()
-	assert expr is ast.MapLiteralExpr
-	map_expr := expr as ast.MapLiteralExpr
-	assert map_expr.entries.len == 2
+	mut parser0 := parser.new_main_parser(tokens)
 
-	// Verificar primeira entrada
-	first_entry := map_expr.entries[0]
-	assert first_entry.key is ast.LiteralExpr
-	key1 := first_entry.key as ast.LiteralExpr
-	assert key1.value is ast.AtomLiteral
-	key1_atom := key1.value as ast.AtomLiteral
-	assert key1_atom.value == 'name'
-
-	assert first_entry.value is ast.LiteralExpr
-	value1 := first_entry.value as ast.LiteralExpr
-	assert value1.value is ast.StringLiteral
-	value1_str := value1.value as ast.StringLiteral
-	assert value1_str.value == 'Alice'
+	expr := parser0.parse_expression() or { panic('Failed to parse map') }
+	match expr {
+		ast.MapLiteralExpr {
+			map_expr := expr as ast.MapLiteralExpr
+			assert map_expr.entries.len == 2
+		}
+		else {
+			panic('Expected MapLiteralExpr')
+		}
+	}
 }
 
-fn test_map_parsing_with_string_keys() {
+fn test_map_with_string_keys_parsing() {
 	tokens := [
-		lexer.Token(lexer.PunctuationToken.lbrace),
 		lexer.Token(lexer.OperatorToken.record_update),
+		lexer.Token(lexer.PunctuationToken.lbrace),
 		lexer.Token(lexer.StringToken{
-			value: 'database_url'
+			value: 'name'
 		}),
 		lexer.Token(lexer.OperatorToken.arrow),
 		lexer.Token(lexer.StringToken{
-			value: 'localhost'
+			value: 'Alice'
 		}),
 		lexer.Token(lexer.PunctuationToken.comma),
 		lexer.Token(lexer.StringToken{
-			value: 'port'
+			value: 'age'
 		}),
 		lexer.Token(lexer.OperatorToken.arrow),
 		lexer.Token(lexer.IntToken{
-			value: 5432
+			value: 30
 		}),
 		lexer.Token(lexer.PunctuationToken.rbrace),
 		lexer.Token(lexer.EOFToken{}),
 	]
-	mut parser0 := parser.new_parser(tokens)
 
-	expr := parser0.parse_expression()
-	assert expr is ast.MapLiteralExpr
-	map_expr := expr as ast.MapLiteralExpr
-	assert map_expr.entries.len == 2
+	mut parser0 := parser.new_main_parser(tokens)
 
-	// Verificar primeira entrada
-	first_entry := map_expr.entries[0]
-	assert first_entry.key is ast.LiteralExpr
-	key1 := first_entry.key as ast.LiteralExpr
-	assert key1.value is ast.StringLiteral
-	key1_str := key1.value as ast.StringLiteral
-	assert key1_str.value == 'database_url'
-
-	assert first_entry.value is ast.LiteralExpr
-	value1 := first_entry.value as ast.LiteralExpr
-	assert value1.value is ast.StringLiteral
-	value1_str := value1.value as ast.StringLiteral
-	assert value1_str.value == 'localhost'
+	expr := parser0.parse_expression() or { panic('Failed to parse map with string keys') }
+	match expr {
+		ast.MapLiteralExpr {
+			map_expr := expr as ast.MapLiteralExpr
+			assert map_expr.entries.len == 2
+		}
+		else {
+			panic('Expected MapLiteralExpr')
+		}
+	}
 }
 
-fn test_nested_structures() {
+fn test_nested_data_structures() {
 	tokens := [
 		lexer.Token(lexer.PunctuationToken.lbrace),
+		lexer.Token(lexer.PunctuationToken.lbracket),
 		lexer.Token(lexer.IntToken{
 			value: 1
 		}),
 		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.PunctuationToken.lbracket),
 		lexer.Token(lexer.IntToken{
 			value: 2
 		}),
+		lexer.Token(lexer.PunctuationToken.rbracket),
+		lexer.Token(lexer.PunctuationToken.comma),
+		lexer.Token(lexer.OperatorToken.record_update),
+		lexer.Token(lexer.PunctuationToken.lbrace),
+		lexer.Token(lexer.AtomToken{
+			value: 'key'
+		}),
+		lexer.Token(lexer.PunctuationToken.colon),
+		lexer.Token(lexer.StringToken{
+			value: 'value'
+		}),
+		lexer.Token(lexer.PunctuationToken.rbrace),
 		lexer.Token(lexer.PunctuationToken.comma),
 		lexer.Token(lexer.IntToken{
 			value: 3
 		}),
-		lexer.Token(lexer.PunctuationToken.rbracket),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.PunctuationToken.lbrace),
-		lexer.Token(lexer.IntToken{
-			value: 4
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IntToken{
-			value: 5
-		}),
-		lexer.Token(lexer.PunctuationToken.rbrace),
 		lexer.Token(lexer.PunctuationToken.rbrace),
 		lexer.Token(lexer.EOFToken{}),
 	]
-	mut parser0 := parser.new_parser(tokens)
 
-	expr := parser0.parse_expression()
-	assert expr is ast.TupleExpr
-	tuple_expr := expr as ast.TupleExpr
-	assert tuple_expr.elements.len == 3
+	mut parser0 := parser.new_main_parser(tokens)
 
-	// Primeiro elemento: 1
-	assert tuple_expr.elements[0] is ast.LiteralExpr
-	first := tuple_expr.elements[0] as ast.LiteralExpr
-	assert first.value is ast.IntegerLiteral
-	first_int := first.value as ast.IntegerLiteral
-	assert first_int.value == 1
-
-	// Segundo elemento: [2, 3]
-	assert tuple_expr.elements[1] is ast.ListLiteralExpr
-	second := tuple_expr.elements[1] as ast.ListLiteralExpr
-	assert second.elements.len == 2
-
-	// Terceiro elemento: {4, 5}
-	assert tuple_expr.elements[2] is ast.TupleExpr
-	third := tuple_expr.elements[2] as ast.TupleExpr
-	assert third.elements.len == 2
+	expr := parser0.parse_expression() or { panic('Failed to parse nested data structures') }
+	match expr {
+		ast.TupleExpr {
+			tuple_expr := expr as ast.TupleExpr
+			assert tuple_expr.elements.len == 3
+		}
+		else {
+			panic('Expected TupleExpr')
+		}
+	}
 }

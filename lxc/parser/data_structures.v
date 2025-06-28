@@ -159,12 +159,12 @@ pub fn (mut p Parser) parse_map() ast.Expr {
 	}
 	p.consume(lexer.PunctuationToken.rbrace, 'Expected "}" after map entries') or {
 		return ast.MapLiteralExpr{
-			entries: entries
+			entries:  entries
 			position: ast.Position{}
 		}
 	}
 	return ast.MapLiteralExpr{
-		entries: entries
+		entries:  entries
 		position: ast.Position{}
 	}
 }

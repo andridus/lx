@@ -8,19 +8,19 @@ import os
 // CompilerResult represents the result of compilation
 pub struct CompilerResult {
 pub:
-	success      bool
-	erlang_code  string
-	module_name  string
-	file_path    string
-	errors       []string
-	warnings     []string
+	success     bool
+	erlang_code string
+	module_name string
+	file_path   string
+	errors      []string
+	warnings    []string
 }
 
 // Compiler represents the main compiler for LX language
 pub struct Compiler {
 mut:
-	file_path   string
-	module_name string
+	file_path       string
+	module_name     string
 	lexer_instance  lexer.Lexer
 	parser_instance parser.MainParser
 }
@@ -28,8 +28,8 @@ mut:
 // new_compiler creates a new compiler instance
 pub fn new_compiler() Compiler {
 	return Compiler{
-		module_name:     ''
-		file_path:       ''
+		module_name: ''
+		file_path:   ''
 	}
 }
 
@@ -66,9 +66,7 @@ pub fn (mut comp Compiler) compile_file(file_path string) !ast.ModuleStmt {
 
 	// Create parser and parse the tokens into AST
 	comp.parser_instance = parser.new_main_parser(tokens)
-	module_stmt := comp.parser_instance.parse_module() or {
-		return error('Parsing failed: ${err}')
-	}
+	module_stmt := comp.parser_instance.parse_module() or { return error('Parsing failed: ${err}') }
 
 	if comp.parser_instance.has_errors() {
 		mut errors := []string{}
@@ -108,9 +106,7 @@ pub fn (mut comp Compiler) compile_string(source string) !ast.ModuleStmt {
 
 	// Create parser and parse the tokens into AST
 	comp.parser_instance = parser.new_main_parser(tokens)
-	module_stmt := comp.parser_instance.parse_module() or {
-		return error('Parsing failed: ${err}')
-	}
+	module_stmt := comp.parser_instance.parse_module() or { return error('Parsing failed: ${err}') }
 
 	if comp.parser_instance.has_errors() {
 		mut errors := []string{}
@@ -143,9 +139,7 @@ pub fn (result CompilerResult) write_erlang_file(output_dir string) !string {
 	}
 
 	// Create output directory if it doesn't exist
-	os.mkdir_all(output_dir) or {
-		return error('Failed to create output directory: ${err}')
-	}
+	os.mkdir_all(output_dir) or { return error('Failed to create output directory: ${err}') }
 
 	// Generate output filename
 	output_file := '${output_dir}/${result.module_name}.erl'

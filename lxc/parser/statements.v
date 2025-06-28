@@ -33,24 +33,20 @@ fn (mut sp StatementParser) parse_statement() ?ast.Stmt {
 				else { sp.parse_expression_statement() }
 			}
 		}
-		else { sp.parse_expression_statement() }
+		else {
+			sp.parse_expression_statement()
+		}
 	}
 }
 
 // parse_expression_statement parses an expression as a statement
 fn (mut sp StatementParser) parse_expression_statement() ?ast.Stmt {
-	mut expr_parser := new_expression_parser(sp.tokens[sp.position..])
-	expr := expr_parser.parse_expression()?
+	// Parse the expression using the current parser state
+	expr := sp.parse_expression()?
 
-	// Advance the main parser to the position where expression parser ended
-	sp.position += expr_parser.position
-	if sp.position < sp.tokens.len {
-		sp.current = sp.tokens[sp.position]
-	} else {
-		sp.current = lexer.EOFToken{}
+	return ast.ExprStmt{
+		expr: expr
 	}
-
-	return ast.ExprStmt{ expr: expr }
 }
 
 // parse_function_statement parses function definitions
@@ -127,7 +123,11 @@ fn (mut sp StatementParser) parse_function_clause() ?ast.FunctionClause {
 	}
 
 	// Parse guard (optional)
-	mut guard := ast.Expr(ast.LiteralExpr{ value: ast.BooleanLiteral{ value: true } })
+	mut guard := ast.Expr(ast.LiteralExpr{
+		value: ast.BooleanLiteral{
+			value: true
+		}
+	})
 	if sp.match(lexer.KeywordToken.when) {
 		guard = sp.parse_expression()?
 	}
@@ -474,15 +474,11 @@ fn (mut sp StatementParser) parse_statement_block() ?[]ast.Stmt {
 // Helper methods for error handling and position tracking
 fn (mut sp StatementParser) add_error(message string, context string) {
 	pos := sp.get_current_position()
-	comp_error := errors.new_compilation_error(
-		errors.ErrorKind(errors.SyntaxError{
-			message:  message
-			expected: context
-			found:    sp.current.str()
-		}),
-		pos,
-		'${message}: ${context}'
-	)
+	comp_error := errors.new_compilation_error(errors.ErrorKind(errors.SyntaxError{
+		message:  message
+		expected: context
+		found:    sp.current.str()
+	}), pos, '${message}: ${context}')
 	sp.errors << comp_error
 }
 

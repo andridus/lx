@@ -5,7 +5,7 @@ import lexer
 import ast
 
 fn test_arithmetic_operators() {
-	// Teste de adição
+	// Test addition
 	tokens1 := [
 		lexer.Token(lexer.IntToken{
 			value: 1
@@ -16,33 +16,43 @@ fn test_arithmetic_operators() {
 		}),
 		lexer.Token(lexer.EOFToken{}),
 	]
-	mut parser1 := parser.new_parser(tokens1)
-	expr1 := parser1.parse_expression()
-	assert expr1 is ast.BinaryExpr
-	bin_expr1 := expr1 as ast.BinaryExpr
-	assert bin_expr1.op == ast.BinaryOp.add
+	mut parser1 := parser.new_main_parser(tokens1)
+	expr1 := parser1.parse_expression() or { panic('Failed to parse addition') }
+	match expr1 {
+		ast.BinaryExpr {
+			assert expr1.op == ast.BinaryOp.add
+		}
+		else {
+			panic('Expected BinaryExpr')
+		}
+	}
 
-	// Teste de subtração
+	// Test subtraction
 	tokens2 := [
 		lexer.Token(lexer.IntToken{
-			value: 3
+			value: 5
 		}),
 		lexer.Token(lexer.OperatorToken.minus),
 		lexer.Token(lexer.IntToken{
-			value: 4
+			value: 3
 		}),
 		lexer.Token(lexer.EOFToken{}),
 	]
-	mut parser2 := parser.new_parser(tokens2)
-	expr2 := parser2.parse_expression()
-	assert expr2 is ast.BinaryExpr
-	bin_expr2 := expr2 as ast.BinaryExpr
-	assert bin_expr2.op == ast.BinaryOp.subtract
+	mut parser2 := parser.new_main_parser(tokens2)
+	expr2 := parser2.parse_expression() or { panic('Failed to parse subtraction') }
+	match expr2 {
+		ast.BinaryExpr {
+			assert expr2.op == ast.BinaryOp.subtract
+		}
+		else {
+			panic('Expected BinaryExpr')
+		}
+	}
 
-	// Teste de multiplicação
+	// Test multiplication
 	tokens3 := [
 		lexer.Token(lexer.IntToken{
-			value: 5
+			value: 4
 		}),
 		lexer.Token(lexer.OperatorToken.mult),
 		lexer.Token(lexer.IntToken{
@@ -50,127 +60,182 @@ fn test_arithmetic_operators() {
 		}),
 		lexer.Token(lexer.EOFToken{}),
 	]
-	mut parser3 := parser.new_parser(tokens3)
-	expr3 := parser3.parse_expression()
-	assert expr3 is ast.BinaryExpr
-	bin_expr3 := expr3 as ast.BinaryExpr
-	assert bin_expr3.op == ast.BinaryOp.multiply
+	mut parser3 := parser.new_main_parser(tokens3)
+	expr3 := parser3.parse_expression() or { panic('Failed to parse multiplication') }
+	match expr3 {
+		ast.BinaryExpr {
+			assert expr3.op == ast.BinaryOp.multiply
+		}
+		else {
+			panic('Expected BinaryExpr')
+		}
+	}
 
-	// Teste de divisão
+	// Test division
 	tokens4 := [
 		lexer.Token(lexer.IntToken{
-			value: 7
+			value: 10
 		}),
 		lexer.Token(lexer.OperatorToken.div),
 		lexer.Token(lexer.IntToken{
-			value: 8
+			value: 2
 		}),
 		lexer.Token(lexer.EOFToken{}),
 	]
-	mut parser4 := parser.new_parser(tokens4)
-	expr4 := parser4.parse_expression()
-	assert expr4 is ast.BinaryExpr
-	bin_expr4 := expr4 as ast.BinaryExpr
-	assert bin_expr4.op == ast.BinaryOp.divide
+	mut parser4 := parser.new_main_parser(tokens4)
+	expr4 := parser4.parse_expression() or { panic('Failed to parse division') }
+	match expr4 {
+		ast.BinaryExpr {
+			assert expr4.op == ast.BinaryOp.divide
+		}
+		else {
+			panic('Expected BinaryExpr')
+		}
+	}
 }
 
 fn test_comparison_operators() {
-	// Teste de igualdade
+	// Test equality
 	tokens1 := [
 		lexer.Token(lexer.IntToken{
 			value: 1
 		}),
 		lexer.Token(lexer.OperatorToken.eq),
 		lexer.Token(lexer.IntToken{
+			value: 1
+		}),
+		lexer.Token(lexer.EOFToken{}),
+	]
+	mut parser1 := parser.new_main_parser(tokens1)
+	expr1 := parser1.parse_expression() or { panic('Failed to parse equality') }
+	match expr1 {
+		ast.BinaryExpr {
+			assert expr1.op == ast.BinaryOp.equal
+		}
+		else {
+			panic('Expected BinaryExpr')
+		}
+	}
+
+	// Test inequality
+	tokens2 := [
+		lexer.Token(lexer.IntToken{
+			value: 1
+		}),
+		lexer.Token(lexer.OperatorToken.neq),
+		lexer.Token(lexer.IntToken{
 			value: 2
 		}),
 		lexer.Token(lexer.EOFToken{}),
 	]
-	mut parser1 := parser.new_parser(tokens1)
-	expr1 := parser1.parse_expression()
-	assert expr1 is ast.BinaryExpr
-	bin_expr1 := expr1 as ast.BinaryExpr
-	assert bin_expr1.op == ast.BinaryOp.equal
+	mut parser2 := parser.new_main_parser(tokens2)
+	expr2 := parser2.parse_expression() or { panic('Failed to parse inequality') }
+	match expr2 {
+		ast.BinaryExpr {
+			assert expr2.op == ast.BinaryOp.not_equal
+		}
+		else {
+			panic('Expected BinaryExpr')
+		}
+	}
 
-	// Teste de desigualdade
-	tokens2 := [
-		lexer.Token(lexer.IntToken{
-			value: 3
-		}),
-		lexer.Token(lexer.OperatorToken.neq),
-		lexer.Token(lexer.IntToken{
-			value: 4
-		}),
-		lexer.Token(lexer.EOFToken{}),
-	]
-	mut parser2 := parser.new_parser(tokens2)
-	expr2 := parser2.parse_expression()
-	assert expr2 is ast.BinaryExpr
-	bin_expr2 := expr2 as ast.BinaryExpr
-	assert bin_expr2.op == ast.BinaryOp.not_equal
-
-	// Teste de menor que
+	// Test less than
 	tokens3 := [
 		lexer.Token(lexer.IntToken{
-			value: 5
+			value: 1
 		}),
 		lexer.Token(lexer.OperatorToken.lt),
 		lexer.Token(lexer.IntToken{
-			value: 6
+			value: 2
 		}),
 		lexer.Token(lexer.EOFToken{}),
 	]
-	mut parser3 := parser.new_parser(tokens3)
-	expr3 := parser3.parse_expression()
-	assert expr3 is ast.BinaryExpr
-	bin_expr3 := expr3 as ast.BinaryExpr
-	assert bin_expr3.op == ast.BinaryOp.less_than
+	mut parser3 := parser.new_main_parser(tokens3)
+	expr3 := parser3.parse_expression() or { panic('Failed to parse less than') }
+	match expr3 {
+		ast.BinaryExpr {
+			assert expr3.op == ast.BinaryOp.less_than
+		}
+		else {
+			panic('Expected BinaryExpr')
+		}
+	}
 }
 
 fn test_logical_operators() {
-	// Teste de AND
+	// Test AND
 	tokens1 := [
-		lexer.Token(lexer.KeywordToken.true_),
+		lexer.Token(lexer.BoolToken{
+			value: true
+		}),
 		lexer.Token(lexer.OperatorToken.and_),
-		lexer.Token(lexer.KeywordToken.false_),
+		lexer.Token(lexer.BoolToken{
+			value: false
+		}),
 		lexer.Token(lexer.EOFToken{}),
 	]
-	mut parser1 := parser.new_parser(tokens1)
-	expr1 := parser1.parse_expression()
-	assert expr1 is ast.BinaryExpr
-	bin_expr1 := expr1 as ast.BinaryExpr
-	assert bin_expr1.op == ast.BinaryOp.and
+	mut parser1 := parser.new_main_parser(tokens1)
+	expr1 := parser1.parse_expression() or { panic('Failed to parse AND') }
+	match expr1 {
+		ast.BinaryExpr {
+			assert expr1.op == ast.BinaryOp.and
+		}
+		else {
+			panic('Expected BinaryExpr')
+		}
+	}
 
-	// Teste de OR
+	// Test OR
 	tokens2 := [
-		lexer.Token(lexer.KeywordToken.true_),
+		lexer.Token(lexer.BoolToken{
+			value: true
+		}),
 		lexer.Token(lexer.OperatorToken.or_),
-		lexer.Token(lexer.KeywordToken.false_),
+		lexer.Token(lexer.BoolToken{
+			value: false
+		}),
 		lexer.Token(lexer.EOFToken{}),
 	]
-	mut parser2 := parser.new_parser(tokens2)
-	expr2 := parser2.parse_expression()
-	assert expr2 is ast.BinaryExpr
-	bin_expr2 := expr2 as ast.BinaryExpr
-	assert bin_expr2.op == ast.BinaryOp.or
+	mut parser2 := parser.new_main_parser(tokens2)
+	expr2 := parser2.parse_expression() or { panic('Failed to parse OR') }
+	match expr2 {
+		ast.BinaryExpr {
+			assert expr2.op == ast.BinaryOp.or
+		}
+		else {
+			panic('Expected BinaryExpr')
+		}
+	}
 
-	// Teste de ANDALSO
+	// Test complex logical expression
 	tokens3 := [
-		lexer.Token(lexer.KeywordToken.true_),
-		lexer.Token(lexer.OperatorToken.andalso),
-		lexer.Token(lexer.KeywordToken.false_),
+		lexer.Token(lexer.BoolToken{
+			value: true
+		}),
+		lexer.Token(lexer.OperatorToken.and_),
+		lexer.Token(lexer.BoolToken{
+			value: false
+		}),
+		lexer.Token(lexer.OperatorToken.or_),
+		lexer.Token(lexer.BoolToken{
+			value: true
+		}),
 		lexer.Token(lexer.EOFToken{}),
 	]
-	mut parser3 := parser.new_parser(tokens3)
-	expr3 := parser3.parse_expression()
-	assert expr3 is ast.BinaryExpr
-	bin_expr3 := expr3 as ast.BinaryExpr
-	assert bin_expr3.op == ast.BinaryOp.and
+	mut parser3 := parser.new_main_parser(tokens3)
+	expr3 := parser3.parse_expression() or { panic('Failed to parse complex logical expression') }
+	match expr3 {
+		ast.BinaryExpr {
+			assert expr3.op == ast.BinaryOp.or
+		}
+		else {
+			panic('Expected BinaryExpr')
+		}
+	}
 }
 
 fn test_operator_precedence() {
-	// Testar precedência: * > + > ==
-	// 1 + 2 * 3 == 7 deve ser interpretado como: (1 + (2 * 3)) == 7
+	// Test arithmetic precedence: 1 + 2 * 3 == 7
 	tokens := [
 		lexer.Token(lexer.IntToken{
 			value: 1
@@ -189,49 +254,53 @@ fn test_operator_precedence() {
 		}),
 		lexer.Token(lexer.EOFToken{}),
 	]
-	mut parser0 := parser.new_parser(tokens)
 
-	expr := parser0.parse_expression()
-	assert expr is ast.BinaryExpr
+	mut parser0 := parser.new_main_parser(tokens)
 
-	// Deve ser interpretado como: (1 + (2 * 3)) == 7
-	bin_op := expr as ast.BinaryExpr
-	assert bin_op.op == ast.BinaryOp.equal
-	assert bin_op.right is ast.LiteralExpr
-	right := bin_op.right as ast.LiteralExpr
-	assert right.value is ast.IntegerLiteral
-	right_int := right.value as ast.IntegerLiteral
-	assert right_int.value == 7
+	expr := parser0.parse_expression() or { panic('Failed to parse precedence test') }
+	match expr {
+		ast.BinaryExpr {
+			// Deve ser interpretado como: (1 + (2 * 3)) == 7
+			assert expr.op == ast.BinaryOp.equal
+			match expr.right {
+				ast.LiteralExpr {
+					match expr.right.value {
+						ast.IntegerLiteral { assert expr.right.value.value == 7 }
+						else { panic('Expected IntegerLiteral 7') }
+					}
+				}
+				else {
+					panic('Expected LiteralExpr for 7')
+				}
+			}
 
-	// Verificar lado esquerdo: (1 + (2 * 3))
-	assert bin_op.left is ast.BinaryExpr
-	left_bin_op := bin_op.left as ast.BinaryExpr
-	assert left_bin_op.op == ast.BinaryOp.add
-	assert left_bin_op.left is ast.LiteralExpr
-	left_left := left_bin_op.left as ast.LiteralExpr
-	assert left_left.value is ast.IntegerLiteral
-	left_left_int := left_left.value as ast.IntegerLiteral
-	assert left_left_int.value == 1
-
-	// Verificar multiplicação: (2 * 3)
-	assert left_bin_op.right is ast.BinaryExpr
-	mult_bin_op := left_bin_op.right as ast.BinaryExpr
-	assert mult_bin_op.op == ast.BinaryOp.multiply
-	assert mult_bin_op.left is ast.LiteralExpr
-	mult_left := mult_bin_op.left as ast.LiteralExpr
-	assert mult_left.value is ast.IntegerLiteral
-	mult_left_int := mult_left.value as ast.IntegerLiteral
-	assert mult_left_int.value == 2
-	assert mult_bin_op.right is ast.LiteralExpr
-	mult_right := mult_bin_op.right as ast.LiteralExpr
-	assert mult_right.value is ast.IntegerLiteral
-	mult_right_int := mult_right.value as ast.IntegerLiteral
-	assert mult_right_int.value == 3
+			// Verificar que o lado esquerdo é uma expressão binária
+			match expr.left {
+				ast.BinaryExpr {
+					assert expr.left.op == ast.BinaryOp.add
+					// Verificar que o lado direito da adição é uma multiplicação
+					match expr.left.right {
+						ast.BinaryExpr {
+							assert expr.left.right.op == ast.BinaryOp.multiply
+						}
+						else {
+							panic('Expected BinaryExpr for multiplication')
+						}
+					}
+				}
+				else {
+					panic('Expected BinaryExpr for addition')
+				}
+			}
+		}
+		else {
+			panic('Expected BinaryExpr')
+		}
+	}
 }
 
 fn test_associativity() {
-	// Testar associatividade à esquerda
-	// 1 - 2 - 3 deve ser interpretado como: (1 - 2) - 3
+	// Test left associativity: 1 - 2 - 3
 	tokens := [
 		lexer.Token(lexer.IntToken{
 			value: 1
@@ -246,38 +315,66 @@ fn test_associativity() {
 		}),
 		lexer.Token(lexer.EOFToken{}),
 	]
-	mut parser0 := parser.new_parser(tokens)
 
-	expr := parser0.parse_expression()
-	assert expr is ast.BinaryExpr
+	mut parser0 := parser.new_main_parser(tokens)
 
-	// Deve ser interpretado como: (1 - 2) - 3
-	bin_op := expr as ast.BinaryExpr
-	assert bin_op.op == ast.BinaryOp.subtract
-	assert bin_op.right is ast.LiteralExpr
-	right := bin_op.right as ast.LiteralExpr
-	assert right.value is ast.IntegerLiteral
-	right_int := right.value as ast.IntegerLiteral
-	assert right_int.value == 3
+	expr := parser0.parse_expression() or { panic('Failed to parse associativity test') }
+	match expr {
+		ast.BinaryExpr {
+			// Deve ser interpretado como: (1 - 2) - 3
+			assert expr.op == ast.BinaryOp.subtract
+			match expr.right {
+				ast.LiteralExpr {
+					match expr.right.value {
+						ast.IntegerLiteral { assert expr.right.value.value == 3 }
+						else { panic('Expected IntegerLiteral 3') }
+					}
+				}
+				else {
+					panic('Expected LiteralExpr for 3')
+				}
+			}
 
-	// Verificar lado esquerdo: (1 - 2)
-	assert bin_op.left is ast.BinaryExpr
-	left_bin_op := bin_op.left as ast.BinaryExpr
-	assert left_bin_op.op == ast.BinaryOp.subtract
-	assert left_bin_op.left is ast.LiteralExpr
-	left_left := left_bin_op.left as ast.LiteralExpr
-	assert left_left.value is ast.IntegerLiteral
-	left_left_int := left_left.value as ast.IntegerLiteral
-	assert left_left_int.value == 1
-	assert left_bin_op.right is ast.LiteralExpr
-	left_right := left_bin_op.right as ast.LiteralExpr
-	assert left_right.value is ast.IntegerLiteral
-	left_right_int := left_right.value as ast.IntegerLiteral
-	assert left_right_int.value == 2
+			// Verificar que o lado esquerdo é uma subtração
+			match expr.left {
+				ast.BinaryExpr {
+					assert expr.left.op == ast.BinaryOp.subtract
+					match expr.left.left {
+						ast.LiteralExpr {
+							match expr.left.left.value {
+								ast.IntegerLiteral { assert expr.left.left.value.value == 1 }
+								else { panic('Expected IntegerLiteral 1') }
+							}
+						}
+						else {
+							panic('Expected LiteralExpr for 1')
+						}
+					}
+					match expr.left.right {
+						ast.LiteralExpr {
+							match expr.left.right.value {
+								ast.IntegerLiteral { assert expr.left.right.value.value == 2 }
+								else { panic('Expected IntegerLiteral 2') }
+							}
+						}
+						else {
+							panic('Expected LiteralExpr for 2')
+						}
+					}
+				}
+				else {
+					panic('Expected BinaryExpr for first subtraction')
+				}
+			}
+		}
+		else {
+			panic('Expected BinaryExpr')
+		}
+	}
 }
 
-fn test_complex_expression() {
-	// Testar expressão complexa: a + b * c == d and e or f
+fn test_complex_expression_precedence() {
+	// Test complex expression: a + b * c == d and e or f
 	tokens := [
 		lexer.Token(lexer.IdentToken{
 			value: 'a'
@@ -304,17 +401,107 @@ fn test_complex_expression() {
 		}),
 		lexer.Token(lexer.EOFToken{}),
 	]
-	mut parser0 := parser.new_parser(tokens)
 
-	expr := parser0.parse_expression()
-	assert expr is ast.BinaryExpr
+	mut parser0 := parser.new_main_parser(tokens)
 
-	// Deve ser interpretado como: ((a + (b * c)) == d) and (e or f)
-	// O operador de mais alta precedência é or, então a estrutura deve ser:
-	// (left) or f
-	bin_op := expr as ast.BinaryExpr
-	assert bin_op.op == ast.BinaryOp.or
-	assert bin_op.right is ast.VariableExpr
-	right := bin_op.right as ast.VariableExpr
-	assert right.name == 'f'
+	expr := parser0.parse_expression() or { panic('Failed to parse complex precedence test') }
+	match expr {
+		ast.BinaryExpr {
+			// Deve ser interpretado como: ((a + (b * c)) == d) and (e or f)
+			// O operador de mais alta precedência é or, então a estrutura deve ser:
+			// (left) or f
+			assert expr.op == ast.BinaryOp.or
+			match expr.right {
+				ast.VariableExpr {
+					assert expr.right.name == 'f'
+				}
+				else {
+					panic('Expected VariableExpr for f')
+				}
+			}
+
+			// Verificar o lado esquerdo: ((a + (b * c)) == d) and e
+			match expr.left {
+				ast.BinaryExpr {
+					assert expr.left.op == ast.BinaryOp.and
+					match expr.left.right {
+						ast.VariableExpr {
+							assert expr.left.right.name == 'e'
+						}
+						else {
+							panic('Expected VariableExpr for e')
+						}
+					}
+
+					// Verificar o lado esquerdo da and: (a + (b * c)) == d
+					match expr.left.left {
+						ast.BinaryExpr {
+							assert expr.left.left.op == ast.BinaryOp.equal
+							match expr.left.left.right {
+								ast.VariableExpr {
+									assert expr.left.left.right.name == 'd'
+								}
+								else {
+									panic('Expected VariableExpr for d')
+								}
+							}
+
+							// Verificar o lado esquerdo da equal: a + (b * c)
+							match expr.left.left.left {
+								ast.BinaryExpr {
+									assert expr.left.left.left.op == ast.BinaryOp.add
+									match expr.left.left.left.left {
+										ast.VariableExpr {
+											assert expr.left.left.left.left.name == 'a'
+										}
+										else {
+											panic('Expected VariableExpr for a')
+										}
+									}
+
+									// Verificar o lado direito da plus: b * c
+									match expr.left.left.left.right {
+										ast.BinaryExpr {
+											assert expr.left.left.left.right.op == ast.BinaryOp.multiply
+											match expr.left.left.left.right.left {
+												ast.VariableExpr {
+													assert expr.left.left.left.right.left.name == 'b'
+												}
+												else {
+													panic('Expected VariableExpr for b')
+												}
+											}
+											match expr.left.left.left.right.right {
+												ast.VariableExpr {
+													assert expr.left.left.left.right.right.name == 'c'
+												}
+												else {
+													panic('Expected VariableExpr for c')
+												}
+											}
+										}
+										else {
+											panic('Expected BinaryExpr for b * c')
+										}
+									}
+								}
+								else {
+									panic('Expected BinaryExpr for a + (b * c)')
+								}
+							}
+						}
+						else {
+							panic('Expected BinaryExpr for (a + (b * c)) == d')
+						}
+					}
+				}
+				else {
+					panic('Expected BinaryExpr for ((a + (b * c)) == d) and e')
+				}
+			}
+		}
+		else {
+			panic('Expected BinaryExpr')
+		}
+	}
 }

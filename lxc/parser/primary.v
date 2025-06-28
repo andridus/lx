@@ -137,5 +137,7 @@ pub fn (mut p Parser) parse_parenthesized() ast.Expr {
 		p.consume(lexer.PunctuationToken.rparen, 'Expect ")" after expression') or { return expr }
 		return expr
 	}
-	return ast.LiteralExpr{ value: ast.NilLiteral{} }
+	return ast.LiteralExpr{
+		value: ast.NilLiteral{}
+	}
 }

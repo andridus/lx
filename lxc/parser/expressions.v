@@ -18,14 +18,48 @@ pub fn new_expression_parser(tokens []lexer.Token) &ExpressionParser {
 
 // parse_expression parses the top-level expression
 pub fn (mut ep ExpressionParser) parse_expression() ?ast.Expr {
+	return ep.parse_assignment_expression()
+}
+
+// parse_assignment_expression parses assignment expressions (lowest precedence)
+pub fn (mut ep ExpressionParser) parse_assignment_expression() ?ast.Expr {
+	// Check if we have an identifier followed by assignment operator
+	if ep.current is lexer.IdentToken {
+		ident := ep.current as lexer.IdentToken
+
+		// Look ahead to next token
+		next_token := ep.peek()
+
+		if next_token.str() == 'Operator(=)' {
+			// Consume the identifier
+			ep.advance()
+			// Consume the assignment operator
+			ep.advance()
+
+			// Parse the right-hand side expression
+			value := ep.parse_assignment_expression()?
+
+			return ast.AssignExpr{
+				name:     ident.value
+				value:    value
+				position: ep.get_current_position()
+			}
+		}
+	}
+
+	// If not an assignment, fall back to logical OR
 	return ep.parse_or_expression()
 }
 
 // parse_or_expression parses expressions with 'or' precedence
 fn (mut ep ExpressionParser) parse_or_expression() ?ast.Expr {
 	mut left := ep.parse_and_expression()?
-
-	for ep.match(lexer.OperatorToken.or_) {
+	for ep.current is lexer.OperatorToken {
+		op_token := ep.current as lexer.OperatorToken
+		if op_token != .or_ {
+			break
+		}
+		ep.advance()
 		right := ep.parse_and_expression()?
 		left = ast.BinaryExpr{
 			left:     left
@@ -34,15 +68,18 @@ fn (mut ep ExpressionParser) parse_or_expression() ?ast.Expr {
 			position: ep.get_current_position()
 		}
 	}
-
 	return left
 }
 
 // parse_and_expression parses expressions with 'and' precedence
 fn (mut ep ExpressionParser) parse_and_expression() ?ast.Expr {
 	mut left := ep.parse_orelse_expression()?
-
-	for ep.match(lexer.OperatorToken.and_) {
+	for ep.current is lexer.OperatorToken {
+		op_token := ep.current as lexer.OperatorToken
+		if op_token != .and_ {
+			break
+		}
+		ep.advance()
 		right := ep.parse_orelse_expression()?
 		left = ast.BinaryExpr{
 			left:     left
@@ -51,15 +88,18 @@ fn (mut ep ExpressionParser) parse_and_expression() ?ast.Expr {
 			position: ep.get_current_position()
 		}
 	}
-
 	return left
 }
 
 // parse_orelse_expression parses expressions with 'orelse' precedence
 fn (mut ep ExpressionParser) parse_orelse_expression() ?ast.Expr {
 	mut left := ep.parse_andalso_expression()?
-
-	for ep.match(lexer.OperatorToken.orelse) {
+	for ep.current is lexer.OperatorToken {
+		op_token := ep.current as lexer.OperatorToken
+		if op_token != .orelse {
+			break
+		}
+		ep.advance()
 		right := ep.parse_andalso_expression()?
 		left = ast.BinaryExpr{
 			left:     left
@@ -68,15 +108,18 @@ fn (mut ep ExpressionParser) parse_orelse_expression() ?ast.Expr {
 			position: ep.get_current_position()
 		}
 	}
-
 	return left
 }
 
 // parse_andalso_expression parses expressions with 'andalso' precedence
 fn (mut ep ExpressionParser) parse_andalso_expression() ?ast.Expr {
 	mut left := ep.parse_comparison_expression()?
-
-	for ep.match(lexer.OperatorToken.andalso) {
+	for ep.current is lexer.OperatorToken {
+		op_token := ep.current as lexer.OperatorToken
+		if op_token != .andalso {
+			break
+		}
+		ep.advance()
 		right := ep.parse_comparison_expression()?
 		left = ast.BinaryExpr{
 			left:     left
@@ -85,18 +128,14 @@ fn (mut ep ExpressionParser) parse_andalso_expression() ?ast.Expr {
 			position: ep.get_current_position()
 		}
 	}
-
 	return left
 }
 
 // parse_comparison_expression parses comparison expressions
 fn (mut ep ExpressionParser) parse_comparison_expression() ?ast.Expr {
 	mut left := ep.parse_concatenation_expression()?
-	if ep.current !is lexer.OperatorToken {
-		return left
-	}
-	op_token := ep.current as lexer.OperatorToken
-	for {
+	for ep.current is lexer.OperatorToken {
+		op_token := ep.current as lexer.OperatorToken
 		mut op := ast.BinaryOp.equal
 		mut should_continue := false
 		match op_token {
@@ -124,13 +163,13 @@ fn (mut ep ExpressionParser) parse_comparison_expression() ?ast.Expr {
 				op = .greater_equal
 				should_continue = true
 			}
-			else { break }
+			else {
+				break
+			}
 		}
-
 		if !should_continue {
 			break
 		}
-
 		ep.advance()
 		right := ep.parse_concatenation_expression()?
 		left = ast.BinaryExpr{
@@ -140,7 +179,6 @@ fn (mut ep ExpressionParser) parse_comparison_expression() ?ast.Expr {
 			position: ep.get_current_position()
 		}
 	}
-
 	return left
 }
 
@@ -164,12 +202,8 @@ fn (mut ep ExpressionParser) parse_concatenation_expression() ?ast.Expr {
 // parse_additive_expression parses addition and subtraction expressions
 fn (mut ep ExpressionParser) parse_additive_expression() ?ast.Expr {
 	mut left := ep.parse_multiplicative_expression()?
-
-	if ep.current !is lexer.OperatorToken {
-		return left
-	}
-	op_token := ep.current as lexer.OperatorToken
-	for {
+	for ep.current is lexer.OperatorToken {
+		op_token := ep.current as lexer.OperatorToken
 		mut op := ast.BinaryOp.add
 		mut should_continue := false
 
@@ -182,7 +216,9 @@ fn (mut ep ExpressionParser) parse_additive_expression() ?ast.Expr {
 				op = .subtract
 				should_continue = true
 			}
-			else { break }
+			else {
+				break
+			}
 		}
 
 		if !should_continue {
@@ -198,20 +234,14 @@ fn (mut ep ExpressionParser) parse_additive_expression() ?ast.Expr {
 			position: ep.get_current_position()
 		}
 	}
-
 	return left
 }
 
 // parse_multiplicative_expression parses multiplication and division expressions
 fn (mut ep ExpressionParser) parse_multiplicative_expression() ?ast.Expr {
 	mut left := ep.parse_unary_expression()?
-
-	if ep.current !is lexer.OperatorToken {
-		return left
-	}
-	op_token := ep.current as lexer.OperatorToken
-
-	for {
+	for ep.current is lexer.OperatorToken {
+		op_token := ep.current as lexer.OperatorToken
 		mut op := ast.BinaryOp.multiply
 		mut should_continue := false
 
@@ -224,7 +254,9 @@ fn (mut ep ExpressionParser) parse_multiplicative_expression() ?ast.Expr {
 				op = .divide
 				should_continue = true
 			}
-			else { break }
+			else {
+				break
+			}
 		}
 
 		if !should_continue {
@@ -240,7 +272,6 @@ fn (mut ep ExpressionParser) parse_multiplicative_expression() ?ast.Expr {
 			position: ep.get_current_position()
 		}
 	}
-
 	return left
 }
 
@@ -308,7 +339,9 @@ fn (mut ep ExpressionParser) parse_primary_expression() ?ast.Expr {
 				.lbracket {
 					expr = ep.parse_map_access_expression(expr)?
 				}
-				else { break }
+				else {
+					break
+				}
 			}
 		} else if ep.current is lexer.OperatorToken {
 			op_token := ep.current as lexer.OperatorToken
@@ -316,7 +349,9 @@ fn (mut ep ExpressionParser) parse_primary_expression() ?ast.Expr {
 				.dot {
 					expr = ep.parse_record_access_expression(expr)?
 				}
-				else { break }
+				else {
+					break
+				}
 			}
 		} else {
 			break
@@ -329,20 +364,87 @@ fn (mut ep ExpressionParser) parse_primary_expression() ?ast.Expr {
 // parse_atom_expression parses atomic expressions
 fn (mut ep ExpressionParser) parse_atom_expression() ?ast.Expr {
 	return match ep.current {
-		lexer.IdentToken { ep.parse_identifier_expression() }
-		lexer.UpperIdentToken { ep.parse_identifier_expression() }
-		lexer.StringToken { ep.parse_string_literal() }
-		lexer.IntToken { ep.parse_integer_literal() }
-		lexer.FloatToken { ep.parse_float_literal() }
-		lexer.BoolToken { ep.parse_boolean_literal() }
-		lexer.AtomToken { ep.parse_atom_literal() }
-		lexer.NilToken { ep.parse_nil_literal() }
+		lexer.IdentToken {
+			ep.parse_identifier_expression()
+		}
+		lexer.UpperIdentToken {
+			ep.parse_identifier_expression()
+		}
+		lexer.StringToken {
+			ep.parse_string_literal()
+		}
+		lexer.IntToken {
+			ep.parse_integer_literal()
+		}
+		lexer.FloatToken {
+			ep.parse_float_literal()
+		}
+		lexer.BoolToken {
+			ep.parse_boolean_literal()
+		}
+		lexer.AtomToken {
+			ep.parse_atom_literal()
+		}
+		lexer.NilToken {
+			ep.parse_nil_literal()
+		}
+		lexer.ErrorToken {
+			// Adiciona erro ao parser e avança
+			err := ep.current as lexer.ErrorToken
+			ep.add_error('Parse error: ${err.message}', 'ErrorToken')
+			ep.advance()
+			return ast.LiteralExpr{
+				value: ast.NilLiteral{}
+			}
+		}
+		lexer.KeywordToken {
+			keyword_token := ep.current as lexer.KeywordToken
+			match keyword_token {
+				.if_ {
+					ep.parse_if_expression()
+				}
+				.case_ {
+					ep.parse_case_expression()
+				}
+				.with {
+					ep.parse_with_expression()
+				}
+				.for_ {
+					ep.parse_for_expression()
+				}
+				.receive {
+					ep.parse_receive_expression()
+				}
+				.record {
+					ep.parse_record_expression()
+				}
+				.unsafe {
+					ep.parse_unsafe_expression()
+				}
+				.nil_ {
+					ep.advance()
+					return ast.LiteralExpr{
+						value: ast.NilLiteral{}
+					}
+				}
+				else {
+					ep.add_error('Unexpected token: ${ep.current.str()}', 'Expected expression')
+					none
+				}
+			}
+		}
 		lexer.PunctuationToken {
 			punc_token := ep.current as lexer.PunctuationToken
 			match punc_token {
-				.lparen { ep.parse_parenthesized_expression() }
-				.lbrace { ep.parse_tuple_expression() }
-				.lbracket { ep.parse_list_expression() }
+				.lparen {
+					ep.parse_parenthesized_expression()
+				}
+				.lbrace {
+					ep.parse_tuple_expression()
+				}
+				.lbracket {
+					ep.parse_list_expression()
+				}
 				else {
 					ep.add_error('Unexpected token: ${ep.current.str()}', 'Expected expression')
 					none
@@ -352,23 +454,9 @@ fn (mut ep ExpressionParser) parse_atom_expression() ?ast.Expr {
 		lexer.OperatorToken {
 			op_token := ep.current as lexer.OperatorToken
 			match op_token {
-				.record_update { ep.parse_map_expression() }
-				else {
-					ep.add_error('Unexpected token: ${ep.current.str()}', 'Expected expression')
-					none
+				.record_update {
+					ep.parse_map_expression()
 				}
-			}
-		}
-		lexer.KeywordToken {
-			keyword_token := ep.current as lexer.KeywordToken
-			match keyword_token {
-				.if_ { ep.parse_if_expression() }
-				.case_ { ep.parse_case_expression() }
-				.with { ep.parse_with_expression() }
-				.for_ { ep.parse_for_expression() }
-				.receive { ep.parse_receive_expression() }
-				.record { ep.parse_record_expression() }
-				.unsafe { ep.parse_unsafe_expression() }
 				else {
 					ep.add_error('Unexpected token: ${ep.current.str()}', 'Expected expression')
 					none
@@ -701,7 +789,11 @@ fn (mut ep ExpressionParser) parse_case_expression() ?ast.Expr {
 	for !ep.check(lexer.KeywordToken.end_) {
 		pattern := ep.parse_pattern()?
 
-		mut guard := ast.Expr(ast.LiteralExpr{ value: ast.BooleanLiteral{ value: true } })
+		mut guard := ast.Expr(ast.LiteralExpr{
+			value: ast.BooleanLiteral{
+				value: true
+			}
+		})
 		if ep.match(lexer.KeywordToken.when) {
 			guard = ep.parse_expression()?
 		}
@@ -721,8 +813,8 @@ fn (mut ep ExpressionParser) parse_case_expression() ?ast.Expr {
 	ep.consume(lexer.KeywordToken.end_, 'Expected end after case expression')?
 
 	return ast.CaseExpr{
-		value:   value
-		cases:   cases
+		value:    value
+		cases:    cases
 		position: ep.get_current_position()
 	}
 }
@@ -760,8 +852,8 @@ fn (mut ep ExpressionParser) parse_with_expression() ?ast.Expr {
 	ep.consume(lexer.KeywordToken.end_, 'Expected end after with expression')?
 
 	return ast.WithExpr{
-		bindings: bindings
-		body:     body
+		bindings:  bindings
+		body:      body
 		else_body: else_body
 		position:  ep.get_current_position()
 	}
@@ -776,7 +868,11 @@ fn (mut ep ExpressionParser) parse_for_expression() ?ast.Expr {
 
 	collection := ep.parse_expression()?
 
-	mut guard := ast.Expr(ast.LiteralExpr{ value: ast.BooleanLiteral{ value: true } })
+	mut guard := ast.Expr(ast.LiteralExpr{
+		value: ast.BooleanLiteral{
+			value: true
+		}
+	})
 	if ep.match(lexer.KeywordToken.when) {
 		guard = ep.parse_expression()?
 	}
@@ -805,7 +901,11 @@ fn (mut ep ExpressionParser) parse_receive_expression() ?ast.Expr {
 	for !ep.check(lexer.KeywordToken.after) && !ep.check(lexer.KeywordToken.end_) {
 		pattern := ep.parse_pattern()?
 
-		mut guard := ast.Expr(ast.LiteralExpr{ value: ast.BooleanLiteral{ value: true } })
+		mut guard := ast.Expr(ast.LiteralExpr{
+			value: ast.BooleanLiteral{
+				value: true
+			}
+		})
 		if ep.match(lexer.KeywordToken.when) {
 			guard = ep.parse_expression()?
 		}
@@ -822,7 +922,11 @@ fn (mut ep ExpressionParser) parse_receive_expression() ?ast.Expr {
 		}
 	}
 
-	mut timeout := ast.Expr(ast.LiteralExpr{ value: ast.IntegerLiteral{ value: 0 } })
+	mut timeout := ast.Expr(ast.LiteralExpr{
+		value: ast.IntegerLiteral{
+			value: 0
+		}
+	})
 	if ep.match(lexer.KeywordToken.after) {
 		timeout = ep.parse_expression()?
 		ep.consume(lexer.KeywordToken.do_, 'Expected do after timeout')?
@@ -834,8 +938,8 @@ fn (mut ep ExpressionParser) parse_receive_expression() ?ast.Expr {
 	ep.consume(lexer.KeywordToken.end_, 'Expected end after receive expression')?
 
 	return ast.ReceiveExpr{
-		cases:   cases
-		timeout: timeout
+		cases:    cases
+		timeout:  timeout
 		position: ep.get_current_position()
 	}
 }
@@ -867,33 +971,59 @@ fn (mut ep ExpressionParser) parse_statement_block() ?[]ast.Stmt {
 // parse_statement parses a single statement
 fn (mut ep ExpressionParser) parse_statement() ?ast.Stmt {
 	expr := ep.parse_expression()?
-	return ast.ExprStmt{ expr: expr }
+	return ast.ExprStmt{
+		expr: expr
+	}
 }
 
 // parse_pattern parses patterns for pattern matching
 fn (mut ep ExpressionParser) parse_pattern() ?ast.Pattern {
 	return match ep.current {
-		lexer.IdentToken { ep.parse_variable_pattern() }
-		lexer.UpperIdentToken { ep.parse_variable_pattern() }
-		lexer.StringToken { ep.parse_literal_pattern() }
-		lexer.IntToken { ep.parse_literal_pattern() }
-		lexer.FloatToken { ep.parse_literal_pattern() }
-		lexer.BoolToken { ep.parse_literal_pattern() }
-		lexer.AtomToken { ep.parse_atom_pattern() }
-		lexer.NilToken { ep.parse_nil_pattern() }
+		lexer.IdentToken {
+			ep.parse_variable_pattern()
+		}
+		lexer.UpperIdentToken {
+			ep.parse_variable_pattern()
+		}
+		lexer.StringToken {
+			ep.parse_literal_pattern()
+		}
+		lexer.IntToken {
+			ep.parse_literal_pattern()
+		}
+		lexer.FloatToken {
+			ep.parse_literal_pattern()
+		}
+		lexer.BoolToken {
+			ep.parse_literal_pattern()
+		}
+		lexer.AtomToken {
+			ep.parse_atom_pattern()
+		}
+		lexer.NilToken {
+			ep.parse_nil_pattern()
+		}
 		lexer.PunctuationToken {
 			punc_token := ep.current as lexer.PunctuationToken
 			match punc_token {
-				.lparen { ep.parse_parenthesized_pattern() }
-				.lbrace { ep.parse_tuple_pattern() }
-				.lbracket { ep.parse_list_pattern() }
+				.lparen {
+					ep.parse_parenthesized_pattern()
+				}
+				.lbrace {
+					ep.parse_tuple_pattern()
+				}
+				.lbracket {
+					ep.parse_list_pattern()
+				}
 				else {
 					ep.add_error('Unexpected token in pattern: ${ep.current.str()}', 'Expected pattern')
 					none
 				}
 			}
 		}
-		lexer.OperatorToken { ep.parse_map_pattern() }
+		lexer.OperatorToken {
+			ep.parse_map_pattern()
+		}
 		else {
 			ep.add_error('Unexpected token in pattern: ${ep.current.str()}', 'Expected pattern')
 			none
@@ -917,14 +1047,24 @@ fn (mut ep ExpressionParser) parse_literal_pattern() ?ast.Pattern {
 	ep.advance()
 
 	value := match token {
-		lexer.StringToken { ast.Literal(ast.StringLiteral{ value: token.value }) }
-		lexer.IntToken { ast.Literal(ast.IntegerLiteral{ value: token.value }) }
-		lexer.FloatToken { ast.Literal(ast.FloatLiteral{ value: token.value }) }
-		lexer.BoolToken { ast.Literal(ast.BooleanLiteral{ value: token.value }) }
+		lexer.StringToken { ast.Literal(ast.StringLiteral{
+				value: token.value
+			}) }
+		lexer.IntToken { ast.Literal(ast.IntegerLiteral{
+				value: token.value
+			}) }
+		lexer.FloatToken { ast.Literal(ast.FloatLiteral{
+				value: token.value
+			}) }
+		lexer.BoolToken { ast.Literal(ast.BooleanLiteral{
+				value: token.value
+			}) }
 		else { ast.Literal(ast.NilLiteral{}) }
 	}
 
-	return ast.LiteralPattern{ value: value }
+	return ast.LiteralPattern{
+		value: value
+	}
 }
 
 // parse_atom_pattern parses atom patterns
@@ -1045,15 +1185,11 @@ fn (mut ep ExpressionParser) parse_map_pattern() ?ast.Pattern {
 // Helper methods for error handling and position tracking
 fn (mut ep ExpressionParser) add_error(message string, context string) {
 	pos := ep.get_current_position()
-	comp_error := errors.new_compilation_error(
-		errors.ErrorKind(errors.SyntaxError{
-			message:  message
-			expected: context
-			found:    ep.current.str()
-		}),
-		pos,
-		'${message}: ${context}'
-	)
+	comp_error := errors.new_compilation_error(errors.ErrorKind(errors.SyntaxError{
+		message:  message
+		expected: context
+		found:    ep.current.str()
+	}), pos, '${message}: ${context}')
 	ep.errors << comp_error
 }
 

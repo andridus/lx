@@ -195,15 +195,11 @@ pub fn (mut mp MainParser) parse_pattern() ?ast.Pattern {
 // Helper methods for error handling and position tracking
 fn (mut mp MainParser) add_error(message string, context string) {
 	pos := mp.get_current_position()
-	comp_error := errors.new_compilation_error(
-		errors.ErrorKind(errors.SyntaxError{
-			message:  message
-			expected: context
-			found:    mp.current.str()
-		}),
-		pos,
-		'${message}: ${context}'
-	)
+	comp_error := errors.new_compilation_error(errors.ErrorKind(errors.SyntaxError{
+		message:  message
+		expected: context
+		found:    mp.current.str()
+	}), pos, '${message}: ${context}')
 	mp.errors << comp_error
 }
 

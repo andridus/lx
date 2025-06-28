@@ -2,7 +2,7 @@ module erlang
 
 import ast
 import typechecker
-import generate { CodeGenerator, CodegenResult }
+import generate { CodegenResult }
 
 // ErlangGenerator generates Erlang code from LX AST
 pub struct ErlangGenerator {}
@@ -12,15 +12,31 @@ pub fn new_erlang_generator() ErlangGenerator {
 	return ErlangGenerator{}
 }
 
-
 // generate_module generates a complete Erlang module (implements CodeGenerator interface)
 pub fn (gen ErlangGenerator) generate_module(module_stmt ast.ModuleStmt, type_ctx typechecker.TypeContext) CodegenResult {
-	// Exemplo simplificado: gerar apenas um código fixo
-	code := '-module(' + module_stmt.name + ').\n-export([func/1]).\n\nfunc(X) -> X.\n'
+	// Generate module header
+	mut code := gen.get_module_header(module_stmt.name)
+
+	// Generate exports
+	exports := gen.generate_exports(module_stmt.statements)
+	if exports.len > 0 {
+		code += '-export([${exports.join(', ')}]).\n'
+	}
+	code += '\n'
+
+	// Generate statements
+	for stmt in module_stmt.statements {
+		stmt_code := gen.generate_statement(stmt)
+		code += stmt_code + '\n'
+	}
+
+	// Add module footer
+	code += gen.get_module_footer()
+
 	return CodegenResult{
 		success: true
-		errors: []
-		code: code
+		errors:  []
+		code:    code
 	}
 }
 
@@ -390,7 +406,15 @@ fn (gen ErlangGenerator) generate_function(func ast.FunctionStmt) string {
 			return ' when ' + gen.generate_expression(clause.guard)
 		}
 		body := clause.body.map(gen.generate_statement(it))
-		clauses << '${func.name}(${parameters.join(', ')})${guard} ->\n${body.join(';\n')}'
+		// Emit all statements separated by ',' except the last one (Erlang style)
+		body_code := if body.len > 1 {
+			body[..body.len - 1].join(',\n') + ',\n' + body[body.len - 1]
+		} else if body.len == 1 {
+			body[0]
+		} else {
+			'ok'
+		}
+		clauses << '${func.name}(${parameters.join(', ')})${guard} ->\n${body_code}'
 	}
 
 	return clauses.join(';\n') + '.'

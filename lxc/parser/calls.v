@@ -55,14 +55,14 @@ pub fn (mut p Parser) finish_call(callee ast.Expr) ast.Expr {
 		return ast.CallExpr{
 			function:  callee
 			arguments: args
-			position: ast.Position{}
+			position:  ast.Position{}
 		}
 	}
 
 	return ast.CallExpr{
 		function:  callee
 		arguments: args
-		position: ast.Position{}
+		position:  ast.Position{}
 	}
 }
 

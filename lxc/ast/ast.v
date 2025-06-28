@@ -153,16 +153,16 @@ pub:
 // CaseExpr represents a case expression
 pub struct CaseExpr {
 pub:
-	value Expr
-	cases []MatchCase
+	value    Expr
+	cases    []MatchCase
 	position Position
 }
 
 // WithExpr represents a with expression
 pub struct WithExpr {
 pub:
-	bindings []WithBinding
-	body     []Stmt
+	bindings  []WithBinding
+	body      []Stmt
 	else_body []Stmt
 	position  Position
 }
@@ -170,11 +170,11 @@ pub:
 // ForExpr represents a for expression (list comprehension)
 pub struct ForExpr {
 pub:
-	pattern Pattern
+	pattern    Pattern
 	collection Expr
-	guard     Expr
-	body      []Stmt
-	position  Position
+	guard      Expr
+	body       []Stmt
+	position   Position
 }
 
 // Expr represents expressions in LX using sum types
@@ -538,7 +538,7 @@ pub:
 // WithBinding represents a binding in a with expression
 pub struct WithBinding {
 pub:
-	pattern Pattern
-	value   Expr
+	pattern  Pattern
+	value    Expr
 	position Position
 }
