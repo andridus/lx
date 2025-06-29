@@ -103,7 +103,7 @@ fn (mut ep ExpressionParser) parse_orelse_expression() ?ast.Expr {
 		right := ep.parse_andalso_expression()?
 		left = ast.BinaryExpr{
 			left:     left
-			op:       .or
+			op:       .orelse
 			right:    right
 			position: ep.get_current_position()
 		}
@@ -123,7 +123,7 @@ fn (mut ep ExpressionParser) parse_andalso_expression() ?ast.Expr {
 		right := ep.parse_comparison_expression()?
 		left = ast.BinaryExpr{
 			left:     left
-			op:       .and
+			op:       .andalso
 			right:    right
 			position: ep.get_current_position()
 		}
@@ -400,6 +400,22 @@ fn (mut ep ExpressionParser) parse_atom_expression() ?ast.Expr {
 		lexer.KeywordToken {
 			keyword_token := ep.current as lexer.KeywordToken
 			match keyword_token {
+				.true_ {
+					ep.advance()
+					ast.LiteralExpr{
+						value: ast.BooleanLiteral{
+							value: true
+						}
+					}
+				}
+				.false_ {
+					ep.advance()
+					ast.LiteralExpr{
+						value: ast.BooleanLiteral{
+							value: false
+						}
+					}
+				}
 				.if_ {
 					ep.parse_if_expression()
 				}

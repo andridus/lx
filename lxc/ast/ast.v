@@ -218,6 +218,8 @@ pub enum BinaryOp {
 	greater_equal
 	and
 	or
+	andalso
+	orelse
 	cons
 	append
 }
@@ -239,6 +241,8 @@ pub fn (op BinaryOp) str() string {
 		.greater_equal { '>=' }
 		.and { '&&' }
 		.or { '||' }
+		.andalso { 'andalso' }
+		.orelse { 'orelse' }
 		.cons { '::' }
 		.append { '++' }
 	}

@@ -1,6 +1,9 @@
 module main
 
 import typechecker
+import parser
+import ast
+import lexer
 
 fn test_type_variables() {
 	// Test type variable creation and string representation
@@ -406,6 +409,43 @@ fn test_type_string_representations() {
 	assert binary_type.str() == 'binary(8)'
 }
 
+fn test_parse_boolean_literal() {
+	source := 'true'
+
+	// Create lexer and tokenize
+	mut lexer_instance := lexer.new_lexer(source, 'test.lx')
+	mut tokens := []lexer.Token{}
+	for {
+		token := lexer_instance.next_token()
+		if token is lexer.EOFToken {
+			break
+		}
+		if token is lexer.ErrorToken {
+			panic('Lexical error: ${token.message}')
+		}
+		tokens << token
+	}
+
+	// Verify we have the right token
+	assert tokens.len == 1
+	assert tokens[0] is lexer.KeywordToken
+	keyword_token := tokens[0] as lexer.KeywordToken
+	assert keyword_token == .true_
+
+	// Test parser primary expression
+	mut expr_parser := parser.new_expression_parser(tokens)
+	expr := expr_parser.parse_primary()
+
+	// Verify the AST structure
+	assert expr is ast.LiteralExpr
+	lit := expr as ast.LiteralExpr
+	assert lit.value is ast.BooleanLiteral
+	bool_lit := lit.value as ast.BooleanLiteral
+	assert bool_lit.value == true
+
+	println('Boolean literal parsing test passed!')
+}
+
 fn main() {
 	test_type_variables()
 	test_type_constructors()
@@ -422,4 +462,5 @@ fn main() {
 	test_type_string_representations()
 	test_complex_type_expressions()
 	test_builtin_types()
+	test_parse_boolean_literal()
 }

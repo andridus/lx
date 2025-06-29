@@ -214,33 +214,9 @@ pub fn get_transitions() []Transition {
 		},
 		Transition{
 			from_state: .initial
-			to_state:   .error
-			condition:  CharacterCondition{
-				value: `.`
-			}
-			action:     .emit_error
-		},
-		Transition{
-			from_state: .initial
-			to_state:   .float
-			condition:  CharacterCondition{
-				value: `.`
-			}
-			action:     .consume_character
-		},
-		Transition{
-			from_state: .initial
 			to_state:   .operator
 			condition:  CharacterClassCondition{
 				class: .operator_start
-			}
-			action:     .consume_character
-		},
-		Transition{
-			from_state: .initial
-			to_state:   .operator
-			condition:  CharacterClassCondition{
-				class: .punctuation
 			}
 			action:     .consume_character
 		},
@@ -251,6 +227,14 @@ pub fn get_transitions() []Transition {
 				class: .whitespace
 			}
 			action:     .skip_character
+		},
+		Transition{
+			from_state: .initial
+			to_state:   .operator
+			condition:  CharacterClassCondition{
+				class: .punctuation
+			}
+			action:     .consume_character
 		},
 		// Whitespace state transitions
 		Transition{
@@ -282,14 +266,6 @@ pub fn get_transitions() []Transition {
 			to_state:   .operator
 			condition:  CharacterClassCondition{
 				class: .operator_start
-			}
-			action:     .consume_character
-		},
-		Transition{
-			from_state: .whitespace
-			to_state:   .operator
-			condition:  CharacterClassCondition{
-				class: .punctuation
 			}
 			action:     .consume_character
 		},

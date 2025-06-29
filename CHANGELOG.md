@@ -20,6 +20,8 @@
 - **Module System**: Dependency management with global and per-file declarations, type validation via BEAM files
 - **Enhanced Pattern Matching**: Support for complex patterns including maps, records, tuples, and nested structures
 - **Type System Improvements**: Comprehensive type checking for all new constructs with proper error reporting
+- **Logical operators `andalso`/`&&` and `orelse`/`||` now generate `andalso` and `orelse` in Erlang output, matching modern BEAM semantics.
+- **Lexer recognizes both symbolic and word forms for these operators.
 
 ### Fixed
 - Fixed parser error handling to register errors but continue parsing, ensuring all syntax errors are reported

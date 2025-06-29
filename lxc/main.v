@@ -34,10 +34,6 @@ fn main() {
 		eprintln('Failed to read file: ${err}')
 		exit(1)
 	}
-
-	eprintln('File content length: ${content.len}')
-	eprintln('First 100 chars: ${content[..if content.len > 100 { 100 } else { content.len }]}')
-
 	// Create lexer and tokenize
 	mut lexer_instance := lexer.new_lexer(content, input_file)
 	mut tokens := []lexer.Token{}
@@ -66,6 +62,10 @@ fn main() {
 	mut parser_instance := parser.new_main_parser(tokens)
 	mut module_stmt := parser_instance.parse_module() or {
 		eprintln('Parsing failed: ${err}')
+		eprintln('Parser errors:')
+		for error in parser_instance.get_errors() {
+			eprintln('  ${error}')
+		}
 		exit(1)
 	}
 

@@ -25,6 +25,8 @@ pub const operator_map = {
 	'not':     OperatorToken.not_
 	'andalso': OperatorToken.andalso
 	'orelse':  OperatorToken.orelse
+	'&&':      OperatorToken.andalso
+	'||':      OperatorToken.orelse
 }
 
 // PunctuationMap maps punctuation strings to their corresponding tokens
@@ -78,7 +80,7 @@ pub fn get_all_punctuation() []string {
 // is_single_char_operator checks if a character can be the start of an operator
 pub fn is_single_char_operator(c u8) bool {
 	return c == `=` || c == `<` || c == `>` || c == `!` || c == `:` || c == `+` || c == `-`
-		|| c == `*` || c == `/` || c == `|` || c == `.`
+		|| c == `*` || c == `/` || c == `|` || c == `.` || c == `&`
 }
 
 // is_operator_start checks if a character can be the start of an operator

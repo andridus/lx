@@ -92,14 +92,14 @@ pub fn (mut mp MainParser) parse_module() ?ast.ModuleStmt {
 
 // parse_statement parses a single statement using the statement parser
 fn (mut mp MainParser) parse_statement() ?ast.Stmt {
-	mut stmt_parser := new_statement_parser(mp.tokens[mp.position..])
-	stmt_parser.position = 0
+	mut stmt_parser := new_statement_parser(mp.tokens)
+	stmt_parser.position = mp.position
 	stmt_parser.current = mp.current
 
 	stmt := stmt_parser.parse_statement()?
 
 	// Advance the main parser to the position where statement parser ended
-	mp.position += stmt_parser.position
+	mp.position = stmt_parser.position
 	if mp.position < mp.tokens.len {
 		mp.current = mp.tokens[mp.position]
 	} else {
@@ -150,14 +150,14 @@ fn (mut mp MainParser) parse_import_statement() ?ast.Import {
 
 // parse_expression parses expressions using the expression parser
 pub fn (mut mp MainParser) parse_expression() ?ast.Expr {
-	mut expr_parser := new_expression_parser(mp.tokens[mp.position..])
-	expr_parser.position = 0
+	mut expr_parser := new_expression_parser(mp.tokens)
+	expr_parser.position = mp.position
 	expr_parser.current = mp.current
 
 	expr := expr_parser.parse_expression()?
 
 	// Advance the main parser to the position where expression parser ended
-	mp.position += expr_parser.position
+	mp.position = expr_parser.position
 	if mp.position < mp.tokens.len {
 		mp.current = mp.tokens[mp.position]
 	} else {
@@ -172,14 +172,14 @@ pub fn (mut mp MainParser) parse_expression() ?ast.Expr {
 
 // parse_pattern parses patterns using the expression parser
 pub fn (mut mp MainParser) parse_pattern() ?ast.Pattern {
-	mut expr_parser := new_expression_parser(mp.tokens[mp.position..])
-	expr_parser.position = 0
+	mut expr_parser := new_expression_parser(mp.tokens)
+	expr_parser.position = mp.position
 	expr_parser.current = mp.current
 
 	pattern := expr_parser.parse_pattern()?
 
 	// Advance the main parser to the position where expression parser ended
-	mp.position += expr_parser.position
+	mp.position = expr_parser.position
 	if mp.position < mp.tokens.len {
 		mp.current = mp.tokens[mp.position]
 	} else {

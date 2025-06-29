@@ -43,17 +43,19 @@ pub fn (gen ErlangGenerator) generate_module(module_stmt ast.ModuleStmt, type_ct
 // generate_exports generates export list from module statements
 fn (gen ErlangGenerator) generate_exports(statements []ast.Stmt) []string {
 	mut exports := []string{}
+	mut seen_exports := map[string]bool{}
 
 	for stmt in statements {
 		match stmt {
 			ast.FunctionStmt {
-				// Count parameters from the first clause
-				if stmt.clauses.len > 0 {
-					param_count := stmt.clauses[0].parameters.len
-					exports << '${stmt.name}/${param_count}'
-				} else {
-					// Default to 0 parameters if no clauses
-					exports << '${stmt.name}/0'
+				// Generate exports for all clauses with different arities
+				for clause in stmt.clauses {
+					param_count := clause.parameters.len
+					export_name := '${stmt.name}/${param_count}'
+					if !seen_exports[export_name] {
+						exports << export_name
+						seen_exports[export_name] = true
+					}
 				}
 			}
 			else {
@@ -210,7 +212,7 @@ fn (gen ErlangGenerator) capitalize_variable(name string) string {
 			return '?MODULE'
 		}
 		else {
-			return name[0].str().to_upper() + name[1..]
+			return name[0].ascii_str().to_upper() + name[1..]
 		}
 	}
 }
@@ -240,6 +242,8 @@ fn (gen ErlangGenerator) translate_operator(operator ast.BinaryOp) string {
 		.greater_equal { return '>=' }
 		.and { return 'and' }
 		.or { return 'or' }
+		.andalso { return 'andalso' }
+		.orelse { return 'orelse' }
 		.append { return '++' }
 		.cons { return '|' }
 	}
@@ -386,38 +390,55 @@ fn (gen ErlangGenerator) generate_guard(expr ast.GuardExpr) string {
 
 // generate_function generates code for function definitions
 fn (gen ErlangGenerator) generate_function(func ast.FunctionStmt) string {
-	mut clauses := []string{}
+	// Group clauses by arity
+	mut clauses_by_arity := map[int][]ast.FunctionClause{}
 
 	for clause in func.clauses {
-		parameters := clause.parameters.map(gen.generate_pattern(it))
-		guard := if clause.guard is ast.LiteralExpr {
-			literal := clause.guard as ast.LiteralExpr
-			if literal.value is ast.BooleanLiteral {
-				boolean := literal.value as ast.BooleanLiteral
-				if boolean.value {
-					'' // Skip 'when true' guards
-				} else {
-					return ' when ' + gen.generate_expression(clause.guard)
-				}
-			} else {
-				return ' when ' + gen.generate_expression(clause.guard)
-			}
-		} else {
-			return ' when ' + gen.generate_expression(clause.guard)
+		arity := clause.parameters.len
+		if arity !in clauses_by_arity {
+			clauses_by_arity[arity] = []ast.FunctionClause{}
 		}
-		body := clause.body.map(gen.generate_statement(it))
-		// Emit all statements separated by ',' except the last one (Erlang style)
-		body_code := if body.len > 1 {
-			body[..body.len - 1].join(',\n') + ',\n' + body[body.len - 1]
-		} else if body.len == 1 {
-			body[0]
-		} else {
-			'ok'
-		}
-		clauses << '${func.name}(${parameters.join(', ')})${guard} ->\n${body_code}'
+		clauses_by_arity[arity] << clause
 	}
 
-	return clauses.join(';\n') + '.'
+	mut function_definitions := []string{}
+
+	// Generate separate function definitions for each arity
+	for clauses in clauses_by_arity.values() {
+		mut clause_strings := []string{}
+
+		for clause in clauses {
+			parameters := clause.parameters.map(gen.generate_pattern(it))
+			mut guard := ''
+			if clause.guard is ast.LiteralExpr {
+				literal := clause.guard as ast.LiteralExpr
+				if literal.value is ast.BooleanLiteral {
+					boolean := literal.value as ast.BooleanLiteral
+					if !boolean.value {
+						guard = ' when ' + gen.generate_expression(clause.guard)
+					}
+				} else {
+					guard = ' when ' + gen.generate_expression(clause.guard)
+				}
+			} else {
+				guard = ' when ' + gen.generate_expression(clause.guard)
+			}
+			body := clause.body.map(gen.generate_statement(it))
+			// Emit all statements separated by ',' except the last one (Erlang style)
+			body_code := if body.len > 1 {
+				body[..body.len - 1].join(',\n') + ',\n' + body[body.len - 1]
+			} else if body.len == 1 {
+				body[0]
+			} else {
+				'ok'
+			}
+			clause_strings << '${func.name}(${parameters.join(', ')})${guard} ->\n${body_code}'
+		}
+
+		function_definitions << clause_strings.join(';\n') + '.'
+	}
+
+	return function_definitions.join('\n\n')
 }
 
 // generate_pattern generates code for patterns

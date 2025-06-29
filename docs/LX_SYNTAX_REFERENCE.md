@@ -1207,3 +1207,20 @@ end
 - Full compatibility with OTP/Erlang
 
 ---
+
+## Logical Operators
+
+LX supports both symbolic and word forms for short-circuit logical operators:
+
+| LX Syntax      | Description         | Erlang Output |
+| -------------- | ------------------ | ------------- |
+| a andalso b    | short-circuit AND  | a andalso b   |
+| a && b         | short-circuit AND  | a andalso b   |
+| a orelse b     | short-circuit OR   | a orelse b    |
+| a || b         | short-circuit OR   | a orelse b    |
+
+Both forms are fully equivalent in LX and always generate the modern Erlang/BEAM operators (`andalso`, `orelse`).
+
+> Note: The classic `and`/`or` (non-short-circuit) are also available as `and`/`or` in LX, mapping to their respective Erlang forms.
+
+---
