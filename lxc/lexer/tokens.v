@@ -12,6 +12,7 @@ pub type Token = IdentToken
 	| KeywordToken
 	| OperatorToken
 	| PunctuationToken
+	| NewlineToken
 	| EOFToken
 	| ErrorToken
 
@@ -139,6 +140,10 @@ pub enum PunctuationToken {
 	colon     // :
 }
 
+// NewlineToken represents a newline token
+pub struct NewlineToken {
+}
+
 // EOFToken represents end of file token
 pub struct EOFToken {
 }
@@ -163,6 +168,7 @@ pub fn (t Token) str() string {
 		KeywordToken { 'Keyword(${t.str()})' }
 		OperatorToken { 'Operator(${t.str()})' }
 		PunctuationToken { 'Punctuation(${t.str()})' }
+		NewlineToken { 'Newline' }
 		EOFToken { 'EOF' }
 		ErrorToken { 'Error(${t.message})' }
 	}

@@ -5,6 +5,8 @@ import lexer
 import parser
 import generate.erlang
 import typechecker
+import linter
+import ast
 
 fn main() {
 	args := os.args
@@ -34,6 +36,7 @@ fn main() {
 		eprintln('Failed to read file: ${err}')
 		exit(1)
 	}
+
 	// Create lexer and tokenize
 	mut lexer_instance := lexer.new_lexer(content, input_file)
 	mut tokens := []lexer.Token{}
@@ -58,7 +61,13 @@ fn main() {
 		exit(1)
 	}
 
-	// Create parser and parse the tokens into AST
+	// Debug: print tokens
+	eprintln('Tokens: ${tokens.len}')
+	for i, token in tokens {
+		eprintln('${i}: ${token.str()}')
+	}
+
+	// Parse the tokens as a module
 	mut parser_instance := parser.new_main_parser(tokens)
 	mut module_stmt := parser_instance.parse_module() or {
 		eprintln('Parsing failed: ${err}')
@@ -79,7 +88,22 @@ fn main() {
 	}
 
 	// Override the module name with the file name
-	module_stmt.name = module_name
+	module_stmt = ast.ModuleStmt{
+		...module_stmt
+		name: module_name
+	}
+
+	// Run linter to check code quality
+	linter_instance := linter.new_linter()
+	linter_result := linter_instance.lint_module(module_stmt)
+
+	if !linter_result.success {
+		eprintln('Linter errors:')
+		for error in linter_result.errors {
+			eprintln('  ${error.message}')
+		}
+		exit(1)
+	}
 
 	// Generate Erlang code
 	erlang_gen := erlang.new_erlang_generator()

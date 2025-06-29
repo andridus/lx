@@ -94,6 +94,9 @@ pub fn (mut l Lexer) next_token() Token {
 				if ch == `\n` {
 					l.line++
 					l.column = 1
+					// Emit NewlineToken immediately when we encounter \n
+					l.state = transition.to_state
+					return NewlineToken{}
 				} else {
 					l.column++
 				}

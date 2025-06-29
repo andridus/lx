@@ -80,38 +80,55 @@ pub fn (mut sp StatementParser) parse_function_statement() ?ast.Stmt {
 	name := sp.current.get_value()
 	sp.advance()
 
-	mut clauses := []ast.FunctionClause{}
-
-	// Check for new multi-header syntax: def name do ... end
+	// PRIMEIRO: se for 'do', é multi-head
 	if sp.check(lexer.KeywordToken.do_) {
 		sp.advance() // consume 'do'
-
-		// Parse multiple function headers inside do...end block
+		mut clauses := []ast.FunctionClause{}
 		for !sp.check(lexer.KeywordToken.end_) && !sp.is_at_end() {
-			if sp.check(lexer.PunctuationToken.lparen) {
+			sp.skip_irrelevant_tokens()
+			// Pular até o próximo (
+			for sp.position < sp.tokens.len && !(sp.tokens[sp.position] is lexer.PunctuationToken && (sp.tokens[sp.position] as lexer.PunctuationToken) == .lparen) && !sp.check(lexer.KeywordToken.end_) {
+				sp.position++
+				sp.sync_current_token()
+			}
+			if sp.is_potential_new_clause_start() {
 				clause := sp.parse_function_header()?
 				clauses << clause
 			} else {
 				break
 			}
 		}
-
 		if !sp.check(lexer.KeywordToken.end_) {
 			sp.add_error('Expected end after function headers', 'Got ${sp.current.str()}')
 			return none
 		}
 		sp.consume(lexer.KeywordToken.end_, 'Expected end after function headers')?
-	} else {
-		// Parse traditional single clause function
-		clause := sp.parse_function_clause()?
-		clauses << clause
+		return ast.FunctionStmt{
+			name:     name
+			clauses:  clauses
+			position: sp.get_current_position()
+		}
 	}
 
-	return ast.FunctionStmt{
-		name:     name
-		clauses:  clauses
-		position: sp.get_current_position()
+	// SÓ SE NÃO FOR 'do', verifica se é '('
+	if sp.check(lexer.PunctuationToken.lparen) {
+		clause := sp.parse_function_clause()?
+		return ast.FunctionStmt{
+			name:     name
+			clauses:  [clause]
+			position: sp.get_current_position()
+		}
 	}
+
+	sp.add_error('Expected do or ( after function name (multi-head or single-head)', 'Got ${sp.current.str()}')
+	return none
+}
+
+// skip_irrelevant_tokens pula tokens que não são significativos para o parsing
+fn (mut sp StatementParser) skip_irrelevant_tokens() {
+	// Por enquanto, não há tokens específicos de comentário ou whitespace
+	// Se no futuro adicionar tokens de comentário, whitespace, etc, adicione aqui
+	// Por enquanto, é um no-op
 }
 
 // parse_private_function_statement parses private function definitions
@@ -200,7 +217,6 @@ fn (mut sp StatementParser) parse_function_clause() ?ast.FunctionClause {
 
 // parse_function_header parses function headers in new syntax: (params) when guard -> body
 fn (mut sp StatementParser) parse_function_header() ?ast.FunctionClause {
-
 	// Parse parameters
 	mut parameters := []ast.Pattern{}
 
@@ -663,11 +679,15 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 			mut expr := ast.Expr(ast.VariableExpr{
 				name: token.value
 			})
-			// Loop para dot access e chamada de função
+			// Allow both record access and function calls
 			for {
 				match sp.current() {
 					lexer.OperatorToken {
 						op_token := sp.current() as lexer.OperatorToken
+						// Stop if we encounter -> (marks end of clause body)
+						if op_token == .arrow {
+							break
+						}
 						if op_token == .dot {
 							sp.safe_advance()
 							match sp.current() {
@@ -693,6 +713,10 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 					lexer.PunctuationToken {
 						punc_token := sp.current() as lexer.PunctuationToken
 						if punc_token == .lparen {
+							// Verificar se este ( é o início de uma nova cláusula multi-head
+							if sp.is_potential_new_clause_start() {
+								break
+							}
 							sp.safe_advance()
 							mut arguments := []ast.Expr{}
 							if !sp.check(lexer.PunctuationToken.rparen) {
@@ -768,16 +792,25 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 fn (mut sp StatementParser) parse_clause_body() ?[]ast.Stmt {
 	mut statements := []ast.Stmt{}
 
-	// Parse statements until we find the next clause (starting with '(') or 'end'
-	// Note: 'when' is not checked here because it always comes after '(' in multi-clause functions
-	// and is handled inside parse_function_header
-	for !sp.check(lexer.PunctuationToken.lparen) && !sp.check(lexer.KeywordToken.end_) && !sp.is_at_end() {
+	for !sp.is_at_end() {
+		// Detecta início de nova cláusula multi-head: ( ... ) ->
+		if sp.is_potential_new_clause_start() {
+			break
+		}
+		if sp.check(lexer.KeywordToken.end_) {
+			break
+		}
+		// Se o próximo token é (, verificar se é início de nova cláusula antes de consumir
+		if sp.check(lexer.PunctuationToken.lparen) {
+			if sp.is_potential_new_clause_start() {
+				break
+			}
+		}
 		// Parse assignment statements
 		if sp.current is lexer.IdentToken && sp.peek().str() == 'Operator(=)' {
 			stmt := sp.parse_assignment_statement()?
 			statements << stmt
 		} else {
-			// Parse expression statements (tuples, etc.)
 			expr := sp.parse_clause_expression()?
 			statements << ast.ExprStmt{
 				expr: expr
@@ -785,7 +818,44 @@ fn (mut sp StatementParser) parse_clause_body() ?[]ast.Stmt {
 		}
 	}
 
+	if statements.len == 0 {
+		expr := sp.parse_simple_expression()?
+		statements << ast.ExprStmt{
+			expr: expr
+		}
+	}
+
 	return statements
+}
+
+// Detecta início de nova cláusula multi-head pelo padrão ( ... ) ->
+fn (sp StatementParser) is_potential_new_clause_start() bool {
+	mut pos := sp.position
+	if pos >= sp.tokens.len { return false }
+	if !(sp.tokens[pos] is lexer.PunctuationToken) { return false }
+	punc := sp.tokens[pos] as lexer.PunctuationToken
+	if punc != .lparen { return false }
+	// Procurar pelo fechamento do parêntese
+	mut paren_count := 1
+	pos++
+	for pos < sp.tokens.len && paren_count > 0 {
+		tok := sp.tokens[pos]
+		if tok is lexer.PunctuationToken {
+			p := tok as lexer.PunctuationToken
+			if p == .lparen { paren_count++ }
+			if p == .rparen { paren_count-- }
+		}
+		pos++
+	}
+	if paren_count != 0 { return false }
+	// Após fechar parêntese, deve vir ->
+	if pos < sp.tokens.len && sp.tokens[pos] is lexer.OperatorToken {
+		op := sp.tokens[pos] as lexer.OperatorToken
+		if op == .arrow {
+			return true
+		}
+	}
+	return false
 }
 
 // parse_assignment_statement parses assignment statements
@@ -878,9 +948,6 @@ fn (mut sp StatementParser) parse_restricted_expression() ?ast.Expr {
 			return sp.parse_simple_expression()
 		}
 	}
-
-	// Note: We don't check for '->' or 'when' here because they always come after '(' in multi-clause functions
-	// and we already check for '(' in the main loop
 
 	return expr
 }
