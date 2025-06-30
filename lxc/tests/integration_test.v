@@ -1,7 +1,7 @@
 module main
 
-import parser
-import lexer
+import frontend.parser
+import frontend.lexer
 import ast
 
 // Test the complete parsing pipeline from tokens to AST

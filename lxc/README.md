@@ -153,6 +153,8 @@ lxc/
 - **Type Safety**: Strong type system with Hindley-Milner type inference
 - **Extensibility**: Clean interfaces allow for easy addition of new features
 - **Testability**: Comprehensive test suite covering all major components
+- **Separation of Concerns**: Lexer focuses purely on tokenization, parser handles semantic interpretation (e.g., negative numbers are parsed as unary operators, not lexed as negative literals)
+- **Modern Compiler Design**: Follows established compiler construction principles with clear phase separation
 
 ## Building and Running
 

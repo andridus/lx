@@ -103,7 +103,10 @@ fn (mut mp MainParser) parse_statement() ?ast.Stmt {
 	stmt_parser.position = mp.position
 	stmt_parser.current = mp.current
 
-	stmt := stmt_parser.parse_statement()?
+	stmt := stmt_parser.parse_statement() or {
+		mp.errors << stmt_parser.errors
+		return none
+	}
 
 	// Advance the main parser to the position where statement parser ended
 	mp.position = stmt_parser.position
@@ -114,7 +117,7 @@ fn (mut mp MainParser) parse_statement() ?ast.Stmt {
 	}
 
 	// Copy any errors from the statement parser
-	mp.errors << stmt_parser.errors
+
 
 	return stmt
 }
@@ -161,7 +164,10 @@ pub fn (mut mp MainParser) parse_expression_internal() ?ast.Expr {
 	expr_parser.position = mp.position
 	expr_parser.current = mp.current
 
-	expr := expr_parser.parse_expression()?
+	expr := expr_parser.parse_expression() or {
+		mp.errors << expr_parser.errors
+		return none
+	}
 
 	// Advance the main parser to the position where expression parser ended
 	mp.position = expr_parser.position
@@ -172,7 +178,7 @@ pub fn (mut mp MainParser) parse_expression_internal() ?ast.Expr {
 	}
 
 	// Copy any errors from the expression parser
-	mp.errors << expr_parser.errors
+
 
 	return expr
 }
@@ -183,7 +189,10 @@ pub fn (mut mp MainParser) parse_pattern_internal() ?ast.Pattern {
 	expr_parser.position = mp.position
 	expr_parser.current = mp.current
 
-	pattern := expr_parser.parse_pattern()?
+	pattern := expr_parser.parse_pattern() or {
+		mp.errors << expr_parser.errors
+		return none
+	}
 
 	// Advance the main parser to the position where expression parser ended
 	mp.position = expr_parser.position
@@ -194,7 +203,7 @@ pub fn (mut mp MainParser) parse_pattern_internal() ?ast.Pattern {
 	}
 
 	// Copy any errors from the expression parser
-	mp.errors << expr_parser.errors
+
 
 	return pattern
 }

@@ -1,6 +1,6 @@
 module main
 
-import lexer
+import frontend.lexer
 
 fn test_inline_comments() {
 	input := 'x = 42 # This is a comment'

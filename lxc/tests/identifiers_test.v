@@ -1,6 +1,6 @@
 module main
 
-import lexer
+import frontend.lexer
 
 fn test_variable_identifiers() {
 	input := 'x count _unused _123'

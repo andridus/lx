@@ -1,6 +1,6 @@
 module main
 
-import lexer
+import frontend.lexer
 
 fn test_errors_unterminated_string() {
 	input := '"hello world'

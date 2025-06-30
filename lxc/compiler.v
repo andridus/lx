@@ -66,7 +66,9 @@ pub fn (mut comp Compiler) compile_file(file_path string) !ast.ModuleStmt {
 
 	// Create parser and parse the tokens into AST
 	comp.parser_instance = parser.new_main_parser(tokens)
-	module_stmt := comp.parser_instance.parse_module() or { return error('Parsing failed: ${err}') }
+	module_stmt := comp.parser_instance.parse_module() or {
+		return error('Parsing failed: ${comp.parser_instance}')
+	}
 
 	if comp.parser_instance.has_errors() {
 		mut errors := []string{}

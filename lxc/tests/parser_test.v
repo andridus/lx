@@ -1,7 +1,7 @@
 module main
 
-import parser
-import lexer
+import frontend.parser
+import frontend.lexer
 import ast
 
 // Test basic literal parsing

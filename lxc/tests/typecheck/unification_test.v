@@ -1,6 +1,6 @@
 module main
 
-import typechecker
+import analysis.typechecker
 import ast { Position }
 
 fn test_unifier_creation() {

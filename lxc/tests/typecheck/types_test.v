@@ -1,9 +1,9 @@
 module main
 
-import typechecker
-import parser
+import analysis.typechecker
+import frontend.parser
+import frontend.lexer
 import ast
-import lexer
 
 fn test_type_variables() {
 	// Test type variable creation and string representation

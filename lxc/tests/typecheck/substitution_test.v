@@ -1,6 +1,6 @@
 module main
 
-import typechecker
+import analysis.typechecker
 
 fn test_substitution_creation() {
 	// Test substitution creation

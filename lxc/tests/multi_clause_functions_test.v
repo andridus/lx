@@ -1,9 +1,9 @@
 module main
 
-import parser
-import lexer
+import analysis.linter
+import frontend.parser
+import frontend.lexer
 import ast
-import linter
 import errors
 
 fn test_multi_clause_function_parsing() {

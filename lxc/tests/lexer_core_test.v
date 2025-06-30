@@ -1,6 +1,6 @@
 module main
 
-import lexer
+import frontend.lexer
 
 fn test_lexer_initialization() {
 	input := 'x = 42'

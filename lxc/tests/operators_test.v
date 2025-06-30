@@ -1,7 +1,7 @@
 module main
 
-import parser
-import lexer
+import frontend.lexer
+import frontend.parser
 import ast
 
 fn test_arithmetic_operators() {

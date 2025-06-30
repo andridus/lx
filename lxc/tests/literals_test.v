@@ -1,6 +1,6 @@
 module main
 
-import lexer
+import frontend.lexer
 
 fn test_string_literals() {
 	// Test basic strings
