@@ -41,9 +41,17 @@ fn (mut sp StatementParser) parse_clause_body() ?[]ast.Stmt {
 			}
 		}
 		// Parse assignment statements
-		if sp.current is lexer.IdentToken && sp.peek().str() == 'Operator(=)' {
-			stmt := sp.parse_assignment_statement()?
-			statements << stmt
+		if sp.current is lexer.IdentToken && sp.peek() is lexer.OperatorToken {
+			op_token := sp.peek() as lexer.OperatorToken
+			if op_token.value == .assign {
+				stmt := sp.parse_assignment_statement()?
+				statements << stmt
+			} else {
+				expr := sp.parse_clause_expression()?
+				statements << ast.ExprStmt{
+					expr: expr
+				}
+			}
 		} else {
 			expr := sp.parse_clause_expression()?
 			statements << ast.ExprStmt{

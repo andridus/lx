@@ -142,6 +142,20 @@ x = 10
 x = 20  # Error: reassignment not allowed
 ```
 
+#### Assignment in function bodies
+
+You can assign values to variables inside function bodies:
+
+```lx
+def a() do
+  name = "Alice"
+  age = 30
+  is_active = true
+end
+```
+
+Multiple assignments are allowed in sequence. Each variable can only be assigned once per scope.
+
 #### Block expressions:
 
 Code blocks are now defined using `do` and `end` keywords:
