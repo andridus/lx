@@ -85,11 +85,7 @@ pub fn (mut l Lexer) next_token() Token {
 
 		match transition.action or { TransitionAction.consume_character } {
 			.consume_character {
-				if l.state == .maybe_negative && transition.to_state == .number {
-					l.buffer = '-' + ch.ascii_str()
-				} else {
-					l.buffer += ch.ascii_str()
-				}
+				l.buffer += ch.ascii_str()
 				l.position++
 				if ch == `\n` {
 					l.line++
@@ -138,15 +134,6 @@ pub fn (mut l Lexer) next_token() Token {
 				l.state = transition.to_state
 			}
 			.emit_token {
-				if l.state == .maybe_negative {
-					l.state = transition.to_state
-					continue
-				}
-				if l.state == .comment {
-					l.buffer = ''
-					l.state = transition.to_state
-					continue
-				}
 				token := l.create_token_from_buffer()
 				l.state = transition.to_state
 				l.buffer = ''
@@ -359,11 +346,6 @@ fn (mut l Lexer) create_token_from_buffer() Token {
 					message: 'Lexical error: Unknown operator'
 				}
 			}
-		}
-		.maybe_negative {
-			// In maybe_negative state, the buffer contains only "-"
-			// This should be treated as a minus operator
-			OperatorToken.minus
 		}
 		else {
 			ErrorToken{

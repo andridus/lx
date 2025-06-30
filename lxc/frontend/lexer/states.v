@@ -13,7 +13,6 @@ pub enum LexerState {
 	operator
 	whitespace
 	error
-	maybe_negative
 }
 
 // str returns a string representation of LexerState
@@ -30,14 +29,13 @@ pub fn (s LexerState) str() string {
 		.operator { 'operator' }
 		.whitespace { 'whitespace' }
 		.error { 'error' }
-		.maybe_negative { 'maybe_negative' }
 	}
 }
 
 // is_final_state checks if a state is a final state (can emit a token)
 pub fn (s LexerState) is_final_state() bool {
 	return match s {
-		.identifier, .number, .float, .string, .atom, .error, .maybe_negative { true }
+		.identifier, .number, .float, .string, .atom, .error { true }
 		else { false }
 	}
 }
@@ -47,8 +45,7 @@ pub fn (current LexerState) can_transition_to(target LexerState) bool {
 	return match current {
 		.initial {
 			match target {
-				.identifier, .number, .string, .atom, .comment, .operator, .whitespace,
-				.maybe_negative {
+				.identifier, .number, .string, .atom, .comment, .operator, .whitespace {
 					true
 				}
 				else {
@@ -58,8 +55,7 @@ pub fn (current LexerState) can_transition_to(target LexerState) bool {
 		}
 		.atom_start {
 			match target {
-				.identifier, .number, .string, .atom, .comment, .operator, .whitespace,
-				.maybe_negative {
+				.identifier, .number, .string, .atom, .comment, .operator, .whitespace {
 					true
 				}
 				else {
@@ -111,8 +107,7 @@ pub fn (current LexerState) can_transition_to(target LexerState) bool {
 		}
 		.whitespace {
 			match target {
-				.initial, .identifier, .number, .string, .atom, .operator, .comment,
-				.maybe_negative {
+				.initial, .identifier, .number, .string, .atom, .operator, .comment {
 					true
 				}
 				else {
@@ -123,12 +118,6 @@ pub fn (current LexerState) can_transition_to(target LexerState) bool {
 		.error {
 			match target {
 				.initial { true }
-				else { false }
-			}
-		}
-		.maybe_negative {
-			match target {
-				.number, .operator, .initial { true }
 				else { false }
 			}
 		}
@@ -149,7 +138,6 @@ pub fn (s LexerState) get_default_transition() LexerState {
 		.operator { .initial }
 		.whitespace { .initial }
 		.error { .initial }
-		.maybe_negative { .initial }
 	}
 }
 

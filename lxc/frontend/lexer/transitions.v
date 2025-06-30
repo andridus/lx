@@ -182,14 +182,6 @@ pub fn get_transitions() []Transition {
 		},
 		Transition{
 			from_state: .initial
-			to_state:   .maybe_negative
-			condition:  CharacterCondition{
-				value: `-`
-			}
-			action:     .consume_character
-		},
-		Transition{
-			from_state: .initial
 			to_state:   .string
 			condition:  CharacterClassCondition{
 				class: .quote
@@ -244,30 +236,6 @@ pub fn get_transitions() []Transition {
 				class: .whitespace
 			}
 			action:     .skip_character
-		},
-		Transition{
-			from_state: .whitespace
-			to_state:   .maybe_negative
-			condition:  CharacterCondition{
-				value: `-`
-			}
-			action:     .consume_character
-		},
-		Transition{
-			from_state: .whitespace
-			to_state:   .atom_start
-			condition:  CharacterCondition{
-				value: `:`
-			}
-			action:     .consume_character
-		},
-		Transition{
-			from_state: .whitespace
-			to_state:   .operator
-			condition:  CharacterClassCondition{
-				class: .operator_start
-			}
-			action:     .consume_character
 		},
 		Transition{
 			from_state: .whitespace
@@ -465,21 +433,6 @@ pub fn get_transitions() []Transition {
 			to_state:   .initial
 			condition:  AlwaysCondition{}
 			action:     .emit_error
-		},
-		// MaybeNegative state transitions
-		Transition{
-			from_state: .maybe_negative
-			to_state:   .number
-			condition:  CharacterClassCondition{
-				class: .digit
-			}
-			action:     .consume_character
-		},
-		Transition{
-			from_state: .maybe_negative
-			to_state:   .operator
-			condition:  AlwaysCondition{}
-			action:     .emit_token
 		},
 	]
 }
