@@ -56,7 +56,7 @@ fn (mut ep ExpressionParser) parse_or_expression() ?ast.Expr {
 	mut left := ep.parse_and_expression()?
 	for ep.current is lexer.OperatorToken {
 		op_token := ep.current as lexer.OperatorToken
-		if op_token != .or_ {
+		if op_token.value != .or_ {
 			break
 		}
 		ep.advance()
@@ -76,7 +76,7 @@ fn (mut ep ExpressionParser) parse_and_expression() ?ast.Expr {
 	mut left := ep.parse_orelse_expression()?
 	for ep.current is lexer.OperatorToken {
 		op_token := ep.current as lexer.OperatorToken
-		if op_token != .and_ {
+		if op_token.value != .and_ {
 			break
 		}
 		ep.advance()
@@ -96,7 +96,7 @@ fn (mut ep ExpressionParser) parse_orelse_expression() ?ast.Expr {
 	mut left := ep.parse_andalso_expression()?
 	for ep.current is lexer.OperatorToken {
 		op_token := ep.current as lexer.OperatorToken
-		if op_token != .orelse {
+		if op_token.value != .orelse {
 			break
 		}
 		ep.advance()
@@ -116,7 +116,7 @@ fn (mut ep ExpressionParser) parse_andalso_expression() ?ast.Expr {
 	mut left := ep.parse_comparison_expression()?
 	for ep.current is lexer.OperatorToken {
 		op_token := ep.current as lexer.OperatorToken
-		if op_token != .andalso {
+		if op_token.value != .andalso {
 			break
 		}
 		ep.advance()
@@ -143,8 +143,7 @@ fn (mut ep ExpressionParser) add_error(message string, context string) {
 }
 
 fn (ep ExpressionParser) get_current_position() ast.Position {
-	return ast.Position{
-		line:   1
-		column: ep.position + 1
-	}
+	// Use the current token's position if available
+	pos := ep.current.get_position()
+	return ast.new_position(pos.line, pos.column, pos.filename)
 }

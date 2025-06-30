@@ -8,17 +8,17 @@ fn (mut ep ExpressionParser) parse_tuple_expression() ?ast.Expr {
 	ep.advance() // consume '{'
 
 	mut elements := []ast.Expr{}
-	if !ep.check(lexer.PunctuationToken.rbrace) {
+	if !ep.check(lexer.punctuation(.rbrace)) {
 		for {
 			elements << ep.parse_expression()?
 
-			if !ep.match(lexer.PunctuationToken.comma) {
+			if !ep.match(lexer.punctuation(.comma)) {
 				break
 			}
 		}
 	}
 
-	ep.consume(lexer.PunctuationToken.rbrace, 'Expected closing brace')?
+	ep.consume(lexer.punctuation(.rbrace), 'Expected closing brace')?
 
 	return ast.TupleExpr{
 		elements: elements
@@ -31,17 +31,16 @@ fn (mut ep ExpressionParser) parse_list_expression() ?ast.Expr {
 	ep.advance() // consume '['
 
 	mut elements := []ast.Expr{}
-	if !ep.check(lexer.PunctuationToken.rbracket) {
+	if !ep.check(lexer.punctuation(.rbracket)) {
 		for {
 			elements << ep.parse_expression()?
-
-			if !ep.match(lexer.PunctuationToken.comma) {
+			if !ep.match(lexer.punctuation(.comma)) {
 				break
 			}
 		}
 	}
 
-	ep.consume(lexer.PunctuationToken.rbracket, 'Expected closing bracket')?
+	ep.consume(lexer.punctuation(.rbracket), 'Expected closing bracket')?
 
 	return ast.ListLiteralExpr{
 		elements: elements
@@ -52,22 +51,22 @@ fn (mut ep ExpressionParser) parse_list_expression() ?ast.Expr {
 // parse_map_expression parses map expressions
 fn (mut ep ExpressionParser) parse_map_expression() ?ast.Expr {
 	ep.advance() // consume '%'
-	ep.consume(lexer.PunctuationToken.lbrace, 'Expected opening brace after %')?
+	ep.consume(lexer.punctuation(.lbrace), 'Expected opening brace after %')?
 
 	mut entries := []ast.MapEntry{}
-	if !ep.check(lexer.PunctuationToken.rbrace) {
+	if !ep.check(lexer.punctuation(.rbrace)) {
 		for {
 			key := ep.parse_expression()?
 
 			// Check for colon (atom key) or arrow (general key)
-			if ep.match(lexer.PunctuationToken.colon) {
+			if ep.match(lexer.punctuation(.colon)) {
 				value := ep.parse_expression()?
 				entries << ast.MapEntry{
 					key:      key
 					value:    value
 					position: ep.get_current_position()
 				}
-			} else if ep.match(lexer.OperatorToken.arrow) {
+			} else if ep.match(lexer.operator(.arrow)) {
 				value := ep.parse_expression()?
 				entries << ast.MapEntry{
 					key:      key
@@ -79,13 +78,13 @@ fn (mut ep ExpressionParser) parse_map_expression() ?ast.Expr {
 				return none
 			}
 
-			if !ep.match(lexer.PunctuationToken.comma) {
+			if !ep.match(lexer.punctuation(.comma)) {
 				break
 			}
 		}
 	}
 
-	ep.consume(lexer.PunctuationToken.rbrace, 'Expected closing brace')?
+	ep.consume(lexer.punctuation(.rbrace), 'Expected closing brace')?
 
 	return ast.MapLiteralExpr{
 		entries:  entries
@@ -105,10 +104,10 @@ fn (mut ep ExpressionParser) parse_record_expression() ?ast.Expr {
 	}
 	ep.advance()
 
-	ep.consume(lexer.PunctuationToken.lbrace, 'Expected opening brace')?
+	ep.consume(lexer.punctuation(.lbrace), 'Expected opening brace')?
 
 	mut fields := []ast.RecordField{}
-	if !ep.check(lexer.PunctuationToken.rbrace) {
+	if !ep.check(lexer.punctuation(.rbrace)) {
 		for {
 			field_name := ep.current.get_value()
 			if !ep.current.is_identifier() {
@@ -117,7 +116,7 @@ fn (mut ep ExpressionParser) parse_record_expression() ?ast.Expr {
 			}
 			ep.advance()
 
-			ep.consume(lexer.PunctuationToken.colon, 'Expected colon after field name')?
+			ep.consume(lexer.punctuation(.colon), 'Expected colon after field name')?
 
 			value := ep.parse_expression()?
 			fields << ast.RecordField{
@@ -126,13 +125,13 @@ fn (mut ep ExpressionParser) parse_record_expression() ?ast.Expr {
 				position: ep.get_current_position()
 			}
 
-			if !ep.match(lexer.PunctuationToken.comma) {
+			if !ep.match(lexer.punctuation(.comma)) {
 				break
 			}
 		}
 	}
 
-	ep.consume(lexer.PunctuationToken.rbrace, 'Expected closing brace')?
+	ep.consume(lexer.punctuation(.rbrace), 'Expected closing brace')?
 
 	return ast.RecordLiteralExpr{
 		name:     name_token.get_value()

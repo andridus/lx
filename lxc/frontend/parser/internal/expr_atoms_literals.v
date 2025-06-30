@@ -41,7 +41,7 @@ fn (mut ep ExpressionParser) parse_atom_expression() ?ast.Expr {
 		}
 		lexer.KeywordToken {
 			keyword_token := ep.current as lexer.KeywordToken
-			match keyword_token {
+			match keyword_token.value {
 				.true_ {
 					ep.advance()
 					ast.LiteralExpr{
@@ -93,7 +93,7 @@ fn (mut ep ExpressionParser) parse_atom_expression() ?ast.Expr {
 		}
 		lexer.PunctuationToken {
 			punc_token := ep.current as lexer.PunctuationToken
-			match punc_token {
+			match punc_token.value {
 				.lparen {
 					ep.parse_parenthesized_expression()
 				}
@@ -111,7 +111,7 @@ fn (mut ep ExpressionParser) parse_atom_expression() ?ast.Expr {
 		}
 		lexer.OperatorToken {
 			op_token := ep.current as lexer.OperatorToken
-			match op_token {
+			match op_token.value {
 				.record_update {
 					ep.parse_map_expression()
 				}
@@ -214,7 +214,7 @@ fn (mut ep ExpressionParser) parse_nil_literal() ?ast.Expr {
 fn (mut ep ExpressionParser) parse_parenthesized_expression() ?ast.Expr {
 	ep.advance() // consume '('
 	expr := ep.parse_expression()?
-	ep.consume(lexer.PunctuationToken.rparen, 'Expected closing parenthesis')?
+	ep.consume(lexer.punctuation(.rparen), 'Expected closing parenthesis')?
 
 	return expr
 }

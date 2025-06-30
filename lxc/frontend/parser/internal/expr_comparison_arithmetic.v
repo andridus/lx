@@ -10,7 +10,7 @@ fn (mut ep ExpressionParser) parse_comparison_expression() ?ast.Expr {
 		op_token := ep.current as lexer.OperatorToken
 		mut op := ast.BinaryOp.equal
 		mut should_continue := false
-		match op_token {
+		match op_token.value {
 			.eq {
 				op = .equal
 				should_continue = true
@@ -58,7 +58,7 @@ fn (mut ep ExpressionParser) parse_comparison_expression() ?ast.Expr {
 fn (mut ep ExpressionParser) parse_concatenation_expression() ?ast.Expr {
 	mut left := ep.parse_additive_expression()?
 
-	for ep.match(lexer.OperatorToken.concat) {
+	for ep.match(lexer.operator(.concat)) {
 		right := ep.parse_additive_expression()?
 		left = ast.BinaryExpr{
 			left:     left
@@ -79,7 +79,7 @@ fn (mut ep ExpressionParser) parse_additive_expression() ?ast.Expr {
 		mut op := ast.BinaryOp.add
 		mut should_continue := false
 
-		match op_token {
+		match op_token.value {
 			.plus {
 				op = .add
 				should_continue = true
@@ -117,7 +117,7 @@ fn (mut ep ExpressionParser) parse_multiplicative_expression() ?ast.Expr {
 		mut op := ast.BinaryOp.multiply
 		mut should_continue := false
 
-		match op_token {
+		match op_token.value {
 			.mult {
 				op = .multiply
 				should_continue = true
@@ -151,7 +151,7 @@ fn (mut ep ExpressionParser) parse_multiplicative_expression() ?ast.Expr {
 fn (mut ep ExpressionParser) parse_unary_expression() ?ast.Expr {
 	if ep.current is lexer.OperatorToken {
 		op_token := ep.current as lexer.OperatorToken
-		if op_token == .not_ {
+		if op_token.value == .not_ {
 			operand := ep.parse_unary_expression()?
 			return ast.UnaryExpr{
 				op:       .not

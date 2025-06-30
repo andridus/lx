@@ -28,7 +28,7 @@ pub fn new_precedence_table() PrecedenceTable {
 
 // get_precedence returns the precedence level for an operator token
 pub fn (p PrecedenceTable) get_precedence(token lexer.OperatorToken) Precedence {
-	return match token {
+	return match token.value {
 		.assign { .assignment }
 		.pattern_match { .assignment }
 		.or_ { .or_ }
@@ -65,7 +65,7 @@ pub fn (p PrecedenceTable) get_precedence_from_token(token lexer.Token) Preceden
 
 // is_left_associative checks if an operator is left associative
 pub fn (p PrecedenceTable) is_left_associative(token lexer.OperatorToken) bool {
-	return match token {
+	return match token.value {
 		.assign { false }
 		.pattern_match { false }
 		.or_ { true }

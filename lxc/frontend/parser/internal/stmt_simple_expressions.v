@@ -14,7 +14,7 @@ fn (mut sp StatementParser) parse_simple_expression() ?ast.Expr {
 		mut op := ast.BinaryOp.add
 		mut should_continue := false
 
-		match op_token {
+		match op_token.value {
 			.plus {
 				op = .add
 				should_continue = true
@@ -93,10 +93,10 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 					lexer.OperatorToken {
 						op_token := sp.current() as lexer.OperatorToken
 						// Stop if we encounter -> (marks end of clause body)
-						if op_token == .arrow {
+						if op_token.value == .arrow {
 							break
 						}
-						if op_token == .dot {
+						if op_token.value == .dot {
 							sp.safe_advance()
 							match sp.current() {
 								lexer.IdentToken {
@@ -120,22 +120,21 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 					}
 					lexer.PunctuationToken {
 						punc_token := sp.current() as lexer.PunctuationToken
-						if punc_token == .lparen {
-							// Verificar se este ( é o início de uma nova cláusula multi-head
+						if punc_token.value == .lparen {
 							if sp.is_potential_new_clause_start() {
 								break
 							}
 							sp.safe_advance()
 							mut arguments := []ast.Expr{}
-							if !sp.check(lexer.PunctuationToken.rparen) {
+							if !sp.check(lexer.punctuation(.rparen)) {
 								for {
 									arguments << sp.parse_simple_expression()?
-									if !sp.match(lexer.PunctuationToken.comma) {
+									if !sp.match(lexer.punctuation(.comma)) {
 										break
 									}
 								}
 							}
-							sp.consume(lexer.PunctuationToken.rparen, 'Expected closing parenthesis')?
+							sp.consume(lexer.punctuation(.rparen), 'Expected closing parenthesis')?
 							expr = ast.Expr(ast.CallExpr{
 								function:  expr
 								arguments: arguments

@@ -17,7 +17,13 @@ pub fn new_parser(tokens []lexer.Token) &Parser {
 	return &Parser{
 		tokens:   tokens
 		position: 0
-		current:  if tokens.len > 0 { tokens[0] } else { lexer.EOFToken{} }
+		current:  if tokens.len > 0 {
+			tokens[0]
+		} else {
+			lexer.EOFToken{
+				position: lexer.new_token_position(1, 1, '')
+			}
+		}
 		errors:   []
 	}
 }
@@ -27,7 +33,9 @@ pub fn (mut p Parser) advance() {
 	if p.position < p.tokens.len {
 		p.current = p.tokens[p.position]
 	} else {
-		p.current = lexer.EOFToken{}
+		p.current = lexer.EOFToken{
+			position: lexer.new_token_position(1, 1, '')
+		}
 	}
 }
 
@@ -35,14 +43,18 @@ pub fn (p Parser) peek() lexer.Token {
 	if p.position + 1 < p.tokens.len {
 		return p.tokens[p.position + 1]
 	}
-	return lexer.EOFToken{}
+	return lexer.EOFToken{
+		position: lexer.new_token_position(1, 1, '')
+	}
 }
 
 pub fn (p Parser) peek_n(n int) lexer.Token {
 	if p.position + n < p.tokens.len {
 		return p.tokens[p.position + n]
 	}
-	return lexer.EOFToken{}
+	return lexer.EOFToken{
+		position: lexer.new_token_position(1, 1, '')
+	}
 }
 
 pub fn (p Parser) is_at_end() bool {
@@ -53,7 +65,7 @@ pub fn (p Parser) check(token_type lexer.Token) bool {
 	if p.is_at_end() {
 		return false
 	}
-	return p.current == token_type
+	return p.current.str() == token_type.str()
 }
 
 pub fn (mut p Parser) match(token_type lexer.Token) bool {
@@ -70,16 +82,15 @@ pub fn (mut p Parser) consume(token_type lexer.Token, message string) ?lexer.Tok
 		return p.tokens[p.position - 1]
 	}
 
-	pos := ast.Position{
-		line:   1
-		column: p.position + 1
-	}
+	// Use the current token's position for error reporting
+	pos := p.current.get_position()
+	ast_pos := ast.new_position(pos.line, pos.column, pos.filename)
 
 	comp_error := errors.new_compilation_error(errors.ErrorKind(errors.SyntaxError{
 		message:  message
 		expected: token_type.str()
 		found:    p.current.str()
-	}), pos, 'Expected ${token_type.str()}, got ${p.current.str()}')
+	}), ast_pos, 'Expected ${token_type.str()}, got ${p.current.str()}')
 
 	p.errors << comp_error
 	return none

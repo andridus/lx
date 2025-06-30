@@ -25,7 +25,9 @@ fn (mut sp StatementParser) sync_current_token() {
 	if sp.position < sp.tokens.len {
 		sp.current = sp.tokens[sp.position]
 	} else {
-		sp.current = lexer.EOFToken{}
+		sp.current = lexer.EOFToken{
+			position: lexer.new_token_position(1, 1, '')
+		}
 	}
 }
 
@@ -40,7 +42,7 @@ fn (mut sp StatementParser) parse_statement() ?ast.Stmt {
 	return match sp.current {
 		lexer.KeywordToken {
 			keyword_token := sp.current as lexer.KeywordToken
-			match keyword_token {
+			match keyword_token.value {
 				.def { sp.parse_function_statement() }
 				.defp { sp.parse_private_function_statement() }
 				.record { sp.parse_record_definition() }
@@ -144,8 +146,7 @@ fn (mut sp StatementParser) add_error(message string, context string) {
 }
 
 fn (sp StatementParser) get_current_position() ast.Position {
-	return ast.Position{
-		line:   1
-		column: sp.position + 1
-	}
+	// Use the current token's position if available
+	pos := sp.current.get_position()
+	return ast.new_position(pos.line, pos.column, pos.filename)
 }

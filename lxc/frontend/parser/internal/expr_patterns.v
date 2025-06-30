@@ -32,7 +32,7 @@ fn (mut ep ExpressionParser) parse_pattern() ?ast.Pattern {
 		}
 		lexer.PunctuationToken {
 			punc_token := ep.current as lexer.PunctuationToken
-			match punc_token {
+			match punc_token.value {
 				.lparen {
 					ep.parse_parenthesized_pattern()
 				}
@@ -124,7 +124,7 @@ fn (mut ep ExpressionParser) parse_nil_pattern() ?ast.Pattern {
 fn (mut ep ExpressionParser) parse_parenthesized_pattern() ?ast.Pattern {
 	ep.advance() // consume '('
 	pattern := ep.parse_pattern()?
-	ep.consume(lexer.PunctuationToken.rparen, 'Expected closing parenthesis')?
+	ep.consume(lexer.punctuation(.rparen), 'Expected closing parenthesis')?
 
 	return pattern
 }
@@ -134,17 +134,17 @@ fn (mut ep ExpressionParser) parse_tuple_pattern() ?ast.Pattern {
 	ep.advance() // consume '{'
 
 	mut elements := []ast.Pattern{}
-	if !ep.check(lexer.PunctuationToken.rbrace) {
+	if !ep.check(lexer.punctuation(.rbrace)) {
 		for {
 			elements << ep.parse_pattern()?
 
-			if !ep.match(lexer.PunctuationToken.comma) {
+			if !ep.match(lexer.punctuation(.comma)) {
 				break
 			}
 		}
 	}
 
-	ep.consume(lexer.PunctuationToken.rbrace, 'Expected closing brace')?
+	ep.consume(lexer.punctuation(.rbrace), 'Expected closing brace')?
 
 	return ast.TuplePattern{
 		elements: elements
@@ -155,7 +155,7 @@ fn (mut ep ExpressionParser) parse_tuple_pattern() ?ast.Pattern {
 fn (mut ep ExpressionParser) parse_list_pattern() ?ast.Pattern {
 	ep.advance() // consume '['
 
-	if ep.check(lexer.PunctuationToken.rbracket) {
+	if ep.check(lexer.punctuation(.rbracket)) {
 		ep.advance() // consume ']'
 		return ast.ListEmptyPattern{}
 	}
@@ -164,12 +164,12 @@ fn (mut ep ExpressionParser) parse_list_pattern() ?ast.Pattern {
 	for {
 		elements << ep.parse_pattern()?
 
-		if !ep.match(lexer.PunctuationToken.comma) {
+		if !ep.match(lexer.punctuation(.comma)) {
 			break
 		}
 	}
 
-	ep.consume(lexer.PunctuationToken.rbracket, 'Expected closing bracket')?
+	ep.consume(lexer.punctuation(.rbracket), 'Expected closing bracket')?
 
 	return ast.ListLiteralPattern{
 		elements: elements
@@ -179,22 +179,22 @@ fn (mut ep ExpressionParser) parse_list_pattern() ?ast.Pattern {
 // parse_map_pattern parses map patterns
 fn (mut ep ExpressionParser) parse_map_pattern() ?ast.Pattern {
 	ep.advance() // consume '%'
-	ep.consume(lexer.PunctuationToken.lbrace, 'Expected opening brace after %')?
+	ep.consume(lexer.punctuation(.lbrace), 'Expected opening brace after %')?
 
 	mut entries := []ast.MapPatternEntry{}
-	if !ep.check(lexer.PunctuationToken.rbrace) {
+	if !ep.check(lexer.punctuation(.rbrace)) {
 		for {
 			key := ep.parse_pattern()?
 
 			// Check for colon (atom key) or arrow (general key)
-			if ep.match(lexer.PunctuationToken.colon) {
+			if ep.match(lexer.punctuation(.colon)) {
 				value := ep.parse_pattern()?
 				entries << ast.MapPatternEntry{
 					key:      key
 					value:    value
 					position: ep.get_current_position()
 				}
-			} else if ep.match(lexer.OperatorToken.arrow) {
+			} else if ep.match(lexer.operator(.arrow)) {
 				value := ep.parse_pattern()?
 				entries << ast.MapPatternEntry{
 					key:      key
@@ -206,13 +206,13 @@ fn (mut ep ExpressionParser) parse_map_pattern() ?ast.Pattern {
 				return none
 			}
 
-			if !ep.match(lexer.PunctuationToken.comma) {
+			if !ep.match(lexer.punctuation(.comma)) {
 				break
 			}
 		}
 	}
 
-	ep.consume(lexer.PunctuationToken.rbrace, 'Expected closing brace')?
+	ep.consume(lexer.punctuation(.rbrace), 'Expected closing brace')?
 
 	return ast.MapPattern{
 		entries: entries

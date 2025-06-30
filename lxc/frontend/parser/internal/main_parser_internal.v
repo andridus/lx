@@ -31,7 +31,7 @@ pub fn (mut mp MainParser) parse_module_internal() ?ast.ModuleStmt {
 	mut exports := []string{}
 
 	// Parse module header if present
-	if mp.check(lexer.KeywordToken.module) {
+	if mp.check(lexer.keyword(.module)) {
 		mp.advance() // consume 'module'
 
 		if !mp.current.is_identifier() {
@@ -41,8 +41,8 @@ pub fn (mut mp MainParser) parse_module_internal() ?ast.ModuleStmt {
 		mp.advance()
 
 		// Parse exports if present
-		if mp.match(lexer.PunctuationToken.lbracket) {
-			for !mp.check(lexer.PunctuationToken.rbracket) {
+		if mp.match(lexer.punctuation(.lbracket)) {
+			for !mp.check(lexer.punctuation(.rbracket)) {
 				export := mp.current.get_value()
 				if !mp.current.is_identifier() {
 					mp.add_error('Expected export name', 'Got ${mp.current.str()}')
@@ -51,31 +51,31 @@ pub fn (mut mp MainParser) parse_module_internal() ?ast.ModuleStmt {
 				mp.advance()
 				exports << export
 
-				if !mp.match(lexer.PunctuationToken.comma) {
+				if !mp.match(lexer.punctuation(.comma)) {
 					break
 				}
 			}
-			mp.consume(lexer.PunctuationToken.rbracket, 'Expected closing bracket')?
+			mp.consume(lexer.punctuation(.rbracket), 'Expected closing bracket')?
 		}
 
 		// Parse imports if present
-		if mp.match(lexer.KeywordToken.import) {
+		if mp.match(lexer.keyword(.import)) {
 			for {
 				import_stmt := mp.parse_import_statement()?
 				imports << import_stmt
 
-				if !mp.match(lexer.PunctuationToken.comma) {
+				if !mp.match(lexer.punctuation(.comma)) {
 					break
 				}
 			}
 		}
 
-		mp.consume(lexer.PunctuationToken.lbrace, 'Expected opening brace')?
+		mp.consume(lexer.punctuation(.lbrace), 'Expected opening brace')?
 	}
 
 	// Parse all statements in the module
 	for !mp.is_at_end() {
-		if mp.check(lexer.PunctuationToken.rbrace) {
+		if mp.check(lexer.punctuation(.rbrace)) {
 			break
 		}
 
@@ -84,7 +84,7 @@ pub fn (mut mp MainParser) parse_module_internal() ?ast.ModuleStmt {
 	}
 
 	// Consume closing brace if present
-	if mp.check(lexer.PunctuationToken.rbrace) {
+	if mp.check(lexer.punctuation(.rbrace)) {
 		mp.advance()
 	}
 
@@ -113,11 +113,12 @@ fn (mut mp MainParser) parse_statement() ?ast.Stmt {
 	if mp.position < mp.tokens.len {
 		mp.current = mp.tokens[mp.position]
 	} else {
-		mp.current = lexer.EOFToken{}
+		mp.current = lexer.EOFToken{
+			position: lexer.new_token_position(1, 1, '')
+		}
 	}
 
 	// Copy any errors from the statement parser
-
 
 	return stmt
 }
@@ -134,8 +135,8 @@ fn (mut mp MainParser) parse_import_statement() ?ast.Import {
 	mut aliases := []string{}
 
 	// Parse aliases if present
-	if mp.match(lexer.PunctuationToken.lbracket) {
-		for !mp.check(lexer.PunctuationToken.rbracket) {
+	if mp.match(lexer.punctuation(.lbracket)) {
+		for !mp.check(lexer.punctuation(.rbracket)) {
 			alias := mp.current.get_value()
 			if !mp.current.is_identifier() {
 				mp.add_error('Expected alias name', 'Got ${mp.current.str()}')
@@ -144,11 +145,11 @@ fn (mut mp MainParser) parse_import_statement() ?ast.Import {
 			mp.advance()
 			aliases << alias
 
-			if !mp.match(lexer.PunctuationToken.comma) {
+			if !mp.match(lexer.punctuation(.comma)) {
 				break
 			}
 		}
-		mp.consume(lexer.PunctuationToken.rbracket, 'Expected closing bracket')?
+		mp.consume(lexer.punctuation(.rbracket), 'Expected closing bracket')?
 	}
 
 	return ast.Import{
@@ -174,11 +175,12 @@ pub fn (mut mp MainParser) parse_expression_internal() ?ast.Expr {
 	if mp.position < mp.tokens.len {
 		mp.current = mp.tokens[mp.position]
 	} else {
-		mp.current = lexer.EOFToken{}
+		mp.current = lexer.EOFToken{
+			position: lexer.new_token_position(1, 1, '')
+		}
 	}
 
 	// Copy any errors from the expression parser
-
 
 	return expr
 }
@@ -199,11 +201,12 @@ pub fn (mut mp MainParser) parse_pattern_internal() ?ast.Pattern {
 	if mp.position < mp.tokens.len {
 		mp.current = mp.tokens[mp.position]
 	} else {
-		mp.current = lexer.EOFToken{}
+		mp.current = lexer.EOFToken{
+			position: lexer.new_token_position(1, 1, '')
+		}
 	}
 
 	// Copy any errors from the expression parser
-
 
 	return pattern
 }
@@ -220,8 +223,7 @@ fn (mut mp MainParser) add_error(message string, context string) {
 }
 
 fn (mp MainParser) get_current_position() ast.Position {
-	return ast.Position{
-		line:   1
-		column: mp.position + 1
-	}
+	// Use the current token's position if available
+	pos := mp.current.get_position()
+	return ast.new_position(pos.line, pos.column, pos.filename)
 }

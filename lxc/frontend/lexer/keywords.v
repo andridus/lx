@@ -1,38 +1,38 @@
 module lexer
 
-// KeywordMap maps keyword strings to their corresponding tokens
+// KeywordMap maps keyword strings to their corresponding values
 pub const keyword_map = {
-	'def':          KeywordToken.def
-	'defp':         KeywordToken.defp
-	'case':         KeywordToken.case_
-	'if':           KeywordToken.if_
-	'else':         KeywordToken.else_
-	'do':           KeywordToken.do_
-	'end':          KeywordToken.end_
-	'with':         KeywordToken.with
-	'for':          KeywordToken.for_
-	'when':         KeywordToken.when
-	'receive':      KeywordToken.receive
-	'after':        KeywordToken.after
-	'true':         KeywordToken.true_
-	'false':        KeywordToken.false_
-	'nil':          KeywordToken.nil_
-	'unsafe':       KeywordToken.unsafe
-	'record':       KeywordToken.record
-	'worker':       KeywordToken.worker
-	'supervisor':   KeywordToken.supervisor
-	'strategy':     KeywordToken.strategy
-	'children':     KeywordToken.children
-	'one_for_one':  KeywordToken.one_for_one
-	'one_for_all':  KeywordToken.one_for_all
-	'rest_for_one': KeywordToken.rest_for_one
-	'spec':         KeywordToken.spec
-	'requires':     KeywordToken.requires
-	'ensures':      KeywordToken.ensures
-	'matches':      KeywordToken.matches
-	'describe':     KeywordToken.describe
-	'test':         KeywordToken.test_
-	'assert':       KeywordToken.assert
+	'def':          KeywordValue.def
+	'defp':         KeywordValue.defp
+	'case':         KeywordValue.case_
+	'if':           KeywordValue.if_
+	'else':         KeywordValue.else_
+	'do':           KeywordValue.do_
+	'end':          KeywordValue.end_
+	'with':         KeywordValue.with
+	'for':          KeywordValue.for_
+	'when':         KeywordValue.when
+	'receive':      KeywordValue.receive
+	'after':        KeywordValue.after
+	'true':         KeywordValue.true_
+	'false':        KeywordValue.false_
+	'nil':          KeywordValue.nil_
+	'unsafe':       KeywordValue.unsafe
+	'record':       KeywordValue.record
+	'worker':       KeywordValue.worker
+	'supervisor':   KeywordValue.supervisor
+	'strategy':     KeywordValue.strategy
+	'children':     KeywordValue.children
+	'one_for_one':  KeywordValue.one_for_one
+	'one_for_all':  KeywordValue.one_for_all
+	'rest_for_one': KeywordValue.rest_for_one
+	'spec':         KeywordValue.spec
+	'requires':     KeywordValue.requires
+	'ensures':      KeywordValue.ensures
+	'matches':      KeywordValue.matches
+	'describe':     KeywordValue.describe
+	'test':         KeywordValue.test_
+	'assert':       KeywordValue.assert
 }
 
 // is_keyword checks if a string is a keyword
@@ -41,9 +41,12 @@ pub fn is_keyword(s string) bool {
 }
 
 // get_keyword_token returns the token for a keyword string
-pub fn get_keyword_token(s string) ?KeywordToken {
+pub fn get_keyword_token(s string, position TokenPosition) ?KeywordToken {
 	if s in keyword_map {
-		return keyword_map[s]
+		return KeywordToken{
+			value:    keyword_map[s]
+			position: position
+		}
 	}
 	return none
 }

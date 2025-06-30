@@ -10,11 +10,12 @@ import ast
 fn main() {
 	args := os.args
 	if args.len < 2 {
-		eprintln('Usage: lxc <input_file>')
+		eprintln('Usage: lxc <input_file> [--debug-tokens]')
 		exit(1)
 	}
 
 	input_file := args[1]
+	debug_tokens := args.len > 2 && args[2] == '--debug-tokens'
 
 	if !os.exists(input_file) {
 		eprintln('Input file not found: ${input_file}')
@@ -32,8 +33,11 @@ fn main() {
 
 	// Use the compiler module to compile the file
 	mut comp := compiler.new_compiler()
+	if debug_tokens {
+		comp.debug_tokens = true
+	}
 	mut module_stmt := comp.compile_file(input_file) or {
-		eprintln('Compilation failed: ${err}')
+		eprintln(err)
 		exit(1)
 	}
 

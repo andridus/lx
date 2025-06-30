@@ -10,7 +10,7 @@ fn (mut sp StatementParser) parse_statement_block() ?[]ast.Stmt {
 	for {
 		if sp.current is lexer.KeywordToken {
 			keyword_token := sp.current as lexer.KeywordToken
-			if keyword_token == .end_ {
+			if keyword_token.value == .end_ {
 				break
 			}
 		}
@@ -31,11 +31,11 @@ fn (mut sp StatementParser) parse_clause_body() ?[]ast.Stmt {
 		if sp.is_potential_new_clause_start() {
 			break
 		}
-		if sp.check(lexer.KeywordToken.end_) {
+		if sp.check(lexer.keyword(.end_)) {
 			break
 		}
 		// Se o próximo token é (, verificar se é início de nova cláusula antes de consumir
-		if sp.check(lexer.PunctuationToken.lparen) {
+		if sp.check(lexer.punctuation(.lparen)) {
 			if sp.is_potential_new_clause_start() {
 				break
 			}
@@ -62,7 +62,6 @@ fn (mut sp StatementParser) parse_clause_body() ?[]ast.Stmt {
 	return statements
 }
 
-// Detecta início de nova cláusula multi-head pelo padrão ( ... ) ->
 fn (sp StatementParser) is_potential_new_clause_start() bool {
 	mut pos := sp.position
 	if pos >= sp.tokens.len {
@@ -72,7 +71,7 @@ fn (sp StatementParser) is_potential_new_clause_start() bool {
 		return false
 	}
 	punc := sp.tokens[pos] as lexer.PunctuationToken
-	if punc != .lparen {
+	if punc.value != .lparen {
 		return false
 	}
 	// Procurar pelo fechamento do parêntese
@@ -82,10 +81,10 @@ fn (sp StatementParser) is_potential_new_clause_start() bool {
 		tok := sp.tokens[pos]
 		if tok is lexer.PunctuationToken {
 			p := tok as lexer.PunctuationToken
-			if p == .lparen {
+			if p.value == .lparen {
 				paren_count++
 			}
-			if p == .rparen {
+			if p.value == .rparen {
 				paren_count--
 			}
 		}
@@ -94,10 +93,9 @@ fn (sp StatementParser) is_potential_new_clause_start() bool {
 	if paren_count != 0 {
 		return false
 	}
-	// Após fechar parêntese, deve vir ->
 	if pos < sp.tokens.len && sp.tokens[pos] is lexer.OperatorToken {
 		op := sp.tokens[pos] as lexer.OperatorToken
-		if op == .arrow {
+		if op.value == .arrow {
 			return true
 		}
 	}
@@ -115,7 +113,7 @@ fn (mut sp StatementParser) parse_assignment_statement() ?ast.Stmt {
 	sp.advance()
 
 	// Parse assignment operator
-	sp.consume(lexer.OperatorToken.assign, 'Expected = in assignment')?
+	sp.consume(lexer.operator(.assign), 'Expected = in assignment')?
 
 	// Parse value
 	value := sp.parse_expression()?
@@ -135,7 +133,7 @@ fn (mut sp StatementParser) parse_clause_expression() ?ast.Expr {
 	return match sp.current {
 		lexer.PunctuationToken {
 			punc_token := sp.current as lexer.PunctuationToken
-			match punc_token {
+			match punc_token.value {
 				.lbrace {
 					sp.parse_tuple_expression()
 				}
@@ -156,17 +154,17 @@ fn (mut sp StatementParser) parse_tuple_expression() ?ast.Expr {
 	sp.advance() // consume '{'
 
 	mut elements := []ast.Expr{}
-	if !sp.check(lexer.PunctuationToken.rbrace) {
+	if !sp.check(lexer.punctuation(.rbrace)) {
 		for {
 			elements << sp.parse_simple_expression()?
 
-			if !sp.match(lexer.PunctuationToken.comma) {
+			if !sp.match(lexer.punctuation(.comma)) {
 				break
 			}
 		}
 	}
 
-	sp.consume(lexer.PunctuationToken.rbrace, 'Expected closing brace')?
+	sp.consume(lexer.punctuation(.rbrace), 'Expected closing brace')?
 
 	return ast.TupleExpr{
 		elements: elements
@@ -186,7 +184,7 @@ fn (mut sp StatementParser) parse_restricted_expression() ?ast.Expr {
 	// Check if we consumed a token that should stop us
 	if sp.current is lexer.KeywordToken {
 		keyword_token := sp.current as lexer.KeywordToken
-		if keyword_token == .end_ {
+		if keyword_token.value == .end_ {
 			// Rollback to start position
 			sp.position = start_pos
 			sp.sync_current_token()

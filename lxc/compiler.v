@@ -4,6 +4,7 @@ import frontend.lexer
 import frontend.parser
 import ast
 import os
+import errors
 
 // CompilerResult represents the result of compilation
 pub struct CompilerResult {
@@ -18,18 +19,22 @@ pub:
 
 // Compiler represents the main compiler for LX language
 pub struct Compiler {
-mut:
+pub mut:
 	file_path       string
 	module_name     string
 	lexer_instance  lexer.Lexer
 	parser_instance parser.MainParser
+	error_formatter errors.ErrorFormatter
+	debug_tokens    bool
 }
 
 // new_compiler creates a new compiler instance
 pub fn new_compiler() Compiler {
 	return Compiler{
-		module_name: ''
-		file_path:   ''
+		module_name:     ''
+		file_path:       ''
+		error_formatter: errors.new_error_formatter()
+		debug_tokens:    false
 	}
 }
 
@@ -56,26 +61,45 @@ pub fn (mut comp Compiler) compile_file(file_path string) !ast.ModuleStmt {
 		tokens << token
 	}
 
-	if comp.lexer_instance.has_errors() {
-		mut errors := []string{}
-		for error in comp.lexer_instance.get_errors() {
-			errors << error.message
+	// Debug: Show tokens if requested
+	if comp.debug_tokens {
+		println('=== TOKENS ===')
+		for i, token in tokens {
+			println('${i}: ${token.str()} @ ${token.get_position().str()}')
 		}
-		return error('Lexical errors: ${errors.join('\n')}')
+		println('=== END TOKENS ===')
+	}
+
+	if comp.lexer_instance.has_errors() {
+		// Format lexer errors properly
+		source_lines := errors.load_source_lines(file_path)
+		mut formatted_errors := []string{}
+		for error in comp.lexer_instance.get_errors() {
+			formatted_errors << comp.error_formatter.format_error(error, source_lines)
+		}
+		return error('Lexical errors:\n${formatted_errors.join('\n')}')
 	}
 
 	// Create parser and parse the tokens into AST
 	comp.parser_instance = parser.new_main_parser(tokens)
 	module_stmt := comp.parser_instance.parse_module() or {
-		return error('Parsing failed: ${comp.parser_instance}')
+		// Format parser errors properly
+		source_lines := errors.load_source_lines(file_path)
+		mut formatted_errors := []string{}
+		for error in comp.parser_instance.get_errors() {
+			formatted_errors << comp.error_formatter.format_error(error, source_lines)
+		}
+		return error(formatted_errors.join('\n'))
 	}
 
 	if comp.parser_instance.has_errors() {
-		mut errors := []string{}
+		// Format parser errors properly
+		source_lines := errors.load_source_lines(file_path)
+		mut formatted_errors := []string{}
 		for error in comp.parser_instance.get_errors() {
-			errors << error.message
+			formatted_errors << comp.error_formatter.format_error(error, source_lines)
 		}
-		return error('Parser errors: ${errors.join('\n')}')
+		return error('Parser errors:\n${formatted_errors.join('\n')}')
 	}
 
 	println('Compiled ${file_path} successfully')
@@ -99,23 +123,35 @@ pub fn (mut comp Compiler) compile_string(source string) !ast.ModuleStmt {
 	}
 
 	if comp.lexer_instance.has_errors() {
-		mut errors := []string{}
+		// Format lexer errors properly for string compilation
+		source_lines := source.split('\n')
+		mut formatted_errors := []string{}
 		for error in comp.lexer_instance.get_errors() {
-			errors << error.message
+			formatted_errors << comp.error_formatter.format_error(error, source_lines)
 		}
-		return error('Lexical errors: ${errors.join('\n')}')
+		return error('Lexical errors:\n${formatted_errors.join('\n')}')
 	}
 
 	// Create parser and parse the tokens into AST
 	comp.parser_instance = parser.new_main_parser(tokens)
-	module_stmt := comp.parser_instance.parse_module() or { return error('Parsing failed: ${err}') }
+	module_stmt := comp.parser_instance.parse_module() or {
+		// Format parser errors properly for string compilation
+		source_lines := source.split('\n')
+		mut formatted_errors := []string{}
+		for error in comp.parser_instance.get_errors() {
+			formatted_errors << comp.error_formatter.format_error(error, source_lines)
+		}
+		return error(formatted_errors.join('\n'))
+	}
 
 	if comp.parser_instance.has_errors() {
-		mut errors := []string{}
+		// Format parser errors properly for string compilation
+		source_lines := source.split('\n')
+		mut formatted_errors := []string{}
 		for error in comp.parser_instance.get_errors() {
-			errors << error.message
+			formatted_errors << comp.error_formatter.format_error(error, source_lines)
 		}
-		return error('Parser errors: ${errors.join('\n')}')
+		return error('Parser errors:\n${formatted_errors.join('\n')}')
 	}
 
 	println('Compiled string successfully')
@@ -123,13 +159,13 @@ pub fn (mut comp Compiler) compile_string(source string) !ast.ModuleStmt {
 }
 
 // new_compiler_result creates a new compiler result
-fn (comp Compiler) new_compiler_result(success bool, erlang_code string, errors []string, warnings []string) CompilerResult {
+fn (comp Compiler) new_compiler_result(success bool, erlang_code string, error_list []string, warnings []string) CompilerResult {
 	return CompilerResult{
 		success:     success
 		erlang_code: erlang_code
 		module_name: comp.module_name
 		file_path:   comp.file_path
-		errors:      errors
+		errors:      error_list
 		warnings:    warnings
 	}
 }

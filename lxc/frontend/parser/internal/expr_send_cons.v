@@ -7,7 +7,7 @@ import lexer
 fn (mut ep ExpressionParser) parse_send_expression() ?ast.Expr {
 	mut left := ep.parse_cons_expression()?
 
-	for ep.match(lexer.OperatorToken.send) {
+	for ep.match(lexer.operator(.send)) {
 		right := ep.parse_cons_expression()?
 		left = ast.SendExpr{
 			pid:      left
@@ -23,7 +23,7 @@ fn (mut ep ExpressionParser) parse_send_expression() ?ast.Expr {
 fn (mut ep ExpressionParser) parse_cons_expression() ?ast.Expr {
 	mut left := ep.parse_primary_expression()?
 
-	for ep.match(lexer.OperatorToken.type_cons) {
+	for ep.match(lexer.operator(.type_cons)) {
 		right := ep.parse_primary_expression()?
 		left = ast.ListConsExpr{
 			head:     left

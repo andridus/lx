@@ -1,5 +1,27 @@
 module lexer
 
+// TokenPosition represents the position of a token in source code
+pub struct TokenPosition {
+pub:
+	line     int    // 1-indexed line number
+	column   int    // 1-indexed column number
+	filename string // Source file name
+}
+
+// new_token_position creates a new TokenPosition
+pub fn new_token_position(line int, column int, filename string) TokenPosition {
+	return TokenPosition{
+		line:     line
+		column:   column
+		filename: filename
+	}
+}
+
+// str returns a string representation of TokenPosition
+pub fn (p TokenPosition) str() string {
+	return '${p.filename}:${p.line}:${p.column}'
+}
+
 // Token represents a lexical token in LX language using sum types
 pub type Token = IdentToken
 	| UpperIdentToken
@@ -19,51 +41,60 @@ pub type Token = IdentToken
 // IdentToken represents an identifier token
 pub struct IdentToken {
 pub:
-	value string
+	value    string
+	position TokenPosition
 }
 
 // UpperIdentToken represents an uppercase identifier token (for records)
 pub struct UpperIdentToken {
 pub:
-	value string
+	value    string
+	position TokenPosition
 }
 
 // StringToken represents a string literal token
 pub struct StringToken {
 pub:
-	value string
+	value    string
+	position TokenPosition
 }
 
 // IntToken represents an integer literal token
 pub struct IntToken {
 pub:
-	value int
+	value    int
+	position TokenPosition
 }
 
 // FloatToken represents a float literal token
 pub struct FloatToken {
 pub:
-	value f64
+	value    f64
+	position TokenPosition
 }
 
 // BoolToken represents a boolean literal token
 pub struct BoolToken {
 pub:
-	value bool
+	value    bool
+	position TokenPosition
 }
 
 // AtomToken represents an atom literal token
 pub struct AtomToken {
 pub:
-	value string
+	value    string
+	position TokenPosition
 }
 
 // NilToken represents a nil literal token
 pub struct NilToken {
+pub:
+	position TokenPosition
 }
 
-// KeywordToken represents a keyword token
-pub enum KeywordToken {
+// KeywordValue represents the value of a keyword token
+pub enum KeywordValue {
 	def
 	defp
 	case_
@@ -100,8 +131,15 @@ pub enum KeywordToken {
 	in
 }
 
-// OperatorToken represents an operator token
-pub enum OperatorToken {
+// KeywordToken represents a keyword token
+pub struct KeywordToken {
+pub:
+	value    KeywordValue
+	position TokenPosition
+}
+
+// OperatorValue represents the value of an operator token
+pub enum OperatorValue {
 	assign        // =
 	pattern_match // <-
 	arrow         // ->
@@ -127,8 +165,15 @@ pub enum OperatorToken {
 	orelse
 }
 
-// PunctuationToken represents a punctuation token
-pub enum PunctuationToken {
+// OperatorToken represents an operator token
+pub struct OperatorToken {
+pub:
+	value    OperatorValue
+	position TokenPosition
+}
+
+// PunctuationValue represents the value of a punctuation token
+pub enum PunctuationValue {
 	lparen    // (
 	rparen    // )
 	lbrace    // {
@@ -140,42 +185,54 @@ pub enum PunctuationToken {
 	colon     // :
 }
 
+// PunctuationToken represents a punctuation token
+pub struct PunctuationToken {
+pub:
+	value    PunctuationValue
+	position TokenPosition
+}
+
 // NewlineToken represents a newline token
 pub struct NewlineToken {
+pub:
+	position TokenPosition
 }
 
 // EOFToken represents end of file token
 pub struct EOFToken {
+pub:
+	position TokenPosition
 }
 
 // ErrorToken represents an error token
 pub struct ErrorToken {
 pub:
-	message string
+	message  string
+	position TokenPosition
 }
 
 // str returns a string representation of Token
 pub fn (t Token) str() string {
 	return match t {
-		IdentToken { 'Ident(${t.value})' }
-		UpperIdentToken { 'UpperIdent(${t.value})' }
-		StringToken { 'String("${t.value}")' }
-		IntToken { 'Int(${t.value})' }
-		FloatToken { 'Float(${t.value})' }
-		BoolToken { 'Bool(${t.value})' }
-		AtomToken { 'Atom(${t.value})' }
+		IdentToken { '${t.value}' }
+		UpperIdentToken { '${t.value}' }
+		StringToken { '"${t.value}"' }
+		IntToken { '${t.value}' }
+		FloatToken { '${t.value}' }
+		BoolToken { '${t.value}' }
+		AtomToken { '${t.value}' }
 		NilToken { 'Nil' }
-		KeywordToken { 'Keyword(${t.str()})' }
-		OperatorToken { 'Operator(${t.str()})' }
-		PunctuationToken { 'Punctuation(${t.str()})' }
+		KeywordToken { '${t.value.str()}' }
+		OperatorToken { '${t.value.str()}' }
+		PunctuationToken { '${t.value.str()}' }
 		NewlineToken { 'Newline' }
 		EOFToken { 'EOF' }
-		ErrorToken { 'Error(${t.message})' }
+		ErrorToken { '${t.message}' }
 	}
 }
 
-// str returns a string representation of KeywordToken
-pub fn (k KeywordToken) str() string {
+// str returns a string representation of KeywordValue
+pub fn (k KeywordValue) str() string {
 	return match k {
 		.def { 'def' }
 		.defp { 'defp' }
@@ -214,8 +271,8 @@ pub fn (k KeywordToken) str() string {
 	}
 }
 
-// str returns a string representation of OperatorToken
-pub fn (o OperatorToken) str() string {
+// str returns a string representation of OperatorValue
+pub fn (o OperatorValue) str() string {
 	return match o {
 		.assign { '=' }
 		.pattern_match { '<-' }
@@ -243,8 +300,8 @@ pub fn (o OperatorToken) str() string {
 	}
 }
 
-// str returns a string representation of PunctuationToken
-pub fn (p PunctuationToken) str() string {
+// str returns a string representation of PunctuationValue
+pub fn (p PunctuationValue) str() string {
 	return match p {
 		.lparen { '(' }
 		.rparen { ')' }
@@ -316,5 +373,44 @@ pub fn (t Token) get_boolean_value() ?bool {
 	return match t {
 		BoolToken { t.value }
 		else { none }
+	}
+}
+
+// Helper functions for token construction
+pub fn keyword(val KeywordValue) KeywordToken {
+	return KeywordToken{
+		value: val
+	}
+}
+
+pub fn operator(val OperatorValue) OperatorToken {
+	return OperatorToken{
+		value: val
+	}
+}
+
+pub fn punctuation(val PunctuationValue) PunctuationToken {
+	return PunctuationToken{
+		value: val
+	}
+}
+
+// get_position returns the position of a token
+pub fn (t Token) get_position() TokenPosition {
+	return match t {
+		IdentToken { t.position }
+		UpperIdentToken { t.position }
+		StringToken { t.position }
+		IntToken { t.position }
+		FloatToken { t.position }
+		BoolToken { t.position }
+		AtomToken { t.position }
+		NilToken { t.position }
+		KeywordToken { t.position }
+		OperatorToken { t.position }
+		PunctuationToken { t.position }
+		NewlineToken { t.position }
+		EOFToken { t.position }
+		ErrorToken { t.position }
 	}
 }

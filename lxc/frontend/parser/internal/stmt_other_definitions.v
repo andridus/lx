@@ -14,10 +14,10 @@ fn (mut sp StatementParser) parse_record_definition() ?ast.Stmt {
 	}
 	sp.advance()
 
-	sp.consume(lexer.PunctuationToken.lbrace, 'Expected opening brace')?
+	sp.consume(lexer.punctuation(.lbrace), 'Expected opening brace')?
 
 	mut fields := []ast.RecordFieldDef{}
-	if !sp.check(lexer.PunctuationToken.rbrace) {
+	if !sp.check(lexer.punctuation(.rbrace)) {
 		for {
 			field_name := sp.current.get_value()
 			if !sp.current.is_identifier() {
@@ -26,7 +26,7 @@ fn (mut sp StatementParser) parse_record_definition() ?ast.Stmt {
 			}
 			sp.advance()
 
-			sp.consume(lexer.OperatorToken.type_cons, 'Expected :: after field name')?
+			sp.consume(lexer.operator(.type_cons), 'Expected :: after field name')?
 
 			field_type := sp.parse_type()?
 
@@ -36,13 +36,13 @@ fn (mut sp StatementParser) parse_record_definition() ?ast.Stmt {
 				position:   sp.get_current_position()
 			}
 
-			if !sp.match(lexer.PunctuationToken.comma) {
+			if !sp.match(lexer.punctuation(.comma)) {
 				break
 			}
 		}
 	}
 
-	sp.consume(lexer.PunctuationToken.rbrace, 'Expected closing brace')?
+	sp.consume(lexer.punctuation(.rbrace), 'Expected closing brace')?
 
 	return ast.RecordDefStmt{
 		name:     name
@@ -62,15 +62,15 @@ fn (mut sp StatementParser) parse_worker_statement() ?ast.Stmt {
 	}
 	sp.advance()
 
-	sp.consume(lexer.KeywordToken.do_, 'Expected do after worker name')?
+	sp.consume(lexer.keyword(.do_), 'Expected do after worker name')?
 
 	mut statements := []ast.Stmt{}
-	for !sp.check(lexer.KeywordToken.end_) && !sp.is_at_end() {
+	for !sp.check(lexer.keyword(.end_)) && !sp.is_at_end() {
 		stmt := sp.parse_statement()?
 		statements << stmt
 	}
 
-	sp.consume(lexer.KeywordToken.end_, 'Expected end after worker body')?
+	sp.consume(lexer.keyword(.end_), 'Expected end after worker body')?
 
 	// For now, we'll return a module statement
 	// In a full implementation, we'd have a specific WorkerStmt type
@@ -94,10 +94,10 @@ fn (mut sp StatementParser) parse_supervisor_statement() ?ast.Stmt {
 	}
 	sp.advance()
 
-	sp.consume(lexer.PunctuationToken.lbrace, 'Expected opening brace')?
+	sp.consume(lexer.punctuation(.lbrace), 'Expected opening brace')?
 
 	// Parse strategy
-	sp.consume(lexer.KeywordToken.strategy, 'Expected strategy keyword')?
+	sp.consume(lexer.keyword(.strategy), 'Expected strategy keyword')?
 	// strategy := sp.current.get_value()
 	if !sp.current.is_identifier() {
 		sp.add_error('Expected strategy name', 'Got ${sp.current.str()}')
@@ -106,11 +106,11 @@ fn (mut sp StatementParser) parse_supervisor_statement() ?ast.Stmt {
 	sp.advance()
 
 	// Parse children
-	sp.consume(lexer.KeywordToken.children, 'Expected children keyword')?
-	sp.consume(lexer.PunctuationToken.lbracket, 'Expected opening bracket')?
+	sp.consume(lexer.keyword(.children), 'Expected children keyword')?
+	sp.consume(lexer.punctuation(.lbracket), 'Expected opening bracket')?
 
 	mut children := []string{}
-	if !sp.check(lexer.PunctuationToken.rbracket) {
+	if !sp.check(lexer.punctuation(.rbracket)) {
 		for {
 			child := sp.current.get_value()
 			if !sp.current.is_identifier() {
@@ -120,14 +120,14 @@ fn (mut sp StatementParser) parse_supervisor_statement() ?ast.Stmt {
 			sp.advance()
 			children << child
 
-			if !sp.match(lexer.PunctuationToken.comma) {
+			if !sp.match(lexer.punctuation(.comma)) {
 				break
 			}
 		}
 	}
 
-	sp.consume(lexer.PunctuationToken.rbracket, 'Expected closing bracket')?
-	sp.consume(lexer.PunctuationToken.rbrace, 'Expected closing brace')?
+	sp.consume(lexer.punctuation(.rbracket), 'Expected closing bracket')?
+	sp.consume(lexer.punctuation(.rbrace), 'Expected closing brace')?
 
 	// For now, we'll return a module statement
 	// In a full implementation, we'd have a specific SupervisorStmt type
@@ -151,15 +151,15 @@ fn (mut sp StatementParser) parse_specification_statement() ?ast.Stmt {
 	}
 	sp.advance()
 
-	sp.consume(lexer.PunctuationToken.lbrace, 'Expected opening brace')?
+	sp.consume(lexer.punctuation(.lbrace), 'Expected opening brace')?
 
 	mut statements := []ast.Stmt{}
-	for !sp.check(lexer.PunctuationToken.rbrace) && !sp.is_at_end() {
+	for !sp.check(lexer.punctuation(.rbrace)) && !sp.is_at_end() {
 		stmt := sp.parse_statement()?
 		statements << stmt
 	}
 
-	sp.consume(lexer.PunctuationToken.rbrace, 'Expected closing brace')?
+	sp.consume(lexer.punctuation(.rbrace), 'Expected closing brace')?
 
 	// For now, we'll return a module statement
 	// In a full implementation, we'd have a specific SpecStmt type
@@ -184,15 +184,15 @@ fn (mut sp StatementParser) parse_test_describe_statement() ?ast.Stmt {
 		return none
 	}
 
-	sp.consume(lexer.PunctuationToken.lbrace, 'Expected opening brace')?
+	sp.consume(lexer.punctuation(.lbrace), 'Expected opening brace')?
 
 	mut statements := []ast.Stmt{}
-	for !sp.check(lexer.PunctuationToken.rbrace) && !sp.is_at_end() {
+	for !sp.check(lexer.punctuation(.rbrace)) && !sp.is_at_end() {
 		stmt := sp.parse_statement()?
 		statements << stmt
 	}
 
-	sp.consume(lexer.PunctuationToken.rbrace, 'Expected closing brace')?
+	sp.consume(lexer.punctuation(.rbrace), 'Expected closing brace')?
 
 	// For now, we'll return a module statement
 	// In a full implementation, we'd have a specific TestDescribeStmt type
@@ -217,15 +217,15 @@ fn (mut sp StatementParser) parse_test_statement() ?ast.Stmt {
 		return none
 	}
 
-	sp.consume(lexer.PunctuationToken.lbrace, 'Expected opening brace')?
+	sp.consume(lexer.punctuation(.lbrace), 'Expected opening brace')?
 
 	mut statements := []ast.Stmt{}
-	for !sp.check(lexer.PunctuationToken.rbrace) && !sp.is_at_end() {
+	for !sp.check(lexer.punctuation(.rbrace)) && !sp.is_at_end() {
 		stmt := sp.parse_statement()?
 		statements << stmt
 	}
 
-	sp.consume(lexer.PunctuationToken.rbrace, 'Expected closing brace')?
+	sp.consume(lexer.punctuation(.rbrace), 'Expected closing brace')?
 
 	// For now, we'll return a module statement
 	// In a full implementation, we'd have a specific TestStmt type

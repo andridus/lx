@@ -14,7 +14,7 @@ mut:
 	filename  string
 	state     LexerState
 	buffer    string
-	start_pos ast.Position
+	start_pos TokenPosition
 	errors    []errors.CompilationError
 	had_error bool
 }
@@ -29,7 +29,7 @@ pub fn new_lexer(input string, filename string) Lexer {
 		filename:  filename
 		state:     .initial
 		buffer:    ''
-		start_pos: ast.new_position(1, 1, filename)
+		start_pos: new_token_position(1, 1, filename)
 		errors:    []
 		had_error: false
 	}
@@ -39,7 +39,9 @@ pub fn new_lexer(input string, filename string) Lexer {
 pub fn (mut l Lexer) next_token() Token {
 	// Se houve erro fatal, só retorna EOF
 	if l.had_error {
-		return EOFToken{}
+		return EOFToken{
+			position: l.get_current_position()
+		}
 	}
 	// If there are errors, always return ErrorToken first
 	if l.has_errors() {
@@ -48,7 +50,8 @@ pub fn (mut l Lexer) next_token() Token {
 		l.errors.delete(0)
 		l.errors.clear()
 		return ErrorToken{
-			message: msg
+			message:  msg
+			position: l.get_current_position()
 		}
 	}
 
@@ -78,13 +81,18 @@ pub fn (mut l Lexer) next_token() Token {
 				l.errors.clear()
 				l.had_error = false
 				return ErrorToken{
-					message: msg
+					message:  msg
+					position: l.get_current_position()
 				}
 			}
 		}
 
 		match transition.action or { TransitionAction.consume_character } {
 			.consume_character {
+				if l.state == .initial
+					&& (ch != ` ` && ch != `\t` && ch != `\n` && ch != `\r` && ch != `#`) {
+					l.start_pos = l.get_current_position()
+				}
 				l.buffer += ch.ascii_str()
 				l.position++
 				if ch == `\n` {
@@ -92,7 +100,9 @@ pub fn (mut l Lexer) next_token() Token {
 					l.column = 1
 					// Emit NewlineToken immediately when we encounter \n
 					l.state = transition.to_state
-					return NewlineToken{}
+					return NewlineToken{
+						position: l.get_current_position()
+					}
 				} else {
 					l.column++
 				}
@@ -125,6 +135,10 @@ pub fn (mut l Lexer) next_token() Token {
 				if ch == `\n` {
 					l.line++
 					l.column = 1
+					// Após pular linha, o próximo token deve atualizar l.start_pos
+					l.state = transition.to_state
+					l.buffer = ''
+					continue
 				} else {
 					l.column++
 				}
@@ -150,7 +164,8 @@ pub fn (mut l Lexer) next_token() Token {
 				l.state = transition.to_state
 				l.buffer = ''
 				return ErrorToken{
-					message: error_message
+					message:  error_message
+					position: l.get_current_position()
 				}
 			}
 			.backtrack {
@@ -166,7 +181,8 @@ pub fn (mut l Lexer) next_token() Token {
 		msg := l.errors[0].message
 		l.errors.delete(0)
 		return ErrorToken{
-			message: msg
+			message:  msg
+			position: l.get_current_position()
 		}
 	}
 
@@ -189,7 +205,8 @@ pub fn (mut l Lexer) next_token() Token {
 			l.buffer = ''
 			l.state = .initial
 			return ErrorToken{
-				message: msg
+				message:  msg
+				position: l.get_current_position()
 			}
 		}
 	}
@@ -201,7 +218,8 @@ pub fn (mut l Lexer) next_token() Token {
 			msg := l.errors[0].message
 			l.errors.delete(0)
 			return ErrorToken{
-				message: msg
+				message:  msg
+				position: l.get_current_position()
 			}
 		}
 	}
@@ -233,32 +251,48 @@ pub fn (mut l Lexer) next_token() Token {
 		}
 	}
 
-	return EOFToken{}
+	return EOFToken{
+		position: l.get_current_position()
+	}
 }
 
 // create_token_from_buffer creates a token from the current buffer
 fn (mut l Lexer) create_token_from_buffer() Token {
 	if l.buffer.len == 0 {
-		return EOFToken{}
+		return EOFToken{
+			position: l.get_current_position()
+		}
 	}
 
 	return match l.state {
 		.identifier {
 			if is_keyword(l.buffer) {
-				return get_keyword_token(l.buffer) or { panic('Internal error: keyword not found') }
+				buffer := l.buffer
+				keyword_token := get_keyword_token(buffer, l.start_pos) or {
+					panic('Internal error: keyword not found')
+				}
+				KeywordToken{
+					value:    keyword_token.value
+					position: l.start_pos
+				}
 			} else if is_operator(l.buffer) {
-				operator_token := get_operator_token(l.buffer) or {
+				operator_token := get_operator_token(l.buffer, l.start_pos) or {
 					panic('Internal error: operator not found')
 				}
-				operator_token
+				OperatorToken{
+					value:    operator_token.value
+					position: l.start_pos
+				}
 			} else {
 				if l.buffer[0].is_capital() {
 					UpperIdentToken{
-						value: l.buffer
+						value:    l.buffer
+						position: l.start_pos
 					}
 				} else {
 					IdentToken{
-						value: l.buffer
+						value:    l.buffer
+						position: l.start_pos
 					}
 				}
 			}
@@ -266,72 +300,91 @@ fn (mut l Lexer) create_token_from_buffer() Token {
 		.number {
 			value := l.buffer.int()
 			IntToken{
-				value: value
+				value:    value
+				position: l.start_pos
 			}
 		}
 		.float {
 			// Check if float ends with dot
 			if l.buffer.ends_with('.') {
 				return ErrorToken{
-					message: 'Lexical error: Float literal cannot end with dot'
+					message:  'Lexical error: Float literal cannot end with dot'
+					position: l.start_pos
 				}
 			}
 			value := l.buffer.f64()
 			FloatToken{
-				value: value
+				value:    value
+				position: l.start_pos
 			}
 		}
 		.string {
 			value := l.parse_string_literal() or {
 				return ErrorToken{
-					message: 'Lexical error: Invalid escape sequence in string literal'
+					message:  'Lexical error: Invalid escape sequence in string literal'
+					position: l.start_pos
 				}
 			}
 			StringToken{
-				value: value
+				value:    value
+				position: l.start_pos
 			}
 		}
 		.atom {
 			if l.buffer.len == 1 {
 				return ErrorToken{
-					message: 'Lexical error: Isolated colon is not allowed'
+					message:  'Lexical error: Isolated colon is not allowed'
+					position: l.start_pos
 				}
 			}
 			value := l.buffer[1..]
 			AtomToken{
-				value: value
+				value:    value
+				position: l.start_pos
 			}
 		}
 		.atom_start {
 			// If we have only ':', it's an error
 			if l.buffer == ':' {
 				return ErrorToken{
-					message: 'Lexical error: Isolated colon is not allowed'
+					message:  'Lexical error: Isolated colon is not allowed'
+					position: l.start_pos
 				}
 			}
 			// This should not happen in normal flow, but just in case
 			ErrorToken{
-				message: 'Lexical error: Unexpected state in atom_start'
+				message:  'Lexical error: Unexpected state in atom_start'
+				position: l.start_pos
 			}
 		}
 		.comment {
-			EOFToken{}
+			EOFToken{
+				position: l.get_current_position()
+			}
 		}
 		.operator {
 			if is_punctuation(l.buffer) {
-				if ptok := get_punctuation_token(l.buffer) {
-					ptok
+				if ptok := get_punctuation_token(l.buffer, l.start_pos) {
+					PunctuationToken{
+						value:    ptok.value
+						position: l.start_pos
+					}
 				} else {
 					ErrorToken{
-						message: 'Lexical error: Unknown punctuation'
+						message:  'Lexical error: Unknown punctuation'
+						position: l.start_pos
 					}
 				}
 			} else if is_operator(l.buffer) {
-				if otok := get_operator_token(l.buffer) {
-					otok
+				if otok := get_operator_token(l.buffer, l.start_pos) {
+					OperatorToken{
+						value:    otok.value
+						position: l.start_pos
+					}
 				} else {
 					ErrorToken{
-						message: 'Lexical error: Unknown operator'
+						message:  'Lexical error: Unknown operator'
+						position: l.start_pos
 					}
 				}
 			} else {
@@ -339,17 +392,20 @@ fn (mut l Lexer) create_token_from_buffer() Token {
 				// or if the next character can't form a valid operator
 				if l.buffer == ':' && l.position >= l.input.len {
 					return ErrorToken{
-						message: 'Lexical error: Isolated colon is not allowed'
+						message:  'Lexical error: Isolated colon is not allowed'
+						position: l.start_pos
 					}
 				}
 				ErrorToken{
-					message: 'Lexical error: Unknown operator'
+					message:  'Lexical error: Unknown operator'
+					position: l.start_pos
 				}
 			}
 		}
 		else {
 			ErrorToken{
-				message: 'Lexical error: Unexpected state'
+				message:  'Lexical error: Unexpected state'
+				position: l.start_pos
 			}
 		}
 	}
@@ -399,14 +455,14 @@ fn (mut l Lexer) parse_string_literal() ?string {
 }
 
 // get_current_position returns the current position
-fn (l Lexer) get_current_position() ast.Position {
-	return ast.new_position(l.line, l.column, l.filename)
+fn (l Lexer) get_current_position() TokenPosition {
+	return new_token_position(l.line, l.column, l.filename)
 }
 
 // add_error adds an error to the lexer's error collection
-fn (mut l Lexer) add_error(message string, position ast.Position) {
-	err := errors.new_compilation_error(errors.LexicalError{ message: message }, position,
-		message)
+fn (mut l Lexer) add_error(message string, position TokenPosition) {
+	err := errors.new_compilation_error(errors.LexicalError{ message: message }, ast.new_position(position.line,
+		position.column, position.filename), message)
 	l.errors << err
 }
 
@@ -427,7 +483,7 @@ pub fn (mut l Lexer) reset() {
 	l.column = 1
 	l.state = .initial
 	l.buffer = ''
-	l.start_pos = ast.new_position(1, 1, l.filename)
+	l.start_pos = new_token_position(1, 1, l.filename)
 	l.errors.clear()
 	l.had_error = false
 }
@@ -469,13 +525,14 @@ pub fn (l Lexer) is_at_end() bool {
 }
 
 // get_position returns the current position information
-pub fn (l Lexer) get_position() ast.Position {
+pub fn (l Lexer) get_position() TokenPosition {
 	return l.get_current_position()
 }
 
 // get_span returns a span from start to current position
-pub fn (l Lexer) get_span(start ast.Position) ast.Span {
-	return ast.new_span(start, l.get_current_position())
+pub fn (l Lexer) get_span(start TokenPosition) ast.Span {
+	return ast.new_span(ast.new_position(start.line, start.column, start.filename), ast.new_position(l.line,
+		l.column, l.filename))
 }
 
 // get_input returns the input string

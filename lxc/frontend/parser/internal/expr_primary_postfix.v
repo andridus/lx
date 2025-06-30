@@ -11,7 +11,7 @@ fn (mut ep ExpressionParser) parse_primary_expression() ?ast.Expr {
 	for {
 		if ep.current is lexer.PunctuationToken {
 			punc_token := ep.current as lexer.PunctuationToken
-			match punc_token {
+			match punc_token.value {
 				.lparen {
 					expr = ep.parse_call_expression(expr)?
 				}
@@ -24,7 +24,7 @@ fn (mut ep ExpressionParser) parse_primary_expression() ?ast.Expr {
 			}
 		} else if ep.current is lexer.OperatorToken {
 			op_token := ep.current as lexer.OperatorToken
-			match op_token {
+			match op_token.value {
 				.dot {
 					expr = ep.parse_record_access_expression(expr)?
 				}
@@ -45,17 +45,17 @@ fn (mut ep ExpressionParser) parse_call_expression(function ast.Expr) ?ast.Expr 
 	ep.advance() // consume '('
 
 	mut arguments := []ast.Expr{}
-	if !ep.check(lexer.PunctuationToken.rparen) {
+	if !ep.check(lexer.punctuation(.rparen)) {
 		for {
 			arguments << ep.parse_expression()?
 
-			if !ep.match(lexer.PunctuationToken.comma) {
+			if !ep.match(lexer.punctuation(.comma)) {
 				break
 			}
 		}
 	}
 
-	ep.consume(lexer.PunctuationToken.rparen, 'Expected closing parenthesis')?
+	ep.consume(lexer.punctuation(.rparen), 'Expected closing parenthesis')?
 
 	return ast.CallExpr{
 		function:  function
@@ -86,7 +86,7 @@ fn (mut ep ExpressionParser) parse_record_access_expression(record ast.Expr) ?as
 fn (mut ep ExpressionParser) parse_map_access_expression(map_expr ast.Expr) ?ast.Expr {
 	ep.advance() // consume '['
 	key := ep.parse_expression()?
-	ep.consume(lexer.PunctuationToken.rbracket, 'Expected closing bracket')?
+	ep.consume(lexer.punctuation(.rbracket), 'Expected closing bracket')?
 
 	return ast.MapAccessExpr{
 		map_expr: map_expr
