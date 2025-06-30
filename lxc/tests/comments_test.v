@@ -14,7 +14,7 @@ fn test_inline_comments() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.assign
+	assert operator_token.value == lexer.OperatorValue.assign
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IntToken
@@ -38,7 +38,7 @@ fn test_comment_only_line() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.assign
+	assert operator_token.value == lexer.OperatorValue.assign
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IntToken
@@ -59,7 +59,7 @@ fn test_comment_with_code() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token1 := token2 as lexer.OperatorToken
-	assert operator_token1 == lexer.OperatorToken.assign
+	assert operator_token1.value == lexer.OperatorValue.assign
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IntToken
@@ -75,7 +75,7 @@ fn test_comment_with_code() {
 	token5 := lexer0.next_token()
 	assert token5 is lexer.OperatorToken
 	operator_token2 := token5 as lexer.OperatorToken
-	assert operator_token2 == lexer.OperatorToken.assign
+	assert operator_token2.value == lexer.OperatorValue.assign
 
 	token6 := lexer0.next_token()
 	assert token6 is lexer.IntToken
@@ -98,7 +98,7 @@ fn test_multiple_comment_lines() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.assign
+	assert operator_token.value == lexer.OperatorValue.assign
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IntToken
@@ -118,7 +118,7 @@ fn test_comment_at_end_of_file() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.assign
+	assert operator_token.value == lexer.OperatorValue.assign
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IntToken
@@ -141,7 +141,7 @@ fn test_comment_with_special_characters() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.assign
+	assert operator_token.value == lexer.OperatorValue.assign
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IntToken
@@ -165,7 +165,7 @@ fn test_comment_with_quotes() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.assign
+	assert operator_token.value == lexer.OperatorValue.assign
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IntToken
@@ -189,7 +189,7 @@ fn test_comment_with_operators() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.assign
+	assert operator_token.value == lexer.OperatorValue.assign
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IntToken
@@ -213,7 +213,7 @@ fn test_comment_with_keywords() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.assign
+	assert operator_token.value == lexer.OperatorValue.assign
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IntToken
@@ -237,7 +237,7 @@ fn test_comment_with_identifiers() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.assign
+	assert operator_token.value == lexer.OperatorValue.assign
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IntToken
@@ -261,7 +261,7 @@ fn test_comment_with_numbers() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.assign
+	assert operator_token.value == lexer.OperatorValue.assign
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IntToken
@@ -285,7 +285,7 @@ fn test_comment_with_atoms() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.assign
+	assert operator_token.value == lexer.OperatorValue.assign
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IntToken
@@ -309,7 +309,7 @@ fn test_comment_with_strings() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.assign
+	assert operator_token.value == lexer.OperatorValue.assign
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IntToken
@@ -333,7 +333,7 @@ fn test_comment_with_escape_sequences() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.assign
+	assert operator_token.value == lexer.OperatorValue.assign
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IntToken
@@ -358,7 +358,7 @@ fn test_comment_line_numbering() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token1 := token2 as lexer.OperatorToken
-	assert operator_token1 == lexer.OperatorToken.assign
+	assert operator_token1.value == lexer.OperatorValue.assign
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IntToken
@@ -377,7 +377,7 @@ fn test_comment_line_numbering() {
 	token5 := lexer0.next_token()
 	assert token5 is lexer.OperatorToken
 	operator_token2 := token5 as lexer.OperatorToken
-	assert operator_token2 == lexer.OperatorToken.assign
+	assert operator_token2.value == lexer.OperatorValue.assign
 
 	token6 := lexer0.next_token()
 	assert token6 is lexer.IntToken
@@ -401,7 +401,7 @@ fn test_empty_comment() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token1 := token2 as lexer.OperatorToken
-	assert operator_token1 == lexer.OperatorToken.assign
+	assert operator_token1.value == lexer.OperatorValue.assign
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IntToken
@@ -417,7 +417,7 @@ fn test_empty_comment() {
 	token5 := lexer0.next_token()
 	assert token5 is lexer.OperatorToken
 	operator_token2 := token5 as lexer.OperatorToken
-	assert operator_token2 == lexer.OperatorToken.assign
+	assert operator_token2.value == lexer.OperatorValue.assign
 
 	token6 := lexer0.next_token()
 	assert token6 is lexer.IntToken

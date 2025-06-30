@@ -430,11 +430,11 @@ fn test_parse_boolean_literal() {
 	assert tokens.len == 1
 	assert tokens[0] is lexer.KeywordToken
 	keyword_token := tokens[0] as lexer.KeywordToken
-	assert keyword_token == .true_
+	assert keyword_token.value == lexer.KeywordValue.true_
 
 	// Test parser primary expression
 	mut expr_parser := parser.new_expression_parser(tokens)
-	expr := expr_parser.parse_primary()
+	expr := expr_parser.parse_expression() or { panic('Failed to parse boolean literal') }
 
 	// Verify the AST structure
 	assert expr is ast.LiteralExpr

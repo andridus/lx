@@ -95,11 +95,16 @@ lxc/
 
 ### Frontend - Lexical Analysis
 - **`lexer/lexer.v`**: Main lexer implementation with state machine
-- **`lexer/tokens.v`**: Token type definitions and utility functions
-- **`lexer/keywords.v`**: Keyword recognition and validation
-- **`lexer/operators.v`**: Operator definitions and precedence rules
+- **`lexer/tokens.v`**: Token type definitions, structs with enum values, and helper functions (`keyword()`, `operator()`, `punctuation()`)
+- **`lexer/keywords.v`**: Keyword recognition and validation using `KeywordValue` enum
+- **`lexer/operators.v`**: Operator definitions and precedence rules using `OperatorValue` enum
 - **`lexer/states.v`**: Lexer state definitions and transitions
 - **`lexer/transitions.v`**: State transition rules and conditions
+
+**Token Structure**: The lexer uses a consistent token structure where `KeywordToken`, `OperatorToken`, and `PunctuationToken` are structs containing a `value` field with the corresponding enum (`KeywordValue`, `OperatorValue`, `PunctuationValue`). Helper functions provide simplified token creation:
+- `keyword(.end_)` creates `KeywordToken{ value: KeywordValue.end_ }`
+- `operator(.plus)` creates `OperatorToken{ value: OperatorValue.plus }`
+- `punctuation(.lparen)` creates `PunctuationToken{ value: PunctuationValue.lparen }`
 
 ### Frontend - Syntax Analysis
 - **`parser/main_parser.v`**: Public interface for parsing operations

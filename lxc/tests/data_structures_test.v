@@ -6,20 +6,14 @@ import ast
 
 fn test_tuple_parsing() {
 	tokens := [
-		lexer.Token(lexer.PunctuationToken.lbrace),
-		lexer.Token(lexer.IntToken{
-			value: 1
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IntToken{
-			value: 2
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IntToken{
-			value: 3
-		}),
-		lexer.Token(lexer.PunctuationToken.rbrace),
-		lexer.Token(lexer.EOFToken{}),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbrace)),
+		lexer.Token(lexer.new_int_token(1)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
+		lexer.Token(lexer.new_int_token(2)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
+		lexer.Token(lexer.new_int_token(3)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbrace)),
+		lexer.Token(lexer.new_eof_token()),
 	]
 
 	mut parser0 := parser.new_main_parser(tokens)
@@ -38,9 +32,9 @@ fn test_tuple_parsing() {
 
 fn test_empty_tuple_parsing() {
 	tokens := [
-		lexer.Token(lexer.PunctuationToken.lbrace),
-		lexer.Token(lexer.PunctuationToken.rbrace),
-		lexer.Token(lexer.EOFToken{}),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbrace)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbrace)),
+		lexer.Token(lexer.new_eof_token()),
 	]
 
 	mut parser0 := parser.new_main_parser(tokens)
@@ -59,25 +53,19 @@ fn test_empty_tuple_parsing() {
 
 fn test_list_parsing() {
 	tokens := [
-		lexer.Token(lexer.PunctuationToken.lbracket),
-		lexer.Token(lexer.IntToken{
-			value: 1
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IntToken{
-			value: 2
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IntToken{
-			value: 3
-		}),
-		lexer.Token(lexer.PunctuationToken.rbracket),
-		lexer.Token(lexer.EOFToken{}),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbracket)),
+		lexer.Token(lexer.new_int_token(1)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
+		lexer.Token(lexer.new_int_token(2)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
+		lexer.Token(lexer.new_int_token(3)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbracket)),
+		lexer.Token(lexer.new_eof_token()),
 	]
 
 	mut parser0 := parser.new_main_parser(tokens)
 
-	expr := parser0.parse_expression() or { panic('Failed to parse list') }
+	expr := parser0.parse_expression() or { panic('Failed to parse list')}
 	match expr {
 		ast.ListLiteralExpr {
 			list_expr := expr as ast.ListLiteralExpr
@@ -91,14 +79,14 @@ fn test_list_parsing() {
 
 fn test_empty_list_parsing() {
 	tokens := [
-		lexer.Token(lexer.PunctuationToken.lbracket),
-		lexer.Token(lexer.PunctuationToken.rbracket),
-		lexer.Token(lexer.EOFToken{}),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbracket)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbracket)),
+		lexer.Token(lexer.new_eof_token()),
 	]
 
 	mut parser0 := parser.new_main_parser(tokens)
 
-	expr := parser0.parse_expression() or { panic('Failed to parse empty list') }
+	expr := parser0.parse_expression() or { panic('Failed to parse empty list')}
 	match expr {
 		ast.ListLiteralExpr {
 			list_expr := expr as ast.ListLiteralExpr
@@ -112,25 +100,19 @@ fn test_empty_list_parsing() {
 
 fn test_list_cons_parsing() {
 	tokens := [
-		lexer.Token(lexer.IntToken{
-			value: 1
-		}),
-		lexer.Token(lexer.OperatorToken.type_cons),
-		lexer.Token(lexer.PunctuationToken.lbracket),
-		lexer.Token(lexer.IntToken{
-			value: 2
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IntToken{
-			value: 3
-		}),
-		lexer.Token(lexer.PunctuationToken.rbracket),
-		lexer.Token(lexer.EOFToken{}),
+		lexer.Token(lexer.new_int_token(1)),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.type_cons)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbracket)),
+		lexer.Token(lexer.new_int_token(2)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
+		lexer.Token(lexer.new_int_token(3)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbracket)),
+		lexer.Token(lexer.new_eof_token()),
 	]
 
 	mut parser0 := parser.new_main_parser(tokens)
 
-	expr := parser0.parse_expression() or { panic('Failed to parse list cons') }
+	expr := parser0.parse_expression() or { panic('Failed to parse list cons')}
 	match expr {
 		ast.ListConsExpr {
 			cons_expr := expr as ast.ListConsExpr
@@ -172,30 +154,22 @@ fn test_list_cons_parsing() {
 
 fn test_map_parsing() {
 	tokens := [
-		lexer.Token(lexer.OperatorToken.record_update),
-		lexer.Token(lexer.PunctuationToken.lbrace),
-		lexer.Token(lexer.AtomToken{
-			value: 'name'
-		}),
-		lexer.Token(lexer.PunctuationToken.colon),
-		lexer.Token(lexer.StringToken{
-			value: 'Alice'
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.AtomToken{
-			value: 'age'
-		}),
-		lexer.Token(lexer.PunctuationToken.colon),
-		lexer.Token(lexer.IntToken{
-			value: 30
-		}),
-		lexer.Token(lexer.PunctuationToken.rbrace),
-		lexer.Token(lexer.EOFToken{}),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.record_update)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbrace)),
+		lexer.Token(lexer.new_atom_token('name')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.colon)),
+		lexer.Token(lexer.new_string_token('Alice')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
+		lexer.Token(lexer.new_atom_token('age')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.colon)),
+		lexer.Token(lexer.new_int_token(30)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbrace)),
+		lexer.Token(lexer.new_eof_token()),
 	]
 
 	mut parser0 := parser.new_main_parser(tokens)
 
-	expr := parser0.parse_expression() or { panic('Failed to parse map') }
+	expr := parser0.parse_expression() or { panic('Failed to parse map')}
 	match expr {
 		ast.MapLiteralExpr {
 			map_expr := expr as ast.MapLiteralExpr
@@ -209,30 +183,22 @@ fn test_map_parsing() {
 
 fn test_map_with_string_keys_parsing() {
 	tokens := [
-		lexer.Token(lexer.OperatorToken.record_update),
-		lexer.Token(lexer.PunctuationToken.lbrace),
-		lexer.Token(lexer.StringToken{
-			value: 'name'
-		}),
-		lexer.Token(lexer.OperatorToken.arrow),
-		lexer.Token(lexer.StringToken{
-			value: 'Alice'
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.StringToken{
-			value: 'age'
-		}),
-		lexer.Token(lexer.OperatorToken.arrow),
-		lexer.Token(lexer.IntToken{
-			value: 30
-		}),
-		lexer.Token(lexer.PunctuationToken.rbrace),
-		lexer.Token(lexer.EOFToken{}),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.record_update)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbrace)),
+		lexer.Token(lexer.new_string_token('name')),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.arrow)),
+		lexer.Token(lexer.new_string_token('Alice')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
+		lexer.Token(lexer.new_string_token('age')),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.arrow)),
+		lexer.Token(lexer.new_int_token(30)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbrace)),
+		lexer.Token(lexer.new_eof_token()),
 	]
 
 	mut parser0 := parser.new_main_parser(tokens)
 
-	expr := parser0.parse_expression() or { panic('Failed to parse map with string keys') }
+	expr := parser0.parse_expression() or { panic('Failed to parse map with string keys')}
 	match expr {
 		ast.MapLiteralExpr {
 			map_expr := expr as ast.MapLiteralExpr
@@ -246,38 +212,28 @@ fn test_map_with_string_keys_parsing() {
 
 fn test_nested_data_structures() {
 	tokens := [
-		lexer.Token(lexer.PunctuationToken.lbrace),
-		lexer.Token(lexer.PunctuationToken.lbracket),
-		lexer.Token(lexer.IntToken{
-			value: 1
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IntToken{
-			value: 2
-		}),
-		lexer.Token(lexer.PunctuationToken.rbracket),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.OperatorToken.record_update),
-		lexer.Token(lexer.PunctuationToken.lbrace),
-		lexer.Token(lexer.AtomToken{
-			value: 'key'
-		}),
-		lexer.Token(lexer.PunctuationToken.colon),
-		lexer.Token(lexer.StringToken{
-			value: 'value'
-		}),
-		lexer.Token(lexer.PunctuationToken.rbrace),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IntToken{
-			value: 3
-		}),
-		lexer.Token(lexer.PunctuationToken.rbrace),
-		lexer.Token(lexer.EOFToken{}),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbrace)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbracket)),
+		lexer.Token(lexer.new_int_token(1)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
+		lexer.Token(lexer.new_int_token(2)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbracket)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.record_update)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbrace)),
+		lexer.Token(lexer.new_atom_token('key')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.colon)),
+		lexer.Token(lexer.new_string_token('value')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbrace)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
+		lexer.Token(lexer.new_int_token(3)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbrace)),
+		lexer.Token(lexer.new_eof_token()),
 	]
 
 	mut parser0 := parser.new_main_parser(tokens)
 
-	expr := parser0.parse_expression() or { panic('Failed to parse nested data structures') }
+	expr := parser0.parse_expression() or { panic('Failed to parse nested data structures')}
 	match expr {
 		ast.TupleExpr {
 			tuple_expr := expr as ast.TupleExpr

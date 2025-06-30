@@ -86,7 +86,7 @@ fn test_literal_parsing() {
 		value: 'ok'
 	})]
 	mut parser4 := parser.new_expression_parser(tokens4)
-	expr4 := parser4.parse_expression() or { panic('Failed to parse atom') }
+	expr4 := parser4.parse_expression() or { panic('Failed to parse atom')}
 
 	match expr4 {
 		ast.LiteralExpr {
@@ -114,13 +114,13 @@ fn test_binary_expression_parsing() {
 		lexer.Token(lexer.IntToken{
 			value: 1
 		}),
-		lexer.Token(lexer.OperatorToken.plus),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.plus)),
 		lexer.Token(lexer.IntToken{
 			value: 2
 		}),
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse binary expression') }
+	expr := parser_instance.parse_expression() or { panic('Failed to parse binary expression')}
 
 	match expr {
 		ast.BinaryExpr {
@@ -171,13 +171,13 @@ fn test_binary_expression_parsing() {
 		lexer.Token(lexer.IntToken{
 			value: 5
 		}),
-		lexer.Token(lexer.OperatorToken.gt),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.gt)),
 		lexer.Token(lexer.IntToken{
 			value: 3
 		}),
 	]
 	mut parser2 := parser.new_expression_parser(tokens2)
-	expr2 := parser2.parse_expression() or { panic('Failed to parse comparison') }
+	expr2 := parser2.parse_expression() or { panic('Failed to parse comparison')}
 
 	match expr2 {
 		ast.BinaryExpr {
@@ -194,22 +194,22 @@ fn test_binary_expression_parsing() {
 fn test_data_structure_parsing() {
 	// Test list parsing
 	tokens := [
-		lexer.Token(lexer.PunctuationToken.lbracket),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbracket)),
 		lexer.Token(lexer.IntToken{
 			value: 1
 		}),
-		lexer.Token(lexer.PunctuationToken.comma),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
 		lexer.Token(lexer.IntToken{
 			value: 2
 		}),
-		lexer.Token(lexer.PunctuationToken.comma),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
 		lexer.Token(lexer.IntToken{
 			value: 3
 		}),
-		lexer.Token(lexer.PunctuationToken.rbracket),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbracket)),
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse list') }
+	expr := parser_instance.parse_expression() or { panic('Failed to parse list')}
 
 	match expr {
 		ast.ListLiteralExpr {
@@ -223,18 +223,18 @@ fn test_data_structure_parsing() {
 
 	// Test tuple parsing
 	tokens2 := [
-		lexer.Token(lexer.PunctuationToken.lbrace),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbrace)),
 		lexer.Token(lexer.StringToken{
 			value: 'hello'
 		}),
-		lexer.Token(lexer.PunctuationToken.comma),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
 		lexer.Token(lexer.IntToken{
 			value: 42
 		}),
-		lexer.Token(lexer.PunctuationToken.rbrace),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbrace)),
 	]
 	mut parser2 := parser.new_expression_parser(tokens2)
-	expr2 := parser2.parse_expression() or { panic('Failed to parse tuple') }
+	expr2 := parser2.parse_expression() or { panic('Failed to parse tuple')}
 
 	match expr2 {
 		ast.TupleExpr {
@@ -251,27 +251,27 @@ fn test_data_structure_parsing() {
 fn test_map_parsing() {
 	// Test map with atom keys
 	tokens := [
-		lexer.Token(lexer.OperatorToken.record_update),
-		lexer.Token(lexer.PunctuationToken.lbrace),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.record_update)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbrace)),
 		lexer.Token(lexer.AtomToken{
 			value: 'name'
 		}),
-		lexer.Token(lexer.PunctuationToken.colon),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.colon)),
 		lexer.Token(lexer.StringToken{
 			value: 'Alice'
 		}),
-		lexer.Token(lexer.PunctuationToken.comma),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
 		lexer.Token(lexer.AtomToken{
 			value: 'age'
 		}),
-		lexer.Token(lexer.PunctuationToken.colon),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.colon)),
 		lexer.Token(lexer.IntToken{
 			value: 30
 		}),
-		lexer.Token(lexer.PunctuationToken.rbrace),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbrace)),
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse map') }
+	expr := parser_instance.parse_expression() or { panic('Failed to parse map')}
 
 	match expr {
 		ast.MapLiteralExpr {
@@ -290,13 +290,13 @@ fn test_assignment_parsing() {
 		lexer.Token(lexer.IdentToken{
 			value: 'x'
 		}),
-		lexer.Token(lexer.OperatorToken.assign),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.assign)),
 		lexer.Token(lexer.IntToken{
 			value: 42
 		}),
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse assignment') }
+	expr := parser_instance.parse_expression() or { panic('Failed to parse assignment')}
 
 	match expr {
 		ast.AssignExpr {
@@ -315,18 +315,18 @@ fn test_function_call_parsing() {
 		lexer.Token(lexer.IdentToken{
 			value: 'add'
 		}),
-		lexer.Token(lexer.PunctuationToken.lparen),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lparen)),
 		lexer.Token(lexer.IntToken{
 			value: 1
 		}),
-		lexer.Token(lexer.PunctuationToken.comma),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
 		lexer.Token(lexer.IntToken{
 			value: 2
 		}),
-		lexer.Token(lexer.PunctuationToken.rparen),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rparen)),
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse function call') }
+	expr := parser_instance.parse_expression() or { panic('Failed to parse function call')}
 
 	match expr {
 		ast.CallExpr {
@@ -345,13 +345,13 @@ fn test_record_access_parsing() {
 		lexer.Token(lexer.IdentToken{
 			value: 'person'
 		}),
-		lexer.Token(lexer.OperatorToken.dot),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.dot)),
 		lexer.Token(lexer.IdentToken{
 			value: 'name'
 		}),
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse record access') }
+	expr := parser_instance.parse_expression() or { panic('Failed to parse record access')}
 
 	match expr {
 		ast.RecordAccessExpr {
@@ -368,22 +368,22 @@ fn test_record_access_parsing() {
 // // Test case expression parsing
 fn test_case_expression_parsing() {
 	tokens := [
-		lexer.Token(lexer.KeywordToken.case_),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.case_)),
 		lexer.Token(lexer.IdentToken{
 			value: 'value'
 		}),
-		lexer.Token(lexer.KeywordToken.do_),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.do_)),
 		lexer.Token(lexer.IntToken{
 			value: 1
 		}),
-		lexer.Token(lexer.OperatorToken.arrow),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.arrow)),
 		lexer.Token(lexer.StringToken{
 			value: 'one'
 		}),
-		lexer.Token(lexer.KeywordToken.end_),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.end_)),
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse case expression') }
+	expr := parser_instance.parse_expression() or { panic('Failed to parse case expression')}
 
 	match expr {
 		ast.CaseExpr {
@@ -419,18 +419,18 @@ fn test_case_expression_parsing() {
 // // Test if expression parsing
 // fn test_if_expression_parsing() {
 // 	tokens := [
-// 		lexer.Token(lexer.KeywordToken.if_),
-// 		lexer.Token(lexer.IdentToken{ value: 'x' }),
-// 		lexer.Token(lexer.OperatorToken.gt),
-// 		lexer.Token(lexer.IntToken{ value: 0 }),
-// 		lexer.Token(lexer.KeywordToken.do_),
-// 		lexer.Token(lexer.StringToken{ value: 'yes' }),
-// 		lexer.Token(lexer.KeywordToken.else_),
-// 		lexer.Token(lexer.StringToken{ value: 'no' }),
-// 		lexer.Token(lexer.KeywordToken.end_)
+// 		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.if_),
+// 		lexer.Token(lexer.new_ident_token('x'),
+// 		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.gt),
+// 		lexer.Token(lexer.new_int_token(0),
+// 		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.do_),
+// 		lexer.Token(lexer.new_string_token('yes'),
+// 		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.else_),
+// 		lexer.Token(lexer.new_string_token('no'),
+// 		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.end_)
 // 	]
 // 	mut parser_instance := parser.new_expression_parser(tokens)
-// 	expr := parser_instance.parse_expression() or { panic('Failed to parse if expression') }
+// 	expr := parser_instance.parse_expression() or { panic('Failed to parse if expression'))
 
 // 	match expr {
 // 		ast.IfExpr {
@@ -438,9 +438,9 @@ fn test_case_expression_parsing() {
 // 			assert if_expr.then_body.len == 1
 // 			assert if_expr.else_body.len == 1
 // 		}
-// 		else { assert false, 'Expected IfExpr' }
+// 		else { assert false, 'Expected IfExpr')
 // 	}
-// }
+//)
 
 // // Test send expression parsing
 fn test_send_expression_parsing() {
@@ -448,13 +448,13 @@ fn test_send_expression_parsing() {
 		lexer.Token(lexer.IdentToken{
 			value: 'pid'
 		}),
-		lexer.Token(lexer.OperatorToken.send),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.send)),
 		lexer.Token(lexer.StringToken{
 			value: 'hello'
 		}),
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse send expression') }
+	expr := parser_instance.parse_expression() or { panic('Failed to parse send expression')}
 
 	match expr {
 		ast.SendExpr {
@@ -470,19 +470,19 @@ fn test_send_expression_parsing() {
 // // Test receive expression parsing
 fn test_receive_expression_parsing() {
 	tokens := [
-		lexer.Token(lexer.KeywordToken.receive),
-		lexer.Token(lexer.KeywordToken.do_),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.receive)),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.do_)),
 		lexer.Token(lexer.StringToken{
 			value: 'hello'
 		}),
-		lexer.Token(lexer.OperatorToken.arrow),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.arrow)),
 		lexer.Token(lexer.StringToken{
 			value: 'received'
 		}),
-		lexer.Token(lexer.KeywordToken.end_),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.end_)),
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse receive expression') }
+	expr := parser_instance.parse_expression() or { panic('Failed to parse receive expression')}
 
 	match expr {
 		ast.ReceiveExpr {
@@ -498,46 +498,46 @@ fn test_receive_expression_parsing() {
 // // Test module parsing
 fn test_module_parsing() {
 	tokens := [
-		lexer.Token(lexer.KeywordToken.module),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.module)),
 		lexer.Token(lexer.IdentToken{
 			value: 'math'
 		}),
-		lexer.Token(lexer.PunctuationToken.lbracket),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbracket)),
 		lexer.Token(lexer.IdentToken{
 			value: 'add'
 		}),
-		lexer.Token(lexer.PunctuationToken.comma),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
 		lexer.Token(lexer.IdentToken{
 			value: 'subtract'
 		}),
-		lexer.Token(lexer.PunctuationToken.rbracket),
-		lexer.Token(lexer.PunctuationToken.lbrace),
-		lexer.Token(lexer.KeywordToken.def),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbracket)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbrace)),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.def)),
 		lexer.Token(lexer.IdentToken{
 			value: 'add'
 		}),
-		lexer.Token(lexer.PunctuationToken.lparen),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lparen)),
 		lexer.Token(lexer.IdentToken{
 			value: 'x'
 		}),
-		lexer.Token(lexer.PunctuationToken.comma),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
 		lexer.Token(lexer.IdentToken{
 			value: 'y'
 		}),
-		lexer.Token(lexer.PunctuationToken.rparen),
-		lexer.Token(lexer.KeywordToken.do_),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rparen)),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.do_)),
 		lexer.Token(lexer.IdentToken{
 			value: 'x'
 		}),
-		lexer.Token(lexer.OperatorToken.plus),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.plus)),
 		lexer.Token(lexer.IdentToken{
 			value: 'y'
 		}),
-		lexer.Token(lexer.KeywordToken.end_),
-		lexer.Token(lexer.PunctuationToken.rbrace),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.end_)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbrace)),
 	]
 	mut parser_instance := parser.new_main_parser(tokens)
-	module_stmt := parser_instance.parse_module() or { panic('Failed to parse module') }
+	module_stmt := parser_instance.parse_module() or { panic('Failed to parse module')}
 
 	// Since ModuleStmt is a struct, we can't match it directly
 	// Just check that parsing succeeded
@@ -551,7 +551,7 @@ fn test_error_handling() {
 		lexer.Token(lexer.IntToken{
 			value: 1
 		}),
-		lexer.Token(lexer.OperatorToken.plus),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.plus)),
 		// Missing right operand
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
@@ -570,22 +570,22 @@ fn test_error_handling() {
 fn test_complex_expressions() {
 	// Test nested expressions
 	tokens := [
-		lexer.Token(lexer.PunctuationToken.lparen),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lparen)),
 		lexer.Token(lexer.IntToken{
 			value: 1
 		}),
-		lexer.Token(lexer.OperatorToken.plus),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.plus)),
 		lexer.Token(lexer.IntToken{
 			value: 2
 		}),
-		lexer.Token(lexer.PunctuationToken.rparen),
-		lexer.Token(lexer.OperatorToken.mult),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rparen)),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.mult)),
 		lexer.Token(lexer.IntToken{
 			value: 3
 		}),
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse complex expression') }
+	expr := parser_instance.parse_expression() or { panic('Failed to parse complex expression')}
 
 	match expr {
 		ast.BinaryExpr {
@@ -605,17 +605,17 @@ fn test_operator_precedence() {
 		lexer.Token(lexer.IntToken{
 			value: 1
 		}),
-		lexer.Token(lexer.OperatorToken.plus),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.plus)),
 		lexer.Token(lexer.IntToken{
 			value: 2
 		}),
-		lexer.Token(lexer.OperatorToken.mult),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.mult)),
 		lexer.Token(lexer.IntToken{
 			value: 3
 		}),
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse precedence test') }
+	expr := parser_instance.parse_expression() or { panic('Failed to parse precedence test')}
 
 	match expr {
 		ast.BinaryExpr {

@@ -414,3 +414,99 @@ pub fn (t Token) get_position() TokenPosition {
 		ErrorToken { t.position }
 	}
 }
+
+// Helper functions for creating tokens with default positions (for testing)
+pub fn new_ident_token(value string) IdentToken {
+	return IdentToken{
+		value:    value
+		position: new_token_position(1, 1, 'test')
+	}
+}
+
+pub fn new_upper_ident_token(value string) UpperIdentToken {
+	return UpperIdentToken{
+		value:    value
+		position: new_token_position(1, 1, 'test')
+	}
+}
+
+pub fn new_string_token(value string) StringToken {
+	return StringToken{
+		value:    value
+		position: new_token_position(1, 1, 'test')
+	}
+}
+
+pub fn new_int_token(value int) IntToken {
+	return IntToken{
+		value:    value
+		position: new_token_position(1, 1, 'test')
+	}
+}
+
+pub fn new_float_token(value f64) FloatToken {
+	return FloatToken{
+		value:    value
+		position: new_token_position(1, 1, 'test')
+	}
+}
+
+pub fn new_bool_token(value bool) BoolToken {
+	return BoolToken{
+		value:    value
+		position: new_token_position(1, 1, 'test')
+	}
+}
+
+pub fn new_atom_token(value string) AtomToken {
+	return AtomToken{
+		value:    value
+		position: new_token_position(1, 1, 'test')
+	}
+}
+
+pub fn new_nil_token() NilToken {
+	return NilToken{
+		position: new_token_position(1, 1, 'test')
+	}
+}
+
+pub fn new_keyword_token(value KeywordValue) KeywordToken {
+	return KeywordToken{
+		value:    value
+		position: new_token_position(1, 1, 'test')
+	}
+}
+
+pub fn new_operator_token(value OperatorValue) OperatorToken {
+	return OperatorToken{
+		value:    value
+		position: new_token_position(1, 1, 'test')
+	}
+}
+
+pub fn new_punctuation_token(value PunctuationValue) PunctuationToken {
+	return PunctuationToken{
+		value:    value
+		position: new_token_position(1, 1, 'test')
+	}
+}
+
+pub fn new_newline_token() NewlineToken {
+	return NewlineToken{
+		position: new_token_position(1, 1, 'test')
+	}
+}
+
+pub fn new_eof_token() EOFToken {
+	return EOFToken{
+		position: new_token_position(1, 1, 'test')
+	}
+}
+
+pub fn new_error_token(message string) ErrorToken {
+	return ErrorToken{
+		message:  message
+		position: new_token_position(1, 1, 'test')
+	}
+}

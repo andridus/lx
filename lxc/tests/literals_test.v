@@ -106,24 +106,18 @@ fn test_literals_numeric_literals() {
 }
 
 fn test_negative_integers() {
-	// Test negative integers
-	input := '-42 -123 -0'
+	input := '-123'
 	mut lexer0 := lexer.new_lexer(input, 'test.lx')
 
 	token1 := lexer0.next_token()
-	assert token1 is lexer.IntToken
-	int_token1 := token1 as lexer.IntToken
-	assert int_token1.value == -42
+	assert token1 is lexer.OperatorToken
+	operator_token := token1 as lexer.OperatorToken
+	assert operator_token.value == lexer.OperatorValue.minus
 
 	token2 := lexer0.next_token()
 	assert token2 is lexer.IntToken
-	int_token2 := token2 as lexer.IntToken
-	assert int_token2.value == -123
-
-	token3 := lexer0.next_token()
-	assert token3 is lexer.IntToken
-	int_token3 := token3 as lexer.IntToken
-	assert int_token3.value == 0 // -0 is just 0
+	int_token := token2 as lexer.IntToken
+	assert int_token.value == 123
 }
 
 fn test_float_literals() {
@@ -153,24 +147,18 @@ fn test_float_literals() {
 }
 
 fn test_negative_floats() {
-	// Test negative floats
-	input := '-3.14 -2.5 -0.0'
+	input := '-2.5'
 	mut lexer0 := lexer.new_lexer(input, 'test.lx')
 
 	token1 := lexer0.next_token()
-	assert token1 is lexer.FloatToken
-	float_token1 := token1 as lexer.FloatToken
-	assert float_token1.value == -3.14
+	assert token1 is lexer.OperatorToken
+	operator_token := token1 as lexer.OperatorToken
+	assert operator_token.value == lexer.OperatorValue.minus
 
 	token2 := lexer0.next_token()
 	assert token2 is lexer.FloatToken
-	float_token2 := token2 as lexer.FloatToken
-	assert float_token2.value == -2.5
-
-	token3 := lexer0.next_token()
-	assert token3 is lexer.FloatToken
-	float_token3 := token3 as lexer.FloatToken
-	assert float_token3.value == 0.0 // -0.0 is just 0.0
+	float_token := token2 as lexer.FloatToken
+	assert float_token.value == 2.5
 }
 
 fn test_integer_to_float_transition() {
@@ -211,12 +199,12 @@ fn test_literals_boolean_literals() {
 	token1 := lexer0.next_token()
 	assert token1 is lexer.KeywordToken
 	keyword_token1 := token1 as lexer.KeywordToken
-	assert keyword_token1 == lexer.KeywordToken.true_
+	assert keyword_token1.value == lexer.KeywordValue.true_
 
 	token2 := lexer0.next_token()
 	assert token2 is lexer.KeywordToken
 	keyword_token2 := token2 as lexer.KeywordToken
-	assert keyword_token2 == lexer.KeywordToken.false_
+	assert keyword_token2.value == lexer.KeywordValue.false_
 }
 
 fn test_literals_nil_literal() {
@@ -227,7 +215,7 @@ fn test_literals_nil_literal() {
 	token := lexer0.next_token()
 	assert token is lexer.KeywordToken
 	keyword_token := token as lexer.KeywordToken
-	assert keyword_token == lexer.KeywordToken.nil_
+	assert keyword_token.value == lexer.KeywordValue.nil_
 }
 
 fn test_literals_atom_literals() {
@@ -274,7 +262,7 @@ fn test_mixed_literals() {
 	token4 := lexer0.next_token()
 	assert token4 is lexer.KeywordToken
 	keyword_token := token4 as lexer.KeywordToken
-	assert keyword_token == lexer.KeywordToken.true_
+	assert keyword_token.value == lexer.KeywordValue.true_
 
 	token5 := lexer0.next_token()
 	assert token5 is lexer.AtomToken

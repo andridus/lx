@@ -20,7 +20,7 @@ module math_utils [add, multiply] {
   record Point {
     x :: integer,
     y :: integer
-  }
+ )
 
   def distance(p1, p2) do
     dx = p1.x - p2.x
@@ -45,167 +45,19 @@ module math_utils [add, multiply] {
 // Helper function to create tokens for the test program
 fn create_tokens_for_program() []lexer.Token {
 	return [
-		lexer.Token(lexer.KeywordToken.module),
-		lexer.Token(lexer.IdentToken{
-			value: 'math_utils'
-		}),
-		lexer.Token(lexer.PunctuationToken.lbracket),
-		lexer.Token(lexer.IdentToken{
-			value: 'add'
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IdentToken{
-			value: 'multiply'
-		}),
-		lexer.Token(lexer.PunctuationToken.rbracket),
-		lexer.Token(lexer.PunctuationToken.lbrace),
-		// Function add
-		lexer.Token(lexer.KeywordToken.def),
-		lexer.Token(lexer.IdentToken{
-			value: 'add'
-		}),
-		lexer.Token(lexer.PunctuationToken.lparen),
-		lexer.Token(lexer.IdentToken{
-			value: 'x'
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IdentToken{
-			value: 'y'
-		}),
-		lexer.Token(lexer.PunctuationToken.rparen),
-		lexer.Token(lexer.KeywordToken.do_),
-		lexer.Token(lexer.IdentToken{
-			value: 'x'
-		}),
-		lexer.Token(lexer.OperatorToken.plus),
-		lexer.Token(lexer.IdentToken{
-			value: 'y'
-		}),
-		lexer.Token(lexer.KeywordToken.end_),
-		// Function multiply
-		lexer.Token(lexer.KeywordToken.def),
-		lexer.Token(lexer.IdentToken{
-			value: 'multiply'
-		}),
-		lexer.Token(lexer.PunctuationToken.lparen),
-		lexer.Token(lexer.IdentToken{
-			value: 'x'
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IdentToken{
-			value: 'y'
-		}),
-		lexer.Token(lexer.PunctuationToken.rparen),
-		lexer.Token(lexer.KeywordToken.do_),
-		lexer.Token(lexer.IdentToken{
-			value: 'x'
-		}),
-		lexer.Token(lexer.OperatorToken.mult),
-		lexer.Token(lexer.IdentToken{
-			value: 'y'
-		}),
-		lexer.Token(lexer.KeywordToken.end_),
-		// Record Point
-		lexer.Token(lexer.KeywordToken.record),
-		lexer.Token(lexer.IdentToken{
-			value: 'Point'
-		}),
-		lexer.Token(lexer.PunctuationToken.lbrace),
-		lexer.Token(lexer.IdentToken{
-			value: 'x'
-		}),
-		lexer.Token(lexer.OperatorToken.type_cons),
-		lexer.Token(lexer.IdentToken{
-			value: 'integer'
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IdentToken{
-			value: 'y'
-		}),
-		lexer.Token(lexer.OperatorToken.type_cons),
-		lexer.Token(lexer.IdentToken{
-			value: 'integer'
-		}),
-		lexer.Token(lexer.PunctuationToken.rbrace),
-		// Function distance
-		lexer.Token(lexer.KeywordToken.def),
-		lexer.Token(lexer.IdentToken{
-			value: 'distance'
-		}),
-		lexer.Token(lexer.PunctuationToken.lparen),
-		lexer.Token(lexer.IdentToken{
-			value: 'p1'
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IdentToken{
-			value: 'p2'
-		}),
-		lexer.Token(lexer.PunctuationToken.rparen),
-		lexer.Token(lexer.KeywordToken.do_),
-		lexer.Token(lexer.IdentToken{
-			value: 'dx'
-		}),
-		lexer.Token(lexer.OperatorToken.assign),
-		lexer.Token(lexer.IdentToken{
-			value: 'p1'
-		}),
-		lexer.Token(lexer.OperatorToken.dot),
-		lexer.Token(lexer.IdentToken{
-			value: 'x'
-		}),
-		lexer.Token(lexer.OperatorToken.minus),
-		lexer.Token(lexer.IdentToken{
-			value: 'p2'
-		}),
-		lexer.Token(lexer.OperatorToken.dot),
-		lexer.Token(lexer.IdentToken{
-			value: 'x'
-		}),
-		lexer.Token(lexer.IdentToken{
-			value: 'dy'
-		}),
-		lexer.Token(lexer.OperatorToken.assign),
-		lexer.Token(lexer.IdentToken{
-			value: 'p1'
-		}),
-		lexer.Token(lexer.OperatorToken.dot),
-		lexer.Token(lexer.IdentToken{
-			value: 'y'
-		}),
-		lexer.Token(lexer.OperatorToken.minus),
-		lexer.Token(lexer.IdentToken{
-			value: 'p2'
-		}),
-		lexer.Token(lexer.OperatorToken.dot),
-		lexer.Token(lexer.IdentToken{
-			value: 'y'
-		}),
-		lexer.Token(lexer.IdentToken{
-			value: 'math'
-		}),
-		lexer.Token(lexer.OperatorToken.dot),
-		lexer.Token(lexer.IdentToken{
-			value: 'sqrt'
-		}),
-		lexer.Token(lexer.PunctuationToken.lparen),
-		lexer.Token(lexer.IdentToken{
-			value: 'dx'
-		}),
-		lexer.Token(lexer.OperatorToken.mult),
-		lexer.Token(lexer.IdentToken{
-			value: 'dx'
-		}),
-		lexer.Token(lexer.OperatorToken.plus),
-		lexer.Token(lexer.IdentToken{
-			value: 'dy'
-		}),
-		lexer.Token(lexer.OperatorToken.mult),
-		lexer.Token(lexer.IdentToken{
-			value: 'dy'
-		}),
-		lexer.Token(lexer.PunctuationToken.rparen),
-		lexer.Token(lexer.KeywordToken.end_),
-		lexer.Token(lexer.PunctuationToken.rbrace),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.def)),
+		lexer.Token(lexer.new_ident_token('sum')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lparen)),
+		lexer.Token(lexer.new_ident_token('a')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
+		lexer.Token(lexer.new_ident_token('b')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rparen)),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.assign)),
+		lexer.Token(lexer.new_ident_token('a')),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.plus)),
+		lexer.Token(lexer.new_ident_token('b')),
+		lexer.Token(lexer.new_newline_token()),
+		lexer.Token(lexer.new_eof_token()),
 	]
 }
 
@@ -213,19 +65,13 @@ fn create_tokens_for_program() []lexer.Token {
 fn test_pattern_matching_expressions() {
 	// Test case expression with a simple pattern
 	tokens := [
-		lexer.Token(lexer.KeywordToken.case_),
-		lexer.Token(lexer.IdentToken{
-			value: 'value'
-		}),
-		lexer.Token(lexer.KeywordToken.do_),
-		lexer.Token(lexer.IntToken{
-			value: 1
-		}),
-		lexer.Token(lexer.OperatorToken.arrow),
-		lexer.Token(lexer.StringToken{
-			value: 'one'
-		}),
-		lexer.Token(lexer.KeywordToken.end_),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.case_)),
+		lexer.Token(lexer.new_ident_token('value')),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.do_)),
+		lexer.Token(lexer.new_int_token(1)),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.arrow)),
+		lexer.Token(lexer.new_string_token('one')),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.end_)),
 	]
 
 	mut parser_instance := parser.new_expression_parser(tokens)
@@ -266,36 +112,24 @@ fn test_pattern_matching_expressions() {
 fn test_data_structure_expressions() {
 	// Test map with different key types
 	tokens := [
-		lexer.Token(lexer.OperatorToken.record_update),
-		lexer.Token(lexer.PunctuationToken.lbrace),
-		lexer.Token(lexer.AtomToken{
-			value: 'name'
-		}),
-		lexer.Token(lexer.PunctuationToken.colon),
-		lexer.Token(lexer.StringToken{
-			value: 'Alice'
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.StringToken{
-			value: 'age'
-		}),
-		lexer.Token(lexer.OperatorToken.arrow),
-		lexer.Token(lexer.IntToken{
-			value: 30
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IntToken{
-			value: 1
-		}),
-		lexer.Token(lexer.OperatorToken.arrow),
-		lexer.Token(lexer.StringToken{
-			value: 'first'
-		}),
-		lexer.Token(lexer.PunctuationToken.rbrace),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.record_update)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbrace)),
+		lexer.Token(lexer.new_atom_token('name')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.colon)),
+		lexer.Token(lexer.new_string_token('Alice')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
+		lexer.Token(lexer.new_string_token('age')),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.arrow)),
+		lexer.Token(lexer.new_int_token(30)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
+		lexer.Token(lexer.new_int_token(1)),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.arrow)),
+		lexer.Token(lexer.new_string_token('first')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbrace)),
 	]
 
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse map expression') }
+	expr := parser_instance.parse_expression() or { panic('Failed to parse map expression')}
 
 	match expr {
 		ast.MapLiteralExpr {

@@ -6,10 +6,8 @@ import ast
 
 fn test_simple_integer() {
 	tokens := [
-		lexer.Token(lexer.IntToken{
-			value: 42
-		}),
-		lexer.Token(lexer.EOFToken{}),
+		lexer.Token(lexer.new_int_token(42)),
+		lexer.Token(lexer.new_eof_token()),
 	]
 	mut parser0 := parser.new_main_parser(tokens)
 	expr := parser0.parse_expression() or { panic('Failed to parse integer') }
@@ -33,14 +31,10 @@ fn test_simple_integer() {
 
 fn test_simple_addition() {
 	tokens := [
-		lexer.Token(lexer.IntToken{
-			value: 1
-		}),
-		lexer.Token(lexer.OperatorToken.plus),
-		lexer.Token(lexer.IntToken{
-			value: 2
-		}),
-		lexer.Token(lexer.EOFToken{}),
+		lexer.Token(lexer.new_int_token(1)),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.plus)),
+		lexer.Token(lexer.new_int_token(2)),
+		lexer.Token(lexer.new_eof_token()),
 	]
 	mut parser0 := parser.new_main_parser(tokens)
 	expr := parser0.parse_expression() or { panic('Failed to parse addition') }

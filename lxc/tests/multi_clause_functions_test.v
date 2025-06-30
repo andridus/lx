@@ -9,59 +9,26 @@ import errors
 fn test_multi_clause_function_parsing() {
 	// Test parsing of multi-clause function with correct arity order
 	tokens := [
-		lexer.Token(lexer.KeywordToken.module),
-		lexer.Token(lexer.IdentToken{
-			value: 'test_module'
-		}),
-		lexer.Token(lexer.PunctuationToken.lbrace),
-		lexer.Token(lexer.KeywordToken.def),
-		lexer.Token(lexer.IdentToken{
-			value: 'factorial'
-		}),
-		lexer.Token(lexer.KeywordToken.do_),
-		// First clause: factorial(0) -> 1
-		lexer.Token(lexer.PunctuationToken.lparen),
-		lexer.Token(lexer.IntToken{
-			value: 0
-		}),
-		lexer.Token(lexer.PunctuationToken.rparen),
-		lexer.Token(lexer.OperatorToken.arrow),
-		lexer.Token(lexer.IntToken{
-			value: 1
-		}),
-		// Second clause: factorial(N) when N > 0 -> N * factorial(N - 1)
-		lexer.Token(lexer.PunctuationToken.lparen),
-		lexer.Token(lexer.IdentToken{
-			value: 'N'
-		}),
-		lexer.Token(lexer.PunctuationToken.rparen),
-		lexer.Token(lexer.KeywordToken.when),
-		lexer.Token(lexer.IdentToken{
-			value: 'N'
-		}),
-		lexer.Token(lexer.OperatorToken.gt),
-		lexer.Token(lexer.IntToken{
-			value: 0
-		}),
-		lexer.Token(lexer.OperatorToken.arrow),
-		lexer.Token(lexer.IdentToken{
-			value: 'N'
-		}),
-		lexer.Token(lexer.OperatorToken.mult),
-		lexer.Token(lexer.IdentToken{
-			value: 'factorial'
-		}),
-		lexer.Token(lexer.PunctuationToken.lparen),
-		lexer.Token(lexer.IdentToken{
-			value: 'N'
-		}),
-		lexer.Token(lexer.OperatorToken.minus),
-		lexer.Token(lexer.IntToken{
-			value: 1
-		}),
-		lexer.Token(lexer.PunctuationToken.rparen),
-		lexer.Token(lexer.KeywordToken.end_),
-		lexer.Token(lexer.PunctuationToken.rbrace),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.module)),
+		lexer.Token(lexer.new_ident_token('test_module')),
+		lexer.Token(lexer.new_newline_token()),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.def)),
+		lexer.Token(lexer.new_ident_token('f')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lparen)),
+		lexer.Token(lexer.new_ident_token('x')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rparen)),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.assign)),
+		lexer.Token(lexer.new_int_token(1)),
+		lexer.Token(lexer.new_newline_token()),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.def)),
+		lexer.Token(lexer.new_ident_token('f')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lparen)),
+		lexer.Token(lexer.new_ident_token('y')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rparen)),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.assign)),
+		lexer.Token(lexer.new_int_token(2)),
+		lexer.Token(lexer.new_newline_token()),
+		lexer.Token(lexer.new_eof_token()),
 	]
 
 	mut parser_instance := parser.new_main_parser(tokens)
@@ -86,7 +53,7 @@ fn test_multi_clause_function_parsing() {
 	}
 
 	assert found == true
-	assert func_stmt.name == 'factorial'
+	assert func_stmt.name == 'f'
 	assert func_stmt.clauses.len == 2
 
 	// Check first clause (arity 1)
@@ -101,65 +68,43 @@ fn test_multi_clause_function_parsing() {
 fn test_multi_clause_function_with_different_arities() {
 	// Test function with clauses of different arities in correct order
 	tokens := [
-		lexer.Token(lexer.KeywordToken.module),
-		lexer.Token(lexer.IdentToken{
-			value: 'test_module'
-		}),
-		lexer.Token(lexer.PunctuationToken.lbrace),
-		lexer.Token(lexer.KeywordToken.def),
-		lexer.Token(lexer.IdentToken{
-			value: 'process'
-		}),
-		lexer.Token(lexer.KeywordToken.do_),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.module)),
+		lexer.Token(lexer.new_ident_token('test_module')),
+		lexer.Token(lexer.new_newline_token()),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.def)),
+		lexer.Token(lexer.new_ident_token('process')),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.do_)),
 		// First clause: process() -> :ok
-		lexer.Token(lexer.PunctuationToken.lparen),
-		lexer.Token(lexer.PunctuationToken.rparen),
-		lexer.Token(lexer.OperatorToken.arrow),
-		lexer.Token(lexer.AtomToken{
-			value: 'ok'
-		}),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lparen)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rparen)),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.arrow)),
+		lexer.Token(lexer.new_atom_token('ok')),
 		// Second clause: process(x) -> {:ok, x}
-		lexer.Token(lexer.PunctuationToken.lparen),
-		lexer.Token(lexer.IdentToken{
-			value: 'x'
-		}),
-		lexer.Token(lexer.PunctuationToken.rparen),
-		lexer.Token(lexer.OperatorToken.arrow),
-		lexer.Token(lexer.PunctuationToken.lbrace),
-		lexer.Token(lexer.AtomToken{
-			value: 'ok'
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IdentToken{
-			value: 'x'
-		}),
-		lexer.Token(lexer.PunctuationToken.rbrace),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lparen)),
+		lexer.Token(lexer.new_ident_token('x')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rparen)),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.arrow)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbrace)),
+		lexer.Token(lexer.new_atom_token('ok')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
+		lexer.Token(lexer.new_ident_token('x')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbrace)),
 		// Third clause: process(x, y) -> {:ok, x, y}
-		lexer.Token(lexer.PunctuationToken.lparen),
-		lexer.Token(lexer.IdentToken{
-			value: 'x'
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IdentToken{
-			value: 'y'
-		}),
-		lexer.Token(lexer.PunctuationToken.rparen),
-		lexer.Token(lexer.OperatorToken.arrow),
-		lexer.Token(lexer.PunctuationToken.lbrace),
-		lexer.Token(lexer.AtomToken{
-			value: 'ok'
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IdentToken{
-			value: 'x'
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IdentToken{
-			value: 'y'
-		}),
-		lexer.Token(lexer.PunctuationToken.rbrace),
-		lexer.Token(lexer.KeywordToken.end_),
-		lexer.Token(lexer.PunctuationToken.rbrace),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lparen)),
+		lexer.Token(lexer.new_ident_token('x')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
+		lexer.Token(lexer.new_ident_token('y')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rparen)),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.arrow)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbrace)),
+		lexer.Token(lexer.new_atom_token('ok')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
+		lexer.Token(lexer.new_ident_token('x')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
+		lexer.Token(lexer.new_ident_token('y')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbrace)),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.end_)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbrace)),
 	]
 
 	mut parser_instance := parser.new_main_parser(tokens)
@@ -196,64 +141,40 @@ fn test_multi_clause_function_with_different_arities() {
 fn test_multi_clause_function_with_blocks() {
 	// Test function with clauses containing blocks
 	tokens := [
-		lexer.Token(lexer.KeywordToken.module),
-		lexer.Token(lexer.IdentToken{
-			value: 'test_module'
-		}),
-		lexer.Token(lexer.PunctuationToken.lbrace),
-		lexer.Token(lexer.KeywordToken.def),
-		lexer.Token(lexer.IdentToken{
-			value: 'calculate'
-		}),
-		lexer.Token(lexer.KeywordToken.do_),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.module)),
+		lexer.Token(lexer.new_ident_token('test_module')),
+		lexer.Token(lexer.new_newline_token()),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.def)),
+		lexer.Token(lexer.new_ident_token('calculate')),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.do_)),
 		// First clause: calculate(x) do x * 2 end
-		lexer.Token(lexer.PunctuationToken.lparen),
-		lexer.Token(lexer.IdentToken{
-			value: 'x'
-		}),
-		lexer.Token(lexer.PunctuationToken.rparen),
-		lexer.Token(lexer.KeywordToken.do_),
-		lexer.Token(lexer.IdentToken{
-			value: 'x'
-		}),
-		lexer.Token(lexer.OperatorToken.mult),
-		lexer.Token(lexer.IntToken{
-			value: 2
-		}),
-		lexer.Token(lexer.KeywordToken.end_),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lparen)),
+		lexer.Token(lexer.new_ident_token('x')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rparen)),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.do_)),
+		lexer.Token(lexer.new_ident_token('x')),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.mult)),
+		lexer.Token(lexer.new_int_token(2)),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.end_)),
 		// Second clause: calculate(x, y) do result = x + y; result * 2 end
-		lexer.Token(lexer.PunctuationToken.lparen),
-		lexer.Token(lexer.IdentToken{
-			value: 'x'
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IdentToken{
-			value: 'y'
-		}),
-		lexer.Token(lexer.PunctuationToken.rparen),
-		lexer.Token(lexer.KeywordToken.do_),
-		lexer.Token(lexer.IdentToken{
-			value: 'result'
-		}),
-		lexer.Token(lexer.OperatorToken.assign),
-		lexer.Token(lexer.IdentToken{
-			value: 'x'
-		}),
-		lexer.Token(lexer.OperatorToken.plus),
-		lexer.Token(lexer.IdentToken{
-			value: 'y'
-		}),
-		lexer.Token(lexer.PunctuationToken.semicolon),
-		lexer.Token(lexer.IdentToken{
-			value: 'result'
-		}),
-		lexer.Token(lexer.OperatorToken.mult),
-		lexer.Token(lexer.IntToken{
-			value: 2
-		}),
-		lexer.Token(lexer.KeywordToken.end_),
-		lexer.Token(lexer.KeywordToken.end_),
-		lexer.Token(lexer.PunctuationToken.rbrace),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lparen)),
+		lexer.Token(lexer.new_ident_token('x')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
+		lexer.Token(lexer.new_ident_token('y')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rparen)),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.do_)),
+		lexer.Token(lexer.new_ident_token('result')),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.assign)),
+		lexer.Token(lexer.new_ident_token('x')),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.plus)),
+		lexer.Token(lexer.new_ident_token('y')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.semicolon)),
+		lexer.Token(lexer.new_ident_token('result')),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.mult)),
+		lexer.Token(lexer.new_int_token(2)),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.end_)),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.end_)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbrace)),
 	]
 
 	mut parser_instance := parser.new_main_parser(tokens)
@@ -295,52 +216,36 @@ fn test_multi_clause_function_with_blocks() {
 fn test_multi_clause_function_with_tuples() {
 	// Test function with clauses returning tuples
 	tokens := [
-		lexer.Token(lexer.KeywordToken.module),
-		lexer.Token(lexer.IdentToken{
-			value: 'test_module'
-		}),
-		lexer.Token(lexer.PunctuationToken.lbrace),
-		lexer.Token(lexer.KeywordToken.def),
-		lexer.Token(lexer.IdentToken{
-			value: 'pair'
-		}),
-		lexer.Token(lexer.KeywordToken.do_),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.module)),
+		lexer.Token(lexer.new_ident_token('test_module')),
+		lexer.Token(lexer.new_newline_token()),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.def)),
+		lexer.Token(lexer.new_ident_token('pair')),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.do_)),
 		// First clause: pair(x) -> {x, nil}
-		lexer.Token(lexer.PunctuationToken.lparen),
-		lexer.Token(lexer.IdentToken{
-			value: 'x'
-		}),
-		lexer.Token(lexer.PunctuationToken.rparen),
-		lexer.Token(lexer.OperatorToken.arrow),
-		lexer.Token(lexer.PunctuationToken.lbrace),
-		lexer.Token(lexer.IdentToken{
-			value: 'x'
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.KeywordToken.nil_),
-		lexer.Token(lexer.PunctuationToken.rbrace),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lparen)),
+		lexer.Token(lexer.new_ident_token('x')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rparen)),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.arrow)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbrace)),
+		lexer.Token(lexer.new_ident_token('x')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.nil_)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbrace)),
 		// Second clause: pair(x, y) -> {x, y}
-		lexer.Token(lexer.PunctuationToken.lparen),
-		lexer.Token(lexer.IdentToken{
-			value: 'x'
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IdentToken{
-			value: 'y'
-		}),
-		lexer.Token(lexer.PunctuationToken.rparen),
-		lexer.Token(lexer.OperatorToken.arrow),
-		lexer.Token(lexer.PunctuationToken.lbrace),
-		lexer.Token(lexer.IdentToken{
-			value: 'x'
-		}),
-		lexer.Token(lexer.PunctuationToken.comma),
-		lexer.Token(lexer.IdentToken{
-			value: 'y'
-		}),
-		lexer.Token(lexer.PunctuationToken.rbrace),
-		lexer.Token(lexer.KeywordToken.end_),
-		lexer.Token(lexer.PunctuationToken.rbrace),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lparen)),
+		lexer.Token(lexer.new_ident_token('x')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
+		lexer.Token(lexer.new_ident_token('y')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rparen)),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.arrow)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbrace)),
+		lexer.Token(lexer.new_ident_token('x')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
+		lexer.Token(lexer.new_ident_token('y')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbrace)),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.end_)),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbrace)),
 	]
 
 	mut parser_instance := parser.new_main_parser(tokens)

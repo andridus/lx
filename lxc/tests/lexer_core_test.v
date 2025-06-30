@@ -31,7 +31,7 @@ fn test_basic_token_scanning() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.assign
+	assert operator_token.value == lexer.OperatorValue.assign
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IntToken
@@ -55,7 +55,7 @@ fn test_whitespace_handling() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.assign
+	assert operator_token.value == lexer.OperatorValue.assign
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IntToken
@@ -75,7 +75,7 @@ fn test_newline_handling() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.assign
+	assert operator_token.value == lexer.OperatorValue.assign
 }
 
 fn test_core_string_literals() {
@@ -105,7 +105,6 @@ fn test_core_string_literals() {
 	assert token3 is lexer.ErrorToken
 	error_token3 := token3 as lexer.ErrorToken
 	assert error_token3.message.contains('Unterminated string')
-	// Após consumir erro, não deve haver mais erros
 	assert lexer3.has_errors() == false
 }
 
@@ -120,32 +119,42 @@ fn test_core_numeric_literals() {
 	assert int_token1.value == 42
 
 	token2 := lexer0.next_token()
-	assert token2 is lexer.IntToken
-	int_token2 := token2 as lexer.IntToken
-	assert int_token2.value == -123
+	assert token2 is lexer.OperatorToken
+	operator_token2 := token2 as lexer.OperatorToken
+	assert operator_token2.value == lexer.OperatorValue.minus
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IntToken
 	int_token3 := token3 as lexer.IntToken
-	assert int_token3.value == 0
+	assert int_token3.value == 123
+
+	token4 := lexer0.next_token()
+	assert token4 is lexer.IntToken
+	int_token4 := token4 as lexer.IntToken
+	assert int_token4.value == 0
 
 	// Test floats
 	input2 := '3.14 -2.5 0.0'
 	mut lexer2 := lexer.new_lexer(input2, 'test.lx')
 
-	token4 := lexer2.next_token()
-	assert token4 is lexer.FloatToken
-	float_token1 := token4 as lexer.FloatToken
-	assert float_token1.value == 3.14
-
 	token5 := lexer2.next_token()
 	assert token5 is lexer.FloatToken
-	float_token2 := token5 as lexer.FloatToken
-	assert float_token2.value == -2.5
+	float_token1 := token5 as lexer.FloatToken
+	assert float_token1.value == 3.14
 
 	token6 := lexer2.next_token()
-	assert token6 is lexer.FloatToken
-	float_token3 := token6 as lexer.FloatToken
+	assert token6 is lexer.OperatorToken
+	operator_token6 := token6 as lexer.OperatorToken
+	assert operator_token6.value == lexer.OperatorValue.minus
+
+	token7 := lexer2.next_token()
+	assert token7 is lexer.FloatToken
+	float_token2 := token7 as lexer.FloatToken
+	assert float_token2.value == 2.5
+
+	token8 := lexer2.next_token()
+	assert token8 is lexer.FloatToken
+	float_token3 := token8 as lexer.FloatToken
 	assert float_token3.value == 0.0
 }
 
@@ -156,12 +165,12 @@ fn test_core_boolean_literals() {
 	token1 := lexer0.next_token()
 	assert token1 is lexer.KeywordToken
 	keyword_token1 := token1 as lexer.KeywordToken
-	assert keyword_token1 == lexer.KeywordToken.true_
+	assert keyword_token1.value == lexer.KeywordValue.true_
 
 	token2 := lexer0.next_token()
 	assert token2 is lexer.KeywordToken
 	keyword_token2 := token2 as lexer.KeywordToken
-	assert keyword_token2 == lexer.KeywordToken.false_
+	assert keyword_token2.value == lexer.KeywordValue.false_
 }
 
 fn test_core_atom_literals() {
@@ -191,7 +200,7 @@ fn test_core_nil_literal() {
 	token := lexer0.next_token()
 	assert token is lexer.KeywordToken
 	keyword_token := token as lexer.KeywordToken
-	assert keyword_token == lexer.KeywordToken.nil_
+	assert keyword_token.value == lexer.KeywordValue.nil_
 }
 
 fn test_core_variable_identifiers() {
@@ -256,12 +265,12 @@ fn test_core_assignment_operators() {
 	token1 := lexer0.next_token()
 	assert token1 is lexer.OperatorToken
 	operator_token1 := token1 as lexer.OperatorToken
-	assert operator_token1 == lexer.OperatorToken.assign
+	assert operator_token1.value == lexer.OperatorValue.assign
 
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token2 := token2 as lexer.OperatorToken
-	assert operator_token2 == lexer.OperatorToken.pattern_match
+	assert operator_token2.value == lexer.OperatorValue.pattern_match
 }
 
 fn test_core_arithmetic_operators() {
@@ -271,22 +280,22 @@ fn test_core_arithmetic_operators() {
 	token1 := lexer0.next_token()
 	assert token1 is lexer.OperatorToken
 	operator_token1 := token1 as lexer.OperatorToken
-	assert operator_token1 == lexer.OperatorToken.plus
+	assert operator_token1.value == lexer.OperatorValue.plus
 
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token2 := token2 as lexer.OperatorToken
-	assert operator_token2 == lexer.OperatorToken.minus
+	assert operator_token2.value == lexer.OperatorValue.minus
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.OperatorToken
 	operator_token3 := token3 as lexer.OperatorToken
-	assert operator_token3 == lexer.OperatorToken.mult
+	assert operator_token3.value == lexer.OperatorValue.mult
 
 	token4 := lexer0.next_token()
 	assert token4 is lexer.OperatorToken
 	operator_token4 := token4 as lexer.OperatorToken
-	assert operator_token4 == lexer.OperatorToken.div
+	assert operator_token4.value == lexer.OperatorValue.div
 }
 
 fn test_core_comparison_operators() {
@@ -296,32 +305,32 @@ fn test_core_comparison_operators() {
 	token1 := lexer0.next_token()
 	assert token1 is lexer.OperatorToken
 	operator_token1 := token1 as lexer.OperatorToken
-	assert operator_token1 == lexer.OperatorToken.eq
+	assert operator_token1.value == lexer.OperatorValue.eq
 
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token2 := token2 as lexer.OperatorToken
-	assert operator_token2 == lexer.OperatorToken.neq
+	assert operator_token2.value == lexer.OperatorValue.neq
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.OperatorToken
 	operator_token3 := token3 as lexer.OperatorToken
-	assert operator_token3 == lexer.OperatorToken.lt
+	assert operator_token3.value == lexer.OperatorValue.lt
 
 	token4 := lexer0.next_token()
 	assert token4 is lexer.OperatorToken
 	operator_token4 := token4 as lexer.OperatorToken
-	assert operator_token4 == lexer.OperatorToken.gt
+	assert operator_token4.value == lexer.OperatorValue.gt
 
 	token5 := lexer0.next_token()
 	assert token5 is lexer.OperatorToken
 	operator_token5 := token5 as lexer.OperatorToken
-	assert operator_token5 == lexer.OperatorToken.leq
+	assert operator_token5.value == lexer.OperatorValue.leq
 
 	token6 := lexer0.next_token()
 	assert token6 is lexer.OperatorToken
 	operator_token6 := token6 as lexer.OperatorToken
-	assert operator_token6 == lexer.OperatorToken.geq
+	assert operator_token6.value == lexer.OperatorValue.geq
 }
 
 fn test_core_logical_operators() {
@@ -331,27 +340,27 @@ fn test_core_logical_operators() {
 	token1 := lexer0.next_token()
 	assert token1 is lexer.OperatorToken
 	operator_token1 := token1 as lexer.OperatorToken
-	assert operator_token1 == lexer.OperatorToken.and_
+	assert operator_token1.value == lexer.OperatorValue.and_
 
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token2 := token2 as lexer.OperatorToken
-	assert operator_token2 == lexer.OperatorToken.or_
+	assert operator_token2.value == lexer.OperatorValue.or_
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.OperatorToken
 	operator_token3 := token3 as lexer.OperatorToken
-	assert operator_token3 == lexer.OperatorToken.not_
+	assert operator_token3.value == lexer.OperatorValue.not_
 
 	token4 := lexer0.next_token()
 	assert token4 is lexer.OperatorToken
 	operator_token4 := token4 as lexer.OperatorToken
-	assert operator_token4 == lexer.OperatorToken.andalso
+	assert operator_token4.value == lexer.OperatorValue.andalso
 
 	token5 := lexer0.next_token()
 	assert token5 is lexer.OperatorToken
 	operator_token5 := token5 as lexer.OperatorToken
-	assert operator_token5 == lexer.OperatorToken.orelse
+	assert operator_token5.value == lexer.OperatorValue.orelse
 }
 
 fn test_punctuation() {
@@ -361,42 +370,42 @@ fn test_punctuation() {
 	token1 := lexer0.next_token()
 	assert token1 is lexer.PunctuationToken
 	punct_token1 := token1 as lexer.PunctuationToken
-	assert punct_token1 == lexer.PunctuationToken.lparen
+	assert punct_token1.value == lexer.PunctuationValue.lparen
 
 	token2 := lexer0.next_token()
 	assert token2 is lexer.PunctuationToken
 	punct_token2 := token2 as lexer.PunctuationToken
-	assert punct_token2 == lexer.PunctuationToken.rparen
+	assert punct_token2.value == lexer.PunctuationValue.rparen
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.PunctuationToken
 	punct_token3 := token3 as lexer.PunctuationToken
-	assert punct_token3 == lexer.PunctuationToken.lbrace
+	assert punct_token3.value == lexer.PunctuationValue.lbrace
 
 	token4 := lexer0.next_token()
 	assert token4 is lexer.PunctuationToken
 	punct_token4 := token4 as lexer.PunctuationToken
-	assert punct_token4 == lexer.PunctuationToken.rbrace
+	assert punct_token4.value == lexer.PunctuationValue.rbrace
 
 	token5 := lexer0.next_token()
 	assert token5 is lexer.PunctuationToken
 	punct_token5 := token5 as lexer.PunctuationToken
-	assert punct_token5 == lexer.PunctuationToken.lbracket
+	assert punct_token5.value == lexer.PunctuationValue.lbracket
 
 	token6 := lexer0.next_token()
 	assert token6 is lexer.PunctuationToken
 	punct_token6 := token6 as lexer.PunctuationToken
-	assert punct_token6 == lexer.PunctuationToken.rbracket
+	assert punct_token6.value == lexer.PunctuationValue.rbracket
 
 	token7 := lexer0.next_token()
 	assert token7 is lexer.PunctuationToken
 	punct_token7 := token7 as lexer.PunctuationToken
-	assert punct_token7 == lexer.PunctuationToken.comma
+	assert punct_token7.value == lexer.PunctuationValue.comma
 
 	token8 := lexer0.next_token()
 	assert token8 is lexer.PunctuationToken
 	punct_token8 := token8 as lexer.PunctuationToken
-	assert punct_token8 == lexer.PunctuationToken.semicolon
+	assert punct_token8.value == lexer.PunctuationValue.semicolon
 }
 
 fn test_core_inline_comments() {
@@ -411,7 +420,7 @@ fn test_core_inline_comments() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.assign
+	assert operator_token.value == lexer.OperatorValue.assign
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IntToken
@@ -435,7 +444,7 @@ fn test_core_comment_only_line() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token := token2 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.assign
+	assert operator_token.value == lexer.OperatorValue.assign
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IntToken
@@ -456,7 +465,7 @@ fn test_core_comment_with_code() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token1 := token2 as lexer.OperatorToken
-	assert operator_token1 == lexer.OperatorToken.assign
+	assert operator_token1.value == lexer.OperatorValue.assign
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IntToken
@@ -472,7 +481,7 @@ fn test_core_comment_with_code() {
 	token5 := lexer0.next_token()
 	assert token5 is lexer.OperatorToken
 	operator_token2 := token5 as lexer.OperatorToken
-	assert operator_token2 == lexer.OperatorToken.assign
+	assert operator_token2.value == lexer.OperatorValue.assign
 
 	token6 := lexer0.next_token()
 	assert token6 is lexer.IntToken
@@ -490,7 +499,6 @@ fn test_lexer_errors() {
 	assert token is lexer.ErrorToken
 	error_token := token as lexer.ErrorToken
 	assert error_token.message.contains('Unterminated string')
-	// Após consumir erro, não deve haver mais erros
 	assert lexer0.has_errors() == false
 }
 

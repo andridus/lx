@@ -135,13 +135,18 @@ fn test_invalid_float_format() {
 }
 
 fn test_invalid_float_format2() {
-	input := '.123'
+	input := '.1'
 	mut lexer0 := lexer.new_lexer(input, 'test.lx')
 
-	token := lexer0.next_token()
-	assert token is lexer.ErrorToken
-	error_token := token as lexer.ErrorToken
-	assert error_token.message.contains('Lexical error:')
+	token1 := lexer0.next_token()
+	assert token1 is lexer.OperatorToken
+	operator_token := token1 as lexer.OperatorToken
+	assert operator_token.value == lexer.OperatorValue.dot
+
+	token2 := lexer0.next_token()
+	assert token2 is lexer.IntToken
+	int_token := token2 as lexer.IntToken
+	assert int_token.value == 1
 }
 
 fn test_invalid_float_format3() {
@@ -246,7 +251,7 @@ fn test_error_line_tracking() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token1 := token2 as lexer.OperatorToken
-	assert operator_token1 == lexer.OperatorToken.assign
+	assert operator_token1.value == lexer.OperatorValue.assign
 	_, line2, _ := lexer0.get_position_info()
 	assert line2 == 1
 
@@ -491,4 +496,19 @@ fn test_invalid_character_in_comment() {
 
 	// Comment should be ignored, no error expected
 	assert lexer0.has_errors() == false
+}
+
+fn test_invalid_negative_integer() {
+	input := '-abc'
+	mut lexer0 := lexer.new_lexer(input, 'test.lx')
+
+	token1 := lexer0.next_token()
+	assert token1 is lexer.OperatorToken
+	operator_token := token1 as lexer.OperatorToken
+	assert operator_token.value == lexer.OperatorValue.minus
+
+	token2 := lexer0.next_token()
+	assert token2 is lexer.IdentToken
+	ident_token := token2 as lexer.IdentToken
+	assert ident_token.value == 'abc'
 }

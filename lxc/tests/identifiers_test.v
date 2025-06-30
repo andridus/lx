@@ -124,17 +124,17 @@ fn test_keyword_not_identifier() {
 	token1 := lexer0.next_token()
 	assert token1 is lexer.KeywordToken
 	keyword_token1 := token1 as lexer.KeywordToken
-	assert keyword_token1 == lexer.KeywordToken.def
+	assert keyword_token1.value == lexer.KeywordValue.def
 
 	token2 := lexer0.next_token()
 	assert token2 is lexer.KeywordToken
 	keyword_token2 := token2 as lexer.KeywordToken
-	assert keyword_token2 == lexer.KeywordToken.case_
+	assert keyword_token2.value == lexer.KeywordValue.case_
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.KeywordToken
 	keyword_token3 := token3 as lexer.KeywordToken
-	assert keyword_token3 == lexer.KeywordToken.if_
+	assert keyword_token3.value == lexer.KeywordValue.if_
 }
 
 fn test_identifier_validation() {
@@ -252,7 +252,7 @@ fn test_identifier_followed_by_operators() {
 	token2 := lexer0.next_token()
 	assert token2 is lexer.OperatorToken
 	operator_token1 := token2 as lexer.OperatorToken
-	assert operator_token1 == lexer.OperatorToken.assign
+	assert operator_token1.value == lexer.OperatorValue.assign
 
 	token3 := lexer0.next_token()
 	assert token3 is lexer.IdentToken
@@ -262,7 +262,7 @@ fn test_identifier_followed_by_operators() {
 	token4 := lexer0.next_token()
 	assert token4 is lexer.OperatorToken
 	operator_token2 := token4 as lexer.OperatorToken
-	assert operator_token2 == lexer.OperatorToken.plus
+	assert operator_token2.value == lexer.OperatorValue.plus
 
 	token5 := lexer0.next_token()
 	assert token5 is lexer.IdentToken
@@ -277,7 +277,7 @@ fn test_identifier_with_keywords() {
 	token1 := lexer0.next_token()
 	assert token1 is lexer.KeywordToken
 	keyword_token := token1 as lexer.KeywordToken
-	assert keyword_token == lexer.KeywordToken.def
+	assert keyword_token.value == lexer.KeywordValue.def
 
 	token2 := lexer0.next_token()
 	assert token2 is lexer.IdentToken
@@ -287,7 +287,7 @@ fn test_identifier_with_keywords() {
 	token3 := lexer0.next_token()
 	assert token3 is lexer.OperatorToken
 	operator_token := token3 as lexer.OperatorToken
-	assert operator_token == lexer.OperatorToken.assign
+	assert operator_token.value == lexer.OperatorValue.assign
 
 	token4 := lexer0.next_token()
 	assert token4 is lexer.IntToken

@@ -23,6 +23,7 @@
 - **Logical operators `andalso`/`&&` and `orelse`/`||` now generate `andalso` and `orelse` in Erlang output, matching modern BEAM semantics.
 - **Lexer recognizes both symbolic and word forms for these operators.
 - **Didactic Examples**: Added a comprehensive set of didactic `.lx` example files in `lxc/examples/`, covering basic to advanced features (syntax, pattern matching, functions, control flow, data structures, OTP, concurrency, specifications, testing, and a full application). All examples follow the official Lx syntax and ensure every expression is inside a function, serving as reference and test material for users and contributors.
+- **Lexer Token Refactoring**: Refactored `KeywordToken`, `OperatorToken`, and `PunctuationToken` from enums to structs with a `value` field containing the corresponding enum (`KeywordValue`, `OperatorValue`, `PunctuationValue`). Added helper functions `keyword()`, `operator()`, and `punctuation()` for simplified token creation. This improves type safety and provides a more consistent token structure throughout the lexer and parser.
 
 ### Fixed
 - **Fixed lexer negative number handling**: Removed the `maybe_negative` state from the lexer to follow modern compiler design principles. The lexer now always separates the minus operator (`-`) from numbers, leaving the interpretation of negative numbers to the parser phase. This ensures correct tokenization for expressions like `n-1` (which now produces `IdentToken("n")`, `OperatorToken.minus`, `IntToken(1)`) and eliminates ambiguity in complex expressions.
