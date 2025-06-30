@@ -144,6 +144,28 @@ lxc/
 - **`tests/typecheck/`**: Type checking and inference tests
 - **`tests/*.v`**: Various test modules for different compiler components
 
+#### Writing Tests
+
+The test suite includes utility functions to simplify testing LX to Erlang compilation:
+
+```v
+// Test utility function for comparing LX code with generated Erlang
+fn assert_lx_generates_erlang(lx_code string, expected_erlang string) {
+    // Automatically handles lexing, parsing, and code generation
+    // Compares the generated Erlang code with expected output
+}
+
+// Example usage in tests
+fn test_simple_function() {
+    assert_lx_generates_erlang(
+        'def f() do\n1\nend',
+        '-module(main).\n-export([f/0]).\n\nf() ->\n1.\n'
+    )
+}
+```
+
+This utility function eliminates the need for manual token creation and provides a clean, readable way to test the complete compilation pipeline from LX source to Erlang output.
+
 ## Compilation Pipeline
 
 1. **Lexical Analysis**: Source code → Tokens (`frontend/lexer/`)

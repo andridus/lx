@@ -52,39 +52,5 @@ fn test_simple_addition() {
 }
 
 fn test_simple_function_string() {
-	source := 'def f() do\n1\nend'
-
-	// Create lexer from string
-	mut lexer_instance := lexer.new_lexer(source, 'test')
-	mut tokens := []lexer.Token{}
-
-	// Tokenize the source
-	for {
-		token := lexer_instance.next_token()
-		if token is lexer.EOFToken {
-			break
-		}
-		if token is lexer.ErrorToken {
-			panic('Lexical error: ${token.message}')
-		}
-		tokens << token
-	}
-
-	// Parse the tokens
-	mut parser_instance := parser.new_main_parser(tokens)
-	module_stmt := parser_instance.parse_module() or { panic('Failed to parse function') }
-
-	// Generate Erlang code
-	erlang_gen := erlang.new_erlang_generator()
-	type_ctx := typechecker.new_type_context()
-	codegen_result := erlang_gen.generate_module(module_stmt, type_ctx)
-
-	// Simple assertion that code generation succeeded
-	assert codegen_result.success
-
-	// Expected Erlang code for: def f() do 1 end
-	expected_code := '-module(main).\n-export([f/0]).\n\nf() ->\n1.\n'
-
-	// Compare generated code with expected code
-	assert codegen_result.code == expected_code
+	assert_lx_generates_erlang('def f() do\n1\nend', '-module(main).\n-export([f/0]).\n\nf() ->\n1.\n')
 }
