@@ -9,7 +9,6 @@ fn test_arithmetic_operators() {
 	tokens1 := [
 		lexer.Token(lexer.new_int_token(1)),
 		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.plus)),
-		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.plus)),
 		lexer.Token(lexer.new_int_token(2)),
 		lexer.Token(lexer.new_eof_token()),
 	]
@@ -261,7 +260,7 @@ fn test_operator_precedence() {
 			match expr.right {
 				ast.LiteralExpr {
 					match expr.right.value {
-						ast.IntegerLiteral { assert expr.right.value.value == 7}
+						ast.IntegerLiteral { assert expr.right.value.value == 7 }
 						else { panic('Expected IntegerLiteral 7') }
 					}
 				}

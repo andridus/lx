@@ -13,6 +13,7 @@ pub enum LexerState {
 	operator
 	whitespace
 	error
+	punctuation
 }
 
 // str returns a string representation of LexerState
@@ -29,13 +30,14 @@ pub fn (s LexerState) str() string {
 		.operator { 'operator' }
 		.whitespace { 'whitespace' }
 		.error { 'error' }
+		.punctuation { 'punctuation' }
 	}
 }
 
 // is_final_state checks if a state is a final state (can emit a token)
 pub fn (s LexerState) is_final_state() bool {
 	return match s {
-		.identifier, .number, .float, .string, .atom, .error { true }
+		.identifier, .number, .float, .string, .atom, .error, .punctuation { true }
 		else { false }
 	}
 }
@@ -121,6 +123,12 @@ pub fn (current LexerState) can_transition_to(target LexerState) bool {
 				else { false }
 			}
 		}
+		.punctuation {
+			match target {
+				.initial { true }
+				else { false }
+			}
+		}
 	}
 }
 
@@ -138,6 +146,7 @@ pub fn (s LexerState) get_default_transition() LexerState {
 		.operator { .initial }
 		.whitespace { .initial }
 		.error { .initial }
+		.punctuation { .initial }
 	}
 }
 

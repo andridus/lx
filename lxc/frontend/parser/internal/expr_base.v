@@ -30,19 +30,22 @@ pub fn (mut ep ExpressionParser) parse_assignment_expression() ?ast.Expr {
 		// Look ahead to next token
 		next_token := ep.peek()
 
-		if next_token.str() == 'Operator(=)' {
-			// Consume the identifier
-			ep.advance()
-			// Consume the assignment operator
-			ep.advance()
+		if next_token is lexer.OperatorToken {
+			op_token := next_token as lexer.OperatorToken
+			if op_token.value == .assign {
+				// Consume the identifier
+				ep.advance()
+				// Consume the assignment operator
+				ep.advance()
 
-			// Parse the right-hand side expression
-			value := ep.parse_assignment_expression()?
+				// Parse the right-hand side expression
+				value := ep.parse_assignment_expression()?
 
-			return ast.AssignExpr{
-				name:     ident.value
-				value:    value
-				position: ep.get_current_position()
+				return ast.AssignExpr{
+					name:     ident.value
+					value:    value
+					position: ep.get_current_position()
+				}
 			}
 		}
 	}

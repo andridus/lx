@@ -179,6 +179,11 @@ fn (mut sp StatementParser) parse_function_header() ?ast.FunctionClause {
 	// Parse arrow
 	sp.consume(lexer.operator(.arrow), 'Expected -> after function header')?
 
+	// Skip newlines after arrow
+	for sp.current is lexer.NewlineToken {
+		sp.advance()
+	}
+
 	// Parse body - block of statements until next clause or end
 	body := sp.parse_clause_body()?
 

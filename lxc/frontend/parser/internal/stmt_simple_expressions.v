@@ -80,6 +80,11 @@ fn (mut sp StatementParser) parse_simple_expression() ?ast.Expr {
 
 // parse_simple_atom parses atomic expressions (identifiers, literals)
 fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
+	// Skip newlines before atom
+	for sp.current is lexer.NewlineToken {
+		sp.advance()
+	}
+
 	return match sp.current {
 		lexer.IdentToken {
 			token := sp.current as lexer.IdentToken
@@ -185,6 +190,21 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 			ast.LiteralExpr{
 				value: ast.AtomLiteral{
 					value: token.value
+				}
+			}
+		}
+		lexer.KeywordToken {
+			keyword_token := sp.current as lexer.KeywordToken
+			match keyword_token.value {
+				.nil_ {
+					sp.advance()
+					ast.LiteralExpr{
+						value: ast.NilLiteral{}
+					}
+				}
+				else {
+					sp.add_error('Expected simple expression', 'Got ${sp.current.str()}')
+					none
 				}
 			}
 		}

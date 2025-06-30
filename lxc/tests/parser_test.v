@@ -86,7 +86,7 @@ fn test_literal_parsing() {
 		value: 'ok'
 	})]
 	mut parser4 := parser.new_expression_parser(tokens4)
-	expr4 := parser4.parse_expression() or { panic('Failed to parse atom')}
+	expr4 := parser4.parse_expression() or { panic('Failed to parse atom') }
 
 	match expr4 {
 		ast.LiteralExpr {
@@ -120,7 +120,7 @@ fn test_binary_expression_parsing() {
 		}),
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse binary expression')}
+	expr := parser_instance.parse_expression() or { panic('Failed to parse binary expression') }
 
 	match expr {
 		ast.BinaryExpr {
@@ -177,7 +177,7 @@ fn test_binary_expression_parsing() {
 		}),
 	]
 	mut parser2 := parser.new_expression_parser(tokens2)
-	expr2 := parser2.parse_expression() or { panic('Failed to parse comparison')}
+	expr2 := parser2.parse_expression() or { panic('Failed to parse comparison') }
 
 	match expr2 {
 		ast.BinaryExpr {
@@ -209,7 +209,7 @@ fn test_data_structure_parsing() {
 		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbracket)),
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse list')}
+	expr := parser_instance.parse_expression() or { panic('Failed to parse list') }
 
 	match expr {
 		ast.ListLiteralExpr {
@@ -234,7 +234,7 @@ fn test_data_structure_parsing() {
 		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbrace)),
 	]
 	mut parser2 := parser.new_expression_parser(tokens2)
-	expr2 := parser2.parse_expression() or { panic('Failed to parse tuple')}
+	expr2 := parser2.parse_expression() or { panic('Failed to parse tuple') }
 
 	match expr2 {
 		ast.TupleExpr {
@@ -271,7 +271,7 @@ fn test_map_parsing() {
 		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbrace)),
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse map')}
+	expr := parser_instance.parse_expression() or { panic('Failed to parse map') }
 
 	match expr {
 		ast.MapLiteralExpr {
@@ -294,9 +294,10 @@ fn test_assignment_parsing() {
 		lexer.Token(lexer.IntToken{
 			value: 42
 		}),
+		lexer.Token(lexer.new_eof_token()),
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse assignment')}
+	expr := parser_instance.parse_expression() or { panic('Failed to parse assignment') }
 
 	match expr {
 		ast.AssignExpr {
@@ -326,7 +327,7 @@ fn test_function_call_parsing() {
 		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rparen)),
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse function call')}
+	expr := parser_instance.parse_expression() or { panic('Failed to parse function call') }
 
 	match expr {
 		ast.CallExpr {
@@ -351,7 +352,7 @@ fn test_record_access_parsing() {
 		}),
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse record access')}
+	expr := parser_instance.parse_expression() or { panic('Failed to parse record access') }
 
 	match expr {
 		ast.RecordAccessExpr {
@@ -383,7 +384,7 @@ fn test_case_expression_parsing() {
 		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.end_)),
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse case expression')}
+	expr := parser_instance.parse_expression() or { panic('Failed to parse case expression') }
 
 	match expr {
 		ast.CaseExpr {
@@ -454,7 +455,7 @@ fn test_send_expression_parsing() {
 		}),
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse send expression')}
+	expr := parser_instance.parse_expression() or { panic('Failed to parse send expression') }
 
 	match expr {
 		ast.SendExpr {
@@ -482,7 +483,7 @@ fn test_receive_expression_parsing() {
 		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.end_)),
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse receive expression')}
+	expr := parser_instance.parse_expression() or { panic('Failed to parse receive expression') }
 
 	match expr {
 		ast.ReceiveExpr {
@@ -537,7 +538,7 @@ fn test_module_parsing() {
 		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbrace)),
 	]
 	mut parser_instance := parser.new_main_parser(tokens)
-	module_stmt := parser_instance.parse_module() or { panic('Failed to parse module')}
+	module_stmt := parser_instance.parse_module() or { panic('Failed to parse module') }
 
 	// Since ModuleStmt is a struct, we can't match it directly
 	// Just check that parsing succeeded
@@ -585,7 +586,7 @@ fn test_complex_expressions() {
 		}),
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse complex expression')}
+	expr := parser_instance.parse_expression() or { panic('Failed to parse complex expression') }
 
 	match expr {
 		ast.BinaryExpr {
@@ -615,7 +616,7 @@ fn test_operator_precedence() {
 		}),
 	]
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse precedence test')}
+	expr := parser_instance.parse_expression() or { panic('Failed to parse precedence test') }
 
 	match expr {
 		ast.BinaryExpr {

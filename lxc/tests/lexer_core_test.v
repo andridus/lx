@@ -528,3 +528,21 @@ fn test_lexer_position_tracking() {
 	assert line4 == 2
 	assert column4 == 2
 }
+
+fn test_arrow_lbrace_tokenization() {
+	input := '-> {'
+	mut lexer0 := lexer.new_lexer(input, 'test.lx')
+
+	token1 := lexer0.next_token()
+	assert token1 is lexer.OperatorToken
+	operator_token := token1 as lexer.OperatorToken
+	assert operator_token.value == lexer.OperatorValue.arrow
+
+	token2 := lexer0.next_token()
+	assert token2 is lexer.PunctuationToken
+	punct_token := token2 as lexer.PunctuationToken
+	assert punct_token.value == lexer.PunctuationValue.lbrace
+
+	token3 := lexer0.next_token()
+	assert token3 is lexer.EOFToken
+}

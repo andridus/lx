@@ -402,6 +402,26 @@ fn (mut l Lexer) create_token_from_buffer() Token {
 				}
 			}
 		}
+		.punctuation {
+			if is_punctuation(l.buffer) {
+				if ptok := get_punctuation_token(l.buffer, l.start_pos) {
+					PunctuationToken{
+						value:    ptok.value
+						position: l.start_pos
+					}
+				} else {
+					ErrorToken{
+						message:  'Lexical error: Unknown punctuation'
+						position: l.start_pos
+					}
+				}
+			} else {
+				ErrorToken{
+					message:  'Lexical error: Unknown punctuation'
+					position: l.start_pos
+				}
+			}
+		}
 		else {
 			ErrorToken{
 				message:  'Lexical error: Unexpected state'

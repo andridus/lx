@@ -24,6 +24,11 @@ fn (mut sp StatementParser) parse_statement_block() ?[]ast.Stmt {
 
 // parse_clause_body parses a block of statements until next clause or end
 fn (mut sp StatementParser) parse_clause_body() ?[]ast.Stmt {
+	// Skip newlines at the start of clause body
+	for sp.current is lexer.NewlineToken {
+		sp.advance()
+	}
+
 	mut statements := []ast.Stmt{}
 
 	for !sp.is_at_end() {
@@ -60,7 +65,7 @@ fn (mut sp StatementParser) parse_clause_body() ?[]ast.Stmt {
 		}
 	}
 
-	if statements.len == 0 {
+	if statements.len == 0 && !sp.is_potential_new_clause_start() && !sp.check(lexer.keyword(.end_)) {
 		expr := sp.parse_simple_expression()?
 		statements << ast.ExprStmt{
 			expr: expr

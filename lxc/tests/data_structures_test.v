@@ -65,7 +65,7 @@ fn test_list_parsing() {
 
 	mut parser0 := parser.new_main_parser(tokens)
 
-	expr := parser0.parse_expression() or { panic('Failed to parse list')}
+	expr := parser0.parse_expression() or { panic('Failed to parse list') }
 	match expr {
 		ast.ListLiteralExpr {
 			list_expr := expr as ast.ListLiteralExpr
@@ -86,7 +86,7 @@ fn test_empty_list_parsing() {
 
 	mut parser0 := parser.new_main_parser(tokens)
 
-	expr := parser0.parse_expression() or { panic('Failed to parse empty list')}
+	expr := parser0.parse_expression() or { panic('Failed to parse empty list') }
 	match expr {
 		ast.ListLiteralExpr {
 			list_expr := expr as ast.ListLiteralExpr
@@ -112,7 +112,7 @@ fn test_list_cons_parsing() {
 
 	mut parser0 := parser.new_main_parser(tokens)
 
-	expr := parser0.parse_expression() or { panic('Failed to parse list cons')}
+	expr := parser0.parse_expression() or { panic('Failed to parse list cons') }
 	match expr {
 		ast.ListConsExpr {
 			cons_expr := expr as ast.ListConsExpr
@@ -169,7 +169,7 @@ fn test_map_parsing() {
 
 	mut parser0 := parser.new_main_parser(tokens)
 
-	expr := parser0.parse_expression() or { panic('Failed to parse map')}
+	expr := parser0.parse_expression() or { panic('Failed to parse map') }
 	match expr {
 		ast.MapLiteralExpr {
 			map_expr := expr as ast.MapLiteralExpr
@@ -198,7 +198,7 @@ fn test_map_with_string_keys_parsing() {
 
 	mut parser0 := parser.new_main_parser(tokens)
 
-	expr := parser0.parse_expression() or { panic('Failed to parse map with string keys')}
+	expr := parser0.parse_expression() or { panic('Failed to parse map with string keys') }
 	match expr {
 		ast.MapLiteralExpr {
 			map_expr := expr as ast.MapLiteralExpr
@@ -233,7 +233,7 @@ fn test_nested_data_structures() {
 
 	mut parser0 := parser.new_main_parser(tokens)
 
-	expr := parser0.parse_expression() or { panic('Failed to parse nested data structures')}
+	expr := parser0.parse_expression() or { panic('Failed to parse nested data structures') }
 	match expr {
 		ast.TupleExpr {
 			tuple_expr := expr as ast.TupleExpr

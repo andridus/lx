@@ -222,7 +222,7 @@ pub fn get_transitions() []Transition {
 		},
 		Transition{
 			from_state: .initial
-			to_state:   .operator
+			to_state:   .punctuation
 			condition:  CharacterClassCondition{
 				class: .punctuation
 			}
@@ -423,6 +423,13 @@ pub fn get_transitions() []Transition {
 		},
 		Transition{
 			from_state: .operator
+			to_state:   .initial
+			condition:  AlwaysCondition{}
+			action:     .emit_token
+		},
+		// Punctuation state transitions
+		Transition{
+			from_state: .punctuation
 			to_state:   .initial
 			condition:  AlwaysCondition{}
 			action:     .emit_token

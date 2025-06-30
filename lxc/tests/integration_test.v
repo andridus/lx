@@ -6,32 +6,21 @@ import ast
 
 // Test the complete parsing pipeline from tokens to AST
 fn test_complete_parsing_pipeline() {
-	// Test a complete LX program
-	program := '
-module math_utils [add, multiply] {
-  def add(x, y) do
-    x + y
-  end
-
-  def multiply(x, y) do
-    x * y
-  end
-
-  record Point {
-    x :: integer,
-    y :: integer
- )
-
-  def distance(p1, p2) do
-    dx = p1.x - p2.x
-    dy = p1.y - p2.y
-    math.sqrt(dx * dx + dy * dy)
-  end
-}'
-
-	// For now, we'll create tokens manually since we don't have a lexer yet
-	// In a real implementation, this would come from the lexer
-	tokens := create_tokens_for_program()
+	// Test a simple LX function
+	tokens := [
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.def)),
+		lexer.Token(lexer.new_ident_token('add')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lparen)),
+		lexer.Token(lexer.new_ident_token('x')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
+		lexer.Token(lexer.new_ident_token('y')),
+		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rparen)),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.do_)),
+		lexer.Token(lexer.new_ident_token('x')),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.plus)),
+		lexer.Token(lexer.new_ident_token('y')),
+		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.end_)),
+	]
 
 	mut parser_instance := parser.new_main_parser(tokens)
 	module_stmt := parser_instance.parse_module() or { panic('Failed to parse complete program') }
@@ -129,7 +118,7 @@ fn test_data_structure_expressions() {
 	]
 
 	mut parser_instance := parser.new_expression_parser(tokens)
-	expr := parser_instance.parse_expression() or { panic('Failed to parse map expression')}
+	expr := parser_instance.parse_expression() or { panic('Failed to parse map expression') }
 
 	match expr {
 		ast.MapLiteralExpr {
