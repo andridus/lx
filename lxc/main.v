@@ -3,8 +3,8 @@ module main
 import os
 import compiler
 import backend.erlang
-import typechecker
-import linter
+import analysis.typechecker
+import analysis.linter
 import ast
 
 fn main() {

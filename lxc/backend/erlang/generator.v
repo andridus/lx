@@ -1,7 +1,7 @@
 module erlang
 
 import ast
-import typechecker
+import analysis.typechecker
 import codegen { CodegenResult }
 
 // ErlangGenerator generates Erlang code from LX AST

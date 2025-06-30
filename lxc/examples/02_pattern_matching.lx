@@ -1,0 +1,122 @@
+# Pattern Matching Examples
+# Demonstrates pattern matching capabilities in Lx
+
+def basic_pattern_matching() do
+  # Tuple pattern matching
+  point = {10, 20}
+  {x, y} = point
+
+  # List pattern matching
+  list = [1, 2, 3, 4, 5]
+  [head | tail] = list
+
+  # Atom pattern matching
+  status = :ok
+
+  {x, y, head, tail, status}
+end
+
+def case_pattern_matching() do
+  # Case expression with pattern matching
+  data = {:user, "Alice", 30}
+
+  case data do
+    {:user, name, age} -> "User: " ++ name ++ ", Age: " ++ integer_to_string(age)
+    {:admin, name} -> "Admin: " ++ name
+    _ -> "Unknown"
+  end
+end
+
+def list_pattern_matching() do
+  # List pattern matching examples
+  numbers = [1, 2, 3, 4, 5]
+
+  case numbers do
+    [first, second | rest] -> {first, second, rest}
+    [single] -> {:single, single, []}
+    [] -> {:empty, 0, []}
+    _ -> {:unknown, 0, []}
+  end
+end
+
+def map_pattern_matching() do
+  # Map pattern matching
+  user = %{name: "Bob", age: 25, active: true}
+
+  # Pattern matching with maps
+  %{name: user_name, age: user_age} = user
+
+  # Pattern matching operator (recommended)
+  %{name: name2, age: _age} <- user
+
+  {user_name, user_age, name2}
+end
+
+def complex_pattern_matching() do
+  # Nested pattern matching
+  data = %{
+    user: %{name: "Charlie", profile: %{age: 35, city: "NYC"}},
+    settings: %{theme: "dark", notifications: true}
+  }
+
+  case data do
+    %{user: %{name: name, profile: %{age: age, city: city}}} ->
+      "User " ++ name ++ " (" ++ integer_to_string(age) ++ ") from " ++ city
+    _ -> "Unknown user"
+  end
+end
+
+def pattern_matching_with_guards() do
+  # Pattern matching with guards
+  values = [10, 20, 30, 40]
+
+  case values do
+    [first, second | _] when first > second -> "First is greater"
+    [first, second | _] when first < second -> "Second is greater"
+    [first, second | _] when first == second -> "Equal"
+    _ -> "Unknown"
+  end
+end
+
+def unsafe_pattern_matching() do
+  # Unsafe pattern matching for dynamic data
+  dynamic_data = %{"dynamic_key" => "dynamic_value", "another" => 42}
+
+  # When you need to bypass type checking
+  unsafe %{key => value} = dynamic_data
+
+  {key, value}
+end
+
+def tuple_pattern_matching() do
+  # Tuple pattern matching examples
+  point_3d = {10, 20, 30}
+
+  case point_3d do
+    {x, y, z} -> "3D point: " ++ integer_to_string(x) ++ ", " ++ integer_to_string(y) ++ ", " ++ integer_to_string(z)
+    {x, y} -> "2D point: " ++ integer_to_string(x) ++ ", " ++ integer_to_string(y)
+    _ -> "Unknown point"
+  end
+end
+
+def mixed_pattern_matching() do
+  # Mixed data structure pattern matching
+  complex_data = {
+    :user,
+    %{name: "David", age: 28},
+    [1, 2, 3, 4]
+  }
+
+  case complex_data do
+    {:user, %{name: name, age: age}, [first | rest]} ->
+      "User " ++ name ++ " (" ++ integer_to_string(age) ++ ") with list starting at " ++ integer_to_string(first)
+    _ -> "Unknown structure"
+  end
+end
+
+# Helper function for integer to string conversion
+def integer_to_string(n) do
+  # This would typically use a standard library function
+  # For demonstration, we'll return a simple string
+  "number"
+end

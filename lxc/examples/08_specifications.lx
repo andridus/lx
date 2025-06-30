@@ -1,0 +1,378 @@
+# Specifications Examples
+# Demonstrates function contracts and specifications in Lx
+
+# Basic specifications
+spec divide {
+  requires y != 0
+  ensures result * y == x
+}
+
+def divide(x, y) do
+  x / y
+end
+
+# Specification with multiple requirements
+spec factorial {
+  requires n >= 0
+  ensures result > 0
+  ensures n == 0 implies result == 1
+  ensures n > 0 implies result == n * factorial(n - 1)
+}
+
+def factorial do
+  (0) do 1 end
+  (n) when n > 0 do n * factorial(n - 1) end
+end
+
+# Specification for list operations
+spec reverse_list {
+  requires is_list(input)
+  ensures length(result) == length(input)
+  ensures forall i in 0..length(input)-1: result[i] == input[length(input)-1-i]
+}
+
+def reverse_list do
+  ([]) do [] end
+  ([head | tail]) do reverse_list(tail) ++ [head] end
+end
+
+# Specification for map operations
+spec update_user {
+  requires user != nil
+  requires user.name != ""
+  requires age >= 0 andalso age <= 150
+  ensures result.name == user.name
+  ensures result.age == age
+  ensures result.email == user.email
+}
+
+def update_user(user, age) do
+  %{user | age: age}
+end
+
+# Specification for validation functions
+spec validate_email {
+  requires email != ""
+  ensures result == true implies contains(email, "@")
+  ensures result == true implies contains(email, ".")
+}
+
+def validate_email(email) do
+  case email do
+    "" -> false
+    email_str ->
+      contains(email_str, "@") andalso contains(email_str, ".")
+  end
+end
+
+# Specification for mathematical functions
+spec gcd {
+  requires a > 0 andalso b > 0
+  ensures result > 0
+  ensures a % result == 0
+  ensures b % result == 0
+  ensures forall d in 1..min(a,b): (a % d == 0 andalso b % d == 0) implies d <= result
+}
+
+def gcd do
+  (a, 0) do a end
+  (a, b) do gcd(b, a % b) end
+end
+
+# Specification for sorting functions
+spec sort_list {
+  requires is_list(input)
+  ensures length(result) == length(input)
+  ensures is_sorted(result)
+  ensures is_permutation(input, result)
+}
+
+def sort_list do
+  ([]) do [] end
+  ([pivot | rest]) do
+    smaller = for x in rest when x <= pivot do x end
+    larger = for x in rest when x > pivot do x end
+    sort_list(smaller) ++ [pivot] ++ sort_list(larger)
+  end
+end
+
+# Specification for database operations
+spec insert_user {
+  requires user != nil
+  requires user.name != ""
+  requires user.email != ""
+  requires not user_exists(users, user.email)
+  ensures user_exists(result, user.email)
+  ensures length(result) == length(users) + 1
+}
+
+def insert_user(users, user) do
+  [user | users]
+end
+
+# Specification for error handling
+spec safe_divide {
+  requires y != 0
+  ensures case result of
+    {:ok, value} -> value * y == x
+    {:error, reason} -> reason == :division_by_zero
+  end
+}
+
+def safe_divide(x, y) do
+  if y == 0 do
+    {:error, :division_by_zero}
+  else
+    {:ok, x / y}
+  end
+end
+
+# Specification for state transitions
+spec counter_increment {
+  requires counter >= 0
+  ensures result == counter + 1
+}
+
+def counter_increment(counter) do
+  counter + 1
+end
+
+# Specification for complex data transformations
+spec transform_user_data {
+  requires user != nil
+  requires user.age >= 0
+  ensures result.status == classify_age(user.age)
+  ensures result.name == user.name
+  ensures result.id == user.id
+}
+
+def transform_user_data(user) do
+  %{
+    id: user.id,
+    name: user.name,
+    status: classify_age(user.age)
+  }
+end
+
+def classify_age do
+  (age) when age < 13 do "child" end
+  (age) when age >= 13 andalso age < 20 do "teenager" end
+  (age) when age >= 20 andalso age < 65 do "adult" end
+  (age) when age >= 65 do "senior" end
+end
+
+# Specification for concurrent operations
+spec process_message {
+  requires message != nil
+  requires is_valid_message(message)
+  ensures result == {:ok, processed_data} or result == {:error, reason}
+  ensures case result of
+    {:ok, data} -> is_valid_response(data)
+    {:error, reason} -> reason != nil
+  end
+}
+
+def process_message(message) do
+  case validate_message(message) do
+    true ->
+      processed = transform_message(message)
+      {:ok, processed}
+    false ->
+      {:error, :invalid_message}
+  end
+end
+
+# Specification for recursive functions
+spec binary_search {
+  requires is_sorted(list)
+  requires target >= min(list) andalso target <= max(list)
+  ensures result == -1 or (result >= 0 andalso result < length(list))
+  ensures result == -1 implies not contains(list, target)
+  ensures result >= 0 implies list[result] == target
+}
+
+def binary_search(list, target) do
+  binary_search_helper(list, target, 0, length(list) - 1)
+end
+
+defp binary_search_helper(list, target, left, right) do
+  if left > right do
+    -1
+  else
+    mid = (left + right) / 2
+    mid_value = list[mid]
+
+    if mid_value == target do
+      mid
+    else
+      if mid_value < target do
+        binary_search_helper(list, target, mid + 1, right)
+      else
+        binary_search_helper(list, target, left, mid - 1)
+      end
+    end
+  end
+end
+
+# Specification for data validation
+spec validate_user_input {
+  requires input != nil
+  ensures result == {:ok, validated_data} or result == {:error, validation_errors}
+  ensures case result of
+    {:ok, data} -> is_valid_user_data(data)
+    {:error, errors} -> length(errors) > 0
+  end
+}
+
+def validate_user_input(input) do
+  errors = []
+
+  # Validate name
+  if input.name == "" do
+    errors = ["Name cannot be empty" | errors]
+  end
+
+  # Validate age
+  if input.age < 0 or input.age > 150 do
+    errors = ["Age must be between 0 and 150" | errors]
+  end
+
+  # Validate email
+  if not validate_email(input.email) do
+    errors = ["Invalid email format" | errors]
+  end
+
+  case errors do
+    [] -> {:ok, input}
+    _ -> {:error, errors}
+  end
+end
+
+# Helper functions for specifications
+defp contains(text, substring) do
+  case text do
+    "" -> false
+    <<char::utf8, rest::binary>> ->
+      if starts_with(text, substring) do
+        true
+      else
+        contains(rest, substring)
+      end
+  end
+end
+
+defp starts_with(text, prefix) do
+  case {text, prefix} do
+    {_, ""} -> true
+    {<<char1::utf8, rest1::binary>>, <<char2::utf8, rest2::binary>>} ->
+      if char1 == char2 do
+        starts_with(rest1, rest2)
+      else
+        false
+      end
+    _ -> false
+  end
+end
+
+defp is_list(data) do
+  case data do
+    [] -> true
+    [_ | _] -> true
+    _ -> false
+  end
+end
+
+defp length(list) do
+  case list do
+    [] -> 0
+    [_ | tail] -> 1 + length(tail)
+  end
+end
+
+defp is_sorted(list) do
+  case list do
+    [] -> true
+    [_] -> true
+    [first, second | rest] ->
+      if first <= second do
+        is_sorted([second | rest])
+      else
+        false
+      end
+  end
+end
+
+defp is_permutation(list1, list2) do
+  # Simplified implementation
+  length(list1) == length(list2)
+end
+
+defp user_exists(users, email) do
+  case users do
+    [] -> false
+    [user | rest] ->
+      if user.email == email do
+        true
+      else
+        user_exists(rest, email)
+      end
+  end
+end
+
+defp is_valid_message(message) do
+  message != nil andalso message.content != ""
+end
+
+defp is_valid_response(data) do
+  data != nil
+end
+
+defp validate_message(message) do
+  message != nil andalso message.content != ""
+end
+
+defp transform_message(message) do
+  %{content: "Processed: " ++ message.content}
+end
+
+defp min(list) do
+  case list do
+    [] -> 0
+    [head | tail] -> min_helper(tail, head)
+  end
+end
+
+defp min_helper(list, current_min) do
+  case list do
+    [] -> current_min
+    [head | tail] ->
+      if head < current_min do
+        min_helper(tail, head)
+      else
+        min_helper(tail, current_min)
+      end
+  end
+end
+
+defp max(list) do
+  case list do
+    [] -> 0
+    [head | tail] -> max_helper(tail, head)
+  end
+end
+
+defp max_helper(list, current_max) do
+  case list do
+    [] -> current_max
+    [head | tail] ->
+      if head > current_max do
+        max_helper(tail, head)
+      else
+        max_helper(tail, current_max)
+      end
+  end
+end
+
+defp is_valid_user_data(data) do
+  data != nil andalso data.name != "" andalso data.age >= 0
+end

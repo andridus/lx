@@ -22,8 +22,10 @@
 - **Type System Improvements**: Comprehensive type checking for all new constructs with proper error reporting
 - **Logical operators `andalso`/`&&` and `orelse`/`||` now generate `andalso` and `orelse` in Erlang output, matching modern BEAM semantics.
 - **Lexer recognizes both symbolic and word forms for these operators.
+- **Didactic Examples**: Added a comprehensive set of didactic `.lx` example files in `lxc/examples/`, covering basic to advanced features (syntax, pattern matching, functions, control flow, data structures, OTP, concurrency, specifications, testing, and a full application). All examples follow the official Lx syntax and ensure every expression is inside a function, serving as reference and test material for users and contributors.
 
 ### Fixed
+- **Fixed multi-head function parsing**: Corrected parser to properly detect and parse multi-head functions with multiple clauses. The parser now correctly distinguishes between single-head (`def name(params) do ... end`) and multi-head (`def name do ... end`) functions, and properly handles clause boundaries by detecting the `( ... ) ->` pattern without consuming tokens from the next clause.
 - Fixed parser error handling to register errors but continue parsing, ensuring all syntax errors are reported
 - Fixed parser synchronization to skip tokens until finding block boundaries after encountering errors
 - Fixed operator precedence parsing to correctly handle complex expressions with multiple operators

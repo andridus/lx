@@ -1,7 +1,7 @@
 module codegen
 
 import ast
-import typechecker
+import analysis.typechecker
 
 // CodeGenerator defines the interface for all code generators
 pub interface CodeGenerator {

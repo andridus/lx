@@ -1,0 +1,457 @@
+# Testing Examples
+# Demonstrates test structure and assertions in Lx
+
+# Basic test structure
+describe "Basic arithmetic tests" do
+  test "adds two numbers" do
+    assert 2 + 2 == 4
+  end
+
+  test "multiplies numbers" do
+    assert 3 * 4 == 12
+  end
+
+  test "divides numbers" do
+    assert 10 / 2 == 5
+  end
+
+  test "handles negative numbers" do
+    assert -5 + 3 == -2
+  end
+end
+
+# String tests
+describe "String operations tests" do
+  test "concatenates strings" do
+    result = "Hello" ++ " " ++ "World"
+    assert result == "Hello World"
+  end
+
+  test "handles empty strings" do
+    result = "" ++ "test"
+    assert result == "test"
+  end
+
+  test "string length" do
+    text = "Hello"
+    assert length_string(text) == 5
+  end
+end
+
+# Function tests
+describe "Function tests" do
+  test "factorial function" do
+    assert factorial(0) == 1
+    assert factorial(1) == 1
+    assert factorial(5) == 120
+  end
+
+  test "greet function" do
+    result = greet("Alice")
+    assert result == "Hello, Alice"
+  end
+
+  test "add function with multiple arguments" do
+    assert add(1, 2) == 3
+    assert add(-1, 1) == 0
+    assert add(10, 20) == 30
+  end
+end
+
+# Pattern matching tests
+describe "Pattern matching tests" do
+  test "tuple pattern matching" do
+    point = {10, 20}
+    {x, y} = point
+    assert x == 10
+    assert y == 20
+  end
+
+  test "list pattern matching" do
+    list = [1, 2, 3, 4, 5]
+    [head | tail] = list
+    assert head == 1
+    assert tail == [2, 3, 4, 5]
+  end
+
+  test "map pattern matching" do
+    user = %{name: "Bob", age: 25}
+    %{name: name, age: age} = user
+    assert name == "Bob"
+    assert age == 25
+  end
+end
+
+# Control flow tests
+describe "Control flow tests" do
+  test "if else statements" do
+    age = 25
+    result = if age >= 18 do
+      "Adult"
+    else
+      "Minor"
+    end
+    assert result == "Adult"
+  end
+
+  test "case statements" do
+    status = :ok
+    result = case status do
+      :ok -> "Success"
+      :error -> "Error"
+      _ -> "Unknown"
+    end
+    assert result == "Success"
+  end
+
+  test "with expressions" do
+    user_data = %{name: "Alice", age: 30}
+    result = with {:ok, name} <= get_name(user_data) do
+      "Hello, " ++ name
+    else
+      "Unknown user"
+    end
+    assert result == "Hello, Alice"
+  end
+end
+
+# Data structure tests
+describe "Data structure tests" do
+  test "list operations" do
+    numbers = [1, 2, 3, 4, 5]
+    doubled = for x in numbers do
+      x * 2
+    end
+    assert doubled == [2, 4, 6, 8, 10]
+  end
+
+  test "map operations" do
+    user = %{name: "Charlie", age: 35}
+    updated_user = %{user | age: 36}
+    assert updated_user[:name] == "Charlie"
+    assert updated_user[:age] == 36
+  end
+
+  test "tuple operations" do
+    point1 = {10, 20}
+    point2 = {30, 40}
+    combined = {point1, point2}
+    {{x1, y1}, {x2, y2}} = combined
+    assert x1 == 10
+    assert y1 == 20
+    assert x2 == 30
+    assert y2 == 40
+  end
+end
+
+# Error handling tests
+describe "Error handling tests" do
+  test "safe division" do
+    result1 = safe_divide(10, 2)
+    assert result1 == {:ok, 5}
+
+    result2 = safe_divide(10, 0)
+    assert result2 == {:error, :division_by_zero}
+  end
+
+  test "validation functions" do
+    valid_email = "test@example.com"
+    invalid_email = "invalid-email"
+
+    assert validate_email(valid_email) == true
+    assert validate_email(invalid_email) == false
+  end
+end
+
+# Complex test scenarios
+describe "Complex scenarios" do
+  test "user registration flow" do
+    # Test user creation
+    user = %{name: "Test User", email: "test@example.com", age: 25}
+
+    # Test validation
+    validation_result = validate_user_input(user)
+    assert validation_result == {:ok, user}
+
+    # Test user insertion
+    users = []
+    updated_users = insert_user(users, user)
+    assert length(updated_users) == 1
+
+    # Test user retrieval
+    retrieved_user = find_user_by_email(updated_users, "test@example.com")
+    assert retrieved_user[:name] == "Test User"
+  end
+
+  test "list processing pipeline" do
+    numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+    # Filter even numbers
+    evens = for x in numbers when x % 2 == 0 do
+      x
+    end
+    assert evens == [2, 4, 6, 8, 10]
+
+    # Double them
+    doubled = for x in evens do
+      x * 2
+    end
+    assert doubled == [4, 8, 12, 16, 20]
+
+    # Sum them
+    sum = reduce_list(doubled, 0, fn(acc, x) do acc + x end)
+    assert sum == 60
+  end
+end
+
+# Performance tests
+describe "Performance tests" do
+  test "sorting performance" do
+    large_list = generate_list(1000)
+    sorted_list = sort_list(large_list)
+    assert is_sorted(sorted_list)
+  end
+
+  test "search performance" do
+    sorted_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    result = binary_search(sorted_list, 7)
+    assert result == 6  # 7 is at index 6
+  end
+end
+
+# Edge case tests
+describe "Edge cases" do
+  test "empty data structures" do
+    assert reverse_list([]) == []
+    assert sort_list([]) == []
+    assert length([]) == 0
+  end
+
+  test "single element lists" do
+    assert reverse_list([1]) == [1]
+    assert sort_list([1]) == [1]
+    assert length([1]) == 1
+  end
+
+  test "boundary conditions" do
+    # Test factorial with 0
+    assert factorial(0) == 1
+
+    # Test division by 1
+    assert safe_divide(10, 1) == {:ok, 10}
+
+    # Test empty string validation
+    assert validate_email("") == false
+  end
+end
+
+# Integration tests
+describe "Integration tests" do
+  test "complete user management system" do
+    # Initialize system
+    users = []
+
+    # Add users
+    user1 = %{name: "Alice", email: "alice@example.com", age: 25}
+    user2 = %{name: "Bob", email: "bob@example.com", age: 30}
+
+    users = insert_user(users, user1)
+    users = insert_user(users, user2)
+
+    # Verify users were added
+    assert length(users) == 2
+
+    # Test user retrieval
+    alice = find_user_by_email(users, "alice@example.com")
+    bob = find_user_by_email(users, "bob@example.com")
+
+    assert alice[:name] == "Alice"
+    assert bob[:name] == "Bob"
+
+    # Test user update
+    updated_alice = update_user(alice, 26)
+    assert updated_alice[:age] == 26
+    assert updated_alice[:name] == "Alice"
+  end
+end
+
+# Helper functions for tests
+def factorial do
+  (0) do 1 end
+  (n) when n > 0 do n * factorial(n - 1) end
+end
+
+def greet(name) do
+  "Hello, " ++ name
+end
+
+def add(a, b) do
+  a + b
+end
+
+def length_string(text) do
+  case text do
+    "" -> 0
+    <<_char::utf8, rest::binary>> -> 1 + length_string(rest)
+  end
+end
+
+def get_name(user_data) do
+  case user_data do
+    %{name: name} -> {:ok, name}
+    _ -> {:error, :not_found}
+  end
+end
+
+def safe_divide(x, y) do
+  if y == 0 do
+    {:error, :division_by_zero}
+  else
+    {:ok, x / y}
+  end
+end
+
+def validate_email(email) do
+  case email do
+    "" -> false
+    email_str ->
+      contains(email_str, "@") andalso contains(email_str, ".")
+  end
+end
+
+def validate_user_input(input) do
+  errors = []
+
+  if input.name == "" do
+    errors = ["Name cannot be empty" | errors]
+  end
+
+  if input.age < 0 or input.age > 150 do
+    errors = ["Age must be between 0 and 150" | errors]
+  end
+
+  if not validate_email(input.email) do
+    errors = ["Invalid email format" | errors]
+  end
+
+  case errors do
+    [] -> {:ok, input}
+    _ -> {:error, errors}
+  end
+end
+
+def insert_user(users, user) do
+  [user | users]
+end
+
+def find_user_by_email(users, email) do
+  case users do
+    [] -> nil
+    [user | rest] ->
+      if user.email == email do
+        user
+      else
+        find_user_by_email(rest, email)
+      end
+  end
+end
+
+def update_user(user, age) do
+  %{user | age: age}
+end
+
+def reduce_list(list, initial, fun) do
+  case list do
+    [] -> initial
+    [head | tail] -> reduce_list(tail, fun(initial, head), fun)
+  end
+end
+
+def generate_list(n) do
+  generate_list_helper(n, [])
+end
+
+defp generate_list_helper(0, acc) do
+  acc
+end
+
+defp generate_list_helper(n, acc) do
+  generate_list_helper(n - 1, [n | acc])
+end
+
+def sort_list do
+  ([]) do [] end
+  ([pivot | rest]) do
+    smaller = for x in rest when x <= pivot do x end
+    larger = for x in rest when x > pivot do x end
+    sort_list(smaller) ++ [pivot] ++ sort_list(larger)
+  end
+end
+
+def is_sorted(list) do
+  case list do
+    [] -> true
+    [_] -> true
+    [first, second | rest] ->
+      if first <= second do
+        is_sorted([second | rest])
+      else
+        false
+      end
+  end
+end
+
+def binary_search(list, target) do
+  binary_search_helper(list, target, 0, length(list) - 1)
+end
+
+defp binary_search_helper(list, target, left, right) do
+  if left > right do
+    -1
+  else
+    mid = (left + right) / 2
+    mid_value = list[mid]
+
+    if mid_value == target do
+      mid
+    else
+      if mid_value < target do
+        binary_search_helper(list, target, mid + 1, right)
+      else
+        binary_search_helper(list, target, left, mid - 1)
+      end
+    end
+  end
+end
+
+def length(list) do
+  case list do
+    [] -> 0
+    [_ | tail] -> 1 + length(tail)
+  end
+end
+
+def contains(text, substring) do
+  case text do
+    "" -> false
+    <<char::utf8, rest::binary>> ->
+      if starts_with(text, substring) do
+        true
+      else
+        contains(rest, substring)
+      end
+  end
+end
+
+defp starts_with(text, prefix) do
+  case {text, prefix} do
+    {_, ""} -> true
+    {<<char1::utf8, rest1::binary>>, <<char2::utf8, rest2::binary>>} ->
+      if char1 == char2 do
+        starts_with(rest1, rest2)
+      else
+        false
+      end
+    _ -> false
+  end
+end

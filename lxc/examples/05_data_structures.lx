@@ -1,0 +1,285 @@
+# Data Structures Examples
+# Demonstrates tuples, lists, maps, records, and binary data in Lx
+
+def tuple_examples() do
+  # Basic tuples
+  point_2d = {10, 20}
+  point_3d = {10, 20, 30}
+  empty_tuple = {}
+
+  # Tuple pattern matching
+  {x, y} = point_2d
+  {a, b, c} = point_3d
+
+  # Tuple with mixed types
+  user_info = {"Alice", 30, :active}
+  {name, age, status} = user_info
+
+  # Nested tuples
+  complex_data = {{1, 2}, {3, 4}, 5}
+  {{first_x, first_y}, {second_x, second_y}, extra} = complex_data
+
+  {point_2d, point_3d, {x, y}, {a, b, c}, user_info, complex_data}
+end
+
+def list_examples() do
+  # Basic lists
+  empty_list = []
+  numbers = [1, 2, 3, 4, 5]
+  mixed_list = [1, "hello", :atom, 3.14]
+
+  # List construction with cons operator
+  head = 0
+  tail = [1, 2, 3]
+  new_list = [head | tail]
+
+  # List pattern matching
+  [first | rest] = numbers
+  [a, b | remaining] = numbers
+
+  # Nested lists
+  matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+  [[row1_first | row1_rest] | matrix_rest] = matrix
+
+  # List operations
+  concatenated = [1, 2] ++ [3, 4, 5]
+
+  {empty_list, numbers, new_list, {first, rest}, {a, b, remaining}, matrix, concatenated}
+end
+
+def map_examples() do
+  # Map creation with atom keys
+  user = %{name: "Alice", age: 30, active: true}
+
+  # Map creation with general keys
+  config = %{"database_url" => "localhost", "port" => 5432}
+
+  # Mixed key types
+  metadata = %{type: "user", "created_at" => "2023-01-01", 1 => "first"}
+
+  # Empty map
+  empty_map = %{}
+
+  # Complex maps with nested structures
+  complex = %{
+    users: [%{name: "Alice"}, %{name: "Bob"}],
+    config: %{timeout: 5000},
+    metadata: {:version, "1.0.0"}
+  }
+
+  # Map access
+  name = user[:name]
+  age = user[:age]
+  url = config["database_url"]
+
+  # Map pattern matching
+  %{name: user_name, age: user_age} = user
+  %{name: name2, age: _age} <- user
+
+  # Nested map patterns
+  %{users: [%{name: first_user} | _]} = complex
+
+  {user, config, metadata, complex, {name, age, url}, {user_name, user_age, name2}, first_user}
+end
+
+def record_examples() do
+  # Record definition (this would be in a separate file or module)
+  # record Person {
+  #   name :: string,
+  #   age :: integer,
+  #   email :: string
+  # }
+
+  # For demonstration, we'll use maps as records
+  person = %{name: "Alice", age: 30, email: "alice@example.com"}
+  config = %{debug: true, timeout: 5000, retries: 3}
+
+  # Record field access (simulated)
+  name = person[:name]
+  age = person[:age]
+  is_debug = config[:debug]
+
+  # Record updates (immutable)
+  older_person = %{person | age: 31}
+  updated_person = %{person | age: 31, email: "alice.smith@example.com"}
+
+  # Chained updates
+  final_person = %{person | age: 31}
+  final_person2 = %{final_person | email: "new@example.com"}
+
+  # Records in pattern matching
+  case person do
+    %{name: "admin", age: _} -> :admin_user
+    %{age: age} when age >= 18 -> :adult
+    %{age: age} when age < 18 -> :minor
+    _ -> :unknown
+  end
+
+  {person, config, {name, age, is_debug}, older_person, updated_person, final_person2}
+end
+
+def binary_examples() do
+  # Simple binary literals
+  empty_binary = <<>>
+  bytes = <<1, 2, 3, 4>>
+  string_binary = <<"Hello World">>
+
+  # Binary with type specifiers
+  integer_bin = <<42/integer>>
+  float_bin = <<3.14159/float>>
+  binary_spec = <<"data"/binary>>
+  utf8_text = <<"Hello"/utf8>>
+
+  # Binary with size specifications
+  byte_value = <<255:8>>
+  word_value = <<1024:16>>
+  dword_value = <<16777216:32>>
+
+  # Combined size and type
+  sized_int = <<42:16/integer>>
+  sized_binary = <<"test":32/binary>>
+
+  # Complex binary construction
+  version = 1
+  length = 10
+  flags = 2
+  header = <<version:8, length:16, flags:8>>
+  packet = <<header/binary, "payload"/binary>>
+
+  # Binary pattern matching
+  data = <<42, 255:8, 1024:16, "hello"/binary>>
+
+  case data do
+    <<first, second:8, third:16, rest/binary>> ->
+      {first, second, third, rest}
+    _ ->
+      :error
+  end
+
+  # Protocol parsing example
+  http_packet = <<"HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\nHello World">>
+
+  case http_packet do
+    <<"HTTP/", version:2/binary, " ", status:3/binary, rest/binary>> ->
+      {:http, version, status, rest}
+    _ ->
+      :unknown
+  end
+
+  {empty_binary, bytes, string_binary, header, packet, data, http_packet}
+end
+
+def data_structure_operations() do
+  # List operations
+  numbers = [1, 2, 3, 4, 5]
+
+  # Map over list
+  doubled = for x in numbers do
+    x * 2
+  end
+
+  # Filter list
+  evens = for x in numbers when x % 2 == 0 do
+    x
+  end
+
+  # Reduce list
+  sum = reduce_list(numbers, 0, fn(acc, x) do acc + x end)
+
+  # Map operations
+  user = %{name: "Alice", age: 30, city: "NYC"}
+
+  # Update multiple fields
+  updated_user = %{user | age: 31, city: "LA"}
+
+  # Add new field
+  user_with_id = %{user | id: 123}
+
+  # Remove field (by creating new map without it)
+  user_without_age = %{name: user[:name], city: user[:city]}
+
+  # Tuple operations
+  point1 = {10, 20}
+  point2 = {30, 40}
+
+  # Combine tuples
+  combined = {point1, point2}
+
+  # Extract from nested tuple
+  {{x1, y1}, {x2, y2}} = combined
+
+  {doubled, evens, sum, updated_user, user_with_id, user_without_age, combined}
+end
+
+def complex_data_structures() do
+  # Complex nested data structure
+  company = %{
+    name: "TechCorp",
+    employees: [
+      %{name: "Alice", role: "Developer", skills: ["Erlang", "Lx"]},
+      %{name: "Bob", role: "Manager", skills: ["Leadership", "Planning"]},
+      %{name: "Charlie", role: "Designer", skills: ["UI", "UX"]}
+    ],
+    departments: %{
+      engineering: %{head: "Alice", budget: 100000},
+      management: %{head: "Bob", budget: 50000},
+      design: %{head: "Charlie", budget: 75000}
+    },
+    metadata: {
+      founded: 2020,
+      location: "San Francisco",
+      status: :active
+    }
+  }
+
+  # Extract information using pattern matching
+  %{name: company_name, employees: all_employees} = company
+
+  # Get all developer names
+  developers = for %{name: name, role: role} in all_employees when role == "Developer" do
+    name
+  end
+
+  # Get total budget
+  %{departments: depts} = company
+  total_budget = reduce_map_values(depts, 0, fn(acc, dept) do
+    acc + dept[:budget]
+  end)
+
+  # Get employee with most skills
+  most_skilled = reduce_list(all_employees, nil, fn(acc, emp) do
+    case acc do
+      nil -> emp
+      current ->
+        if length(emp[:skills]) > length(current[:skills]) do
+          emp
+        else
+          current
+        end
+    end
+  end)
+
+  {company_name, developers, total_budget, most_skilled}
+end
+
+# Helper functions
+defp reduce_list(list, initial, fun) do
+  case list do
+    [] -> initial
+    [head | tail] -> reduce_list(tail, fun(initial, head), fun)
+  end
+end
+
+defp reduce_map_values(map, initial, fun) do
+  case map do
+    %{} -> initial
+    %{_key => value | rest} -> reduce_map_values(rest, fun(initial, value), fun)
+  end
+end
+
+defp length(list) do
+  case list do
+    [] -> 0
+    [_ | tail] -> 1 + length(tail)
+  end
+end
