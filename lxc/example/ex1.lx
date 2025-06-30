@@ -1,3 +1,15 @@
 def func(x) do
   x
 end
+
+
+record Coordinate{x :: integer, y :: integer}
+
+def func do
+  (x) -> x
+  (a, b) -> a + b
+  (coord) ->
+    x2 = coord.x * coord.x
+    y2 = coord.y * coord.y
+    math.sqrt(x2)
+end

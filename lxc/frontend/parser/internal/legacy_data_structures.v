@@ -1,4 +1,4 @@
-module parser
+module internal
 
 import ast
 import lexer

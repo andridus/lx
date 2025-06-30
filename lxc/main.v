@@ -1,9 +1,8 @@
 module main
 
 import os
-import lexer
-import parser
-import generate.erlang
+import compiler
+import backend.erlang
 import typechecker
 import linter
 import ast
@@ -31,59 +30,10 @@ fn main() {
 	// Extract module name from file name (remove .lx extension)
 	module_name := os.file_name(input_file).replace('.lx', '')
 
-	// Read and parse the file
-	content := os.read_file(input_file) or {
-		eprintln('Failed to read file: ${err}')
-		exit(1)
-	}
-
-	// Create lexer and tokenize
-	mut lexer_instance := lexer.new_lexer(content, input_file)
-	mut tokens := []lexer.Token{}
-	for {
-		token := lexer_instance.next_token()
-		if token is lexer.EOFToken {
-			break
-		}
-		if token is lexer.ErrorToken {
-			eprintln('Lexical error: ${token.message}')
-			exit(1)
-		}
-		tokens << token
-	}
-
-	if lexer_instance.has_errors() {
-		mut errors := []string{}
-		for error in lexer_instance.get_errors() {
-			errors << error.message
-		}
-		eprintln('Lexical errors: ${errors.join('\n')}')
-		exit(1)
-	}
-
-	// Debug: print tokens
-	eprintln('Tokens: ${tokens.len}')
-	for i, token in tokens {
-		eprintln('${i}: ${token.str()}')
-	}
-
-	// Parse the tokens as a module
-	mut parser_instance := parser.new_main_parser(tokens)
-	mut module_stmt := parser_instance.parse_module() or {
-		eprintln('Parsing failed: ${err}')
-		eprintln('Parser errors:')
-		for error in parser_instance.get_errors() {
-			eprintln('  ${error}')
-		}
-		exit(1)
-	}
-
-	if parser_instance.has_errors() {
-		mut errors := []string{}
-		for error in parser_instance.get_errors() {
-			errors << error.message
-		}
-		eprintln('Parser errors: ${errors.join('\n')}')
+	// Use the compiler module to compile the file
+	mut comp := compiler.new_compiler()
+	mut module_stmt := comp.compile_file(input_file) or {
+		eprintln('Compilation failed: ${err}')
 		exit(1)
 	}
 

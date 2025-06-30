@@ -1,10 +1,9 @@
-module parser
+module internal
 
 import ast
 import lexer
 import errors
 
-// MainParser is the main parser that orchestrates the entire parsing process
 @[heap]
 pub struct MainParser {
 	Parser
@@ -16,8 +15,17 @@ pub fn new_main_parser(tokens []lexer.Token) &MainParser {
 	}
 }
 
-// parse_module parses an entire LX module
-pub fn (mut mp MainParser) parse_module() ?ast.ModuleStmt {
+pub fn get_errors(mp MainParser) []errors.CompilationError {
+	return mp.errors
+}
+
+// has_errors checks if the parser has any errors
+pub fn has_errors(mp MainParser) bool {
+	return mp.errors.len > 0
+}
+
+// parse_module_internal parses an entire LX module
+pub fn (mut mp MainParser) parse_module_internal() ?ast.ModuleStmt {
 	mut statements := []ast.Stmt{}
 	mut imports := []ast.Import{}
 	mut exports := []string{}
@@ -26,7 +34,6 @@ pub fn (mut mp MainParser) parse_module() ?ast.ModuleStmt {
 	if mp.check(lexer.KeywordToken.module) {
 		mp.advance() // consume 'module'
 
-		// module_name := mp.current.get_value()
 		if !mp.current.is_identifier() {
 			mp.add_error('Expected module name', 'Got ${mp.current.str()}')
 			return none
@@ -148,8 +155,8 @@ fn (mut mp MainParser) parse_import_statement() ?ast.Import {
 	}
 }
 
-// parse_expression parses expressions using the expression parser
-pub fn (mut mp MainParser) parse_expression() ?ast.Expr {
+// parse_expression_internal parses expressions using the expression parser
+pub fn (mut mp MainParser) parse_expression_internal() ?ast.Expr {
 	mut expr_parser := new_expression_parser(mp.tokens)
 	expr_parser.position = mp.position
 	expr_parser.current = mp.current
@@ -170,8 +177,8 @@ pub fn (mut mp MainParser) parse_expression() ?ast.Expr {
 	return expr
 }
 
-// parse_pattern parses patterns using the expression parser
-pub fn (mut mp MainParser) parse_pattern() ?ast.Pattern {
+// parse_pattern_internal parses patterns using the expression parser
+pub fn (mut mp MainParser) parse_pattern_internal() ?ast.Pattern {
 	mut expr_parser := new_expression_parser(mp.tokens)
 	expr_parser.position = mp.position
 	expr_parser.current = mp.current

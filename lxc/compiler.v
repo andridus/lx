@@ -1,7 +1,7 @@
 module compiler
 
-import lexer
-import parser
+import frontend.lexer
+import frontend.parser
 import ast
 import os
 

@@ -75,11 +75,8 @@ fn (l Linter) check_function_arity_ordering(statements []ast.Stmt) []errors.Comp
 					expected: 'Functions ordered by arity (smallest to largest)'
 					found:    'Functions with arities [${arities_str}] in wrong order'
 				}
-				lint_errors << errors.new_compilation_error(
-					syntax_error,
-					ast.new_position(1, 1, 'unknown'),
-					error_msg
-				)
+				lint_errors << errors.new_compilation_error(syntax_error, ast.new_position(1,
+					1, 'unknown'), error_msg)
 			}
 		}
 	}

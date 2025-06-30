@@ -1,0 +1,197 @@
+module internal
+
+import ast
+import lexer
+
+// parse_function_statement parses function definitions
+pub fn (mut sp StatementParser) parse_function_statement() ?ast.Stmt {
+	sp.advance() // consume 'def'
+
+	// Parse function name
+	if !sp.current.is_identifier() {
+		sp.add_error('Expected function name', 'Got ${sp.current.str()}')
+		return none
+	}
+	name := sp.current.get_value()
+	sp.advance()
+
+	// PRIMEIRO: se for 'do', é multi-head
+	if sp.check(lexer.KeywordToken.do_) {
+		sp.advance() // consume 'do'
+		mut clauses := []ast.FunctionClause{}
+		for !sp.check(lexer.KeywordToken.end_) && !sp.is_at_end() {
+			sp.skip_irrelevant_tokens()
+			// Pular até o próximo (
+			for sp.position < sp.tokens.len && !(sp.tokens[sp.position] is lexer.PunctuationToken
+				&& (sp.tokens[sp.position] as lexer.PunctuationToken) == .lparen)
+				&& !sp.check(lexer.KeywordToken.end_) {
+				sp.position++
+				sp.sync_current_token()
+			}
+			if sp.is_potential_new_clause_start() {
+				clause := sp.parse_function_header()?
+				clauses << clause
+			} else {
+				break
+			}
+		}
+		if !sp.check(lexer.KeywordToken.end_) {
+			sp.add_error('Expected end after function headers', 'Got ${sp.current.str()}')
+			return none
+		}
+		sp.consume(lexer.KeywordToken.end_, 'Expected end after function headers')?
+		return ast.FunctionStmt{
+			name:     name
+			clauses:  clauses
+			position: sp.get_current_position()
+		}
+	}
+
+	// SÓ SE NÃO FOR 'do', verifica se é '('
+	if sp.check(lexer.PunctuationToken.lparen) {
+		clause := sp.parse_function_clause()?
+		return ast.FunctionStmt{
+			name:     name
+			clauses:  [clause]
+			position: sp.get_current_position()
+		}
+	}
+
+	sp.add_error('Expected do or ( after function name (multi-head or single-head)', 'Got ${sp.current.str()}')
+	return none
+}
+
+// parse_private_function_statement parses private function definitions
+fn (mut sp StatementParser) parse_private_function_statement() ?ast.Stmt {
+	sp.advance() // consume 'defp'
+
+	name := sp.current.get_value()
+	if !sp.current.is_identifier() {
+		sp.add_error('Expected function name', 'Got ${sp.current.str()}')
+		return none
+	}
+	sp.advance()
+
+	mut clauses := []ast.FunctionClause{}
+
+	// Check for new multi-header syntax: defp name do ... end
+	if sp.check(lexer.KeywordToken.do_) {
+		sp.advance() // consume 'do'
+
+		// Parse multiple function headers inside do...end block
+		for !sp.check(lexer.KeywordToken.end_) && !sp.is_at_end() {
+			clause := sp.parse_function_header()?
+			clauses << clause
+		}
+
+		if !sp.check(lexer.KeywordToken.end_) {
+			sp.add_error('Expected end after function headers', 'Got ${sp.current.str()}')
+			return none
+		}
+		sp.consume(lexer.KeywordToken.end_, 'Expected end after function headers')?
+	} else {
+		// Parse traditional single clause function
+		clause := sp.parse_function_clause()?
+		clauses << clause
+	}
+
+	// For now, we'll use the same structure as public functions
+	// In a full implementation, we'd mark it as private
+	return ast.FunctionStmt{
+		name:     name
+		clauses:  clauses
+		position: sp.get_current_position()
+	}
+}
+
+// parse_function_clause parses a single function clause
+fn (mut sp StatementParser) parse_function_clause() ?ast.FunctionClause {
+	// Parse parameters
+	mut parameters := []ast.Pattern{}
+
+	if sp.check(lexer.PunctuationToken.lparen) {
+		sp.advance() // consume '('
+		for !sp.check(lexer.PunctuationToken.rparen) {
+			param := sp.parse_pattern()?
+			parameters << param
+
+			if !sp.match(lexer.PunctuationToken.comma) {
+				break
+			}
+		}
+		sp.consume(lexer.PunctuationToken.rparen, 'Expected closing parenthesis')?
+	}
+
+	// Parse guard (optional)
+	mut guard := ast.Expr(ast.LiteralExpr{
+		value: ast.BooleanLiteral{
+			value: true
+		}
+	})
+	if sp.match(lexer.KeywordToken.when) {
+		guard = sp.parse_simple_expression()?
+	}
+
+	// Parse body
+	sp.consume(lexer.KeywordToken.do_, 'Expected do after function clause')?
+	body := sp.parse_clause_body()?
+	sp.consume(lexer.KeywordToken.end_, 'Expected end after function body')?
+
+	return ast.FunctionClause{
+		parameters: parameters
+		guard:      guard
+		body:       body
+		position:   sp.get_current_position()
+	}
+}
+
+// parse_function_header parses function headers in new syntax: (params) when guard -> body
+fn (mut sp StatementParser) parse_function_header() ?ast.FunctionClause {
+	// Parse parameters
+	mut parameters := []ast.Pattern{}
+
+	sp.consume(lexer.PunctuationToken.lparen, 'Expected opening parenthesis for function header')?
+
+	// Parse parameter list
+	if !sp.check(lexer.PunctuationToken.rparen) {
+		for {
+			param := sp.parse_pattern()?
+			parameters << param
+
+			if !sp.match(lexer.PunctuationToken.comma) {
+				break
+			}
+		}
+	}
+	sp.consume(lexer.PunctuationToken.rparen, 'Expected closing parenthesis')?
+
+	// Parse guard (optional)
+	mut guard := ast.Expr(ast.LiteralExpr{
+		value: ast.BooleanLiteral{
+			value: true
+		}
+	})
+	if sp.match(lexer.KeywordToken.when) {
+		guard = sp.parse_simple_expression()?
+	}
+
+	// Parse arrow
+	sp.consume(lexer.OperatorToken.arrow, 'Expected -> after function header')?
+
+	// Parse body - block of statements until next clause or end
+	body := sp.parse_clause_body()?
+
+	return ast.FunctionClause{
+		parameters: parameters
+		guard:      guard
+		body:       body
+		position:   sp.get_current_position()
+	}
+}
+
+// skip_irrelevant_tokens pula tokens que não são significativos para o parsing
+fn (mut sp StatementParser) skip_irrelevant_tokens() {
+	// Por enquanto, não há tokens específicos de comentário ou whitespace
+	// Se no futuro adicionar tokens de comentário, whitespace, etc, adicione aqui
+	// Por enquanto, é um no-op
+}

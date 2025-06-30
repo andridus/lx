@@ -1,4 +1,4 @@
-module generate
+module codegen
 
 import ast
 import typechecker
