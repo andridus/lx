@@ -375,9 +375,10 @@ pub mut:
 // FunctionStmt represents a function statement
 pub struct FunctionStmt {
 pub:
-	name     string
-	clauses  []FunctionClause
-	position Position
+	name       string
+	clauses    []FunctionClause
+	is_private bool
+	position   Position
 }
 
 // RecordDefStmt represents a record definition

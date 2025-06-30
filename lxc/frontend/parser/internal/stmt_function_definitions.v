@@ -41,9 +41,10 @@ pub fn (mut sp StatementParser) parse_function_statement() ?ast.Stmt {
 		}
 		sp.consume(lexer.KeywordToken.end_, 'Expected end after function headers')?
 		return ast.FunctionStmt{
-			name:     name
-			clauses:  clauses
-			position: sp.get_current_position()
+			name:       name
+			clauses:    clauses
+			is_private: false
+			position:   sp.get_current_position()
 		}
 	}
 
@@ -51,9 +52,10 @@ pub fn (mut sp StatementParser) parse_function_statement() ?ast.Stmt {
 	if sp.check(lexer.PunctuationToken.lparen) {
 		clause := sp.parse_function_clause()?
 		return ast.FunctionStmt{
-			name:     name
-			clauses:  [clause]
-			position: sp.get_current_position()
+			name:       name
+			clauses:    [clause]
+			is_private: false
+			position:   sp.get_current_position()
 		}
 	}
 
@@ -98,9 +100,10 @@ fn (mut sp StatementParser) parse_private_function_statement() ?ast.Stmt {
 	// For now, we'll use the same structure as public functions
 	// In a full implementation, we'd mark it as private
 	return ast.FunctionStmt{
-		name:     name
-		clauses:  clauses
-		position: sp.get_current_position()
+		name:       name
+		clauses:    clauses
+		is_private: true
+		position:   sp.get_current_position()
 	}
 }
 

@@ -200,23 +200,38 @@ end
 
 ### 8. Function Definitions
 
-Functions now use `do`/`end` syntax instead of curly braces:
+Functions now use `do`/`end` syntax instead of curly braces. Lx supports both public and private functions:
 
-#### Single clause:
+#### Public Functions (`def`):
+
+Public functions are exported and can be called from other modules:
 
 ```lx
 def greet(name) do "Hello, " ++ name end
-defp ping() do :pong end
-```
-
-#### Multiple clauses:
-
-```lx
 def factorial do
   (0) do 1 end
   (N) when N > 0 do N * factorial(N - 1) end
 end
 ```
+
+#### Private Functions (`defp`):
+
+Private functions are internal to the module and are not exported. They cannot be called from other modules:
+
+```lx
+defp ping() do :pong end
+defp internal_helper(data) do
+  # Internal implementation details
+  process_data(data)
+end
+```
+
+**Key differences:**
+- **Public functions** (`def`): Exported in the generated Erlang module, can be called from other modules
+- **Private functions** (`defp`): Not exported, only accessible within the same module
+- Both support the same syntax for single and multiple clauses
+- Both support guards and pattern matching
+- Private functions are useful for internal helper functions and implementation details
 
 ---
 

@@ -48,13 +48,16 @@ fn (gen ErlangGenerator) generate_exports(statements []ast.Stmt) []string {
 	for stmt in statements {
 		match stmt {
 			ast.FunctionStmt {
-				// Generate exports for all clauses with different arities
-				for clause in stmt.clauses {
-					param_count := clause.parameters.len
-					export_name := '${stmt.name}/${param_count}'
-					if !seen_exports[export_name] {
-						exports << export_name
-						seen_exports[export_name] = true
+				// Only export public functions (not private ones)
+				if !stmt.is_private {
+					// Generate exports for all clauses with different arities
+					for clause in stmt.clauses {
+						param_count := clause.parameters.len
+						export_name := '${stmt.name}/${param_count}'
+						if !seen_exports[export_name] {
+							exports << export_name
+							seen_exports[export_name] = true
+						}
 					}
 				}
 			}
