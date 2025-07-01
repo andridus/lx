@@ -361,3 +361,43 @@ fn test_record_access_parsing() {
 		}
 	}
 }
+
+fn test_function_definition_requires_parentheses() {
+	code := 'def func do\n  a\nend'
+
+	// Lex the code
+	mut lexer_instance := lexer.new_lexer(code, 'test.lx')
+	mut tokens := []lexer.Token{}
+
+	// Collect all tokens
+	for !lexer_instance.is_at_end() {
+		token := lexer_instance.next_token()
+		tokens << token
+		if token is lexer.EOFToken {
+			break
+		}
+	}
+
+	// Parse the code
+	mut parser_instance := parser.new_main_parser(tokens)
+
+	// Try to parse the module
+	_ = parser_instance.parse_module() or { return }
+
+	// Should have errors
+	assert parser_instance.has_errors()
+
+	// Check the error message
+	error_list := parser_instance.get_errors()
+	assert error_list.len > 0
+
+	// Look for the specific error message
+	mut found_error := false
+	for error in error_list {
+		if error.message.contains('Multi-clause function must have at least one clause') {
+			found_error = true
+			break
+		}
+	}
+	assert found_error
+}

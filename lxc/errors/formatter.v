@@ -25,7 +25,7 @@ pub fn new_error_formatter() ErrorFormatter {
 pub fn (ef ErrorFormatter) format_error(err CompilationError, source_lines []string) string {
 	mut result := ''
 
-	// Format header
+	// Format header with error category
 	result += ef.format_header(err)
 
 	// Format message
@@ -44,12 +44,12 @@ pub fn (ef ErrorFormatter) format_error(err CompilationError, source_lines []str
 fn (ef ErrorFormatter) format_header(err CompilationError) string {
 	severity_color := ef.get_severity_color(err.severity)
 	position_str := err.position.str()
-	severity_str := err.severity.str()
+	error_category := err.kind.get_error_category()
 
 	if ef.colored_output {
-		return '${severity_color}${severity_str}${ef.reset_color()} at ${position_str}:\n'
+		return '${severity_color}[${error_category} Error]${ef.reset_color()} ${position_str}\n'
 	} else {
-		return '${severity_str} at ${position_str}:\n'
+		return '[${error_category} Error] ${position_str}\n'
 	}
 }
 
@@ -125,8 +125,33 @@ fn (ef ErrorFormatter) format_error_indicator(column int, line_length int) strin
 
 // format_suggestion formats error suggestions
 fn (ef ErrorFormatter) format_suggestion(err CompilationError) string {
-	// For now, return empty string since we don't have get_suggestion method
-	return ''
+	if !ef.show_suggestions {
+		return ''
+	}
+
+	suggestions := generate_suggestions(err)
+	if suggestions.len == 0 {
+		return ''
+	}
+
+	mut result := '\n'
+	suggestion_color := ef.get_suggestion_color()
+
+	if ef.colored_output {
+		result += '${suggestion_color}💡 Suggestion:${ef.reset_color()}\n'
+	} else {
+		result += '💡 Suggestion:\n'
+	}
+
+	for suggestion in suggestions {
+		if ef.colored_output {
+			result += '${suggestion_color}   ${suggestion}${ef.reset_color()}\n'
+		} else {
+			result += '   ${suggestion}\n'
+		}
+	}
+
+	return result
 }
 
 // format_error_collection formats a collection of errors
@@ -211,7 +236,7 @@ fn (ef ErrorFormatter) get_suggestion_color() string {
 	if !ef.colored_output {
 		return ''
 	}
-	return '\x1b[32m' // Green
+	return '\x1b[37m' // White
 }
 
 fn (ef ErrorFormatter) reset_color() string {
@@ -234,9 +259,9 @@ pub fn load_source_lines(filename string) []string {
 // format_error_simple formats an error without source context
 pub fn format_error_simple(err CompilationError) string {
 	position_str := err.position.str()
-	severity_str := err.severity.str()
+	error_category := err.kind.get_error_category()
 
-	return '${severity_str} at ${position_str}: ${err.message}'
+	return '[${error_category} Error] ${position_str}: ${err.message}'
 }
 
 // get_color_code returns the ANSI color code for a severity level

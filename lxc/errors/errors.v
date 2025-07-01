@@ -33,8 +33,51 @@ pub:
 	suggestion string
 }
 
+// PatternError represents a pattern matching error
+pub struct PatternError {
+pub:
+	message   string
+	pattern   string
+	value     string
+	suggestion string
+}
+
+// RecordError represents a record-related error
+pub struct RecordError {
+pub:
+	message   string
+	record_name string
+	field_name string
+	suggestion string
+}
+
+// BinaryError represents a binary/bitstring error
+pub struct BinaryError {
+pub:
+	message   string
+	expected_size int
+	actual_size int
+	suggestion string
+}
+
+// GuardError represents a guard expression error
+pub struct GuardError {
+pub:
+	message   string
+	expression string
+	suggestion string
+}
+
+// DependencyError represents a module dependency error
+pub struct DependencyError {
+pub:
+	message   string
+	module_name string
+	suggestion string
+}
+
 // ErrorKind represents different types of compilation errors using sum types
-pub type ErrorKind = LexicalError | SyntaxError | TypeError | UnboundVariableError
+pub type ErrorKind = LexicalError | SyntaxError | TypeError | UnboundVariableError | PatternError | RecordError | BinaryError | GuardError | DependencyError
 
 // str returns a string representation of ErrorKind
 pub fn (e ErrorKind) str() string {
@@ -43,6 +86,26 @@ pub fn (e ErrorKind) str() string {
 		SyntaxError { 'SyntaxError: ${e.message} (expected: ${e.expected}, found: ${e.found})' }
 		TypeError { 'TypeError: ${e.message} (expected: ${e.expected}, actual: ${e.actual})' }
 		UnboundVariableError { 'UnboundVariable: ${e.variable} (similar: ${e.similar.join(', ')})' }
+		PatternError { 'PatternError: ${e.message} (pattern: ${e.pattern}, value: ${e.value})' }
+		RecordError { 'RecordError: ${e.message} (record: ${e.record_name}, field: ${e.field_name})' }
+		BinaryError { 'BinaryError: ${e.message} (expected: ${e.expected_size}, actual: ${e.actual_size})' }
+		GuardError { 'GuardError: ${e.message} (expression: ${e.expression})' }
+		DependencyError { 'DependencyError: ${e.message} (module: ${e.module_name})' }
+	}
+}
+
+// get_error_category returns the category of an error
+pub fn (e ErrorKind) get_error_category() string {
+	return match e {
+		LexicalError { 'Lexical' }
+		SyntaxError { 'Syntax' }
+		TypeError { 'Type' }
+		UnboundVariableError { 'Variable' }
+		PatternError { 'Pattern' }
+		RecordError { 'Record' }
+		BinaryError { 'Binary' }
+		GuardError { 'Guard' }
+		DependencyError { 'Dependency' }
 	}
 }
 

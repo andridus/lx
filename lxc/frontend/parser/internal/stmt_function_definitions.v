@@ -15,17 +15,23 @@ pub fn (mut sp StatementParser) parse_function_statement() ?ast.Stmt {
 	name := sp.current.get_value()
 	sp.advance()
 
+	// Check for multi-clause function: def func do ... end
 	if sp.check(lexer.keyword(.do_)) {
 		sp.advance()
 		mut clauses := []ast.FunctionClause{}
+
+		// Parse multiple function headers inside do...end block
 		for !sp.check(lexer.keyword(.end_)) && !sp.is_at_end() {
 			sp.skip_irrelevant_tokens()
+
+			// Skip tokens until we find a potential clause start
 			for sp.position < sp.tokens.len && !(sp.tokens[sp.position] is lexer.PunctuationToken
 				&& (sp.tokens[sp.position] as lexer.PunctuationToken).value == .lparen)
 				&& !sp.check(lexer.keyword(.end_)) {
 				sp.position++
 				sp.sync_current_token()
 			}
+
 			if sp.is_potential_new_clause_start() {
 				clause := sp.parse_function_header()?
 				clauses << clause
@@ -33,11 +39,22 @@ pub fn (mut sp StatementParser) parse_function_statement() ?ast.Stmt {
 				break
 			}
 		}
+
 		if !sp.check(lexer.keyword(.end_)) {
 			sp.add_error('Expected end after function headers', 'Got ${sp.current.str()}')
 			return none
 		}
 		sp.consume(lexer.keyword(.end_), 'Expected end after function headers')?
+
+		// Validate that we have at least one clause
+		if clauses.len == 0 {
+			sp.add_error(
+				'Multi-clause function must have at least one clause',
+				'( for single-clause function or do for multi-clause function'
+			)
+			return none
+		}
+
 		return ast.FunctionStmt{
 			name:       name
 			clauses:    clauses
@@ -46,7 +63,7 @@ pub fn (mut sp StatementParser) parse_function_statement() ?ast.Stmt {
 		}
 	}
 
-	// SÓ SE NÃO FOR 'do', verifica se é '('
+	// Single-clause function: def func(...) do ... end
 	if sp.check(lexer.punctuation(.lparen)) {
 		clause := sp.parse_function_clause()?
 		return ast.FunctionStmt{
@@ -57,7 +74,8 @@ pub fn (mut sp StatementParser) parse_function_statement() ?ast.Stmt {
 		}
 	}
 
-	sp.add_error('Expected do or ( after function name (multi-head or single-head)', 'Got ${sp.current.str()}')
+	// If we get here, neither do nor ( was found
+	sp.add_error('Expected ( for single-clause function or do for multi-clause function', 'Got ${sp.current.str()}')
 	return none
 }
 
@@ -65,16 +83,16 @@ pub fn (mut sp StatementParser) parse_function_statement() ?ast.Stmt {
 fn (mut sp StatementParser) parse_private_function_statement() ?ast.Stmt {
 	sp.advance() // consume 'defp'
 
-	name := sp.current.get_value()
 	if !sp.current.is_identifier() {
 		sp.add_error('Expected function name', 'Got ${sp.current.str()}')
 		return none
 	}
+	name := sp.current.get_value()
 	sp.advance()
 
 	mut clauses := []ast.FunctionClause{}
 
-	// Check for new multi-header syntax: defp name do ... end
+	// Check for multi-clause function: defp func do ... end
 	if sp.check(lexer.keyword(.do_)) {
 		sp.advance() // consume 'do'
 
@@ -89,14 +107,26 @@ fn (mut sp StatementParser) parse_private_function_statement() ?ast.Stmt {
 			return none
 		}
 		sp.consume(lexer.keyword(.end_), 'Expected end after function headers')?
+
+		// Validate that we have at least one clause
+		if clauses.len == 0 {
+			sp.add_error(
+				'Multi-clause function must have at least one clause',
+				'( for single-clause function or do for multi-clause function'
+			)
+			return none
+		}
 	} else {
-		// Parse traditional single clause function
+		// Single-clause function: defp func(...) do ... end
+		if !sp.check(lexer.punctuation(.lparen)) {
+			sp.add_error('Expected ( for single-clause function or do for multi-clause function', 'Got ${sp.current.str()}')
+			return none
+		}
+
 		clause := sp.parse_function_clause()?
 		clauses << clause
 	}
 
-	// For now, we'll use the same structure as public functions
-	// In a full implementation, we'd mark it as private
 	return ast.FunctionStmt{
 		name:       name
 		clauses:    clauses

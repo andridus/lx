@@ -27,6 +27,7 @@ Lx is a statically scoped, expression-based functional language designed for bui
 18. Application Definition — project-level metadata and setup
 19. Build System — compiling and generating artifacts
 20. Module System and Dependencies — declaring dependencies and integrating with external modules
+21. Error Handling and Suggestions — comprehensive error reporting with didactic examples
 
 ---
 
@@ -250,6 +251,13 @@ def factorial do
 end
 ```
 
+**Multi-Clause Function Validation:**
+- Multi-clause functions (`def func do ... end`) must contain at least one clause with parameters
+- Each clause must follow the pattern `(params) -> body` or `(params) when guard -> body`
+- Invalid: `def func do a end` (no clauses)
+- Valid: `def func do (x) -> x + 1 end` (single clause)
+- Valid: `def func do (x) -> x + 1; (y) -> y * 2 end` (multiple clauses)
+
 #### Private Functions (`defp`):
 
 Private functions are internal to the module and are not exported. They cannot be called from other modules:
@@ -262,11 +270,18 @@ defp internal_helper(data) do
 end
 ```
 
+**Multi-Clause Function Validation:**
+- Same validation rules apply to private functions (`defp`)
+- Multi-clause private functions must contain at least one clause with parameters
+- Invalid: `defp func do a end` (no clauses)
+- Valid: `defp func do (x) -> x + 1 end` (single clause)
+
 **Key differences:**
 - **Public functions** (`def`): Exported in the generated Erlang module, can be called from other modules
 - **Private functions** (`defp`): Not exported, only accessible within the same module
 - Both support the same syntax for single and multiple clauses
 - Both support guards and pattern matching
+- Both require proper validation: multi-clause functions must have at least one clause with parameters
 - Private functions are useful for internal helper functions and implementation details
 
 ---
@@ -1203,6 +1218,53 @@ Compilation and integration:
 ### 20. Module System and Dependencies
 
 Lx features a module and dependency system inspired by the Erlang/OTP ecosystem, enabling safe and explicit integration with external modules, compile-time type validation, and support for multiple dependency sources.
+
+### 21. Error Handling and Suggestions
+
+Lx provides comprehensive error handling with didactic suggestions to help users understand and fix common issues.
+
+#### Error Categories
+
+The compiler categorizes errors into several types:
+- **Syntax Errors**: Invalid syntax, missing tokens, unexpected characters
+- **Type Errors**: Type mismatches, invalid type conversions
+- **Pattern Errors**: Invalid pattern matching, missing fields
+- **Record Errors**: Invalid record operations, missing fields
+- **Binary Errors**: Invalid binary specifications, size mismatches
+- **Guard Errors**: Invalid guard expressions, unsupported operations
+- **Dependency Errors**: Missing modules, invalid dependencies
+
+#### Didactic Suggestions
+
+When errors occur, the compiler provides practical suggestions with examples:
+
+```lx
+# Example: Invalid multi-clause function
+def func do
+  a
+end
+
+# Error message with suggestions:
+# [Syntax Error] :1:1
+# Multi-clause function must have at least one clause: ( for single-clause function or do for multi-clause function
+#
+# 💡 Suggestion:
+#    For single-clause functions, add parentheses: def func() do ... end
+#    For multi-clause functions, add at least one clause with parameters:
+#      def func do
+#        (x) -> x + 1
+#        (y) -> y * 2
+#      end
+#    Multi-clause functions require at least one clause with parameters.
+```
+
+#### Error Recovery
+
+The parser implements robust error recovery:
+- Continues parsing after encountering errors
+- Reports all errors found in the code
+- Provides context and source code highlighting
+- Suggests fixes with practical examples
 
 #### Declaring Dependencies
 
