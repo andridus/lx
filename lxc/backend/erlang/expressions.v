@@ -165,9 +165,13 @@ fn (gen ErlangGenerator) translate_operator(operator ast.BinaryOp) string {
 
 // generate_function_call generates code for function calls
 fn (gen ErlangGenerator) generate_function_call(call ast.CallExpr) string {
-	function := gen.generate_expression(call.function)
 	args := call.arguments.map(gen.generate_expression(it))
-	return '${function}(${args.join(', ')})'
+	if call.external {
+		return '${call.module}:${call.function_name}(${args.join(', ')})'
+	} else {
+		function := gen.generate_expression(call.function)
+		return '${function}(${args.join(', ')})'
+	}
 }
 
 // generate_assignment generates code for assignments

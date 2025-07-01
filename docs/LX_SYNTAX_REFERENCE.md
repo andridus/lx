@@ -112,7 +112,7 @@ backslash = "Path: C:\\Users\\Name"
 Naming conventions for program symbols:
 
 - Variables: must start lowercase or with `_`, e.g., `count`, `_unused`
-- Modules: lowercase, used in `mod.fun()`
+- Modules: lowercase, used in `:module.function()`
 - Records: must start uppercase, e.g., `Person`, `UserData`
 - Special: `__MODULE__` expands to the current module name
 
@@ -170,10 +170,32 @@ end
 
 #### Function calls:
 
+Lx supports both internal and external function calls with clear syntax distinction:
+
+**Internal function calls:**
 ```lx
 sum(3, 4)
-math.pow(2, 8)
+factorial(5)
+process_data(input)
 ```
+
+**External function calls (module functions):**
+```lx
+:io.format("Hello, ~s", ["World"])
+:lists.map(fn(x) do x * 2 end, [1, 2, 3])
+:erlang.process_info(self())
+:crypto.strong_rand_bytes(16)
+```
+
+**Key differences:**
+- **Internal calls**: `function(args...)` - calls functions defined in the current module
+- **External calls**: `:module.function(args...)` - calls functions from other modules
+- **Record access**: `variable.field` - accesses record fields (not function calls)
+
+The external call syntax provides clear disambiguation between:
+- `person.name` - record field access
+- `:io.format("msg")` - external function call
+- `format("msg")` - internal function call
 
 ---
 
@@ -1126,6 +1148,28 @@ describe "math tests" {
 
 Grouped and isolated via `describe`.
 
+#### Test Utilities
+
+The LX compiler includes utility functions for testing the complete compilation pipeline from LX source to Erlang output:
+
+```v
+// Test utility function for comparing LX code with generated Erlang
+fn assert_lx_generates_erlang(lx_code string, expected_erlang string) {
+    // Automatically handles lexing, parsing, and code generation
+    // Compares the generated Erlang code with expected output
+}
+
+// Example usage in tests
+fn test_simple_function() {
+    assert_lx_generates_erlang(
+        'def f() do\n1\nend',
+        '-module(main).\n-export([f/0]).\n\nf() ->\n1.\n'
+    )
+}
+```
+
+This utility function eliminates the need for manual token creation and provides a clean, readable way to test the complete compilation pipeline from LX source to Erlang output.
+
 ---
 
 ### 18. Application Definition
@@ -1211,7 +1255,7 @@ deps [
 - **Priority**: Local dependencies override global ones with the same name
 
 #### Integration with External Calls
-- All `mod.fun()` calls are validated at compile time
+- All `:module.function()` calls are validated at compile time
 - Arity, argument types, and return types are checked using BEAM file information
 - Clear errors for missing functions, arity, or type mismatches
 
@@ -1222,8 +1266,8 @@ deps [:erlang, :crypto]
 
 worker cart_manager do
   def init(_) do
-    timestamp = erlang.system_time(:millisecond)
-    uuid = crypto.strong_rand_bytes(16)
+    timestamp = :erlang.system_time(:millisecond)
+    uuid = :crypto.strong_rand_bytes(16)
     {:ok, #{carts: #{}, created_at: timestamp, session_id: uuid}}
   end
 end

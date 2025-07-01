@@ -26,7 +26,17 @@ fn (mut ep ExpressionParser) parse_primary_expression() ?ast.Expr {
 			op_token := ep.current as lexer.OperatorToken
 			match op_token.value {
 				.dot {
-					expr = ep.parse_record_access_expression(expr)?
+					// Check if this is an external function call (atom.function) or record access (identifier.field)
+					if expr is ast.LiteralExpr {
+						lit_expr := expr as ast.LiteralExpr
+						if lit_expr.value is ast.AtomLiteral {
+							expr = ep.parse_external_function_call(expr)?
+						} else {
+							expr = ep.parse_record_access_expression(expr)?
+						}
+					} else {
+						expr = ep.parse_record_access_expression(expr)?
+					}
 				}
 				else {
 					break
@@ -57,10 +67,50 @@ fn (mut ep ExpressionParser) parse_call_expression(function ast.Expr) ?ast.Expr 
 
 	ep.consume(lexer.punctuation(.rparen), 'Expected closing parenthesis')?
 
+	// Check if this is an external function call that already has module and function_name
+	if function is ast.CallExpr {
+		call_expr := function as ast.CallExpr
+		if call_expr.external {
+			return ast.CallExpr{
+				external:      true
+				module:        call_expr.module
+				function_name: call_expr.function_name
+				arguments:     arguments
+				position:      ep.get_current_position()
+			}
+		}
+	}
+
 	return ast.CallExpr{
 		function:  function
 		arguments: arguments
 		position:  ep.get_current_position()
+	}
+}
+
+// parse_external_function_call parses external function calls like :module.function
+fn (mut ep ExpressionParser) parse_external_function_call(module_expr ast.Expr) ?ast.Expr {
+	ep.advance() // consume '.'
+
+	field_token := ep.current
+	if !ep.current.is_identifier() {
+		ep.add_error('Expected function name after dot', 'Got ${ep.current.str()}')
+		return none
+	}
+	ep.advance()
+
+	// Extract module name from atom literal
+	lit_expr := module_expr as ast.LiteralExpr
+	atom_lit := lit_expr.value as ast.AtomLiteral
+	module_name := atom_lit.value
+	function_name := field_token.get_value()
+
+	return ast.CallExpr{
+		external:      true
+		module:        module_name
+		function_name: function_name
+		arguments:     []
+		position:      ep.get_current_position()
 	}
 }
 
@@ -75,6 +125,7 @@ fn (mut ep ExpressionParser) parse_record_access_expression(record ast.Expr) ?as
 	}
 	ep.advance()
 
+	// This is a record field access
 	return ast.RecordAccessExpr{
 		record:   record
 		field:    field_token.get_value()

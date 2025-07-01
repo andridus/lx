@@ -32,9 +32,12 @@ pub:
 // CallExpr represents a function call
 pub struct CallExpr {
 pub:
-	function  Expr
-	arguments []Expr
-	position  Position
+	function      Expr   // used for internal calls
+	external      bool   // true if this is an external call
+	module        string // module name if external
+	function_name string // function name if external
+	arguments     []Expr
+	position      Position
 }
 
 // MatchExpr represents pattern matching
@@ -403,29 +406,79 @@ pub type Stmt = ExprStmt | ModuleStmt | FunctionStmt | RecordDefStmt | TypeDefSt
 // str returns a string representation of Expr
 pub fn (e Expr) str() string {
 	return match e {
-		VariableExpr { 'Var(${e.name})' }
-		LiteralExpr { 'Literal(${e.value.str()})' }
-		AssignExpr { 'Assign(${e.name}, ${e.value.str()})' }
-		BinaryExpr { 'Binary(${e.left.str()} ${e.op.str()} ${e.right.str()})' }
-		CallExpr { 'Call(${e.function.str()}, [${e.arguments.map(it.str()).join(', ')}])' }
-		MatchExpr { 'Match(${e.value.str()}, [${e.cases.map(it.str()).join(', ')}])' }
-		ListConsExpr { 'Cons(${e.head.str()}, ${e.tail.str()})' }
-		ListEmptyExpr { 'Empty' }
-		ListLiteralExpr { 'List([${e.elements.map(it.str()).join(', ')}])' }
-		TupleExpr { 'Tuple([${e.elements.map(it.str()).join(', ')}])' }
-		MapLiteralExpr { 'Map([${e.entries.map(it.str()).join(', ')}])' }
-		RecordLiteralExpr { 'Record(${e.name}, [${e.fields.map(it.str()).join(', ')}])' }
-		RecordAccessExpr { 'Access(${e.record.str()}.${e.field})' }
-		FunExpr { 'Fun([${e.parameters.map(it.str()).join(', ')}], [${e.body.map(it.str()).join(', ')}])' }
-		SendExpr { 'Send(${e.pid.str()}, ${e.message.str()})' }
-		ReceiveExpr { 'Receive([${e.cases.map(it.str()).join(', ')}], ${e.timeout.str()})' }
-		GuardExpr { 'Guard(${e.condition.str()})' }
-		UnaryExpr { 'Unary(${e.op.str()}, ${e.operand.str()})' }
-		MapAccessExpr { 'Access(${e.map_expr.str()}[${e.key.str()}])' }
-		IfExpr { 'If(${e.condition.str()}, [${e.then_body.map(it.str()).join(', ')}], [${e.else_body.map(it.str()).join(', ')}])' }
-		CaseExpr { 'Case(${e.value.str()}, [${e.cases.map(it.str()).join(', ')}])' }
-		WithExpr { 'With([${e.bindings.map(it.str()).join(', ')}], [${e.body.map(it.str()).join(', ')}], [${e.else_body.map(it.str()).join(', ')}])' }
-		ForExpr { 'For(${e.pattern.str()}, ${e.collection.str()}, ${e.guard.str()}, [${e.body.map(it.str()).join(', ')}])' }
+		VariableExpr {
+			'Var(${e.name})'
+		}
+		LiteralExpr {
+			'Literal(${e.value.str()})'
+		}
+		AssignExpr {
+			'Assign(${e.name}, ${e.value.str()})'
+		}
+		BinaryExpr {
+			'Binary(${e.left.str()} ${e.op.str()} ${e.right.str()})'
+		}
+		CallExpr {
+			if e.external {
+				'ExternalCall(${e.module}:${e.function_name}, [${e.arguments.map(it.str()).join(', ')}])'
+			} else {
+				'Call(${e.function.str()}, [${e.arguments.map(it.str()).join(', ')}])'
+			}
+		}
+		MatchExpr {
+			'Match(${e.value.str()}, [${e.cases.map(it.str()).join(', ')}])'
+		}
+		ListConsExpr {
+			'Cons(${e.head.str()}, ${e.tail.str()})'
+		}
+		ListEmptyExpr {
+			'Empty'
+		}
+		ListLiteralExpr {
+			'List([${e.elements.map(it.str()).join(', ')}])'
+		}
+		TupleExpr {
+			'Tuple([${e.elements.map(it.str()).join(', ')}])'
+		}
+		MapLiteralExpr {
+			'Map([${e.entries.map(it.str()).join(', ')}])'
+		}
+		RecordLiteralExpr {
+			'Record(${e.name}, [${e.fields.map(it.str()).join(', ')}])'
+		}
+		RecordAccessExpr {
+			'Access(${e.record.str()}.${e.field})'
+		}
+		FunExpr {
+			'Fun([${e.parameters.map(it.str()).join(', ')}], [${e.body.map(it.str()).join(', ')}])'
+		}
+		SendExpr {
+			'Send(${e.pid.str()}, ${e.message.str()})'
+		}
+		ReceiveExpr {
+			'Receive([${e.cases.map(it.str()).join(', ')}], ${e.timeout.str()})'
+		}
+		GuardExpr {
+			'Guard(${e.condition.str()})'
+		}
+		UnaryExpr {
+			'Unary(${e.op.str()}, ${e.operand.str()})'
+		}
+		MapAccessExpr {
+			'Access(${e.map_expr.str()}[${e.key.str()}])'
+		}
+		IfExpr {
+			'If(${e.condition.str()}, [${e.then_body.map(it.str()).join(', ')}], [${e.else_body.map(it.str()).join(', ')}])'
+		}
+		CaseExpr {
+			'Case(${e.value.str()}, [${e.cases.map(it.str()).join(', ')}])'
+		}
+		WithExpr {
+			'With([${e.bindings.map(it.str()).join(', ')}], [${e.body.map(it.str()).join(', ')}], [${e.else_body.map(it.str()).join(', ')}])'
+		}
+		ForExpr {
+			'For(${e.pattern.str()}, ${e.collection.str()}, ${e.guard.str()}, [${e.body.map(it.str()).join(', ')}])'
+		}
 	}
 }
 

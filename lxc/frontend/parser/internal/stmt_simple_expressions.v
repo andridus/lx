@@ -4,12 +4,21 @@ import ast
 import lexer
 
 // parse_simple_expression parses simple expressions without function calls
-// This prevents the parser from consuming tokens from the next clause
 fn (mut sp StatementParser) parse_simple_expression() ?ast.Expr {
+	// Check if this is an atom followed by dot (external function call)
+	if sp.current is lexer.AtomToken {
+		return sp.parse_external_function_call()
+	}
+
+	// For other cases, use the simple atom parser
 	mut left := sp.parse_simple_atom()?
 
-	// Check for binary operators
-	for sp.current is lexer.OperatorToken {
+	// Parse binary expressions
+	for {
+		if sp.current !is lexer.OperatorToken {
+			break
+		}
+
 		op_token := sp.current as lexer.OperatorToken
 		mut op := ast.BinaryOp.add
 		mut should_continue := false
@@ -76,6 +85,63 @@ fn (mut sp StatementParser) parse_simple_expression() ?ast.Expr {
 	}
 
 	return left
+}
+
+// parse_external_function_call parses external function calls like :module.function(args)
+fn (mut sp StatementParser) parse_external_function_call() ?ast.Expr {
+	// Parse the atom (module name)
+	atom_token := sp.current as lexer.AtomToken
+	module_name := atom_token.value
+	sp.advance()
+
+	// Expect a dot
+	if sp.current !is lexer.OperatorToken {
+		sp.add_error('Expected dot after atom', 'Got ${sp.current.str()}')
+		return none
+	}
+	op_token := sp.current as lexer.OperatorToken
+	if op_token.value != .dot {
+		sp.add_error('Expected dot after atom', 'Got ${sp.current.str()}')
+		return none
+	}
+	sp.advance()
+
+	// Expect an identifier (function name)
+	if sp.current !is lexer.IdentToken {
+		sp.add_error('Expected function name after dot', 'Got ${sp.current.str()}')
+		return none
+	}
+	func_token := sp.current as lexer.IdentToken
+	function_name := func_token.value
+	sp.advance()
+
+	// Check for arguments
+	mut arguments := []ast.Expr{}
+	if sp.current is lexer.PunctuationToken {
+		punc_token := sp.current as lexer.PunctuationToken
+		if punc_token.value == .lparen {
+			sp.advance() // consume '('
+
+			if !sp.check(lexer.punctuation(.rparen)) {
+				for {
+					arguments << sp.parse_simple_expression()?
+					if !sp.match(lexer.punctuation(.comma)) {
+						break
+					}
+				}
+			}
+
+			sp.consume(lexer.punctuation(.rparen), 'Expected closing parenthesis')?
+		}
+	}
+
+	return ast.CallExpr{
+		external:      true
+		module:        module_name
+		function_name: function_name
+		arguments:     arguments
+		position:      sp.get_current_position()
+	}
 }
 
 // parse_simple_atom parses atomic expressions (identifiers, literals)

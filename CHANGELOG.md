@@ -1,9 +1,10 @@
 ## [Unreleased]
 
 ### Added
+- **External Function Calls**: Implemented new syntax for external module function calls using `:module.function(args...)` format. This provides clear distinction between record field access (`variable.field`) and external function calls (`:module.function`). The syntax generates proper Erlang `module:function(args...)` calls and supports multiple arguments. Examples: `:io.format("Hello")`, `:lists.map(fn, [1,2,3])`, `:erlang.process_info(pid)`.
 - **Parser Base Structure**: Complete recursive descent parser implementation with token management, error recovery, and precedence table
 - **Error Recovery System**: Robust error handling that continues parsing after encountering invalid tokens, synchronizing to block boundaries (def, defp, worker, supervisor, etc.)
-- **Expression Parsing**: Comprehensive parsing of literals, variables, assignments, and function calls including external module calls (mod.fun)
+- **Expression Parsing**: Comprehensive parsing of literals, variables, assignments, and function calls including external module calls (`:module.function`)
 - **Data Structures Parsing**: Complete parsing of tuples, lists, cons expressions, and maps with nested structure support
 - **Operator Precedence**: Full implementation of operator precedence and associativity for arithmetic, comparison, and logical operators
 - **Recovery Strategy**: Parser continues processing multiple expressions even when errors occur, reporting all errors found in the code
