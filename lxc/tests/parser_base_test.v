@@ -107,7 +107,7 @@ fn test_parser_error_recovery_with_valid_code_after_error() {
 fn test_literal_parsing() {
 	tokens := [
 		lexer.Token(lexer.new_int_token(42)),
-		lexer.Token(lexer.new_eof_token())
+		lexer.Token(lexer.new_eof_token()),
 	]
 	mut parser0 := parser.new_main_parser(tokens)
 	expr := parser0.parse_expression() or { panic('Failed to parse integer') }
@@ -126,7 +126,7 @@ fn test_literal_parsing() {
 	// Test string literal
 	tokens2 := [
 		lexer.Token(lexer.new_string_token('hello')),
-		lexer.Token(lexer.new_eof_token())
+		lexer.Token(lexer.new_eof_token()),
 	]
 	mut parser2 := parser.new_main_parser(tokens2)
 	expr2 := parser2.parse_expression() or { panic('Failed to parse string') }
@@ -145,7 +145,7 @@ fn test_literal_parsing() {
 	// Test boolean literal
 	tokens3 := [
 		lexer.Token(lexer.new_bool_token(true)),
-		lexer.Token(lexer.new_eof_token())
+		lexer.Token(lexer.new_eof_token()),
 	]
 	mut parser3 := parser.new_main_parser(tokens3)
 	expr3 := parser3.parse_expression() or { panic('Failed to parse boolean') }
@@ -164,7 +164,7 @@ fn test_literal_parsing() {
 	// Test atom literal
 	tokens4 := [
 		lexer.Token(lexer.new_atom_token('ok')),
-		lexer.Token(lexer.new_eof_token())
+		lexer.Token(lexer.new_eof_token()),
 	]
 	mut parser4 := parser.new_main_parser(tokens4)
 	expr4 := parser4.parse_expression() or { panic('Failed to parse atom') }
@@ -183,14 +183,14 @@ fn test_literal_parsing() {
 	// Test nil literal
 	tokens5 := [
 		lexer.Token(lexer.new_keyword_token(lexer.KeywordValue.nil_)),
-		lexer.Token(lexer.new_eof_token())
+		lexer.Token(lexer.new_eof_token()),
 	]
 	mut parser5 := parser.new_main_parser(tokens5)
 	expr5 := parser5.parse_expression() or { panic('Failed to parse nil') }
 	match expr5 {
 		ast.LiteralExpr {
 			match expr5.value {
-				ast.NilLiteral { /* OK */ }
+				ast.NilLiteral {} // OK
 				else { assert false, 'Expected NilLiteral' }
 			}
 		}
@@ -203,7 +203,7 @@ fn test_literal_parsing() {
 fn test_variable_parsing() {
 	tokens := [
 		lexer.Token(lexer.new_ident_token('x')),
-		lexer.Token(lexer.new_eof_token())
+		lexer.Token(lexer.new_eof_token()),
 	]
 	mut parser0 := parser.new_main_parser(tokens)
 	expr := parser0.parse_expression() or { panic('Failed to parse variable') }
@@ -222,7 +222,7 @@ fn test_assignment_parsing() {
 		lexer.Token(lexer.new_ident_token('x')),
 		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.assign)),
 		lexer.Token(lexer.new_int_token(42)),
-		lexer.Token(lexer.new_eof_token())
+		lexer.Token(lexer.new_eof_token()),
 	]
 	mut parser0 := parser.new_main_parser(tokens)
 	expr := parser0.parse_expression() or { panic('Failed to parse assignment') }
@@ -236,7 +236,9 @@ fn test_assignment_parsing() {
 						else { assert false, 'Expected IntegerLiteral' }
 					}
 				}
-				else { assert false, 'Expected LiteralExpr' }
+				else {
+					assert false, 'Expected LiteralExpr'
+				}
 			}
 		}
 		else {
@@ -296,15 +298,21 @@ fn test_external_call_parsing() {
 						ast.VariableExpr {
 							assert expr.function.record.name == 'math'
 						}
-						else { assert false, 'Expected VariableExpr for record' }
+						else {
+							assert false, 'Expected VariableExpr for record'
+						}
 					}
 					assert expr.function.field == 'pow'
 				}
-				else { assert false, 'Expected RecordAccessExpr' }
+				else {
+					assert false, 'Expected RecordAccessExpr'
+				}
 			}
 			assert expr.arguments.len == 2
 		}
-		else { assert false, 'Expected CallExpr' }
+		else {
+			assert false, 'Expected CallExpr'
+		}
 	}
 }
 
@@ -348,11 +356,15 @@ fn test_record_access_parsing() {
 						ast.VariableExpr {
 							assert expr.function.record.name == 'person'
 						}
-						else { assert false, 'Expected VariableExpr for record' }
+						else {
+							assert false, 'Expected VariableExpr for record'
+						}
 					}
 					assert expr.function.field == 'name'
 				}
-				else { assert false, 'Expected RecordAccessExpr' }
+				else {
+					assert false, 'Expected RecordAccessExpr'
+				}
 			}
 			assert expr.arguments.len == 1
 		}

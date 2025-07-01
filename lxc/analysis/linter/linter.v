@@ -18,8 +18,6 @@ pub fn new_linter() Linter {
 	return Linter{}
 }
 
-
-
 // lint_module lints a module and returns any errors found
 pub fn (l Linter) lint_module(module_stmt ast.ModuleStmt) LinterResult {
 	mut lint_errors := []errors.CompilationError{}
@@ -27,8 +25,6 @@ pub fn (l Linter) lint_module(module_stmt ast.ModuleStmt) LinterResult {
 	// Check function arity ordering
 	arity_errors := l.check_function_arity_ordering(module_stmt.statements)
 	lint_errors << arity_errors
-
-
 
 	return LinterResult{
 		success: lint_errors.len == 0

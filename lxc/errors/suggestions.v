@@ -56,8 +56,17 @@ pub fn generate_suggestions(err CompilationError) []string {
 		DependencyError {
 			generate_dependency_suggestions(err.kind.message, err.kind.module_name)
 		}
+		UnboundFunctionError {
+			if err.kind.suggestion.len > 0 {
+				[err.kind.suggestion]
+			} else {
+				[
+					'Define the function ${err.kind.function}/${err.kind.arity} as needed.',
+				]
+			}
+		}
 		else {
-			[]
+			[]string{}
 		}
 	}
 }
@@ -508,11 +517,10 @@ fn levenshtein_distance(s1 string, s2 string) int {
 	for i := 1; i <= len1; i++ {
 		for j := 1; j <= len2; j++ {
 			cost := if s1[i - 1] == s2[j - 1] { 0 } else { 1 }
-			matrix[i][j] = min_of_three(
-				matrix[i - 1][j] + 1,     // deletion
-				matrix[i][j - 1] + 1,     // insertion
-				matrix[i - 1][j - 1] + cost // substitution
-			)
+			matrix[i][j] = min_of_three(matrix[i - 1][j] + 1, // deletion
+			 matrix[i][j - 1] + 1, // insertion
+			 matrix[i - 1][j - 1] + cost // substitution
+			 )
 		}
 	}
 
@@ -521,5 +529,17 @@ fn levenshtein_distance(s1 string, s2 string) int {
 
 // min_of_three returns the minimum of three integers
 fn min_of_three(a int, b int, c int) int {
-	return if a < b { if a < c { a } else { c } } else { if b < c { b } else { c } }
+	return if a < b {
+		if a < c {
+			a
+		} else {
+			c
+		}
+	} else {
+		if b < c {
+			b
+		} else {
+			c
+		}
+	}
 }

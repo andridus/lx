@@ -125,11 +125,8 @@ fn test_error_reporting() {
 	mut checker := analysis.new_variable_checker()
 
 	// Report an error
-	checker.report_error(
-		"Variable 'undefined' is not defined",
-		"Variables must be defined before use",
-		ast.new_position(1, 1, 'test.lx')
-	)
+	checker.report_error("Variable 'undefined' is not defined", 'Variables must be defined before use',
+		ast.new_position(1, 1, 'test.lx'))
 
 	assert checker.has_errors() == true
 	assert checker.get_errors().len == 1
@@ -144,7 +141,7 @@ fn test_variable_checker_integration() {
 	// Test integration with the full variable checking system
 	mut checker := analysis.new_variable_checker()
 
-		// Create a simple module structure
+	// Create a simple module structure
 	test_module := ast.ModuleStmt{
 		name:       'test'
 		exports:    []

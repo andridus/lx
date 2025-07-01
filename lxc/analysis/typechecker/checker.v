@@ -169,11 +169,8 @@ fn (mut tc TypeChecker) check_variable_expression(expr ast.VariableExpr) {
 		// Variable is bound, type checking passes
 	} else {
 		// This should have been caught by variable checker, but just in case
-		tc.report_error(
-			"Variable '${expr.name}' is not defined",
-			"Variables must be defined before use",
-			ast.new_position(0, 0, 'unknown')
-		)
+		tc.report_error("Variable '${expr.name}' is not defined", 'Variables must be defined before use',
+			ast.new_position(0, 0, 'unknown'))
 	}
 }
 
@@ -202,11 +199,8 @@ fn (mut tc TypeChecker) check_binary_expression(expr ast.BinaryExpr) {
 	// For now, we'll just check that both operands are numeric for arithmetic operators
 	if expr.op in [.add, .subtract, .multiply, .divide, .modulo, .power] {
 		if !tc.is_numeric_type(left_type) || !tc.is_numeric_type(right_type) {
-			tc.report_error(
-				"Arithmetic operator '${expr.op.str()}' requires numeric operands",
-				"Both operands must be integers or floats",
-				expr.position
-			)
+			tc.report_error("Arithmetic operator '${expr.op.str()}' requires numeric operands",
+				'Both operands must be integers or floats', expr.position)
 		}
 	}
 }
@@ -417,7 +411,7 @@ fn (mut tc TypeChecker) check_pattern(pattern ast.Pattern) {
 	match pattern {
 		ast.VarPattern {
 			// Bind variable with unknown type for now
-			tc.context.bind(pattern.name, typechecker.make_type_var('a'), ast.new_position(0, 0, 'unknown'))
+			tc.context.bind(pattern.name, make_type_var('a'), ast.new_position(0, 0, 'unknown'))
 		}
 		ast.WildcardPattern, ast.LiteralPattern, ast.AtomPattern, ast.ListEmptyPattern {
 			// These patterns don't bind variables
@@ -494,7 +488,7 @@ fn (tc &TypeChecker) infer_expression_type(expr ast.Expr) TypeExpr {
 			if binding := tc.context.lookup(expr.name) {
 				return binding.type_expr
 			}
-			return typechecker.make_type_var('a')
+			return make_type_var('a')
 		}
 		ast.LiteralExpr {
 			return tc.infer_literal_type(expr.value)
@@ -506,69 +500,69 @@ fn (tc &TypeChecker) infer_expression_type(expr ast.Expr) TypeExpr {
 			return tc.infer_binary_expression_type(expr)
 		}
 		ast.CallExpr {
-			return typechecker.make_type_var('a') // Placeholder
+			return make_type_var('a') // Placeholder
 		}
 		ast.MatchExpr {
-			return typechecker.make_type_var('a') // Placeholder
+			return make_type_var('a') // Placeholder
 		}
 		ast.ListConsExpr {
-			return typechecker.make_list_type(typechecker.make_type_var('a'))
+			return make_list_type(make_type_var('a'))
 		}
 		ast.ListEmptyExpr {
-			return typechecker.make_list_type(typechecker.make_type_var('a'))
+			return make_list_type(make_type_var('a'))
 		}
 		ast.ListLiteralExpr {
 			if expr.elements.len == 0 {
-				return typechecker.make_list_type(typechecker.make_type_var('a'))
+				return make_list_type(make_type_var('a'))
 			}
 			element_type := tc.infer_expression_type(expr.elements[0])
-			return typechecker.make_list_type(element_type)
+			return make_list_type(element_type)
 		}
 		ast.TupleExpr {
 			mut element_types := []TypeExpr{}
 			for element in expr.elements {
 				element_types << tc.infer_expression_type(element)
 			}
-			return typechecker.make_tuple_type(element_types)
+			return make_tuple_type(element_types)
 		}
 		ast.MapLiteralExpr {
-			return typechecker.make_map_type(typechecker.make_type_var('k'), typechecker.make_type_var('v'))
+			return make_map_type(make_type_var('k'), make_type_var('v'))
 		}
 		ast.RecordLiteralExpr {
-			return typechecker.make_type_constructor('record', [])
+			return make_type_constructor('record', [])
 		}
 		ast.RecordAccessExpr {
-			return typechecker.make_type_var('a')
+			return make_type_var('a')
 		}
 		ast.FunExpr {
-			return typechecker.make_function_type([], typechecker.make_type_var('a'))
+			return make_function_type([], make_type_var('a'))
 		}
 		ast.SendExpr {
-			return typechecker.make_type_constructor('atom', [])
+			return make_type_constructor('atom', [])
 		}
 		ast.ReceiveExpr {
-			return typechecker.make_type_var('a')
+			return make_type_var('a')
 		}
 		ast.GuardExpr {
-			return typechecker.boolean_type
+			return boolean_type
 		}
 		ast.UnaryExpr {
 			return tc.infer_expression_type(expr.operand)
 		}
 		ast.MapAccessExpr {
-			return typechecker.make_type_var('v')
+			return make_type_var('v')
 		}
 		ast.IfExpr {
-			return typechecker.make_type_var('a')
+			return make_type_var('a')
 		}
 		ast.CaseExpr {
-			return typechecker.make_type_var('a')
+			return make_type_var('a')
 		}
 		ast.WithExpr {
-			return typechecker.make_type_var('a')
+			return make_type_var('a')
 		}
 		ast.ForExpr {
-			return typechecker.make_list_type(typechecker.make_type_var('a'))
+			return make_list_type(make_type_var('a'))
 		}
 	}
 }
@@ -577,16 +571,16 @@ fn (tc &TypeChecker) infer_expression_type(expr ast.Expr) TypeExpr {
 fn (tc &TypeChecker) infer_literal_type(literal ast.Literal) TypeExpr {
 	match literal {
 		ast.IntegerLiteral {
-			return typechecker.integer_type
+			return integer_type
 		}
 		ast.FloatLiteral {
-			return typechecker.float_type
+			return float_type
 		}
 		ast.StringLiteral {
-			return typechecker.string_type
+			return string_type
 		}
 		ast.BooleanLiteral {
-			return typechecker.boolean_type
+			return boolean_type
 		}
 		ast.AtomLiteral {
 			return atom_type
@@ -632,15 +626,11 @@ fn (tc &TypeChecker) is_numeric_type(type_expr TypeExpr) bool {
 
 // report_error adds an error to the type checker
 fn (mut tc TypeChecker) report_error(message string, suggestion string, position ast.Position) {
-	error := errors.new_compilation_error(
-		errors.TypeError{
-			message:    message
-			expected:   ''
-			actual:     ''
-			suggestion: suggestion
-		},
-		position,
-		message
-	)
+	error := errors.new_compilation_error(errors.TypeError{
+		message:    message
+		expected:   ''
+		actual:     ''
+		suggestion: suggestion
+	}, position, message)
 	tc.errors << error
 }

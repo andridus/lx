@@ -10,13 +10,22 @@ pub:
 	position ast.Position
 	defined  bool
 pub mut:
-	used     bool
+	used bool
+}
+
+// FunctionBinding represents a function binding in a scope
+pub struct FunctionBinding {
+pub:
+	name     string
+	position ast.Position
+	arity    int
 }
 
 // VariableScope represents a lexical scope for variable checking
 pub struct VariableScope {
 pub mut:
 	variables map[string]VariableBinding
+	functions map[string]FunctionBinding
 	level     int
 }
 
@@ -24,6 +33,7 @@ pub mut:
 pub fn new_variable_scope() VariableScope {
 	return VariableScope{
 		variables: map[string]VariableBinding{}
+		functions: map[string]FunctionBinding{}
 		level:     0
 	}
 }
@@ -47,6 +57,7 @@ pub fn new_variable_checker() VariableChecker {
 pub fn (mut vc VariableChecker) enter_scope() {
 	vc.scope_stack << VariableScope{
 		variables: map[string]VariableBinding{}
+		functions: map[string]FunctionBinding{}
 		level:     vc.scope_stack.len
 	}
 }
@@ -70,6 +81,17 @@ pub fn (mut vc VariableChecker) bind_variable(name string, position ast.Position
 	}
 }
 
+// bind_function adds a function to the current scope
+pub fn (mut vc VariableChecker) bind_function(name string, position ast.Position, arity int) {
+	if vc.scope_stack.len > 0 {
+		vc.scope_stack[vc.scope_stack.len - 1].functions[name] = FunctionBinding{
+			name:     name
+			position: position
+			arity:    arity
+		}
+	}
+}
+
 // has_binding_local checks if variable exists in current scope only
 pub fn (vc &VariableChecker) has_binding_local(name string) bool {
 	if vc.scope_stack.len == 0 {
@@ -88,6 +110,16 @@ pub fn (vc &VariableChecker) has_binding_recursive(name string) bool {
 	return false
 }
 
+// has_function_recursive checks if function exists in current or parent scopes
+pub fn (vc &VariableChecker) has_function_recursive(name string) bool {
+	for i := vc.scope_stack.len - 1; i >= 0; i-- {
+		if name in vc.scope_stack[i].functions {
+			return true
+		}
+	}
+	return false
+}
+
 // has_binding_in_parent checks if variable exists in parent scopes only
 pub fn (vc &VariableChecker) has_binding_in_parent(name string) bool {
 	for i := vc.scope_stack.len - 2; i >= 0; i-- {
@@ -100,15 +132,11 @@ pub fn (vc &VariableChecker) has_binding_in_parent(name string) bool {
 
 // report_error adds a variable-related error
 pub fn (mut vc VariableChecker) report_error(message string, suggestion string, position ast.Position) {
-	error := errors.new_compilation_error(
-		errors.UnboundVariableError{
-			variable:   ''
-			similar:    []
-			suggestion: suggestion
-		},
-		position,
-		message
-	)
+	error := errors.new_compilation_error(errors.UnboundVariableError{
+		variable:   ''
+		similar:    []
+		suggestion: suggestion
+	}, position, message)
 	vc.errors << error
 }
 
@@ -116,21 +144,15 @@ pub fn (mut vc VariableChecker) report_error(message string, suggestion string, 
 pub fn (mut vc VariableChecker) check_assignment_expression(expr ast.AssignExpr) {
 	// Check for rebind in current scope
 	if vc.has_binding_local(expr.name) {
-		vc.report_error(
-			"Variable '${expr.name}' cannot be reassigned",
-			"Variables in LX are immutable and cannot be reassigned. Use a different variable name or restructure your code.",
-			expr.position
-		)
+		vc.report_error("Variable '${expr.name}' cannot be reassigned", 'Variables in LX are immutable and cannot be reassigned. Use a different variable name or restructure your code.',
+			expr.position)
 		return
 	}
 
 	// Check for shadowing from parent scopes
 	if vc.has_binding_in_parent(expr.name) {
-		vc.report_error(
-			"Variable '${expr.name}' shadows variable from outer scope",
-			"Shadowing is not allowed in LX. Use a different variable name: ${expr.name}_inner",
-			expr.position
-		)
+		vc.report_error("Variable '${expr.name}' shadows variable from outer scope", 'Shadowing is not allowed in LX. Use a different variable name: ${expr.name}_inner',
+			expr.position)
 		return
 	}
 
@@ -143,15 +165,14 @@ pub fn (mut vc VariableChecker) check_assignment_expression(expr ast.AssignExpr)
 
 // check_variable_expression validates variable usage
 pub fn (mut vc VariableChecker) check_variable_expression(expr ast.VariableExpr) {
-	if !vc.has_binding_recursive(expr.name) {
-		vc.report_error(
-			"Variable '${expr.name}' is not defined",
-			"Variables must be defined before use. Check spelling or add an assignment: ${expr.name} = some_value",
-			expr.position
-		)
+	if !vc.has_binding_recursive(expr.name) && !vc.has_function_recursive(expr.name) {
+		vc.report_error("Variable '${expr.name}' is not defined", 'Variables must be defined before use. Check spelling or add an assignment: ${expr.name} = some_value',
+			expr.position)
 	} else {
-		// Mark variable as used
-		vc.mark_variable_used(expr.name)
+		// Mark variable as used (only if it's actually a variable, not a function)
+		if vc.has_binding_recursive(expr.name) {
+			vc.mark_variable_used(expr.name)
+		}
 	}
 }
 
@@ -169,7 +190,28 @@ pub fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 			vc.check_expression(expr.right)
 		}
 		ast.CallExpr {
-			vc.check_expression(expr.function)
+			// Se for chamada de função interna
+			if !expr.external && expr.function is ast.VariableExpr {
+				func_var := expr.function as ast.VariableExpr
+				func_name := func_var.name
+				arity := expr.arguments.len
+				if !vc.has_function_recursive(func_name) {
+					mut params := []string{}
+					for i, arg in expr.arguments {
+						param_type := vc.infer_argument_type(arg)
+						params << 'arg${i + 1} :: ${param_type}'
+					}
+					params_str := params.join(', ')
+					func_suggestion := 'def ${func_name}(${params_str}) do\n  ...\nend'
+					vc.errors << errors.new_compilation_error(errors.UnboundFunctionError{
+						function:   func_name
+						arity:      arity
+						suggestion: func_suggestion
+					}, func_var.position, "Function '${func_name}/${arity}' is not defined")
+				}
+			} else {
+				vc.check_expression(expr.function)
+			}
 			for arg in expr.arguments {
 				vc.check_expression(arg)
 			}
@@ -357,6 +399,9 @@ pub fn (mut vc VariableChecker) check_statement(stmt ast.Stmt) {
 			}
 		}
 		ast.FunctionStmt {
+			// Register the function in the current scope
+			vc.bind_function(stmt.name, stmt.position, stmt.clauses[0].parameters.len)
+
 			for clause in stmt.clauses {
 				vc.enter_scope()
 				for param in clause.parameters {
@@ -378,7 +423,7 @@ pub fn (mut vc VariableChecker) check_statement(stmt ast.Stmt) {
 
 // Resultado da checagem de variáveis
 pub struct VariableCheckResult {
-	pub:
+pub:
 	success bool
 	errors  []errors.CompilationError
 }
@@ -394,7 +439,7 @@ pub fn (mut vc VariableChecker) check_module(mod ast.ModuleStmt) VariableCheckRe
 
 	return VariableCheckResult{
 		success: vc.errors.len == 0
-		errors: vc.errors.clone()
+		errors:  vc.errors.clone()
 	}
 }
 
@@ -427,22 +472,59 @@ pub fn (mut vc VariableChecker) check_unused_variables() {
 		for name, binding in scope.variables {
 			if binding.defined && !binding.used {
 				error_msg := "Variable '${name}' is defined but never used"
-				suggestion := "Remove the variable assignment or use the variable in an expression"
+				suggestion := 'Remove the variable assignment or use the variable in an expression'
 
 				unused_error := errors.UnusedVariableError{
 					variable:   name
 					suggestion: suggestion
 				}
 
-				compilation_error := errors.new_compilation_error_with_severity(
-					unused_error,
-					binding.position,
-					error_msg,
-					.warning
-				)
+				compilation_error := errors.new_compilation_error_with_severity(unused_error,
+					binding.position, error_msg, .warning)
 
 				vc.errors << compilation_error
 			}
+		}
+	}
+}
+
+// infer_argument_type infers the type of an argument expression
+fn (vc &VariableChecker) infer_argument_type(arg ast.Expr) string {
+	match arg {
+		ast.LiteralExpr {
+			match arg.value {
+				ast.IntegerLiteral { return 'integer' }
+				ast.FloatLiteral { return 'float' }
+				ast.StringLiteral { return 'string' }
+				ast.BooleanLiteral { return 'boolean' }
+				ast.AtomLiteral { return 'atom' }
+				ast.NilLiteral { return 'nil' }
+			}
+		}
+		ast.VariableExpr {
+			return 'any'
+		}
+		ast.BinaryExpr {
+			match arg.op {
+				.add, .subtract, .multiply, .divide, .modulo, .power {
+					return 'integer'
+				}
+				.equal, .not_equal, .less_than, .less_equal, .greater_than, .greater_equal {
+					return 'boolean'
+				}
+				.and, .or, .andalso, .orelse {
+					return 'boolean'
+				}
+				else {
+					return 'any'
+				}
+			}
+		}
+		ast.CallExpr {
+			return 'any'
+		}
+		else {
+			return 'any'
 		}
 	}
 }

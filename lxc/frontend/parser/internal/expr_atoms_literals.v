@@ -134,8 +134,9 @@ fn (mut ep ExpressionParser) parse_identifier_expression() ?ast.Expr {
 	ep.advance()
 
 	return ast.VariableExpr{
-		name: token.get_value()
-		position: ast.new_position(token.get_position().line, token.get_position().column, token.get_position().filename)
+		name:     token.get_value()
+		position: ast.new_position(token.get_position().line, token.get_position().column,
+			token.get_position().filename)
 	}
 }
 

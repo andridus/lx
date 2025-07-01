@@ -48,10 +48,7 @@ pub fn (mut sp StatementParser) parse_function_statement() ?ast.Stmt {
 
 		// Validate that we have at least one clause
 		if clauses.len == 0 {
-			sp.add_error(
-				'Multi-clause function must have at least one clause',
-				'( for single-clause function or do for multi-clause function'
-			)
+			sp.add_error('Multi-clause function must have at least one clause', '( for single-clause function or do for multi-clause function')
 			return none
 		}
 
@@ -75,7 +72,8 @@ pub fn (mut sp StatementParser) parse_function_statement() ?ast.Stmt {
 	}
 
 	// If we get here, neither do nor ( was found
-	sp.add_error('Expected ( for single-clause function or do for multi-clause function', 'Got ${sp.current.str()}')
+	sp.add_error('Expected ( for single-clause function or do for multi-clause function',
+		'Got ${sp.current.str()}')
 	return none
 }
 
@@ -110,16 +108,14 @@ fn (mut sp StatementParser) parse_private_function_statement() ?ast.Stmt {
 
 		// Validate that we have at least one clause
 		if clauses.len == 0 {
-			sp.add_error(
-				'Multi-clause function must have at least one clause',
-				'( for single-clause function or do for multi-clause function'
-			)
+			sp.add_error('Multi-clause function must have at least one clause', '( for single-clause function or do for multi-clause function')
 			return none
 		}
 	} else {
 		// Single-clause function: defp func(...) do ... end
 		if !sp.check(lexer.punctuation(.lparen)) {
-			sp.add_error('Expected ( for single-clause function or do for multi-clause function', 'Got ${sp.current.str()}')
+			sp.add_error('Expected ( for single-clause function or do for multi-clause function',
+				'Got ${sp.current.str()}')
 			return none
 		}
 

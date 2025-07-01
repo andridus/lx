@@ -169,8 +169,14 @@ fn (gen ErlangGenerator) generate_function_call(call ast.CallExpr) string {
 	if call.external {
 		return '${call.module}:${call.function_name}(${args.join(', ')})'
 	} else {
-		function := gen.generate_expression(call.function)
-		return '${function}(${args.join(', ')})'
+		// For internal function calls, the function name should not be capitalized
+		if call.function is ast.VariableExpr {
+			func_name := (call.function as ast.VariableExpr).name
+			return '${func_name}(${args.join(', ')})'
+		} else {
+			function := gen.generate_expression(call.function)
+			return '${function}(${args.join(', ')})'
+		}
 	}
 }
 
