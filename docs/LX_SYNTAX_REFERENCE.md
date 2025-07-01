@@ -157,6 +157,63 @@ end
 
 Multiple assignments are allowed in sequence. Each variable can only be assigned once per scope.
 
+#### Variable Scope Rules
+
+Lx enforces strict variable scope rules to ensure code clarity and prevent common errors:
+
+**Variable Declaration:**
+- Variables must be declared before use
+- Each variable can only be assigned once per scope
+- Variables are immutable after assignment
+
+**Scope Validation:**
+- The compiler automatically checks variable scope during compilation
+- Undefined variables are detected with precise error messages showing line and column
+- Reassignment attempts are caught and reported with helpful suggestions
+
+**Error Examples:**
+```lx
+# Error: Variable 'x' is not defined
+def test() do
+  y = x + 1  # x is not defined
+end
+
+# Error: Variable 'count' cannot be reassigned
+def counter() do
+  count = 1
+  count = 2  # Reassignment not allowed
+end
+
+# Error: Variable 'name' shadows variable from outer scope
+def process() do
+  name = "global"
+  if true do
+    name = "local"  # Shadowing not allowed
+  end
+end
+```
+
+**Correct Usage:**
+```lx
+def correct_example() do
+  # Declare variables before use
+  x = 10
+  y = x + 1  # x is defined
+
+  # Use different names for different values
+  count1 = 1
+  count2 = 2
+
+  # Use block scoping for temporary variables
+  result = do
+    temp = x * 2
+    temp + y
+  end
+end
+```
+
+The compiler provides detailed error messages with suggestions for fixing variable scope issues, making it easier to write correct and maintainable code.
+
 #### Block expressions:
 
 Code blocks are now defined using `do` and `end` keywords:
@@ -1228,6 +1285,7 @@ Lx provides comprehensive error handling with didactic suggestions to help users
 The compiler categorizes errors into several types:
 - **Syntax Errors**: Invalid syntax, missing tokens, unexpected characters
 - **Type Errors**: Type mismatches, invalid type conversions
+- **Variable Errors**: Undefined variables, reassignment attempts, shadowing violations
 - **Pattern Errors**: Invalid pattern matching, missing fields
 - **Record Errors**: Invalid record operations, missing fields
 - **Binary Errors**: Invalid binary specifications, size mismatches
@@ -1256,6 +1314,19 @@ end
 #        (y) -> y * 2
 #      end
 #    Multi-clause functions require at least one clause with parameters.
+
+# Example: Variable scope error
+def test() do
+  y = x + 1  # x is not defined
+end
+
+# Error message with suggestions:
+# [Variable Error] :2:5
+# Variable 'x' is not defined
+#
+# 💡 Suggestion:
+#    Variables must be defined before use. Check spelling or add an assignment: x = some_value
+#    Make sure to declare all variables before using them in expressions.
 ```
 
 #### Error Recovery

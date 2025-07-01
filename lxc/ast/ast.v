@@ -3,7 +3,8 @@ module ast
 // VariableExpr represents a variable reference
 pub struct VariableExpr {
 pub:
-	name string
+	name     string
+	position Position
 }
 
 // LiteralExpr represents a literal expression

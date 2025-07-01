@@ -157,6 +157,7 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 			sp.safe_advance()
 			mut expr := ast.Expr(ast.VariableExpr{
 				name: token.value
+				position: ast.new_position(token.position.line, token.position.column, token.position.filename)
 			})
 			// Allow both record access and function calls
 			for {

@@ -5,6 +5,7 @@ import frontend.parser
 import ast
 import os
 import errors
+import analysis
 
 // CompilerResult represents the result of compilation
 pub struct CompilerResult {
@@ -100,6 +101,18 @@ pub fn (mut comp Compiler) compile_file(file_path string) !ast.ModuleStmt {
 			formatted_errors << comp.error_formatter.format_error(error, source_lines)
 		}
 		return error('Parser errors:\n${formatted_errors.join('\n')}')
+	}
+
+	// Variable scope checking (after parsing, before typechecking)
+	mut var_checker := analysis.new_variable_checker()
+	result := var_checker.check_module(module_stmt)
+	if result.errors.len > 0 {
+		source_lines := errors.load_source_lines(file_path)
+		mut formatted_errors := []string{}
+		for err in result.errors {
+			formatted_errors << comp.error_formatter.format_error(err, source_lines)
+		}
+		return error('Variable scope errors:\n' + formatted_errors.join('\n'))
 	}
 
 	println('Compiled ${file_path} successfully')

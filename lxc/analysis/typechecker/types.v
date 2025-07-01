@@ -384,6 +384,22 @@ pub fn make_map_type(key_type TypeExpr, value_type TypeExpr) MapType {
 	}
 }
 
+// make_type_var creates a type variable with the given name
+pub fn make_type_var(name string) TypeVar {
+	return TypeVar{
+		id:   name
+		name: name
+	}
+}
+
+// make_type_constructor creates a type constructor with the given name and parameters
+pub fn make_type_constructor(name string, parameters []TypeExpr) TypeConstructor {
+	return TypeConstructor{
+		name:       name
+		parameters: parameters
+	}
+}
+
 // Helper functions for testing - convert concrete types to TypeExpr and call methods
 
 // is_monomorphic_type_var checks if a TypeVar is monomorphic
