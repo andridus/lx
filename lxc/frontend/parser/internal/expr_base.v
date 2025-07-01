@@ -33,6 +33,9 @@ pub fn (mut ep ExpressionParser) parse_assignment_expression() ?ast.Expr {
 		if next_token is lexer.OperatorToken {
 			op_token := next_token as lexer.OperatorToken
 			if op_token.value == .assign {
+				// Save the position BEFORE consuming the identifier
+				ident_position := ast.new_position(ident.position.line, ident.position.column, ident.position.filename)
+
 				// Consume the identifier
 				ep.advance()
 				// Consume the assignment operator
@@ -44,7 +47,7 @@ pub fn (mut ep ExpressionParser) parse_assignment_expression() ?ast.Expr {
 				return ast.AssignExpr{
 					name:     ident.value
 					value:    value
-					position: ep.get_current_position()
+					position: ident_position
 				}
 			}
 		}

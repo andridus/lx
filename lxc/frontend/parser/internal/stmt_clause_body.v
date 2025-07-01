@@ -122,6 +122,9 @@ fn (mut sp StatementParser) parse_assignment_statement() ?ast.Stmt {
 		sp.add_error('Expected variable name', 'Got ${sp.current.str()}')
 		return none
 	}
+
+	// Save the position BEFORE consuming the identifier
+	ident_position := sp.get_current_position()
 	name := sp.current.get_value()
 	sp.advance()
 
@@ -135,7 +138,7 @@ fn (mut sp StatementParser) parse_assignment_statement() ?ast.Stmt {
 		expr: ast.AssignExpr{
 			name:     name
 			value:    value
-			position: sp.get_current_position()
+			position: ident_position
 		}
 	}
 }

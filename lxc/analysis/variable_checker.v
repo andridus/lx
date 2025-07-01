@@ -9,6 +9,8 @@ pub:
 	name     string
 	position ast.Position
 	defined  bool
+pub mut:
+	used     bool
 }
 
 // VariableScope represents a lexical scope for variable checking
@@ -63,6 +65,7 @@ pub fn (mut vc VariableChecker) bind_variable(name string, position ast.Position
 			name:     name
 			position: position
 			defined:  true
+			used:     false
 		}
 	}
 }
@@ -146,6 +149,9 @@ pub fn (mut vc VariableChecker) check_variable_expression(expr ast.VariableExpr)
 			"Variables must be defined before use. Check spelling or add an assignment: ${expr.name} = some_value",
 			expr.position
 		)
+	} else {
+		// Mark variable as used
+		vc.mark_variable_used(expr.name)
 	}
 }
 
@@ -214,6 +220,7 @@ pub fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 			for stmt in expr.body {
 				vc.check_statement(stmt)
 			}
+			vc.check_unused_variables()
 			vc.exit_scope()
 		}
 		ast.SendExpr {
@@ -350,8 +357,8 @@ pub fn (mut vc VariableChecker) check_statement(stmt ast.Stmt) {
 			}
 		}
 		ast.FunctionStmt {
-			vc.enter_scope()
 			for clause in stmt.clauses {
+				vc.enter_scope()
 				for param in clause.parameters {
 					vc.check_pattern(param)
 				}
@@ -359,8 +366,9 @@ pub fn (mut vc VariableChecker) check_statement(stmt ast.Stmt) {
 				for body_stmt in clause.body {
 					vc.check_statement(body_stmt)
 				}
+				vc.check_unused_variables()
+				vc.exit_scope()
 			}
-			vc.exit_scope()
 		}
 		ast.RecordDefStmt, ast.TypeDefStmt {
 			// These don't involve variable scoping
@@ -380,6 +388,10 @@ pub fn (mut vc VariableChecker) check_module(mod ast.ModuleStmt) VariableCheckRe
 	for stmt in mod.statements {
 		vc.check_statement(stmt)
 	}
+
+	// Check for unused variables after all statements have been processed
+	vc.check_unused_variables()
+
 	return VariableCheckResult{
 		success: vc.errors.len == 0
 		errors: vc.errors.clone()
@@ -394,4 +406,43 @@ pub fn (vc VariableChecker) has_errors() bool {
 // get_errors returns all errors encountered by the variable checker
 pub fn (vc VariableChecker) get_errors() []errors.CompilationError {
 	return vc.errors.clone()
+}
+
+// mark_variable_used marks a variable as used in the current scope or parent scopes
+pub fn (mut vc VariableChecker) mark_variable_used(name string) {
+	// Find the variable in the scope stack and mark it as used
+	for i := vc.scope_stack.len - 1; i >= 0; i-- {
+		if name in vc.scope_stack[i].variables {
+			mut binding := vc.scope_stack[i].variables[name]
+			binding.used = true
+			vc.scope_stack[i].variables[name] = binding
+			break
+		}
+	}
+}
+
+// check_unused_variables checks for unused variables in all scopes
+pub fn (mut vc VariableChecker) check_unused_variables() {
+	for scope in vc.scope_stack {
+		for name, binding in scope.variables {
+			if binding.defined && !binding.used {
+				error_msg := "Variable '${name}' is defined but never used"
+				suggestion := "Remove the variable assignment or use the variable in an expression"
+
+				unused_error := errors.UnusedVariableError{
+					variable:   name
+					suggestion: suggestion
+				}
+
+				compilation_error := errors.new_compilation_error_with_severity(
+					unused_error,
+					binding.position,
+					error_msg,
+					.warning
+				)
+
+				vc.errors << compilation_error
+			}
+		}
+	}
 }

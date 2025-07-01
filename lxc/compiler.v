@@ -6,6 +6,7 @@ import ast
 import os
 import errors
 import analysis
+import analysis.linter
 
 // CompilerResult represents the result of compilation
 pub struct CompilerResult {
@@ -112,7 +113,19 @@ pub fn (mut comp Compiler) compile_file(file_path string) !ast.ModuleStmt {
 		for err in result.errors {
 			formatted_errors << comp.error_formatter.format_error(err, source_lines)
 		}
-		return error('Variable scope errors:\n' + formatted_errors.join('\n'))
+		return error(formatted_errors.join('\n'))
+	}
+
+	// Linting (style and best practices checking)
+	mut linter_instance := linter.new_linter()
+	lint_result := linter_instance.lint_module(module_stmt)
+	if lint_result.errors.len > 0 {
+		source_lines := errors.load_source_lines(file_path)
+		mut formatted_errors := []string{}
+		for err in lint_result.errors {
+			formatted_errors << comp.error_formatter.format_error(err, source_lines)
+		}
+		return error('Linting errors:\n' + formatted_errors.join('\n'))
 	}
 
 	println('Compiled ${file_path} successfully')

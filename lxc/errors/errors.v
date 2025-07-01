@@ -76,8 +76,15 @@ pub:
 	suggestion string
 }
 
+// UnusedVariableError represents an unused variable error
+pub struct UnusedVariableError {
+pub:
+	variable   string
+	suggestion string
+}
+
 // ErrorKind represents different types of compilation errors using sum types
-pub type ErrorKind = LexicalError | SyntaxError | TypeError | UnboundVariableError | PatternError | RecordError | BinaryError | GuardError | DependencyError
+pub type ErrorKind = LexicalError | SyntaxError | TypeError | UnboundVariableError | PatternError | RecordError | BinaryError | GuardError | DependencyError | UnusedVariableError
 
 // str returns a string representation of ErrorKind
 pub fn (e ErrorKind) str() string {
@@ -91,6 +98,7 @@ pub fn (e ErrorKind) str() string {
 		BinaryError { 'BinaryError: ${e.message} (expected: ${e.expected_size}, actual: ${e.actual_size})' }
 		GuardError { 'GuardError: ${e.message} (expression: ${e.expression})' }
 		DependencyError { 'DependencyError: ${e.message} (module: ${e.module_name})' }
+		UnusedVariableError { 'UnusedVariable: ${e.variable} (suggestion: ${e.suggestion})' }
 	}
 }
 
@@ -106,6 +114,7 @@ pub fn (e ErrorKind) get_error_category() string {
 		BinaryError { 'Binary' }
 		GuardError { 'Guard' }
 		DependencyError { 'Dependency' }
+		UnusedVariableError { 'Variable' }
 	}
 }
 
