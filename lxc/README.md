@@ -2,6 +2,41 @@
 
 The LX compiler is a complete compiler implementation written in V that translates LX language source code to Erlang. This document provides an overview of the compiler's architecture and the responsibility of each component.
 
+## Features
+
+### Directives System
+
+LX supports compile-time directives that provide metadata and control compilation behavior. Directives are prefixed with `@` and must be placed immediately before function definitions.
+
+#### Available Directives
+
+- **`@reflection`**: Prints detailed type information for function parameters, guards, and body expressions during compilation
+- **`@inline`**: Marks a function for inlining optimization (planned)
+- **`@deprecated`**: Marks a function as deprecated (planned)
+
+#### Using the Reflection Directive
+
+The `@reflection` directive is particularly useful for debugging type inference and understanding how the compiler interprets your code:
+
+```lx
+@reflection
+def add(a, b) do
+  a + b
+end
+```
+
+When compiled, this will output detailed type information including:
+- Parameter types inferred by the compiler
+- Guard expression types
+- Body expression types with line and column information
+- Variable bindings and their inferred types
+
+This is especially helpful when:
+- Debugging type inference issues
+- Understanding how the compiler interprets complex expressions
+- Learning about the type system behavior
+- Verifying that your code is being analyzed correctly
+
 ## Project Structure
 
 ```

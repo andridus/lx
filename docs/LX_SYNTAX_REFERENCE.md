@@ -7,27 +7,28 @@ Lx is a statically scoped, expression-based functional language designed for bui
 ### Table of Contents
 
 1. Keywords — reserved words grouped by purpose
-2. Operators and Punctuation — syntax markers and behavior
-3. Literals — constants like numbers, strings, atoms
-4. Identifiers — naming conventions for variables and modules
-5. Comments — inline documentation syntax
-6. Expressions — fundamental program building blocks
-7. Pattern Matching — control flow via structural decomposition
-8. Function Definitions — single and multi-clause declarations
-8.1. Fun Expressions — anonymous functions with closures and higher-order support
-9. Guards — conditional clauses in pattern matching
-10. Message Passing — concurrent communication between processes
-11. Receive Expressions — selective message handling
-12. Control Flow — conditional constructs and loops
-13. Data Structures — working with tuples and lists
-14. Records — structured data with named fields
-15. OTP Components — defining supervisors and workers
-16. Specifications — declaring contracts for validation
-17. Testing — structure and assertions for test blocks
-18. Application Definition — project-level metadata and setup
-19. Build System — compiling and generating artifacts
-20. Module System and Dependencies — declaring dependencies and integrating with external modules
-21. Error Handling and Suggestions — comprehensive error reporting with didactic examples
+2. Directives — compile-time metadata and control
+3. Operators and Punctuation — syntax markers and behavior
+4. Literals — constants like numbers, strings, atoms
+5. Identifiers — naming conventions for variables and modules
+6. Comments — inline documentation syntax
+7. Expressions — fundamental program building blocks
+8. Pattern Matching — control flow via structural decomposition
+9. Function Definitions — single and multi-clause declarations
+9.1. Fun Expressions — anonymous functions with closures and higher-order support
+10. Guards — conditional clauses in pattern matching
+11. Message Passing — concurrent communication between processes
+12. Receive Expressions — selective message handling
+13. Control Flow — conditional constructs and loops
+14. Data Structures — working with tuples and lists
+15. Records — structured data with named fields
+16. OTP Components — defining supervisors and workers
+17. Specifications — declaring contracts for validation
+18. Testing — structure and assertions for test blocks
+19. Application Definition — project-level metadata and setup
+20. Build System — compiling and generating artifacts
+21. Module System and Dependencies — declaring dependencies and integrating with external modules
+22. Error Handling and Suggestions — comprehensive error reporting with didactic examples
 
 ---
 
@@ -43,7 +44,78 @@ These reserved words define control flow, type contracts, concurrency, and OTP s
 
 ---
 
-### 2. Operators and Punctuation
+### 2. Directives
+
+Directives provide compile-time metadata and control compilation behavior. They are prefixed with `@` and must be placed immediately before function definitions.
+
+#### Available Directives
+
+- **`@reflection`**: Prints detailed type information for function parameters, guards, and body expressions during compilation
+- **`@inline`**: Marks a function for inlining optimization (planned)
+- **`@deprecated`**: Marks a function as deprecated (planned)
+
+#### Using the Reflection Directive
+
+The `@reflection` directive is particularly useful for debugging type inference and understanding how the compiler interprets your code:
+
+```lx
+@reflection
+def add(a, b) do
+  a + b
+end
+```
+
+When compiled, this will output detailed type information including:
+- Parameter types inferred by the compiler
+- Guard expression types
+- Body expression types with line and column information
+- Variable bindings and their inferred types
+
+This is especially helpful when:
+- Debugging type inference issues
+- Understanding how the compiler interprets complex expressions
+- Learning about the type system behavior
+- Verifying that your code is being analyzed correctly
+
+#### Directive Syntax Rules
+
+- Directives must start with `@` followed by the directive name
+- Directives must be placed immediately before a function definition
+- Multiple directives can be used on the same function
+- Directives are processed during the type checking phase
+- Unknown directives are ignored (with potential future warnings)
+
+#### Examples
+
+```lx
+# Single directive
+@reflection
+def process_data(input) do
+  result = transform(input)
+  validate(result)
+end
+
+# Multiple directives
+@reflection
+@inline
+def fast_calculation(x, y) do
+  x * y + x + y
+end
+
+# Directives with complex functions
+@reflection
+def complex_function(data) when is_list(data) do
+  case data do
+    [head | tail] -> process_list(head, tail)
+    [] -> :empty
+    _ -> :unknown
+  end
+end
+```
+
+---
+
+### 3. Operators and Punctuation
 
 Syntax symbols used for operations, declarations, and structure:
 
@@ -68,7 +140,7 @@ Syntax symbols used for operations, declarations, and structure:
 
 ---
 
-### 3. Literals
+### 4. Literals
 
 Immutable constant values available in source code:
 
@@ -108,7 +180,7 @@ backslash = "Path: C:\\Users\\Name"
 
 ---
 
-### 4. Identifiers
+### 5. Identifiers
 
 Naming conventions for program symbols:
 
@@ -119,7 +191,7 @@ Naming conventions for program symbols:
 
 ---
 
-### 5. Comments
+### 6. Comments
 
 Inline documentation using `#`:
 
@@ -132,7 +204,7 @@ No multiline comment syntax is supported.
 
 ---
 
-### 6. Expressions
+### 7. Expressions
 
 All code is built from expressions. Every block or function evaluates to a value.
 
@@ -257,7 +329,7 @@ The external call syntax provides clear disambiguation between:
 
 ---
 
-### 7. Pattern Matching
+### 8. Pattern Matching
 
 Used for destructuring and conditional logic based on shape:
 
@@ -292,7 +364,7 @@ end
 
 ---
 
-### 8. Function Definitions
+### 9. Function Definitions
 
 Functions now use `do`/`end` syntax instead of curly braces. Lx supports both public and private functions:
 
@@ -343,7 +415,7 @@ end
 
 ---
 
-### 8.1. Fun Expressions (Anonymous Functions)
+### 9.1. Fun Expressions (Anonymous Functions)
 
 Fun expressions create anonymous functions using `do`/`end` syntax:
 
@@ -479,7 +551,7 @@ end)
 
 ---
 
-### 9. Guards
+### 10. Guards
 
 Conditions to refine pattern matching:
 
@@ -493,7 +565,7 @@ Guards are pure boolean expressions. Avoid complex logic here.
 
 ---
 
-### 10. Message Passing
+### 11. Message Passing
 
 Send messages to processes using `!`:
 
@@ -505,7 +577,7 @@ Returns the sent message. Useful for fire-and-forget.
 
 ---
 
-### 11. Receive Expressions
+### 12. Receive Expressions
 
 Blocking pattern match for process messages:
 
@@ -522,7 +594,7 @@ Supports guards and default cases.
 
 ---
 
-### 12. Control Flow
+### 13. Control Flow
 
 #### `if`/`else`:
 
@@ -715,7 +787,7 @@ end
 
 ---
 
-### 13. Data Structures
+### 14. Data Structures
 
 #### Tuples:
 
@@ -1017,7 +1089,7 @@ end
 
 ---
 
-### 14. Records
+### 15. Records
 
 Structured data types with named fields for better code organization and type safety.
 
@@ -1160,7 +1232,7 @@ end
 
 ---
 
-### 15. OTP Components
+### 16. OTP Components
 
 #### Workers:
 
@@ -1191,7 +1263,7 @@ children {
 
 ---
 
-### 16. Specifications
+### 17. Specifications
 
 Function contracts for static analysis:
 
@@ -1206,7 +1278,7 @@ Helps enforce correctness at compile time.
 
 ---
 
-### 17. Testing
+### 18. Testing
 
 Test declarations:
 
@@ -1244,7 +1316,7 @@ This utility function eliminates the need for manual token creation and provides
 
 ---
 
-### 18. Application Definition
+### 19. Application Definition
 
 Defines metadata for runtime:
 
@@ -1260,7 +1332,7 @@ application {
 
 ---
 
-### 19. Build System
+### 20. Build System
 
 Compilation and integration:
 
@@ -1272,11 +1344,11 @@ Compilation and integration:
 
 ---
 
-### 20. Module System and Dependencies
+### 21. Module System and Dependencies
 
 Lx features a module and dependency system inspired by the Erlang/OTP ecosystem, enabling safe and explicit integration with external modules, compile-time type validation, and support for multiple dependency sources.
 
-### 21. Error Handling and Suggestions
+### 22. Error Handling and Suggestions
 
 Lx provides comprehensive error handling with didactic suggestions to help users understand and fix common issues.
 

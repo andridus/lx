@@ -3,8 +3,35 @@ module internal
 import ast
 import lexer
 
+// collect_pending_directives collects directive tokens that precede the current position
+fn (mut sp StatementParser) collect_pending_directives() []string {
+	mut directives := []string{}
+
+	// Look backwards for directive tokens
+	mut pos := sp.position - 1
+	for pos >= 0 {
+		token := sp.tokens[pos]
+		if token is lexer.DirectiveToken {
+			directive_token := token as lexer.DirectiveToken
+			// Adiciona a diretiva sem o @ extra
+			directives.prepend(directive_token.directive)
+		} else if token is lexer.NewlineToken {
+			// Continue looking through newlines
+		} else {
+			// Stop at first non-directive, non-newline token
+			break
+		}
+		pos--
+	}
+
+	return directives
+}
+
 // parse_function_statement parses function definitions
 pub fn (mut sp StatementParser) parse_function_statement() ?ast.Stmt {
+	// Collect pending directives
+	directives := sp.collect_pending_directives()
+
 	sp.advance() // consume 'def'
 
 	// Parse function name
@@ -56,6 +83,7 @@ pub fn (mut sp StatementParser) parse_function_statement() ?ast.Stmt {
 			name:       name
 			clauses:    clauses
 			is_private: false
+			directives: directives
 			position:   sp.get_current_position()
 		}
 	}
@@ -67,6 +95,7 @@ pub fn (mut sp StatementParser) parse_function_statement() ?ast.Stmt {
 			name:       name
 			clauses:    [clause]
 			is_private: false
+			directives: directives
 			position:   sp.get_current_position()
 		}
 	}
@@ -79,6 +108,9 @@ pub fn (mut sp StatementParser) parse_function_statement() ?ast.Stmt {
 
 // parse_private_function_statement parses private function definitions
 fn (mut sp StatementParser) parse_private_function_statement() ?ast.Stmt {
+	// Collect pending directives
+	directives := sp.collect_pending_directives()
+
 	sp.advance() // consume 'defp'
 
 	if !sp.current.is_identifier() {
@@ -127,6 +159,7 @@ fn (mut sp StatementParser) parse_private_function_statement() ?ast.Stmt {
 		name:       name
 		clauses:    clauses
 		is_private: true
+		directives: directives
 		position:   sp.get_current_position()
 	}
 }

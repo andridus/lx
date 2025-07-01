@@ -10,6 +10,7 @@ pub enum LexerState {
 	string
 	atom
 	comment
+	directive
 	operator
 	whitespace
 	error
@@ -27,6 +28,7 @@ pub fn (s LexerState) str() string {
 		.string { 'string' }
 		.atom { 'atom' }
 		.comment { 'comment' }
+		.directive { 'directive' }
 		.operator { 'operator' }
 		.whitespace { 'whitespace' }
 		.error { 'error' }
@@ -37,7 +39,7 @@ pub fn (s LexerState) str() string {
 // is_final_state checks if a state is a final state (can emit a token)
 pub fn (s LexerState) is_final_state() bool {
 	return match s {
-		.identifier, .number, .float, .string, .atom, .error, .punctuation { true }
+		.identifier, .number, .float, .string, .atom, .directive, .error, .punctuation { true }
 		else { false }
 	}
 }
@@ -47,7 +49,7 @@ pub fn (current LexerState) can_transition_to(target LexerState) bool {
 	return match current {
 		.initial {
 			match target {
-				.identifier, .number, .string, .atom, .comment, .operator, .whitespace {
+				.identifier, .number, .string, .atom, .comment, .directive, .operator, .whitespace {
 					true
 				}
 				else {
@@ -57,7 +59,7 @@ pub fn (current LexerState) can_transition_to(target LexerState) bool {
 		}
 		.atom_start {
 			match target {
-				.identifier, .number, .string, .atom, .comment, .operator, .whitespace {
+				.identifier, .number, .string, .atom, .comment, .directive, .operator, .whitespace {
 					true
 				}
 				else {
@@ -101,6 +103,12 @@ pub fn (current LexerState) can_transition_to(target LexerState) bool {
 				else { false }
 			}
 		}
+		.directive {
+			match target {
+				.initial, .whitespace { true }
+				else { false }
+			}
+		}
 		.operator {
 			match target {
 				.initial, .identifier, .number, .string, .atom, .whitespace, .comment { true }
@@ -109,7 +117,7 @@ pub fn (current LexerState) can_transition_to(target LexerState) bool {
 		}
 		.whitespace {
 			match target {
-				.initial, .identifier, .number, .string, .atom, .operator, .comment {
+				.initial, .identifier, .number, .string, .atom, .operator, .comment, .directive {
 					true
 				}
 				else {
@@ -143,6 +151,7 @@ pub fn (s LexerState) get_default_transition() LexerState {
 		.string { .initial }
 		.atom { .initial }
 		.comment { .initial }
+		.directive { .initial }
 		.operator { .initial }
 		.whitespace { .initial }
 		.error { .initial }
@@ -153,7 +162,7 @@ pub fn (s LexerState) get_default_transition() LexerState {
 // is_accepting_state checks if a state can accept more input
 pub fn (s LexerState) is_accepting_state() bool {
 	return match s {
-		.identifier, .number, .float, .string, .atom, .operator, .comment, .atom_start { true }
+		.identifier, .number, .float, .string, .atom, .operator, .comment, .directive, .atom_start { true }
 		else { false }
 	}
 }

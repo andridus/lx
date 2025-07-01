@@ -228,6 +228,14 @@ pub fn get_transitions() []Transition {
 			}
 			action:     .consume_character
 		},
+		Transition{
+			from_state: .initial
+			to_state:   .directive
+			condition:  CharacterCondition{
+				value: `@`
+			}
+			action:     .consume_character
+		},
 		// Whitespace state transitions
 		Transition{
 			from_state: .whitespace
@@ -411,6 +419,29 @@ pub fn get_transitions() []Transition {
 			to_state:   .comment
 			condition:  AlwaysCondition{}
 			action:     .consume_character
+		},
+		// Directive state transitions
+		Transition{
+			from_state: .directive
+			to_state:   .initial
+			condition:  CharacterClassCondition{
+				class: .newline
+			}
+			action:     .emit_token
+		},
+		Transition{
+			from_state: .directive
+			to_state:   .directive
+			condition:  CharacterClassCondition{
+				class: .identifier_part
+			}
+			action:     .consume_character
+		},
+		Transition{
+			from_state: .directive
+			to_state:   .initial
+			condition:  AlwaysCondition{}
+			action:     .emit_token
 		},
 		// Operator state transitions
 		Transition{

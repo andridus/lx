@@ -39,6 +39,12 @@ fn (mut sp StatementParser) safe_advance() {
 
 // parse_statement parses a single statement
 fn (mut sp StatementParser) parse_statement() ?ast.Stmt {
+	// Skip directive tokens and go to the next token
+	if sp.current is lexer.DirectiveToken {
+		sp.advance()
+		return sp.parse_statement()
+	}
+
 	return match sp.current {
 		lexer.KeywordToken {
 			keyword_token := sp.current as lexer.KeywordToken

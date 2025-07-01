@@ -362,6 +362,14 @@ fn (mut l Lexer) create_token_from_buffer() Token {
 				position: l.get_current_position()
 			}
 		}
+		.directive {
+			// Extract directive name (remove @ prefix)
+			directive_text := l.buffer.trim_left('@')
+			DirectiveToken{
+				directive: directive_text
+				position:  l.start_pos
+			}
+		}
 		.operator {
 			if is_punctuation(l.buffer) {
 				if ptok := get_punctuation_token(l.buffer, l.start_pos) {

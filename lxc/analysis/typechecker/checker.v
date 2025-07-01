@@ -11,41 +11,47 @@ pub:
 	errors  []errors.CompilationError
 }
 
-// TypeChecker performs type checking and variable scope checking
+// TypeChecker performs type checking on LX code
 pub struct TypeChecker {
-pub mut:
-	environment      &TypeEnvironment
+mut:
 	context          &TypeContext
-	variable_checker analysis.VariableChecker
+	environment      &TypeEnvironment
+	unifier          Unifier
 	errors           []errors.CompilationError
+	variable_checker analysis.VariableChecker
 }
 
 // new_type_checker creates a new type checker
 pub fn new_type_checker() TypeChecker {
 	return TypeChecker{
+		context:          new_type_context()
 		environment:      new_environment()
-		context:          new_context()
-		variable_checker: analysis.new_variable_checker()
+		unifier:          new_unifier()
 		errors:           []
+		variable_checker: analysis.new_variable_checker()
 	}
 }
 
-// check_module performs both type checking and variable scope checking on a module
-pub fn (mut tc TypeChecker) check_module(mod ast.ModuleStmt) TypeCheckResult {
-	// First, perform variable scope checking
-	variable_result := tc.variable_checker.check_module(mod)
+// check_module performs type checking on a module
+pub fn (mut tc TypeChecker) check_module(module_stmt ast.ModuleStmt) TypeCheckResult {
+	// Validate directives first
+	directive_errors := tc.validate_directives(module_stmt)
+	if directive_errors.len > 0 {
+		tc.errors << directive_errors
+		return TypeCheckResult{
+			success: false
+			errors:  tc.errors
+		}
+	}
 
-	// Then perform type checking
-	type_result := tc.perform_type_checking(mod)
-
-	// Combine results
-	mut all_errors := []errors.CompilationError{}
-	all_errors << variable_result.errors
-	all_errors << type_result.errors
+	// Perform type checking
+	for stmt in module_stmt.statements {
+		tc.check_statement(stmt)
+	}
 
 	return TypeCheckResult{
-		success: all_errors.len == 0
-		errors:  all_errors
+		success: tc.errors.len == 0
+		errors:  tc.errors
 	}
 }
 
@@ -463,10 +469,104 @@ fn (mut tc TypeChecker) check_function_statement(stmt ast.FunctionStmt) {
 		}
 	}
 
+	// Apply directives
+	for directive in stmt.directives {
+		tc.apply_directive(directive, stmt)
+	}
+
 	// Restore parent context
 	if parent := tc.context.parent {
 		tc.context = parent
 	}
+}
+
+// apply_directive applies a directive to a function
+fn (mut tc TypeChecker) apply_directive(directive string, func_stmt ast.FunctionStmt) {
+	// Remove @ prefix if present
+	directive_name := if directive.starts_with('@') {
+		directive[1..]
+	} else {
+		directive
+	}
+
+	match directive_name {
+		'reflection' {
+			tc.handle_reflection(func_stmt)
+		}
+		'inline' {
+			tc.handle_inline(func_stmt)
+		}
+		'deprecated' {
+			tc.handle_deprecated(func_stmt)
+		}
+		else {
+			// Unknown directive - this should be caught by validation
+		}
+	}
+}
+
+// handle_reflection prints type information for functions
+fn (tc &TypeChecker) handle_reflection(func_stmt ast.FunctionStmt) {
+	println('=== REFLECTION INFO for function: ${func_stmt.name} ===')
+
+	for i, clause in func_stmt.clauses {
+		println('Clause ${i + 1}:')
+
+		// Print parameter types
+		println('  Parameters:')
+		for j, param in clause.parameters {
+			param_type := tc.infer_pattern_type(param)
+			println('    ${j + 1}. ${param.str()} :: ${param_type.str()}')
+		}
+
+		// Print guard type
+		guard_type := tc.infer_expression_type(clause.guard)
+		println('  Guard: ${clause.guard.str()} :: ${guard_type.str()}')
+
+		// Print body expressions with type info, line by line
+		println('  Body (line by line):')
+		for stmt in clause.body {
+			match stmt {
+				ast.ExprStmt {
+					mut line := '?'
+					mut col := '?'
+					match stmt.expr {
+						ast.VariableExpr, ast.AssignExpr, ast.BinaryExpr, ast.CallExpr,
+						ast.MatchExpr, ast.ListConsExpr, ast.ListLiteralExpr, ast.TupleExpr,
+						ast.MapLiteralExpr, ast.RecordLiteralExpr, ast.RecordAccessExpr,
+						ast.FunExpr, ast.SendExpr, ast.ReceiveExpr, ast.GuardExpr,
+						ast.UnaryExpr, ast.MapAccessExpr, ast.IfExpr, ast.CaseExpr,
+						ast.WithExpr, ast.ForExpr {
+							line = stmt.expr.position.line.str()
+							col = stmt.expr.position.column.str()
+						}
+						else {
+							line = '?'
+							col = '?'
+						}
+					}
+					type_str := tc.infer_expression_type(stmt.expr).str()
+					println('    [${line}:${col}] ${stmt.expr.str()} :: ${type_str}')
+				}
+				else {
+					println('    [stmt] ${stmt.str()}')
+				}
+			}
+		}
+		println('')
+	}
+	println('=== END REFLECTION INFO ===')
+}
+
+// handle_inline marks function for inlining optimization
+fn (tc &TypeChecker) handle_inline(func_stmt ast.FunctionStmt) {
+	// TODO: Implement inlining logic
+	println('Function ${func_stmt.name} marked for inlining')
+}
+
+// handle_deprecated marks function as deprecated
+fn (tc &TypeChecker) handle_deprecated(func_stmt ast.FunctionStmt) {
+	println('WARNING: Function ${func_stmt.name} is deprecated')
 }
 
 // check_record_definition performs type checking on a record definition
@@ -633,4 +733,102 @@ fn (mut tc TypeChecker) report_error(message string, suggestion string, position
 		suggestion: suggestion
 	}, position, message)
 	tc.errors << error
+}
+
+// print_statement_types prints type information for statements in function body
+fn (tc &TypeChecker) print_statement_types(stmt ast.Stmt, indent string) {
+	match stmt {
+		ast.ExprStmt {
+			expr_type := tc.infer_expression_type(stmt.expr)
+			println('${indent}${stmt.expr.str()} :: ${expr_type.str()}')
+		}
+		else {
+			println('${indent}${stmt.str()}')
+		}
+	}
+}
+
+// infer_pattern_type infers the type of a pattern
+fn (tc &TypeChecker) infer_pattern_type(pattern ast.Pattern) TypeExpr {
+	return match pattern {
+		ast.VarPattern {
+			make_type_var('a')
+		}
+		ast.WildcardPattern {
+			make_type_var('_')
+		}
+		ast.LiteralPattern {
+			tc.infer_literal_type(pattern.value)
+		}
+		ast.AtomPattern {
+			atom_type
+		}
+		ast.ListEmptyPattern {
+			make_list_type(make_type_var('a'))
+		}
+		ast.ListConsPattern {
+			head_type := tc.infer_pattern_type(pattern.head)
+			_ := tc.infer_pattern_type(pattern.tail)
+			// For simplicity, assume tail is a list of the same type as head
+			make_list_type(head_type)
+		}
+		ast.ListLiteralPattern {
+			if pattern.elements.len == 0 {
+				make_list_type(make_type_var('a'))
+			} else {
+				element_type := tc.infer_pattern_type(pattern.elements[0])
+				make_list_type(element_type)
+			}
+		}
+		ast.TuplePattern {
+			mut element_types := []TypeExpr{}
+			for element in pattern.elements {
+				element_types << tc.infer_pattern_type(element)
+			}
+			make_tuple_type(element_types)
+		}
+		ast.MapPattern {
+			make_map_type(make_type_var('k'), make_type_var('v'))
+		}
+		ast.RecordPattern {
+			make_type_constructor('record', [])
+		}
+		ast.BinaryPattern {
+			BinaryType{unit_size: 0}
+		}
+	}
+}
+
+// validate_directives validates all directives in a module
+fn (tc &TypeChecker) validate_directives(module_stmt ast.ModuleStmt) []errors.CompilationError {
+	mut directive_errors := []errors.CompilationError{}
+
+	// Define valid directives
+	valid_directives := ['reflection', 'inline', 'deprecated']
+
+	for stmt in module_stmt.statements {
+		if stmt is ast.FunctionStmt {
+			func_stmt := stmt as ast.FunctionStmt
+			for directive in func_stmt.directives {
+				if !valid_directives.contains(directive) {
+					error_msg := 'Unknown directive: @${directive}'
+					suggestion := 'Available directives: ${valid_directives.join(', ')}'
+
+					compilation_error := errors.new_compilation_error(
+						errors.SyntaxError{
+							message:  error_msg
+							expected: suggestion
+							found:    '@${directive}'
+						},
+						func_stmt.position,
+						error_msg
+					)
+
+					directive_errors << compilation_error
+				}
+			}
+		}
+	}
+
+	return directive_errors
 }

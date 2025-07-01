@@ -35,6 +35,7 @@ pub type Token = IdentToken
 	| OperatorToken
 	| PunctuationToken
 	| NewlineToken
+	| DirectiveToken
 	| EOFToken
 	| ErrorToken
 
@@ -198,6 +199,13 @@ pub:
 	position TokenPosition
 }
 
+// DirectiveToken represents a directive token (e.g., @reflection, @inline)
+pub struct DirectiveToken {
+pub:
+	directive string
+	position  TokenPosition
+}
+
 // EOFToken represents end of file token
 pub struct EOFToken {
 pub:
@@ -226,6 +234,7 @@ pub fn (t Token) str() string {
 		OperatorToken { '${t.value.str()}' }
 		PunctuationToken { '${t.value.str()}' }
 		NewlineToken { 'Newline' }
+		DirectiveToken { 'Directive(${t.directive})' }
 		EOFToken { 'EOF' }
 		ErrorToken { '${t.message}' }
 	}
@@ -410,6 +419,7 @@ pub fn (t Token) get_position() TokenPosition {
 		OperatorToken { t.position }
 		PunctuationToken { t.position }
 		NewlineToken { t.position }
+		DirectiveToken { t.position }
 		EOFToken { t.position }
 		ErrorToken { t.position }
 	}

@@ -382,6 +382,7 @@ pub:
 	name       string
 	clauses    []FunctionClause
 	is_private bool
+	directives []string
 	position   Position
 }
 

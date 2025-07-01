@@ -1,6 +1,12 @@
 ## [Unreleased]
 
 ### Added
+- **Directives System**: Implemented a comprehensive compile-time directives system that allows metadata and compilation control. Directives are prefixed with `@` and must be placed immediately before function definitions. The system includes:
+  - **`@reflection`**: Prints detailed type information for function parameters, guards, and body expressions during compilation, showing line-by-line type inference results
+  - **`@inline`**: Marks a function for inlining optimization (planned)
+  - **`@deprecated`**: Marks a function as deprecated (planned)
+  - **Directive Processing**: Lexer recognizes `@directive` tokens, parser collects and associates directives with function ASTs, and typechecker processes directives during compilation
+  - **Type Reflection**: The `@reflection` directive provides comprehensive debugging information including parameter types, guard types, and body expression types with precise line and column information
 - **Variable Scope Checking Integration**: Integrated automatic variable scope checking into the main compilation pipeline. The compiler now automatically validates variable declarations, usage, and scope rules during compilation, providing precise error messages with correct line and column positions.
 - **Enhanced Variable Error Reporting**: Improved variable error messages to show exact source code positions (line:column) instead of generic 0:0 positions. Variable scope errors now include precise location information for better debugging experience.
 - **Variable Scope Validation**: Comprehensive variable scope checking that detects undefined variables, rebinding attempts, and shadowing violations with detailed error messages and suggestions for fixing common issues.

@@ -7,6 +7,7 @@ import os
 import errors
 import analysis
 import analysis.linter
+import analysis.typechecker
 
 // CompilerResult represents the result of compilation
 pub struct CompilerResult {
@@ -126,6 +127,18 @@ pub fn (mut comp Compiler) compile_file(file_path string) !ast.ModuleStmt {
 			formatted_errors << comp.error_formatter.format_error(err, source_lines)
 		}
 		return error('Linting errors:\n' + formatted_errors.join('\n'))
+	}
+
+	// Type checking (including reflection info for @reflection functions)
+	mut type_checker := typechecker.new_type_checker()
+	type_result := type_checker.check_module(module_stmt)
+	if type_result.errors.len > 0 {
+		source_lines := errors.load_source_lines(file_path)
+		mut formatted_errors := []string{}
+		for err in type_result.errors {
+			formatted_errors << comp.error_formatter.format_error(err, source_lines)
+		}
+		return error('Type checking errors:\n' + formatted_errors.join('\n'))
 	}
 
 	println('Compiled ${file_path} successfully')
