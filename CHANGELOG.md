@@ -1,6 +1,13 @@
 ## [Unreleased]
 
 ### Added
+- **If Expressions**: Complete implementation of `if ... do ... else ... end` expressions with proper type inference and Erlang code generation. Features include:
+  - **Basic If/Else**: Support for `if condition do expr1 else expr2 end` syntax
+  - **If without Else**: Support for `if condition do expr end` (returns `nil` when condition is false)
+  - **Nested If**: Full support for nested if expressions within then/else branches
+  - **Type Inference**: Intelligent type inference that returns the concrete type when both branches have the same type, or the non-nil type when one branch is nil
+  - **Erlang Generation**: Translates if expressions to Erlang `case` statements with proper true/false pattern matching
+  - **Complex Conditions**: Support for any boolean expression as condition including variables, comparisons, and arithmetic operations
 - **Directives System**: Implemented a comprehensive compile-time directives system that allows metadata and compilation control. Directives are prefixed with `@` and must be placed immediately before function definitions. The system includes:
   - **`@reflection`**: Prints detailed type information for function parameters, guards, and body expressions during compilation, showing line-by-line type inference results
   - **`@inline`**: Marks a function for inlining optimization (planned)

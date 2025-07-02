@@ -115,6 +115,9 @@ fn (gen ErlangGenerator) infer_expression_return_type_with_context(expr ast.Expr
 		ast.CallExpr {
 			'${expr.function_name}()'
 		}
+		ast.IfExpr {
+			gen.infer_if_expression_return_type(expr, parameters)
+		}
 		else {
 			'any()'
 		}
@@ -326,4 +329,56 @@ fn (gen ErlangGenerator) generate_type_expression(type_expr ast.TypeExpression) 
 			type_expr.name
 		}
 	}
+}
+
+// infer_if_expression_return_type infers the return type of an if expression
+fn (gen ErlangGenerator) infer_if_expression_return_type(expr ast.IfExpr, parameters []ast.Pattern) string {
+	// Infer the type from the then branch
+	mut then_type := 'any()'
+	if expr.then_body.len > 0 {
+		// Get the type of the last statement in the then branch
+		last_then_stmt := expr.then_body[expr.then_body.len - 1]
+		if last_then_stmt is ast.ExprStmt {
+			then_type = gen.infer_expression_return_type_with_context(last_then_stmt.expr, parameters)
+		}
+	}
+
+	// Infer the type from the else branch
+	mut else_type := 'any()'
+	if expr.else_body.len > 0 {
+		// Get the type of the last statement in the else branch
+		last_else_stmt := expr.else_body[expr.else_body.len - 1]
+		if last_else_stmt is ast.ExprStmt {
+			else_type = gen.infer_expression_return_type_with_context(last_else_stmt.expr, parameters)
+		}
+	} else {
+		// If no else branch, the else type is nil
+		else_type = 'nil'
+	}
+
+	// If both branches have the same type, return that type
+	if then_type == else_type {
+		return then_type
+	}
+
+	// If one is nil and the other is concrete, return the concrete type
+	if else_type == 'nil' && then_type != 'any()' {
+		return then_type
+	}
+
+	if then_type == 'nil' && else_type != 'any()' {
+		return else_type
+	}
+
+	// For different types, return the then type (first branch takes precedence)
+	if then_type != 'any()' {
+		return then_type
+	}
+
+	if else_type != 'any()' {
+		return else_type
+	}
+
+	// If both are any(), return any()
+	return 'any()'
 }

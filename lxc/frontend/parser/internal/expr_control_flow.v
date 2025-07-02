@@ -210,6 +210,10 @@ fn (mut ep ExpressionParser) parse_statement_block() ?[]ast.Stmt {
 	mut statements := []ast.Stmt{}
 
 	for !ep.check(lexer.keyword(.end_)) && !ep.is_at_end() {
+		// Check for else keyword to break early
+		if ep.check(lexer.keyword(.else_)) {
+			break
+		}
 		stmt := ep.parse_statement()?
 		statements << stmt
 	}

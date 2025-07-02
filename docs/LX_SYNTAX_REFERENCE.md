@@ -814,13 +814,53 @@ Supports guards and default cases.
 
 #### `if`/`else`:
 
+The `if` expression evaluates a boolean condition and executes one of two branches. Both branches must return the same type, or the compiler will infer the most specific common type.
+
 ```lx
+# Basic if/else
 if flag do
   do_a()
 else
   do_b()
 end
+
+# If without else (returns nil if condition is false)
+if user_logged_in do
+  "Welcome!"
+end
+
+# If with complex conditions
+if x > 0 and y < 100 do
+  "valid range"
+else
+  "invalid range"
+end
+
+# Nested if expressions
+if temperature > 30 do
+  if humidity > 80 do
+    "hot and humid"
+  else
+    "hot and dry"
+  end
+else
+  "comfortable"
+end
+
+# If with type inference
+result = if score >= 90 do
+  "excellent"    # string type inferred
+else
+  "good"        # same string type
+end
+# result has type: string()
 ```
+
+**Type Inference Rules:**
+- If both branches return the same type, that type is inferred
+- If one branch returns a concrete type and the other is `nil`, the concrete type is inferred
+- If branches return different types, the first branch's type takes precedence
+- If without `else` has an implicit `else nil` branch
 
 #### `if` with `case` (pattern matching):
 

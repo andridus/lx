@@ -249,3 +249,153 @@ create_pair(X, Y) ->
 // 	assert erl1.success
 // 	assert erl1.code == expected
 // }
+
+fn test_if_expression_simple() {
+	lx_code := '
+def simple_if() do
+  if true do
+    42
+  else
+    0
+  end
+end'
+	expected := '-module(main).
+-export([simple_if/0]).
+
+-spec simple_if() -> integer().
+simple_if() ->
+case true of
+    true ->
+        42;
+    false ->
+        0
+end.
+
+'
+	erl1 := generates_erlang(lx_code)
+	assert erl1.success
+	assert erl1.code == expected
+}
+
+fn test_if_expression_with_variable() {
+	lx_code := '
+def if_with_var() do
+  x = 10
+  if x > 5 do
+    "greater"
+  else
+    "lesser"
+  end
+end'
+	expected := '-module(main).
+-export([if_with_var/0]).
+
+-spec if_with_var() -> string().
+if_with_var() ->
+X = 10,
+case X > 5 of
+    true ->
+        "greater";
+    false ->
+        "lesser"
+end.
+
+'
+	erl1 := generates_erlang(lx_code)
+	assert erl1.success
+	assert erl1.code == expected
+}
+
+fn test_if_expression_without_else() {
+	lx_code := '
+def if_no_else() do
+  if false do
+    "never"
+  end
+end'
+	expected := '-module(main).
+-export([if_no_else/0]).
+
+-spec if_no_else() -> string().
+if_no_else() ->
+case false of
+    true ->
+        "never";
+    false ->
+        nil
+end.
+
+'
+	erl1 := generates_erlang(lx_code)
+	assert erl1.success
+	assert erl1.code == expected
+}
+
+fn test_if_expression_nested() {
+	lx_code := '
+def nested_if() do
+  x = 15
+  if x > 10 do
+    if x > 20 do
+      "very large"
+    else
+      "medium"
+    end
+  else
+    "small"
+  end
+end'
+	expected := '-module(main).
+-export([nested_if/0]).
+
+-spec nested_if() -> string().
+nested_if() ->
+X = 15,
+case X > 10 of
+    true ->
+        case X > 20 of
+    true ->
+        "very large";
+    false ->
+        "medium"
+end;
+    false ->
+        "small"
+end.
+
+'
+	erl1 := generates_erlang(lx_code)
+	assert erl1.success
+	assert erl1.code == expected
+}
+
+fn test_if_expression_complex_condition() {
+	lx_code := '
+def complex_if() do
+  x = 5
+  y = 10
+  if x + y > 12 do
+    "sum is greater"
+  else
+    "sum is lesser"
+  end
+end'
+	expected := '-module(main).
+-export([complex_if/0]).
+
+-spec complex_if() -> string().
+complex_if() ->
+X = 5,
+Y = 10,
+case X + Y > 12 of
+    true ->
+        "sum is greater";
+    false ->
+        "sum is lesser"
+end.
+
+'
+	erl1 := generates_erlang(lx_code)
+	assert erl1.success
+	assert erl1.code == expected
+}

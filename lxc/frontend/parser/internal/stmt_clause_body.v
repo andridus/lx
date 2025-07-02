@@ -13,6 +13,9 @@ fn (mut sp StatementParser) parse_statement_block() ?[]ast.Stmt {
 			if keyword_token.value == .end_ {
 				break
 			}
+			if keyword_token.value == .else_ {
+				break
+			}
 		}
 
 		stmt := sp.parse_statement()?
@@ -154,9 +157,32 @@ fn (mut sp StatementParser) parse_assignment_statement() ?ast.Stmt {
 }
 
 // parse_clause_expression parses expressions for clause bodies
-// This is similar to parse_simple_expression but supports tuples
+// This is similar to parse_simple_expression but supports tuples and control flow
 fn (mut sp StatementParser) parse_clause_expression() ?ast.Expr {
 	return match sp.current {
+		lexer.KeywordToken {
+			keyword_token := sp.current as lexer.KeywordToken
+			match keyword_token.value {
+				.if_ {
+					sp.parse_if_expression()
+				}
+				.case_ {
+					sp.parse_case_expression()
+				}
+				.with {
+					sp.parse_with_expression()
+				}
+				.for_ {
+					sp.parse_for_expression()
+				}
+				.receive {
+					sp.parse_receive_expression()
+				}
+				else {
+					sp.parse_restricted_expression()
+				}
+			}
+		}
 		lexer.PunctuationToken {
 			punc_token := sp.current as lexer.PunctuationToken
 			match punc_token.value {
@@ -220,4 +246,194 @@ fn (mut sp StatementParser) parse_restricted_expression() ?ast.Expr {
 	}
 
 	return expr
+}
+
+// parse_if_expression parses if expressions in statement context
+fn (mut sp StatementParser) parse_if_expression() ?ast.Expr {
+	sp.advance() // consume 'if'
+
+	condition := sp.parse_expression()?
+	sp.consume(lexer.keyword(.do_), 'Expected do after if condition')?
+
+	then_body := sp.parse_statement_block()?
+
+	mut else_body := []ast.Stmt{}
+	if sp.match(lexer.keyword(.else_)) {
+		else_body = sp.parse_statement_block()?
+	}
+
+	sp.consume(lexer.keyword(.end_), 'Expected end after if expression')?
+
+	return ast.IfExpr{
+		condition: condition
+		then_body: then_body
+		else_body: else_body
+		position:  sp.get_current_position()
+	}
+}
+
+// parse_case_expression parses case expressions in statement context
+fn (mut sp StatementParser) parse_case_expression() ?ast.Expr {
+	sp.advance() // consume 'case'
+
+	value := sp.parse_expression()?
+	sp.consume(lexer.keyword(.do_), 'Expected do after case value')?
+
+	mut cases := []ast.MatchCase{}
+	for !sp.check(lexer.keyword(.end_)) {
+		pattern := sp.parse_pattern()?
+
+		mut guard := ast.Expr(ast.LiteralExpr{
+			value: ast.BooleanLiteral{
+				value: true
+			}
+		})
+		if sp.match(lexer.keyword(.when)) {
+			guard = sp.parse_expression()?
+		}
+
+		sp.consume(lexer.operator(.arrow), 'Expected -> after pattern')?
+
+		body := sp.parse_statement_block()?
+
+		cases << ast.MatchCase{
+			pattern:  pattern
+			guard:    guard
+			body:     body
+			position: sp.get_current_position()
+		}
+	}
+
+	sp.consume(lexer.keyword(.end_), 'Expected end after case expression')?
+
+	return ast.CaseExpr{
+		value:    value
+		cases:    cases
+		position: sp.get_current_position()
+	}
+}
+
+// parse_with_expression parses with expressions in statement context
+fn (mut sp StatementParser) parse_with_expression() ?ast.Expr {
+	sp.advance() // consume 'with'
+
+	mut bindings := []ast.WithBinding{}
+	for !sp.check(lexer.keyword(.do_)) {
+		pattern := sp.parse_pattern()?
+		sp.consume(lexer.operator(.pattern_match), 'Expected <- in with binding')?
+		value := sp.parse_expression()?
+
+		bindings << ast.WithBinding{
+			pattern:  pattern
+			value:    value
+			position: sp.get_current_position()
+		}
+
+		if !sp.match(lexer.punctuation(.comma)) {
+			break
+		}
+	}
+
+	sp.consume(lexer.keyword(.do_), 'Expected do after with bindings')?
+
+	body := sp.parse_statement_block()?
+
+	mut else_body := []ast.Stmt{}
+	if sp.match(lexer.keyword(.else_)) {
+		else_body = sp.parse_statement_block()?
+	}
+
+	sp.consume(lexer.keyword(.end_), 'Expected end after with expression')?
+
+	return ast.WithExpr{
+		bindings:  bindings
+		body:      body
+		else_body: else_body
+		position:  sp.get_current_position()
+	}
+}
+
+// parse_for_expression parses for expressions in statement context
+fn (mut sp StatementParser) parse_for_expression() ?ast.Expr {
+	sp.advance() // consume 'for'
+
+	pattern := sp.parse_pattern()?
+	sp.consume(lexer.keyword(.in), 'Expected in after pattern')?
+
+	collection := sp.parse_expression()?
+
+	mut guard := ast.Expr(ast.LiteralExpr{
+		value: ast.BooleanLiteral{
+			value: true
+		}
+	})
+	if sp.match(lexer.keyword(.when)) {
+		guard = sp.parse_expression()?
+	}
+
+	sp.consume(lexer.keyword(.do_), 'Expected do after for expression')?
+
+	body := sp.parse_statement_block()?
+
+	sp.consume(lexer.keyword(.end_), 'Expected end after for expression')?
+
+	return ast.ForExpr{
+		pattern:    pattern
+		collection: collection
+		guard:      guard
+		body:       body
+		position:   sp.get_current_position()
+	}
+}
+
+// parse_receive_expression parses receive expressions in statement context
+fn (mut sp StatementParser) parse_receive_expression() ?ast.Expr {
+	sp.advance() // consume 'receive'
+	sp.consume(lexer.keyword(.do_), 'Expected do after receive')?
+
+	mut cases := []ast.ReceiveCase{}
+	for !sp.check(lexer.keyword(.after)) && !sp.check(lexer.keyword(.end_)) {
+		pattern := sp.parse_pattern()?
+
+		mut guard := ast.Expr(ast.LiteralExpr{
+			value: ast.BooleanLiteral{
+				value: true
+			}
+		})
+		if sp.match(lexer.keyword(.when)) {
+			guard = sp.parse_expression()?
+		}
+
+		sp.consume(lexer.operator(.arrow), 'Expected -> after pattern')?
+
+		body := sp.parse_statement_block()?
+
+		cases << ast.ReceiveCase{
+			pattern:  pattern
+			guard:    guard
+			body:     body
+			position: sp.get_current_position()
+		}
+	}
+
+	mut timeout := ast.Expr(ast.LiteralExpr{
+		value: ast.IntegerLiteral{
+			value: 0
+		}
+	})
+	if sp.match(lexer.keyword(.after)) {
+		timeout = sp.parse_expression()?
+		sp.consume(lexer.keyword(.do_), 'Expected do after timeout')?
+		// timeout_body := sp.parse_statement_block()?
+		// For now, we'll use the timeout expression directly
+		// In a full implementation, we'd need to handle the timeout body
+	}
+
+	sp.consume(lexer.keyword(.end_), 'Expected end after receive expression')?
+
+	return ast.ReceiveExpr{
+		cases:    cases
+		timeout:  timeout
+		position: sp.get_current_position()
+	}
 }

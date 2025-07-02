@@ -45,7 +45,7 @@ pub fn (gen ErlangGenerator) generate_expression(expr ast.Expr) string {
 			return gen.generate_record_literal(expr)
 		}
 		ast.IfExpr {
-			return '%% IfExpr not implemented'
+			return gen.generate_if_expression(expr)
 		}
 		ast.CaseExpr {
 			return gen.generate_case(expr)
@@ -120,7 +120,7 @@ pub fn (gen ErlangGenerator) generate_expression_in_guard(expr ast.Expr) string 
 			return gen.generate_record_literal(expr)
 		}
 		ast.IfExpr {
-			return '%% IfExpr not implemented'
+			return gen.generate_if_expression(expr)
 		}
 		ast.CaseExpr {
 			return gen.generate_case(expr)
@@ -440,4 +440,43 @@ fn (gen ErlangGenerator) generate_receive(expr ast.ReceiveExpr) string {
 // generate_guard generates code for guard expressions
 fn (gen ErlangGenerator) generate_guard(expr ast.GuardExpr) string {
 	return gen.generate_expression_in_guard(expr.condition)
+}
+
+// generate_if_expression generates code for if expressions
+fn (gen ErlangGenerator) generate_if_expression(expr ast.IfExpr) string {
+	condition := gen.generate_expression(expr.condition)
+
+	// Generate then body - get the last expression as the return value
+	mut then_statements := []string{}
+	for i, stmt in expr.then_body {
+		if i == expr.then_body.len - 1 {
+			// Last statement is the return value
+			then_statements << gen.generate_statement(stmt)
+		} else {
+			// Non-last statements need comma separation
+			then_statements << gen.generate_statement(stmt) + ','
+		}
+	}
+	then_body := then_statements.join('\n    ')
+
+	// Generate else body - get the last expression as the return value
+	mut else_statements := []string{}
+	if expr.else_body.len > 0 {
+		for i, stmt in expr.else_body {
+			if i == expr.else_body.len - 1 {
+				// Last statement is the return value
+				else_statements << gen.generate_statement(stmt)
+			} else {
+				// Non-last statements need comma separation
+				else_statements << gen.generate_statement(stmt) + ','
+			}
+		}
+	} else {
+		// If no else body, return nil
+		else_statements << 'nil'
+	}
+	else_body := else_statements.join('\n    ')
+
+	// In Erlang, we use case expression to implement if-else
+	return 'case ${condition} of\n    true ->\n        ${then_body};\n    false ->\n        ${else_body}\nend'
 }

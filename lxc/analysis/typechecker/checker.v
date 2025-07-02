@@ -1079,7 +1079,7 @@ fn (mut tc TypeChecker) infer_expression_type(expr ast.Expr) TypeExpr {
 			return make_type_var('v')
 		}
 		ast.IfExpr {
-			return make_type_var('a')
+			return tc.infer_if_expression_type(expr)
 		}
 		ast.CaseExpr {
 			return make_type_var('a')
@@ -1325,4 +1325,59 @@ fn (tc &TypeChecker) get_expression_position(expr ast.Expr) ast.Position {
 		ast.WithExpr { expr.position }
 		ast.ForExpr { expr.position }
 	}
+}
+
+// infer_if_expression_type infers the type of an if expression
+fn (mut tc TypeChecker) infer_if_expression_type(expr ast.IfExpr) TypeExpr {
+	// Infer the type from the then branch
+	mut then_type := TypeExpr(make_type_var('a'))
+	if expr.then_body.len > 0 {
+		// Get the type of the last statement in the then branch
+		last_then_stmt := expr.then_body[expr.then_body.len - 1]
+		if last_then_stmt is ast.ExprStmt {
+			then_type = tc.infer_expression_type(last_then_stmt.expr)
+		}
+	}
+
+	// Infer the type from the else branch
+	mut else_type := TypeExpr(make_type_var('a'))
+	if expr.else_body.len > 0 {
+		// Get the type of the last statement in the else branch
+		last_else_stmt := expr.else_body[expr.else_body.len - 1]
+		if last_else_stmt is ast.ExprStmt {
+			else_type = tc.infer_expression_type(last_else_stmt.expr)
+		}
+	} else {
+		// If no else branch, the else type is nil
+		else_type = TypeExpr(nil_type)
+	}
+
+	// If both branches have the same concrete type, return that type
+	then_str := then_type.str()
+	else_str := else_type.str()
+
+	if then_str == else_str && !then_str.starts_with('a') {
+		return then_type
+	}
+
+	// If one is nil and the other is concrete, return union type
+	if else_str == 'nil' && !then_str.starts_with('a') {
+		return then_type
+	}
+
+	if then_str == 'nil' && !else_str.starts_with('a') {
+		return else_type
+	}
+
+	// For different types, return the then type (first branch takes precedence)
+	if !then_str.starts_with('a') {
+		return then_type
+	}
+
+	if !else_str.starts_with('a') {
+		return else_type
+	}
+
+	// If both are type variables, return a generic type
+	return make_type_var('a')
 }

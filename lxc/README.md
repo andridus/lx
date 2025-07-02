@@ -4,6 +4,51 @@ The LX compiler is a complete compiler implementation written in V that translat
 
 ## Features
 
+### Control Flow Expressions
+
+LX provides powerful control flow expressions with intelligent type inference and clean Erlang code generation.
+
+#### If Expressions
+
+Complete implementation of `if ... do ... else ... end` expressions:
+
+```lx
+# Basic if/else with type inference
+def check_score(score) do
+  if score >= 90 do
+    "excellent"    # Returns: string()
+  else
+    "good"
+  end
+end
+
+# If without else (implicit nil branch)
+def greet_user(logged_in) do
+  if logged_in do
+    "Welcome!"     # Returns: string() when true, nil when false
+  end
+end
+
+# Nested if expressions
+def categorize_weather(temp, humidity) do
+  if temp > 30 do
+    if humidity > 80 do
+      "hot and humid"
+    else
+      "hot and dry"
+    end
+  else
+    "comfortable"
+  end
+end
+```
+
+**Features:**
+- **Type Inference**: Automatically infers return types from branch expressions
+- **Erlang Generation**: Translates to efficient `case` statements
+- **Nested Support**: Full support for nested if expressions
+- **Nil Handling**: Graceful handling of missing else branches
+
 ### Directives System
 
 LX supports compile-time directives that provide metadata and control compilation behavior. Directives are prefixed with `@` and must be placed immediately before function definitions.
