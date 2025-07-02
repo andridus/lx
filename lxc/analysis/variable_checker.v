@@ -347,6 +347,21 @@ pub fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 		ast.LiteralExpr, ast.ListEmptyExpr {
 			// No variables to check in literals
 		}
+		ast.SimpleMatchExpr {
+			vc.check_expression(expr.value)
+			vc.check_pattern(expr.pattern)
+		}
+		ast.MatchRescueExpr {
+			vc.check_expression(expr.value)
+			vc.check_pattern(expr.pattern)
+			vc.enter_scope()
+			// Bind the rescue variable
+			vc.bind_variable(expr.rescue_var, expr.position)
+			for stmt in expr.rescue_body {
+				vc.check_statement(stmt)
+			}
+			vc.exit_scope()
+		}
 	}
 }
 

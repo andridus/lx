@@ -74,6 +74,12 @@ pub fn (gen ErlangGenerator) generate_expression(expr ast.Expr) string {
 		ast.SendExpr {
 			return gen.generate_send(expr)
 		}
+		ast.SimpleMatchExpr {
+			return gen.generate_simple_match(expr)
+		}
+		ast.MatchRescueExpr {
+			return gen.generate_match_rescue(expr)
+		}
 	}
 }
 
@@ -148,6 +154,12 @@ pub fn (gen ErlangGenerator) generate_expression_in_guard(expr ast.Expr) string 
 		}
 		ast.SendExpr {
 			return gen.generate_send(expr)
+		}
+		ast.SimpleMatchExpr {
+			return gen.generate_simple_match(expr)
+		}
+		ast.MatchRescueExpr {
+			return gen.generate_match_rescue(expr)
 		}
 	}
 }
@@ -581,4 +593,43 @@ fn (gen ErlangGenerator) indent_code(code string, level int) string {
 	}
 
 	return indented_lines.join('\n')
+}
+
+// generate_simple_match generates code for simple match expressions
+fn (gen ErlangGenerator) generate_simple_match(expr ast.SimpleMatchExpr) string {
+	pattern := gen.generate_pattern(expr.pattern)
+	value := gen.generate_expression(expr.value)
+
+	// Simple match returns the original value if pattern doesn't match
+	// Note: This is a simplified version. The proper implementation should be handled
+	// at the statement level to include subsequent expressions in the success branch
+	return 'case ${value} of\n    ${pattern} ->\n        ${value};\n    Other ->\n        Other\nend'
+}
+
+// generate_match_rescue generates code for match rescue expressions
+fn (gen ErlangGenerator) generate_match_rescue(expr ast.MatchRescueExpr) string {
+	pattern := gen.generate_pattern(expr.pattern)
+	value := gen.generate_expression(expr.value)
+	rescue_var := gen.capitalize_variable(expr.rescue_var)
+
+	// Generate rescue body - get the last expression as return value
+	rescue_body := if expr.rescue_body.len > 0 {
+		mut rescue_statements := []string{}
+		for i, stmt in expr.rescue_body {
+			if i == expr.rescue_body.len - 1 {
+				// Last statement is the return value
+				rescue_statements << gen.generate_statement(stmt)
+			} else {
+				// Non-last statements need comma separation
+				rescue_statements << gen.generate_statement(stmt) + ','
+			}
+		}
+		rescue_statements.join('\n        ')
+	} else {
+		rescue_var
+	}
+
+	// Note: This is a simplified version. The proper implementation should be handled
+	// at the statement level to include subsequent expressions in the success branch
+	return 'case ${value} of\n    ${pattern} ->\n        ok;\n    ${rescue_var} ->\n        ${rescue_body}\nend'
 }

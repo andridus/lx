@@ -201,6 +201,9 @@ fn (mut sp StatementParser) parse_clause_expression() ?ast.Expr {
 				.receive {
 					sp.parse_receive_expression()
 				}
+				.match_ {
+					sp.parse_match_rescue_expression()
+				}
 				else {
 					sp.parse_restricted_expression()
 				}
@@ -458,5 +461,52 @@ fn (mut sp StatementParser) parse_receive_expression() ?ast.Expr {
 		cases:    cases
 		timeout:  timeout
 		position: sp.get_current_position()
+	}
+}
+
+// parse_match_rescue_expression parses match rescue expressions
+// Syntax: match pattern <- value rescue variable do rescue_body end
+// Or simple match: match pattern <- value
+fn (mut sp StatementParser) parse_match_rescue_expression() ?ast.Expr {
+	sp.advance() // consume 'match'
+
+	pattern := sp.parse_pattern()?
+	sp.consume(lexer.operator(.pattern_match), 'Expected <- in match expression')?
+	value := sp.parse_expression()?
+
+	// Check if this is a simple match or match rescue
+	if sp.check(lexer.keyword(.rescue)) {
+		// Match rescue version
+		sp.consume(lexer.keyword(.rescue), 'Expected rescue after match expression')?
+
+		// Parse rescue variable
+		if sp.current !is lexer.IdentToken {
+			sp.add_error('Expected variable name after rescue', 'Got ${sp.current.str()}')
+			return none
+		}
+		rescue_var_token := sp.current as lexer.IdentToken
+		rescue_var := rescue_var_token.value
+		sp.advance()
+
+		sp.consume(lexer.keyword(.do_), 'Expected do after rescue variable')?
+
+		rescue_body := sp.parse_statement_block()?
+
+		sp.consume(lexer.keyword(.end_), 'Expected end after rescue body')?
+
+		return ast.MatchRescueExpr{
+			pattern:     pattern
+			value:       value
+			rescue_var:  rescue_var
+			rescue_body: rescue_body
+			position:    sp.get_current_position()
+		}
+	} else {
+		// Simple match version
+		return ast.SimpleMatchExpr{
+			pattern:  pattern
+			value:    value
+			position: sp.get_current_position()
+		}
 	}
 }

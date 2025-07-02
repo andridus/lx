@@ -168,6 +168,12 @@ fn (mut tc TypeChecker) check_expression(expr ast.Expr) {
 		ast.ListEmptyExpr {
 			tc.check_list_empty_expression(expr)
 		}
+		ast.SimpleMatchExpr {
+			tc.check_simple_match_expression(expr)
+		}
+		ast.MatchRescueExpr {
+			tc.check_match_rescue_expression(expr)
+		}
 	}
 }
 
@@ -434,6 +440,115 @@ fn (mut tc TypeChecker) check_list_empty_expression(expr ast.ListEmptyExpr) {
 	// Empty list is always well-typed
 }
 
+// check_simple_match_expression performs type checking on a simple match expression
+fn (mut tc TypeChecker) check_simple_match_expression(expr ast.SimpleMatchExpr) {
+	// Check the value expression
+	tc.check_expression(expr.value)
+
+	// Get the type of the value being matched
+	value_type := tc.infer_expression_type(expr.value)
+
+	// Check the pattern with context of the value type
+	tc.check_pattern_with_value_type(expr.pattern, value_type)
+}
+
+// check_match_rescue_expression performs type checking on a match rescue expression
+fn (mut tc TypeChecker) check_match_rescue_expression(expr ast.MatchRescueExpr) {
+	// Check the value expression
+	tc.check_expression(expr.value)
+
+	// Get the type of the value being matched
+	value_type := tc.infer_expression_type(expr.value)
+
+	// Check the pattern with context of the value type
+	tc.check_pattern_with_value_type(expr.pattern, value_type)
+
+	// Create a new context for the rescue body with the rescue variable bound
+	tc.context = tc.context.new_child_context()
+
+	// Bind the rescue variable to the type of the value expression
+	tc.context.bind(expr.rescue_var, value_type, expr.position)
+
+	// Check the rescue body
+	for stmt in expr.rescue_body {
+		tc.check_statement(stmt)
+	}
+
+	// Restore parent context
+	if parent := tc.context.parent {
+		tc.context = parent
+	}
+}
+
+// check_pattern_with_value_type performs type checking on a pattern with knowledge of the value type
+fn (mut tc TypeChecker) check_pattern_with_value_type(pattern ast.Pattern, value_type TypeExpr) {
+	match pattern {
+		ast.VarPattern {
+			// Bind variable with the type from the value
+			tc.context.bind(pattern.name, value_type, pattern.position)
+		}
+		ast.WildcardPattern, ast.LiteralPattern, ast.AtomPattern, ast.ListEmptyPattern {
+			// These patterns don't bind variables
+		}
+		ast.ListConsPattern {
+			// For [h | t] pattern matched against a list, we can infer proper types
+			match value_type {
+				ListType {
+					element_type := value_type.element_type
+
+					// Check if head is a variable pattern
+					match pattern.head {
+						ast.VarPattern {
+							tc.context.bind(pattern.head.name, element_type, pattern.head.position)
+						}
+						else {
+							tc.check_pattern_with_value_type(pattern.head, element_type)
+						}
+					}
+
+					// Check if tail is a variable pattern
+					match pattern.tail {
+						ast.VarPattern {
+							tc.context.bind(pattern.tail.name, value_type, pattern.tail.position)
+						}
+						else {
+							tc.check_pattern_with_value_type(pattern.tail, value_type)
+						}
+					}
+				}
+				else {
+					// Fallback to regular pattern checking
+					tc.check_pattern(pattern)
+				}
+			}
+		}
+		ast.ListLiteralPattern {
+			for element in pattern.elements {
+				tc.check_pattern(element)
+			}
+		}
+		ast.TuplePattern {
+			for element in pattern.elements {
+				tc.check_pattern(element)
+			}
+		}
+		ast.MapPattern {
+			for entry in pattern.entries {
+				tc.check_pattern(entry.key)
+				tc.check_pattern(entry.value)
+			}
+		}
+		ast.RecordPattern {
+			for field in pattern.fields {
+				tc.check_pattern(field.pattern)
+			}
+		}
+		ast.BinaryPattern {
+			// Binary patterns don't bind variables
+		}
+	}
+}
+
 // check_pattern performs type checking on a pattern
 fn (mut tc TypeChecker) check_pattern(pattern ast.Pattern) {
 	match pattern {
@@ -451,8 +566,33 @@ fn (mut tc TypeChecker) check_pattern(pattern ast.Pattern) {
 			// These patterns don't bind variables
 		}
 		ast.ListConsPattern {
-			tc.check_pattern(pattern.head)
-			tc.check_pattern(pattern.tail)
+			// For [h | t] pattern, we need to bind variables with proper types
+			// The head should be the element type, the tail should be a list of element type
+
+			// Check if head is a variable pattern
+			match pattern.head {
+				ast.VarPattern {
+					// For now, we'll infer the type based on the pattern structure
+					// In a proper implementation, we'd use the matched value's type
+					head_type := make_type_var('elem')
+					tc.context.bind(pattern.head.name, head_type, pattern.head.position)
+				}
+				else {
+					tc.check_pattern(pattern.head)
+				}
+			}
+
+			// Check if tail is a variable pattern
+			match pattern.tail {
+				ast.VarPattern {
+					// Tail should be a list of the same type as head
+					tail_type := make_list_type(make_type_var('elem'))
+					tc.context.bind(pattern.tail.name, tail_type, pattern.tail.position)
+				}
+				else {
+					tc.check_pattern(pattern.tail)
+				}
+			}
 		}
 		ast.ListLiteralPattern {
 			for element in pattern.elements {
@@ -1090,6 +1230,12 @@ fn (mut tc TypeChecker) infer_expression_type(expr ast.Expr) TypeExpr {
 		ast.ForExpr {
 			return make_list_type(make_type_var('a'))
 		}
+		ast.SimpleMatchExpr {
+			return tc.infer_simple_match_expression_type(expr)
+		}
+		ast.MatchRescueExpr {
+			return tc.infer_match_rescue_expression_type(expr)
+		}
 	}
 }
 
@@ -1234,9 +1380,13 @@ fn (mut tc TypeChecker) infer_pattern_type(pattern ast.Pattern) TypeExpr {
 			make_list_type(make_type_var('a'))
 		}
 		ast.ListConsPattern {
+			// For [h | t], we need to infer the element type from context
+			// If this pattern is being matched against a value, we should use that value's type
+			// For now, we'll use a more generic approach
 			head_type := tc.infer_pattern_type(pattern.head)
-			_ := tc.infer_pattern_type(pattern.tail)
-			// For simplicity, assume tail is a list of the same type as head
+			_ := tc.infer_pattern_type(pattern.tail) // tail_type - used for validation but not returned
+
+			// The pattern itself represents a list type
 			make_list_type(head_type)
 		}
 		ast.ListLiteralPattern {
@@ -1324,6 +1474,8 @@ fn (tc &TypeChecker) get_expression_position(expr ast.Expr) ast.Position {
 		ast.CaseExpr { expr.position }
 		ast.WithExpr { expr.position }
 		ast.ForExpr { expr.position }
+		ast.SimpleMatchExpr { expr.position }
+		ast.MatchRescueExpr { expr.position }
 	}
 }
 
@@ -1448,4 +1600,37 @@ fn (mut tc TypeChecker) infer_case_expression_type(expr ast.CaseExpr) TypeExpr {
 	}
 
 	return if result_type.str() == 'nil' { make_type_var('a') } else { result_type }
+}
+
+// infer_simple_match_expression_type infers the type of a simple match expression
+fn (mut tc TypeChecker) infer_simple_match_expression_type(expr ast.SimpleMatchExpr) TypeExpr {
+	// Simple match returns the original value if pattern doesn't match
+	// or the pattern variables if it does match
+	// For now, we'll return the value type since that's what gets returned
+	// when the pattern doesn't match
+	return tc.infer_expression_type(expr.value)
+}
+
+// infer_match_rescue_expression_type infers the type of a match rescue expression
+fn (mut tc TypeChecker) infer_match_rescue_expression_type(expr ast.MatchRescueExpr) TypeExpr {
+	// The match rescue expression returns either:
+	// - The pattern variable type if the pattern matches (success case)
+	// - The rescue body type if the pattern doesn't match (failure case)
+
+	// For success case, we would return the pattern variable type
+	// For failure case, we return the type of the rescue body
+
+	// Infer the type from the rescue body
+	mut rescue_type := TypeExpr(make_type_var('a'))
+	if expr.rescue_body.len > 0 {
+		// Get the type of the last statement in the rescue body
+		last_rescue_stmt := expr.rescue_body[expr.rescue_body.len - 1]
+		if last_rescue_stmt is ast.ExprStmt {
+			rescue_type = tc.infer_expression_type(last_rescue_stmt.expr)
+		}
+	}
+
+	// For now, we'll return the rescue type since that's what gets returned
+	// when the pattern doesn't match (which is the common case for error handling)
+	return rescue_type
 }

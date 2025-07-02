@@ -36,6 +36,8 @@ pub const keyword_map = {
 	'describe':     KeywordValue.describe
 	'test':         KeywordValue.test_
 	'assert':       KeywordValue.assert
+	'match':        KeywordValue.match_
+	'rescue':       KeywordValue.rescue
 }
 
 // is_keyword checks if a string is a keyword

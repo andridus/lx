@@ -1003,13 +1003,19 @@ The `match ... rescue` construct provides elegant error handling for operations 
 
 ```lx
 # Single match rescue - if pattern doesn't match, execute rescue expression
-match {:ok, user} <- get_user(id) rescue { :user_not_found }
+match {:ok, user} <- get_user(id) rescue error do
+  {:user_not_found}
+end
 :continue_processing
 
 # Multiple sequential match rescue steps
-match {:ok, user} <- get_user(id) rescue { :user_error }
+match {:ok, user} <- get_user(id) rescue error do
+  {:user_error}
+end
 :log_user_retrieved
-match {:ok, perms} <- get_permissions(user) rescue { :permission_error }
+match {:ok, perms} <- get_permissions(user) rescue error do
+  {:permission_error}
+end
 :log_permissions_retrieved
 :success
 ```
@@ -1018,16 +1024,24 @@ match {:ok, perms} <- get_permissions(user) rescue { :permission_error }
 
 ```lx
 # Works with different pattern types
-match [head | tail] <- get_list() rescue { [] }
-match %{name: user_name, age: user_age} <- get_user_data() rescue { %{name: "unknown", age: 0} }
-match {:ok, value} <- computation() rescue { {:error, "failed"} }
+match [head | tail] <- get_list() rescue error do
+  []
+end
+match %{name: user_name, age: user_age} <- get_user_data() rescue error do
+  %{name: "unknown", age: 0}
+end
+match {:ok, value} <- computation() rescue error do
+  {:error, "failed"}
+end
 ```
 
 ##### Generated Erlang Code:
 
 ```lx
 # Lx source
-match {:ok, user} <- get_user() rescue { :error }
+match {:ok, user} <- get_user() rescue result do
+  {:error, result}
+end
 :continue
 ```
 
@@ -1035,34 +1049,41 @@ match {:ok, user} <- get_user() rescue { :error }
 % Generated Erlang
 case get_user() of
     {ok, User} ->
-        continue;
-    _ ->
-        error
-end
+        get_user();
+    Result ->
+        {error, Result}
+end,
+continue.
 ```
 
 ##### Sequential Match Rescue:
 
 ```lx
-# Multiple steps create nested case expressions
-match {:ok, user} <- get_user() rescue { :user_error }
-match {:ok, role} <- get_role(user) rescue { :role_error }
+# Multiple steps create sequential case expressions
+match {:ok, user} <- get_user() rescue result do
+  {:user_error, result}
+end
+match {:ok, role} <- get_role(user) rescue result do
+  {:role_error, result}
+end
 :success
 ```
 
 ```erlang
-% Generated nested Erlang cases
+% Generated sequential Erlang cases
 case get_user() of
     {ok, User} ->
-        case get_role(User) of
-            {ok, Role} ->
-                success;
-            _ ->
-                role_error
-        end;
-    _ ->
-        user_error
-end
+        get_user();
+    Result ->
+        {user_error, Result}
+end,
+case get_role(User) of
+    {ok, Role} ->
+        get_role(User);
+    Result ->
+        {role_error, Result}
+end,
+success.
 ```
 
 ##### Key Features:
@@ -1072,6 +1093,76 @@ end
 - **Flexible Patterns**: Supports tuples, maps, lists, and complex nested patterns
 - **Efficient Compilation**: Generates optimal nested Erlang case expressions
 - **Sequential Processing**: Each step can depend on variables from previous steps
+
+
+#### Simple Match Expressions
+
+LX supports simple match expressions using the `match pattern <- expression` syntax for elegant pattern matching without rescue clauses:
+
+```lx
+# Basic simple match
+def test_basic() do
+  match {:ok, data} <- {:ok, 123}
+  data
+end
+
+# List cons pattern matching
+def test_cons() do
+  match [h | t] <- [1, 2, 3]
+  {h, t}
+end
+
+# Multiple sequential matches
+def test_sequential() do
+  match {:ok, user} <- get_user()
+  match {:ok, perms} <- get_permissions(user)
+  {user, perms}
+end
+
+# Tuple pattern matching
+def test_tuple() do
+  match {x, y, z} <- get_coordinates()
+  x + y + z
+end
+
+# Atom pattern matching
+def test_atom() do
+  match :ok <- process_data()
+  "success"
+end
+```
+
+**Generated Erlang Code:**
+```erlang
+% Simple match compiles to case expression
+test_basic() ->
+case {ok, 123} of
+    {ok, Data} ->
+        Data;
+    Other ->
+        Other
+end.
+
+% Sequential matches create nested case expressions
+test_sequential() ->
+case get_user() of
+    {ok, User} ->
+        case get_permissions(User) of
+            {ok, Perms} ->
+                {User, Perms};
+            Other ->
+                Other
+        end;
+    Other ->
+        Other
+end.
+```
+
+**Key Features:**
+- **Pattern Extraction**: Variables bound in patterns are available in subsequent code
+- **Automatic Failure Handling**: Non-matching values are propagated through `Other` variables
+- **Sequential Processing**: Multiple matches can be chained together
+- **Type Safety**: Full type checking for patterns and expressions
 
 #### `for` loop (List Comprehensions):
 
@@ -1124,6 +1215,31 @@ end
 ```
 
 Used for iteration and recursion.
+
+##### List Pattern Matching:
+
+```lx
+# Simple list pattern
+case list do
+  [first, second, third] -> {first, second, third}
+  [] -> :empty
+  _ -> :unknown
+end
+
+# List cons pattern (head | tail)
+case list do
+  [head | tail] -> {head, tail}
+  [] -> :empty
+  _ -> :unknown
+end
+
+# Nested list patterns
+case nested_list do
+  [[a, b], [c, d]] -> {a, b, c, d}
+  [head | [second | rest]] -> {head, second, rest}
+  _ -> :unknown
+end
+```
 
 #### Maps:
 

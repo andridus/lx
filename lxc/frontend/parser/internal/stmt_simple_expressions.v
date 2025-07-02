@@ -5,12 +5,7 @@ import lexer
 
 // parse_simple_expression parses simple expressions without function calls
 fn (mut sp StatementParser) parse_simple_expression() ?ast.Expr {
-	// Check if this is an atom followed by dot (external function call)
-	if sp.current is lexer.AtomToken {
-		return sp.parse_external_function_call()
-	}
-
-	// For other cases, use the simple atom parser
+	// For all cases, use the simple atom parser first
 	mut left := sp.parse_simple_atom()?
 
 	// Parse binary expressions
@@ -144,12 +139,44 @@ fn (mut sp StatementParser) parse_external_function_call() ?ast.Expr {
 	}
 
 	return ast.CallExpr{
+		function:      ast.LiteralExpr{} // Dummy value for external calls
 		external:      true
 		module:        module_name
 		function_name: function_name
 		arguments:     arguments
 		position:      sp.get_current_position()
 	}
+}
+
+// parse_list_expression parses list expressions in statement context
+fn (mut sp StatementParser) parse_list_expression() ?ast.Expr {
+	sp.advance() // consume '['
+
+	mut elements := []ast.Expr{}
+	if !sp.check(lexer.punctuation(.rbracket)) {
+		for {
+			elements << sp.parse_simple_expression()?
+			if !sp.match(lexer.punctuation(.comma)) {
+				break
+			}
+		}
+	}
+
+	sp.consume(lexer.punctuation(.rbracket), 'Expected closing bracket')?
+
+	return ast.ListLiteralExpr{
+		elements: elements
+		position: sp.get_current_position()
+	}
+}
+
+// parse_parenthesized_expression parses parenthesized expressions in statement context
+fn (mut sp StatementParser) parse_parenthesized_expression() ?ast.Expr {
+	sp.advance() // consume '('
+	expr := sp.parse_simple_expression()?
+	sp.consume(lexer.punctuation(.rparen), 'Expected closing parenthesis')?
+
+	return expr
 }
 
 // parse_simple_atom parses atomic expressions (identifiers, literals)
@@ -283,6 +310,15 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 		}
 		lexer.AtomToken {
 			token := sp.current as lexer.AtomToken
+			// Check if this is an external function call (:module.function)
+			if sp.peek() is lexer.OperatorToken {
+				peek_token := sp.peek() as lexer.OperatorToken
+				if peek_token.value == .dot {
+					// This is an external function call, delegate to parse_external_function_call
+					return sp.parse_external_function_call()
+				}
+			}
+			// Regular atom literal
 			sp.advance()
 			pos := ast.new_position(token.position.line, token.position.column, token.position.filename)
 			ast.LiteralExpr{
@@ -306,6 +342,24 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 						}
 						position: pos
 					}
+				}
+				else {
+					sp.add_error('Expected simple expression', 'Got ${sp.current.str()}')
+					none
+				}
+			}
+		}
+		lexer.PunctuationToken {
+			punc_token := sp.current as lexer.PunctuationToken
+			match punc_token.value {
+				.lbrace {
+					sp.parse_tuple_expression()
+				}
+				.lbracket {
+					sp.parse_list_expression()
+				}
+				.lparen {
+					sp.parse_parenthesized_expression()
 				}
 				else {
 					sp.add_error('Expected simple expression', 'Got ${sp.current.str()}')

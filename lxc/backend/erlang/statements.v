@@ -26,6 +26,124 @@ pub fn (gen ErlangGenerator) generate_statement(stmt ast.Stmt) string {
 	}
 }
 
+// generate_function_body generates code for function body with special handling for match rescue
+pub fn (gen ErlangGenerator) generate_function_body(statements []ast.Stmt) string {
+	if statements.len == 0 {
+		return 'ok'
+	}
+
+	// Check for match rescue patterns
+	mut result := []string{}
+	mut i := 0
+
+	for i < statements.len {
+		stmt := statements[i]
+		if stmt is ast.ExprStmt {
+			expr_stmt := stmt as ast.ExprStmt
+			if expr_stmt.expr is ast.SimpleMatchExpr {
+				// Found a simple match - collect subsequent expressions
+				simple_match := expr_stmt.expr as ast.SimpleMatchExpr
+
+				// Find all subsequent expressions to include in the success branch
+				mut subsequent_exprs := []ast.Stmt{}
+				mut j := i + 1
+				for j < statements.len {
+					subsequent_exprs << statements[j]
+					j++
+				}
+
+				// Generate the simple match with subsequent expressions
+				result << gen.generate_simple_match_with_continuation(simple_match, subsequent_exprs)
+
+				// Skip all processed statements
+				i = statements.len
+				continue
+			} else if expr_stmt.expr is ast.MatchRescueExpr {
+				// Found a match rescue - collect subsequent expressions
+				match_rescue := expr_stmt.expr as ast.MatchRescueExpr
+
+				// Find all subsequent expressions to include in the success branch
+				mut subsequent_exprs := []ast.Stmt{}
+				mut j := i + 1
+				for j < statements.len {
+					subsequent_exprs << statements[j]
+					j++
+				}
+
+				// Generate the match rescue with subsequent expressions
+				result << gen.generate_match_rescue_with_continuation(match_rescue, subsequent_exprs)
+
+				// Skip all processed statements
+				i = statements.len
+				continue
+			}
+		}
+
+		// Regular statement
+		result << gen.generate_statement(stmt)
+		i++
+	}
+
+	return result.join(',\n')
+}
+
+// generate_simple_match_with_continuation generates simple match with subsequent expressions in success branch
+fn (gen ErlangGenerator) generate_simple_match_with_continuation(expr ast.SimpleMatchExpr, subsequent_exprs []ast.Stmt) string {
+	pattern := gen.generate_pattern(expr.pattern)
+	value := gen.generate_expression(expr.value)
+
+	// Generate success body with subsequent expressions
+	// Use the new function body generator to handle nested match expressions correctly
+	success_code := if subsequent_exprs.len > 0 {
+		gen.generate_function_body(subsequent_exprs)
+	} else {
+		'ok'
+	}
+
+	// Format the success code with proper indentation
+	formatted_success_code := success_code.split('\n').map('        ${it}').join('\n')
+
+	// Simple match returns the original value if pattern doesn't match
+	return 'case ${value} of\n    ${pattern} ->\n${formatted_success_code};\n    Other ->\n        Other\nend'
+}
+
+// generate_match_rescue_with_continuation generates match rescue with subsequent expressions in success branch
+fn (gen ErlangGenerator) generate_match_rescue_with_continuation(expr ast.MatchRescueExpr, subsequent_exprs []ast.Stmt) string {
+	pattern := gen.generate_pattern(expr.pattern)
+	value := gen.generate_expression(expr.value)
+	rescue_var := gen.capitalize_variable(expr.rescue_var)
+
+	// Generate rescue body
+	rescue_body := if expr.rescue_body.len > 0 {
+		mut rescue_statements := []string{}
+		for i, stmt in expr.rescue_body {
+			if i == expr.rescue_body.len - 1 {
+				rescue_statements << gen.generate_statement(stmt)
+			} else {
+				rescue_statements << gen.generate_statement(stmt) + ','
+			}
+		}
+		rescue_statements.join('\n        ')
+	} else {
+		rescue_var
+	}
+
+	// Generate success body with subsequent expressions
+	// Use the new function body generator to handle nested match rescue correctly
+	success_code := if subsequent_exprs.len > 0 {
+		gen.generate_function_body(subsequent_exprs)
+	} else {
+		'ok'
+	}
+
+	// Format the success code with proper indentation
+	formatted_success_code := success_code.split('\n').map('        ${it}').join('\n')
+
+	return 'case ${value} of\n    ${pattern} ->\n${formatted_success_code};\n    ${rescue_var} ->\n        ${rescue_body}\nend'
+}
+
+
+
 // infer_function_return_type infers the return type of a function based on its body
 fn (gen ErlangGenerator) infer_function_return_type(clause ast.FunctionClause) string {
 	if clause.body.len == 0 {
@@ -50,6 +168,8 @@ fn (gen ErlangGenerator) infer_function_return_type(clause ast.FunctionClause) s
 	// fallback return (should never reach here)
 	return 'ok'
 }
+
+
 
 // find_matching_defined_type checks if a type expression matches any defined type
 fn (gen ErlangGenerator) find_matching_defined_type(type_expr string) string {
@@ -129,6 +249,20 @@ fn (gen ErlangGenerator) infer_expression_return_type_with_context(expr ast.Expr
 		}
 	}
 }
+
+// extract_var_from_pattern extracts variable name from a pattern if it's a VarPattern
+fn (gen ErlangGenerator) extract_var_from_pattern(pattern ast.Pattern) ?string {
+	match pattern {
+		ast.VarPattern {
+			return pattern.name
+		}
+		else {
+			return none
+		}
+	}
+}
+
+
 
 // infer_literal_return_type infers the return type of a literal
 fn (gen ErlangGenerator) infer_literal_return_type(literal ast.Literal) string {
@@ -249,15 +383,8 @@ pub fn (gen ErlangGenerator) generate_function(func ast.FunctionStmt) string {
 			} else {
 				guard = ' when ' + gen.generate_expression_in_guard(clause.guard)
 			}
-			body := clause.body.map(gen.generate_statement(it))
-			// Emit all statements separated by ',' except the last one (Erlang style)
-			body_code := if body.len > 1 {
-				body[..body.len - 1].join(',\n') + ',\n' + body[body.len - 1]
-			} else if body.len == 1 {
-				body[0]
-			} else {
-				'ok'
-			}
+			// Use the new function body generator that handles match rescue
+			body_code := gen.generate_function_body(clause.body)
 			clause_strings << '${func.name}(${parameters.join(', ')})${guard} ->\n${body_code}'
 		}
 

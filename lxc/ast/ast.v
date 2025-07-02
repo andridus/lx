@@ -184,6 +184,24 @@ pub:
 	position   Position
 }
 
+// SimpleMatchExpr represents a simple match expression (without rescue)
+pub struct SimpleMatchExpr {
+pub:
+	pattern  Pattern
+	value    Expr
+	position Position
+}
+
+// MatchRescueExpr represents a match rescue expression
+pub struct MatchRescueExpr {
+pub:
+	pattern      Pattern
+	value        Expr
+	rescue_var   string
+	rescue_body  []Stmt
+	position     Position
+}
+
 // Expr represents expressions in LX using sum types
 pub type Expr = VariableExpr
 	| LiteralExpr
@@ -208,6 +226,8 @@ pub type Expr = VariableExpr
 	| CaseExpr
 	| WithExpr
 	| ForExpr
+	| SimpleMatchExpr
+	| MatchRescueExpr
 
 // BinaryOp represents binary operators
 pub enum BinaryOp {
@@ -535,6 +555,12 @@ pub fn (e Expr) str() string {
 		}
 		ForExpr {
 			'For(${e.pattern.str()}, ${e.collection.str()}, ${e.guard.str()}, [${e.body.map(it.str()).join(', ')}])'
+		}
+		SimpleMatchExpr {
+			'SimpleMatch(${e.pattern.str()} <- ${e.value.str()})'
+		}
+		MatchRescueExpr {
+			'MatchRescue(${e.pattern.str()} <- ${e.value.str()} rescue ${e.rescue_var} [${e.rescue_body.map(it.str()).join(', ')}])'
 		}
 	}
 }

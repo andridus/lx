@@ -79,6 +79,9 @@ fn (mut ep ExpressionParser) parse_atom_expression() ?ast.Expr {
 				.unsafe {
 					ep.parse_unsafe_expression()
 				}
+				.match_ {
+					ep.parse_match_rescue_expression()
+				}
 				.nil_ {
 					ep.advance()
 					return ast.LiteralExpr{

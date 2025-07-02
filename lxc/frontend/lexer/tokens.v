@@ -133,6 +133,8 @@ pub enum KeywordValue {
 	module
 	import
 	in
+	match_
+	rescue
 }
 
 // KeywordToken represents a keyword token
@@ -282,6 +284,8 @@ pub fn (k KeywordValue) str() string {
 		.module { 'module' }
 		.import { 'import' }
 		.in { 'in' }
+		.match_ { 'match' }
+		.rescue { 'rescue' }
 	}
 }
 

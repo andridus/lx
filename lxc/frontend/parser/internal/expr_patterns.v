@@ -171,13 +171,24 @@ fn (mut ep ExpressionParser) parse_list_pattern() ?ast.Pattern {
 		return ast.ListEmptyPattern{}
 	}
 
-	mut elements := []ast.Pattern{}
-	for {
-		elements << ep.parse_pattern()?
+	// Parse first element
+	first := ep.parse_pattern()?
 
-		if !ep.match(lexer.punctuation(.comma)) {
-			break
+	// Check if this is a cons pattern [head | tail]
+	if ep.match(lexer.operator(.pipe)) {
+		rest := ep.parse_pattern()?
+		ep.consume(lexer.punctuation(.rbracket), 'Expected closing bracket')?
+
+		return ast.ListConsPattern{
+			head: first
+			tail: rest
 		}
+	}
+
+	// Regular list pattern [elem1, elem2, ...]
+	mut elements := [first]
+	for ep.match(lexer.punctuation(.comma)) {
+		elements << ep.parse_pattern()?
 	}
 
 	ep.consume(lexer.punctuation(.rbracket), 'Expected closing bracket')?
