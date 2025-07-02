@@ -51,7 +51,7 @@ pub fn (gen ErlangGenerator) generate_expression(expr ast.Expr) string {
 			return gen.generate_case(expr)
 		}
 		ast.WithExpr {
-			return '%% WithExpr not implemented'
+			return gen.generate_with_expression(expr)
 		}
 		ast.ForExpr {
 			return '%% ForExpr not implemented'
@@ -126,7 +126,7 @@ pub fn (gen ErlangGenerator) generate_expression_in_guard(expr ast.Expr) string 
 			return gen.generate_case(expr)
 		}
 		ast.WithExpr {
-			return '%% WithExpr not implemented'
+			return gen.generate_with_expression(expr)
 		}
 		ast.ForExpr {
 			return '%% ForExpr not implemented'
@@ -479,4 +479,76 @@ fn (gen ErlangGenerator) generate_if_expression(expr ast.IfExpr) string {
 
 	// In Erlang, we use case expression to implement if-else
 	return 'case ${condition} of\n    true ->\n        ${then_body};\n    false ->\n        ${else_body}\nend'
+}
+
+// generate_with_expression generates code for with expressions
+fn (gen ErlangGenerator) generate_with_expression(expr ast.WithExpr) string {
+	// If there are no bindings, just return the body
+	if expr.bindings.len == 0 {
+		body := expr.body.map(gen.generate_statement(it))
+		return body.join(',\n')
+	}
+
+	// Generate nested case expressions for each binding
+	return gen.generate_with_bindings(expr.bindings, expr.body, expr.else_body, 0)
+}
+
+// generate_with_bindings generates nested case expressions recursively
+fn (gen ErlangGenerator) generate_with_bindings(bindings []ast.WithBinding, body []ast.Stmt, else_body []ast.Stmt, index int) string {
+	if index >= bindings.len {
+		// We've reached the end of bindings, generate the main body
+		if body.len > 0 {
+			body_code := body.map(gen.generate_statement(it))
+			return body_code.join(',\n')
+		}
+		return 'ok'
+	}
+
+	current_binding := bindings[index]
+	pattern := gen.generate_pattern(current_binding.pattern)
+	value := gen.generate_expression(current_binding.value)
+
+	// Generate the next level of bindings or the final body
+	next_code := gen.generate_with_bindings(bindings, body, else_body, index + 1)
+
+	// Generate the failure branch
+	failure_branch := if else_body.len > 0 {
+		else_code := else_body.map(gen.generate_statement(it))
+		else_code.join(',\n')
+	} else {
+		// If no else_body, propagate the failed value
+		'Other'
+	}
+
+	// Format the case expression with proper indentation for nested cases
+	if next_code.contains('case') {
+		// This is a nested case, format it properly
+		indented_next := next_code.split('\n').map('        ${it}').join('\n')
+		return 'case ${value} of\n    ${pattern} ->\n${indented_next};\n    Other ->\n        ${failure_branch}\nend'
+	} else {
+		// This is the final case, format normally
+		return 'case ${value} of\n    ${pattern} ->\n        ${next_code};\n    Other ->\n        ${failure_branch}\nend'
+	}
+}
+
+// indent_code adds proper indentation to code
+fn (gen ErlangGenerator) indent_code(code string, level int) string {
+	if code.trim_space().len == 0 {
+		return code
+	}
+
+	indent := '    '.repeat(level)
+	lines := code.split('\n')
+	mut indented_lines := []string{}
+
+	for line in lines {
+		trimmed := line.trim_space()
+		if trimmed.len > 0 {
+			indented_lines << '${indent}${trimmed}'
+		} else {
+			indented_lines << ''
+		}
+	}
+
+	return indented_lines.join('\n')
 }

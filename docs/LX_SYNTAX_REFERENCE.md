@@ -874,52 +874,117 @@ case
 end
 ```
 
-#### `with` expressions (monadic-style error handling):
+#### `with` expressions (elegant error handling):
 
-The `with` expression provides elegant error handling and pattern matching for sequential operations that may fail.
+The `with` expression provides elegant error handling and sequential pattern matching for operations that may fail. It compiles to nested Erlang `case` expressions for optimal performance.
 
-##### `with`/`else`:
+##### Basic `with` expression:
 
 ```lx
-with {:ok, user} <= get_user(id) do
-  user.name
-else
-  "Unknown user"
+# Simple with expression - executes body if pattern matches
+def get_user_name(id) do
+  with {1, 1} <- func_a() do
+    "success"
+  end
 end
 ```
 
-##### `with`/`case` (pattern matching):
+**Generated Erlang:**
+```erlang
+get_user_name(Id) ->
+case func_a() of
+    {1, 1} ->
+        "success";
+    Other ->
+        Other
+end.
+```
+
+##### `with` with `else` clause:
 
 ```lx
-with {:ok, user} <= get_user(id) do
-  user.name
-case
-  {:error, :not_found} -> "User not found"
-  {:error, reason} when reason == :timeout -> "Request timeout"
-  {:error, _} -> "Unknown error"
-  _ -> "Unexpected result"
+# With else clause for explicit error handling
+def get_user_info(id) do
+  with {1, 1} <- func_a(),
+       {1, 2} <- func_b() do
+    "all good"
+  else
+    "something failed"
+  end
 end
 ```
 
-##### Multiple `with` steps:
+**Generated Erlang:**
+```erlang
+get_user_info(Id) ->
+case func_a() of
+    {1, 1} ->
+        case func_b() of
+            {1, 2} ->
+                "all good";
+            Other ->
+                "something failed"
+        end;
+    Other ->
+        "something failed"
+end.
+```
+
+##### Multiple sequential bindings:
 
 ```lx
-with {:ok, user} <= get_user(id),
-     {:ok, role} <= get_role(user) do
-  {user.name, role}
-else
-  {:error, "Failed to get user or role"}
+# Multiple bindings create nested case expressions
+def complex_operation() do
+  with x <- 1,
+       y <- 2,
+       z <- 3 do
+    {x, y, z}
+  end
 end
 ```
 
-##### `with` without else/case (returns optional):
+**Generated Erlang:**
+```erlang
+complex_operation() ->
+case 1 of
+    X ->
+        case 2 of
+            Y ->
+                case 3 of
+                    Z ->
+                        {X, Y, Z};
+                    Other ->
+                        Other
+                end;
+            Other ->
+                Other
+        end;
+    Other ->
+        Other
+end.
+```
+
+##### `with` without else (auto-propagation):
 
 ```lx
-with {:ok, user} <= get_user(id) do
-  user.name
+# Without else clause, failures are automatically propagated
+def simple_with() do
+  with x <- get_value() do
+    process(x)
+  end
 end
-# Returns the value on success, or nil on failure
+# If get_value() doesn't match x, the result is propagated as-is
 ```
+
+##### Key Features:
+
+- **Sequential Pattern Matching**: Each binding must succeed for the next to execute
+- **Automatic Error Propagation**: Failed matches are propagated through `Other` variables when no `else` clause is present
+- **Explicit Error Handling**: Use `else` clause to handle all failure cases uniformly
+- **Efficient Compilation**: Generates optimal nested Erlang `case` expressions
+- **Type Safety**: Full type checking for patterns, values, and success/failure branches
+- **Variable Binding**: Variables bound in patterns are available in subsequent bindings and the success body
+- **Erlang Compatibility**: Generated code follows Erlang conventions and integrates seamlessly with OTP
 
 #### `case`:
 

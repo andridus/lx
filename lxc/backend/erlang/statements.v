@@ -121,6 +121,9 @@ fn (gen ErlangGenerator) infer_expression_return_type_with_context(expr ast.Expr
 		ast.CaseExpr {
 			gen.infer_case_expression_return_type(expr, parameters)
 		}
+		ast.WithExpr {
+			gen.infer_with_expression_return_type(expr, parameters)
+		}
 		else {
 			'any()'
 		}
@@ -454,4 +457,88 @@ fn (gen ErlangGenerator) infer_case_expression_return_type(expr ast.CaseExpr, pa
 	}
 
 	return if result_type == 'nil' { 'any()' } else { result_type }
+}
+
+// infer_with_expression_return_type infers the return type of a with expression
+fn (gen ErlangGenerator) infer_with_expression_return_type(expr ast.WithExpr, parameters []ast.Pattern) string {
+	// If there are no bindings, infer from the body
+	if expr.bindings.len == 0 {
+		if expr.body.len > 0 {
+			last_stmt := expr.body[expr.body.len - 1]
+			if last_stmt is ast.ExprStmt {
+				return gen.infer_expression_return_type_with_context(last_stmt.expr, parameters)
+			}
+		}
+		return 'ok'
+	}
+
+	// Infer the type from the success body
+	mut success_type := 'any()'
+	if expr.body.len > 0 {
+		last_stmt := expr.body[expr.body.len - 1]
+		if last_stmt is ast.ExprStmt {
+			success_type = gen.infer_expression_return_type_with_context(last_stmt.expr,
+				parameters)
+		}
+	}
+
+	// Infer the type from the else body
+	mut else_type := 'any()'
+	if expr.else_body.len > 0 {
+		last_else_stmt := expr.else_body[expr.else_body.len - 1]
+		if last_else_stmt is ast.ExprStmt {
+			else_type = gen.infer_expression_return_type_with_context(last_else_stmt.expr,
+				parameters)
+		}
+	} else {
+		// If no else body, the else branch can return any failed value
+		else_type = 'any()'
+	}
+
+	// If both branches have the same concrete type, return that type
+	if success_type == else_type && success_type != 'any()' {
+		return success_type
+	}
+
+	// If both are string types, return string
+	if success_type == 'string()' && else_type == 'string()' {
+		return 'string()'
+	}
+
+	// If one is string and the other is any(), return string
+	if success_type == 'string()' || else_type == 'string()' {
+		return 'string()'
+	}
+
+	// If one is specific and the other is any(), return the specific one
+	if success_type != 'any()' && else_type == 'any()' {
+		return success_type
+	}
+
+	if else_type != 'any()' && success_type == 'any()' {
+		return else_type
+	}
+
+	// For different concrete types, use precedence: string() > integer() > float() > boolean() > atom()
+	if success_type != 'any()' && else_type != 'any()' {
+		precedence_map := {
+			'string()':  5
+			'integer()': 4
+			'float()':   3
+			'boolean()': 2
+			'atom()':    1
+		}
+
+		success_precedence := precedence_map[success_type] or { 0 }
+		else_precedence := precedence_map[else_type] or { 0 }
+
+		if success_precedence >= else_precedence {
+			return success_type
+		} else {
+			return else_type
+		}
+	}
+
+	// For different types, return any()
+	return 'any()'
 }

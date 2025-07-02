@@ -1,6 +1,14 @@
 ## [Unreleased]
 
 ### Added
+- **With Expressions**: Complete implementation of `with` expressions for elegant error handling and sequential pattern matching that compiles to nested Erlang `case` expressions. Features include:
+  - **Sequential Pattern Matching**: Support for `with pattern <- expr, pattern2 <- expr2 do ... end` syntax with multiple bindings
+  - **Else Clause Support**: Optional `else` clause for handling pattern match failures: `with pattern <- expr do ... else ... end`
+  - **Nested Case Generation**: Automatically generates nested Erlang `case` expressions for each binding, propagating failures through `Other` variables
+  - **Type Inference**: Intelligent type inference that considers both success and failure branches to determine the overall return type
+  - **Error Propagation**: When no `else` clause is provided, failed pattern matches are automatically propagated using the `Other` variable
+  - **Multiple Bindings**: Full support for multiple sequential bindings with comma separation
+  - **Erlang Compatibility**: Generated code follows Erlang conventions and integrates seamlessly with existing Erlang/OTP codebases
 - **If Expressions**: Complete implementation of `if ... do ... else ... end` expressions with proper type inference and Erlang code generation. Features include:
   - **Basic If/Else**: Support for `if condition do expr1 else expr2 end` syntax
   - **If without Else**: Support for `if condition do expr end` (returns `nil` when condition is false)
