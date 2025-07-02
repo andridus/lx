@@ -179,7 +179,7 @@ fn (mut tc TypeChecker) check_variable_expression(expr ast.VariableExpr) {
 	} else {
 		// This should have been caught by variable checker, but just in case
 		tc.report_error("Variable '${expr.name}' is not defined", 'Variables must be defined before use',
-			ast.new_position(0, 0, 'unknown'))
+			expr.position)
 	}
 }
 
@@ -212,11 +212,23 @@ fn (mut tc TypeChecker) check_binary_expression(expr ast.BinaryExpr) {
 	left_type := tc.infer_expression_type(expr.left)
 	right_type := tc.infer_expression_type(expr.right)
 
+
+
 	// For now, we'll just check that both operands are numeric for arithmetic operators
 	if expr.op in [.add, .subtract, .multiply, .divide, .modulo, .power] {
 		if !tc.is_numeric_type(left_type) || !tc.is_numeric_type(right_type) {
 			tc.report_error("Arithmetic operator '${expr.op.str()}' requires numeric operands",
 				'Both operands must be integers or floats', expr.position)
+		}
+	}
+
+	// Add new check for boolean operands in and/or
+	if expr.op in [.and, .or] {
+		if left_type.str() != 'boolean' {
+			tc.report_error('Left operand of `${expr.op.str()}` must be boolean', 'Use only boolean expressions with `${expr.op.str()}`', tc.get_expression_position(expr.left))
+		}
+		if right_type.str() != 'boolean' {
+			tc.report_error('Right operand of `${expr.op.str()}` must be boolean', 'Use only boolean expressions with `${expr.op.str()}`', tc.get_expression_position(expr.right))
 		}
 	}
 }
@@ -426,8 +438,14 @@ fn (mut tc TypeChecker) check_list_empty_expression(expr ast.ListEmptyExpr) {
 fn (mut tc TypeChecker) check_pattern(pattern ast.Pattern) {
 	match pattern {
 		ast.VarPattern {
-			// Bind variable with unknown type for now
-			tc.context.bind(pattern.name, make_type_var('a'), ast.new_position(0, 0, 'unknown'))
+			// Only bind if not already bound in context
+			if _ := tc.context.lookup(pattern.name) {
+				// Variable already bound, don't override
+			} else {
+				// Bind variable with inferred type
+				param_type := tc.infer_pattern_type(pattern)
+				tc.context.bind(pattern.name, param_type, pattern.position)
+			}
 		}
 		ast.WildcardPattern, ast.LiteralPattern, ast.AtomPattern, ast.ListEmptyPattern {
 			// These patterns don't bind variables
@@ -468,6 +486,17 @@ fn (mut tc TypeChecker) check_function_statement(stmt ast.FunctionStmt) {
 	tc.context = tc.context.new_child_context()
 
 	for clause in stmt.clauses {
+		// Bind parameters with type annotations to the context
+		for param in clause.parameters {
+			match param {
+				ast.VarPattern {
+					param_type := tc.infer_pattern_type(param)
+					tc.context.bind(param.name, param_type, param.position)
+				}
+				else {}
+			}
+		}
+
 		// Validate type annotations in parameters
 		for param in clause.parameters {
 			tc.check_pattern(param)
@@ -827,6 +856,7 @@ type GuardOperator = ast.BinaryOp | ast.UnaryOp
 fn (tc &TypeChecker) format_guard_operator(op GuardOperator) string {
 	return match op {
 		ast.BinaryOp {
+			// In reflection, show the LX syntax (and/or) even in guards
 			op.str()
 		}
 		ast.UnaryOp {
@@ -978,7 +1008,7 @@ fn (mut tc TypeChecker) check_type_annotation(expr ast.Expr, annotation ast.Type
 }
 
 // infer_expression_type infers the type of an expression
-fn (tc &TypeChecker) infer_expression_type(expr ast.Expr) TypeExpr {
+fn (mut tc TypeChecker) infer_expression_type(expr ast.Expr) TypeExpr {
 	match expr {
 		ast.VariableExpr {
 			if binding := tc.context.lookup(expr.name) {
@@ -1088,7 +1118,7 @@ fn (tc &TypeChecker) infer_literal_type(literal ast.Literal) TypeExpr {
 }
 
 // infer_binary_expression_type infers the type of a binary expression
-fn (tc &TypeChecker) infer_binary_expression_type(expr ast.BinaryExpr) TypeExpr {
+fn (mut tc TypeChecker) infer_binary_expression_type(expr ast.BinaryExpr) TypeExpr {
 	left_type := tc.infer_expression_type(expr.left)
 	right_type := tc.infer_expression_type(expr.right)
 
@@ -1103,7 +1133,13 @@ fn (tc &TypeChecker) infer_binary_expression_type(expr ast.BinaryExpr) TypeExpr 
 		.equal, .not_equal, .less_than, .less_equal, .greater_than, .greater_equal {
 			return boolean_type
 		}
-		.and, .or, .andalso, .orelse {
+		.and, .or {
+			if left_type.str() != 'boolean' {
+				tc.report_error('Left operand of `${expr.op.str()}` must be boolean', 'Use only boolean expressions with `${expr.op.str()}`', tc.get_expression_position(expr.left))
+			}
+			if right_type.str() != 'boolean' {
+				tc.report_error('Right operand of `${expr.op.str()}` must be boolean', 'Use only boolean expressions with `${expr.op.str()}`', tc.get_expression_position(expr.right))
+			}
 			return boolean_type
 		}
 		.cons {
@@ -1132,7 +1168,7 @@ fn (mut tc TypeChecker) report_error(message string, suggestion string, position
 }
 
 // print_statement_types prints type information for statements in function body
-fn (tc &TypeChecker) print_statement_types(stmt ast.Stmt, indent string) {
+fn (mut tc TypeChecker) print_statement_types(stmt ast.Stmt, indent string) {
 	match stmt {
 		ast.ExprStmt {
 			expr_type := tc.infer_expression_type(stmt.expr)
@@ -1229,4 +1265,33 @@ fn (tc &TypeChecker) validate_directives(module_stmt ast.ModuleStmt) []errors.Co
 	}
 
 	return directive_errors
+}
+
+// get_expression_position safely gets the position of an expression
+fn (tc &TypeChecker) get_expression_position(expr ast.Expr) ast.Position {
+	return match expr {
+		ast.VariableExpr { expr.position }
+		ast.LiteralExpr { expr.position }
+		ast.AssignExpr { expr.position }
+		ast.BinaryExpr { expr.position }
+		ast.CallExpr { expr.position }
+		ast.MatchExpr { expr.position }
+		ast.ListConsExpr { expr.position }
+		ast.ListEmptyExpr { ast.new_position(0, 0, 'unknown') }
+		ast.ListLiteralExpr { expr.position }
+		ast.TupleExpr { expr.position }
+		ast.MapLiteralExpr { expr.position }
+		ast.RecordLiteralExpr { expr.position }
+		ast.RecordAccessExpr { expr.position }
+		ast.FunExpr { expr.position }
+		ast.SendExpr { expr.position }
+		ast.ReceiveExpr { expr.position }
+		ast.GuardExpr { expr.position }
+		ast.UnaryExpr { expr.position }
+		ast.MapAccessExpr { expr.position }
+		ast.IfExpr { expr.position }
+		ast.CaseExpr { expr.position }
+		ast.WithExpr { expr.position }
+		ast.ForExpr { expr.position }
+	}
 }

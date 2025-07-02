@@ -110,57 +110,17 @@ fn (mut ep ExpressionParser) parse_or_expression() ?ast.Expr {
 
 // parse_and_expression parses expressions with 'and' precedence
 fn (mut ep ExpressionParser) parse_and_expression() ?ast.Expr {
-	mut left := ep.parse_orelse_expression()?
+	mut left := ep.parse_comparison_expression()?
 	for ep.current is lexer.OperatorToken {
 		op_token := ep.current as lexer.OperatorToken
 		if op_token.value != .and_ {
 			break
 		}
 		ep.advance()
-		right := ep.parse_orelse_expression()?
-		left = ast.BinaryExpr{
-			left:     left
-			op:       .and
-			right:    right
-			position: ep.get_current_position()
-		}
-	}
-	return left
-}
-
-// parse_orelse_expression parses expressions with 'orelse' precedence
-fn (mut ep ExpressionParser) parse_orelse_expression() ?ast.Expr {
-	mut left := ep.parse_andalso_expression()?
-	for ep.current is lexer.OperatorToken {
-		op_token := ep.current as lexer.OperatorToken
-		if op_token.value != .orelse {
-			break
-		}
-		ep.advance()
-		right := ep.parse_andalso_expression()?
-		left = ast.BinaryExpr{
-			left:     left
-			op:       .orelse
-			right:    right
-			position: ep.get_current_position()
-		}
-	}
-	return left
-}
-
-// parse_andalso_expression parses expressions with 'andalso' precedence
-fn (mut ep ExpressionParser) parse_andalso_expression() ?ast.Expr {
-	mut left := ep.parse_comparison_expression()?
-	for ep.current is lexer.OperatorToken {
-		op_token := ep.current as lexer.OperatorToken
-		if op_token.value != .andalso {
-			break
-		}
-		ep.advance()
 		right := ep.parse_comparison_expression()?
 		left = ast.BinaryExpr{
 			left:     left
-			op:       .andalso
+			op:       .and
 			right:    right
 			position: ep.get_current_position()
 		}

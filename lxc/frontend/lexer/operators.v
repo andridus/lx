@@ -24,10 +24,6 @@ pub const operator_map = {
 	'and':     OperatorValue.and_
 	'or':      OperatorValue.or_
 	'not':     OperatorValue.not_
-	'andalso': OperatorValue.andalso
-	'orelse':  OperatorValue.orelse
-	'&&':      OperatorValue.andalso
-	'||':      OperatorValue.orelse
 }
 
 // PunctuationMap maps punctuation strings to their corresponding values
@@ -104,7 +100,7 @@ pub fn get_operator_precedence(t OperatorValue) int {
 		.plus, .minus { 4 }
 		.mult, .div, .modulo { 5 }
 		.eq, .neq, .lt, .gt, .leq, .geq { 6 }
-		.and_, .or_, .andalso, .orelse { 7 }
+		.and_, .or_ { 7 }
 		.not_ { 8 }
 		.assign, .pattern_match { 9 }
 		else { 10 }
@@ -114,7 +110,7 @@ pub fn get_operator_precedence(t OperatorValue) int {
 // is_left_associative checks if an operator is left associative
 pub fn is_left_associative(t OperatorValue) bool {
 	return match t {
-		.plus, .minus, .mult, .div, .modulo, .concat, .and_, .or_, .andalso, .orelse { true }
+		.plus, .minus, .mult, .div, .modulo, .concat, .and_, .or_ { true }
 		else { false }
 	}
 }

@@ -77,6 +77,81 @@ pub fn (gen ErlangGenerator) generate_expression(expr ast.Expr) string {
 	}
 }
 
+// generate_expression_in_guard generates code for expressions in guard context
+pub fn (gen ErlangGenerator) generate_expression_in_guard(expr ast.Expr) string {
+	match expr {
+		ast.VariableExpr {
+			return gen.generate_variable(expr.name)
+		}
+		ast.LiteralExpr {
+			return gen.generate_literal(expr.value)
+		}
+		ast.BinaryExpr {
+			return gen.generate_binary_expression_in_guard(expr)
+		}
+		ast.UnaryExpr {
+			return '%% UnaryExpr not implemented'
+		}
+		ast.CallExpr {
+			return gen.generate_function_call(expr)
+		}
+		ast.RecordAccessExpr {
+			return gen.generate_record_access(expr)
+		}
+		ast.MapAccessExpr {
+			return '%% MapAccessExpr not implemented'
+		}
+		ast.TupleExpr {
+			return gen.generate_tuple(expr)
+		}
+		ast.ListConsExpr {
+			return gen.generate_list_cons(expr)
+		}
+		ast.ListEmptyExpr {
+			return '[]'
+		}
+		ast.ListLiteralExpr {
+			return gen.generate_list_literal(expr)
+		}
+		ast.MapLiteralExpr {
+			return gen.generate_map_literal(expr)
+		}
+		ast.RecordLiteralExpr {
+			return gen.generate_record_literal(expr)
+		}
+		ast.IfExpr {
+			return '%% IfExpr not implemented'
+		}
+		ast.CaseExpr {
+			return gen.generate_case(expr)
+		}
+		ast.WithExpr {
+			return '%% WithExpr not implemented'
+		}
+		ast.ForExpr {
+			return '%% ForExpr not implemented'
+		}
+		ast.ReceiveExpr {
+			return gen.generate_receive(expr)
+		}
+		ast.GuardExpr {
+			return gen.generate_guard(expr)
+		}
+		ast.AssignExpr {
+			return gen.generate_assignment(expr)
+		}
+		ast.MatchExpr {
+			return gen.generate_match(expr)
+		}
+		ast.FunExpr {
+			return gen.generate_fun_expression(expr)
+		}
+		ast.SendExpr {
+			return gen.generate_send(expr)
+		}
+	}
+}
+
 // generate_variable generates code for variables
 fn (gen ErlangGenerator) generate_variable(name string) string {
 	return gen.capitalize_variable(name)
@@ -135,12 +210,37 @@ fn (gen ErlangGenerator) capitalize_variable(name string) string {
 fn (gen ErlangGenerator) generate_binary_expression(expr ast.BinaryExpr) string {
 	left := gen.generate_expression(expr.left)
 	right := gen.generate_expression(expr.right)
-	op := gen.translate_operator(expr.op)
+	op := gen.translate_operator(expr.op, false)
 	return '${left} ${op} ${right}'
 }
 
+// generate_binary_expression_in_guard generates code for binary expressions in guards
+fn (gen ErlangGenerator) generate_binary_expression_in_guard(expr ast.BinaryExpr) string {
+	left := gen.generate_expression_in_guard(expr.left)
+	right := gen.generate_expression_in_guard(expr.right)
+	op := gen.translate_operator(expr.op, true)
+	return '${left} ${op} ${right}'
+}
+
+// generate_unary_expression_in_guard generates code for unary expressions in guards
+fn (gen ErlangGenerator) generate_unary_expression_in_guard(expr ast.UnaryExpr) string {
+	operand := gen.generate_expression_in_guard(expr.operand)
+	op := gen.translate_unary_operator(expr.op, true)
+	return '${op}${operand}'
+}
+
+// translate_unary_operator translates LX unary operators to Erlang operators
+// is_guard indicates whether we're in a guard context
+fn (gen ErlangGenerator) translate_unary_operator(operator ast.UnaryOp, is_guard bool) string {
+	match operator {
+		.not { return 'not' }
+		.minus { return '-' }
+	}
+}
+
 // translate_operator translates LX operators to Erlang operators
-fn (gen ErlangGenerator) translate_operator(operator ast.BinaryOp) string {
+// is_guard indicates whether we're in a guard context
+fn (gen ErlangGenerator) translate_operator(operator ast.BinaryOp, is_guard bool) string {
 	match operator {
 		.add { return '+' }
 		.subtract { return '-' }
@@ -154,10 +254,12 @@ fn (gen ErlangGenerator) translate_operator(operator ast.BinaryOp) string {
 		.greater_than { return '>' }
 		.less_equal { return '=<' }
 		.greater_equal { return '>=' }
-		.and { return 'and' }
-		.or { return 'or' }
-		.andalso { return 'andalso' }
-		.orelse { return 'orelse' }
+		.and {
+			return if is_guard { 'andalso' } else { 'and' }
+		}
+		.or {
+			return if is_guard { 'orelse' } else { 'or' }
+		}
 		.append { return '++' }
 		.cons { return '|' }
 	}
@@ -309,5 +411,5 @@ fn (gen ErlangGenerator) generate_receive(expr ast.ReceiveExpr) string {
 
 // generate_guard generates code for guard expressions
 fn (gen ErlangGenerator) generate_guard(expr ast.GuardExpr) string {
-	return gen.generate_expression(expr.condition)
+	return gen.generate_expression_in_guard(expr.condition)
 }

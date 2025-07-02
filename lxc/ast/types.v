@@ -46,40 +46,6 @@ pub fn (t LXType) str() string {
 	}
 }
 
-// StringLiteral represents a string literal
-pub struct StringLiteral {
-pub:
-	value string
-}
-
-// IntegerLiteral represents an integer literal
-pub struct IntegerLiteral {
-pub:
-	value int
-}
-
-// FloatLiteral represents a float literal
-pub struct FloatLiteral {
-pub:
-	value f64
-}
-
-// BooleanLiteral represents a boolean literal
-pub struct BooleanLiteral {
-pub:
-	value bool
-}
-
-// AtomLiteral represents an atom literal
-pub struct AtomLiteral {
-pub:
-	value string
-}
-
-// NilLiteral represents a nil literal
-pub struct NilLiteral {
-}
-
 // Literal represents literal values in LX using sum types
 pub type Literal = StringLiteral
 	| IntegerLiteral

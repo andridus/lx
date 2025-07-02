@@ -71,8 +71,10 @@ fn (mut ep ExpressionParser) parse_variable_pattern() ?ast.Pattern {
 		type_annotation = ep.parse_type_expression()?
 	}
 
+	pos := token.get_position()
 	return ast.VarPattern{
 		name:            token.get_value()
+		position:        ast.new_position(pos.line, pos.column, pos.filename)
 		type_annotation: type_annotation
 	}
 }

@@ -512,7 +512,7 @@ fn (vc &VariableChecker) infer_argument_type(arg ast.Expr) string {
 				.equal, .not_equal, .less_than, .less_equal, .greater_than, .greater_equal {
 					return 'boolean'
 				}
-				.and, .or, .andalso, .orelse {
+				.and, .or {
 					return 'boolean'
 				}
 				else {

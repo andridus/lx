@@ -10,7 +10,8 @@ pub:
 // LiteralExpr represents a literal expression
 pub struct LiteralExpr {
 pub:
-	value Literal
+	value    Literal
+	position Position
 }
 
 // AssignExpr represents an assignment expression
@@ -60,6 +61,7 @@ pub:
 
 // ListEmptyExpr represents an empty list
 pub struct ListEmptyExpr {
+	position Position
 }
 
 // ListLiteralExpr represents a list literal
@@ -223,8 +225,6 @@ pub enum BinaryOp {
 	greater_equal
 	and
 	or
-	andalso
-	orelse
 	cons
 	append
 }
@@ -244,10 +244,8 @@ pub fn (op BinaryOp) str() string {
 		.less_equal { '<=' }
 		.greater_than { '>' }
 		.greater_equal { '>=' }
-		.and { '&&' }
-		.or { '||' }
-		.andalso { 'andalso' }
-		.orelse { 'orelse' }
+		.and { 'and' }
+		.or { 'or' }
 		.cons { '::' }
 		.append { '++' }
 	}
@@ -269,12 +267,14 @@ pub fn (op UnaryOp) str() string {
 
 // WildcardPattern represents a wildcard pattern
 pub struct WildcardPattern {
+	position Position
 }
 
 // VarPattern represents a variable pattern
 pub struct VarPattern {
 pub:
 	name            string
+	position        Position
 	type_annotation ?TypeExpression
 }
 
@@ -288,6 +288,7 @@ pub:
 pub struct AtomPattern {
 pub:
 	value string
+	position Position
 }
 
 // ListConsPattern represents list cons pattern
@@ -299,6 +300,7 @@ pub:
 
 // ListEmptyPattern represents an empty list pattern
 pub struct ListEmptyPattern {
+	position Position
 }
 
 // ListLiteralPattern represents a list literal pattern
@@ -745,4 +747,45 @@ pub fn (te TypeExpression) str() string {
 			te.name
 		}
 	}
+}
+
+// StringLiteral represents a string literal
+pub struct StringLiteral {
+pub:
+	value string
+	position Position
+}
+
+// IntegerLiteral represents an integer literal
+pub struct IntegerLiteral {
+pub:
+	value int
+	position Position
+}
+
+// FloatLiteral represents a float literal
+pub struct FloatLiteral {
+pub:
+	value f64
+	position Position
+}
+
+// BooleanLiteral represents a boolean literal
+pub struct BooleanLiteral {
+pub:
+	value bool
+	position Position
+}
+
+// AtomLiteral represents an atom literal
+pub struct AtomLiteral {
+pub:
+	value string
+	position Position
+}
+
+// NilLiteral represents a nil literal
+pub struct NilLiteral {
+pub:
+	position Position
 }

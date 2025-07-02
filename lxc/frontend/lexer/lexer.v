@@ -297,9 +297,26 @@ fn (mut l Lexer) create_token_from_buffer() Token {
 				keyword_token := get_keyword_token(buffer, l.start_pos) or {
 					panic('Internal error: keyword not found')
 				}
-				KeywordToken{
-					value:    keyword_token.value
-					position: l.start_pos
+				// Convert boolean keywords to BoolToken
+				match keyword_token.value {
+					.true_ {
+						BoolToken{
+							value:    true
+							position: l.start_pos
+						}
+					}
+					.false_ {
+						BoolToken{
+							value:    false
+							position: l.start_pos
+						}
+					}
+					else {
+						KeywordToken{
+							value:    keyword_token.value
+							position: l.start_pos
+						}
+					}
 				}
 			} else if is_operator(l.buffer) {
 				operator_token := get_operator_token(l.buffer, l.start_pos) or {

@@ -32,9 +32,7 @@ pub fn (p PrecedenceTable) get_precedence(token lexer.OperatorToken) Precedence 
 		.assign { .assignment }
 		.pattern_match { .assignment }
 		.or_ { .or_ }
-		.orelse { .or_ }
 		.and_ { .and_ }
-		.andalso { .and_ }
 		.eq { .equality }
 		.neq { .equality }
 		.lt { .comparison }
@@ -70,9 +68,7 @@ pub fn (p PrecedenceTable) is_left_associative(token lexer.OperatorToken) bool {
 		.assign { false }
 		.pattern_match { false }
 		.or_ { true }
-		.orelse { true }
 		.and_ { true }
-		.andalso { true }
 		.eq { false }
 		.neq { false }
 		.lt { false }

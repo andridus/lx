@@ -169,7 +169,7 @@ fn (gen ErlangGenerator) infer_binary_expression_return_type_with_context(expr a
 		.equal, .not_equal, .less_than, .less_equal, .greater_than, .greater_equal {
 			'boolean()'
 		}
-		.and, .or, .andalso, .orelse {
+		.and, .or {
 			'boolean()'
 		}
 		.cons {
@@ -232,13 +232,13 @@ pub fn (gen ErlangGenerator) generate_function(func ast.FunctionStmt) string {
 				if literal.value is ast.BooleanLiteral {
 					boolean := literal.value as ast.BooleanLiteral
 					if !boolean.value {
-						guard = ' when ' + gen.generate_expression(clause.guard)
+						guard = ' when ' + gen.generate_expression_in_guard(clause.guard)
 					}
 				} else {
-					guard = ' when ' + gen.generate_expression(clause.guard)
+					guard = ' when ' + gen.generate_expression_in_guard(clause.guard)
 				}
 			} else {
-				guard = ' when ' + gen.generate_expression(clause.guard)
+				guard = ' when ' + gen.generate_expression_in_guard(clause.guard)
 			}
 			body := clause.body.map(gen.generate_statement(it))
 			// Emit all statements separated by ',' except the last one (Erlang style)

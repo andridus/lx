@@ -166,8 +166,6 @@ pub enum OperatorValue {
 	and_
 	or_
 	not_
-	andalso
-	orelse
 }
 
 // OperatorToken represents an operator token
@@ -312,8 +310,6 @@ pub fn (o OperatorValue) str() string {
 		.and_ { 'and' }
 		.or_ { 'or' }
 		.not_ { 'not' }
-		.andalso { 'andalso' }
-		.orelse { 'orelse' }
 	}
 }
 

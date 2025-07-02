@@ -64,6 +64,14 @@ fn (mut sp StatementParser) parse_simple_expression() ?ast.Expr {
 				op = .not_equal
 				should_continue = true
 			}
+			.and_ {
+				op = .and
+				should_continue = true
+			}
+			.or_ {
+				op = .or
+				should_continue = true
+			}
 			else {
 				break
 			}
@@ -228,46 +236,61 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 		lexer.StringToken {
 			token := sp.current as lexer.StringToken
 			sp.advance()
+			pos := ast.new_position(token.position.line, token.position.column, token.position.filename)
 			ast.LiteralExpr{
 				value: ast.StringLiteral{
 					value: token.value
+					position: pos
 				}
+				position: pos
 			}
 		}
 		lexer.IntToken {
 			token := sp.current as lexer.IntToken
 			sp.advance()
+			pos := ast.new_position(token.position.line, token.position.column, token.position.filename)
 			ast.LiteralExpr{
 				value: ast.IntegerLiteral{
 					value: token.value
+					position: pos
 				}
+				position: pos
 			}
 		}
 		lexer.FloatToken {
 			token := sp.current as lexer.FloatToken
 			sp.advance()
+			pos := ast.new_position(token.position.line, token.position.column, token.position.filename)
 			ast.LiteralExpr{
 				value: ast.FloatLiteral{
 					value: token.value
+					position: pos
 				}
+				position: pos
 			}
 		}
 		lexer.BoolToken {
 			token := sp.current as lexer.BoolToken
 			sp.advance()
+			pos := ast.new_position(token.position.line, token.position.column, token.position.filename)
 			ast.LiteralExpr{
 				value: ast.BooleanLiteral{
 					value: token.value
+					position: pos
 				}
+				position: pos
 			}
 		}
 		lexer.AtomToken {
 			token := sp.current as lexer.AtomToken
 			sp.advance()
+			pos := ast.new_position(token.position.line, token.position.column, token.position.filename)
 			ast.LiteralExpr{
 				value: ast.AtomLiteral{
 					value: token.value
+					position: pos
 				}
+				position: pos
 			}
 		}
 		lexer.KeywordToken {
@@ -275,8 +298,12 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 			match keyword_token.value {
 				.nil_ {
 					sp.advance()
+					pos := ast.new_position(keyword_token.position.line, keyword_token.position.column, keyword_token.position.filename)
 					ast.LiteralExpr{
-						value: ast.NilLiteral{}
+						value: ast.NilLiteral{
+							position: pos
+						}
+						position: pos
 					}
 				}
 				else {
