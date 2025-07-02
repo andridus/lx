@@ -12,6 +12,8 @@ This extension provides comprehensive syntax highlighting and language support f
   - Pattern matching and operators
   - Type specifications and guards
   - Testing framework (`describe`, `test`, `assert`)
+  - **Type System**: Type aliases, annotations, and modifiers (`type`, `opaque`, `nominal`, `::`)
+  - **Directives**: Compile-time metadata (`@reflection`, `@inline`, `@deprecated`)
 
 - **Language Features**:
   - Auto-closing brackets and quotes
@@ -23,6 +25,19 @@ This extension provides comprehensive syntax highlighting and language support f
 - **Color Theme**: Custom dark theme optimized for Lx syntax
 
 ## Supported Syntax
+
+### Type System
+- **Type Aliases**: `type name :: type_expression`
+- **Opaque Types**: `type opaque name :: type_expression`
+- **Nominal Types**: `type nominal name :: type_expression`
+- **Type Annotations**: `variable :: type` and `function(param :: type) :: return_type`
+- **Union Types**: `type number :: integer | float`
+- **Function Types**: `(integer, string) -> boolean`
+
+### Directives
+- **`@reflection`**: Prints detailed type information during compilation
+- **`@inline`**: Marks function for inlining optimization
+- **`@deprecated`**: Marks function as deprecated
 
 ### Data Structures
 - **Maps**: `%{ key: value, "key" => value }`

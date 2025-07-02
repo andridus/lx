@@ -1,8 +1,8 @@
 {
   "name": "lx-language-support",
   "displayName": "Lx Language Support",
-  "description": "Syntax highlighting and language support for the Lx programming language.",
-  "version": "0.0.2",
+  "description": "Syntax highlighting and language support for the Lx programming language with type system and directives.",
+  "version": "0.0.3",
   "publisher": "Helder de Sousa",
   "engines": {
     "vscode": ">=1.50.0"
@@ -16,7 +16,9 @@
     "beam",
     "otp",
     "functional",
-    "concurrent"
+    "concurrent",
+    "type-system",
+    "directives"
   ],
   "contributes": {
     "languages": [

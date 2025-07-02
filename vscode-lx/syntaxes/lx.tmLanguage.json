@@ -50,6 +50,9 @@
     },
     {
       "include": "#list"
+    },
+    {
+      "include": "#directive"
     }
   ],
   "repository": {
@@ -207,11 +210,16 @@
           "match": "\\b(do|end)\\b(?![?!])"
         },
         {
+          "comment": "Type system keywords",
+          "name": "keyword.control.type.lx",
+          "match": "\\b(type|opaque|nominal)\\b(?![?!])"
+        },
+        {
           "comment": "typespec Lx",
           "match": "\\s*(::)\\s*([%\\w{}:.,|]+(?:\\s*\\|\\s*[^\\s]+)*)",
           "captures": {
             "1": {
-              "name": "constant.language.symbol.lx"
+              "name": "keyword.operator.type.lx"
             },
             "2": {
               "name": "entity.name.type.lx"
@@ -313,7 +321,7 @@
       "patterns": [
         {
           "name": "storage.type.lx",
-          "match": "\\b(record|worker|supervisor|spec|application|deps)\\b"
+          "match": "\\b(record|worker|supervisor|spec|application|deps|type|opaque|nominal)\\b"
         },
         {
           "name": "storage.type.record.lx",
@@ -333,7 +341,21 @@
       "patterns": [
         {
           "name": "entity.name.type.lx",
-          "match": "\\b(string|integer|boolean|float|list|map|tuple|atom|binary|any|bitstring)\\b"
+          "match": "\\b(string|integer|boolean|float|list|map|tuple|atom|binary|any|bitstring|nil|pid|reference|port)\\b"
+        },
+        {
+          "comment": "Type annotations with ::",
+          "name": "entity.name.type.annotation.lx",
+          "match": "(?<=::\\s*)[a-zA-Z_][a-zA-Z0-9_]*(?:\\s*\\|\\s*[a-zA-Z_][a-zA-Z0-9_]*)*"
+        }
+      ]
+    },
+    "directive": {
+      "patterns": [
+        {
+          "comment": "Directives like @reflection, @inline, @deprecated",
+          "name": "keyword.directive.lx",
+          "match": "@(reflection|inline|deprecated)\\b"
         }
       ]
     },

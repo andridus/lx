@@ -126,10 +126,24 @@
       }
     },
     {
+      "name": "Keywords Type System",
+      "scope": "keyword.control.type.lx",
+      "settings": {
+        "foreground": "#FFB6C1"
+      }
+    },
+    {
       "name": "Keywords Other",
       "scope": "keyword.control.other.lx",
       "settings": {
         "foreground": "#DDA0DD"
+      }
+    },
+    {
+      "name": "Directives",
+      "scope": "keyword.directive.lx",
+      "settings": {
+        "foreground": "#FF4500"
       }
     },
     {
@@ -182,6 +196,13 @@
       }
     },
     {
+      "name": "Type Annotations",
+      "scope": "entity.name.type.annotation.lx",
+      "settings": {
+        "foreground": "#87CEEB"
+      }
+    },
+    {
       "name": "Operators",
       "scope": "keyword.operator.lx",
       "settings": {
@@ -207,6 +228,13 @@
       "scope": "keyword.operator.with-bind.lx",
       "settings": {
         "foreground": "#00CED1"
+      }
+    },
+    {
+      "name": "Type Operator",
+      "scope": "keyword.operator.type.lx",
+      "settings": {
+        "foreground": "#FFB6C1"
       }
     },
     {

@@ -36,7 +36,7 @@
   },
   "wordPattern": "(-?\\b\\d+\\.\\d+\\b)|(-?\\b\\d+\\b)|(\\b[a-zA-Z_][a-zA-Z0-9_]*\\b)|(:[a-zA-Z_][a-zA-Z0-9_]*)|(\"[^\"]*\")",
   "indentationRules": {
-    "increaseIndentPattern": "^(.*\\bdo\\b.*)$|^(.*\\bif\\b.*)$|^(.*\\bcase\\b.*)$|^(.*\\bwith\\b.*)$|^(.*\\bfor\\b.*)$|^(.*\\bworker\\b.*)$|^(.*\\bsupervisor\\b.*)$|^(.*\\brecord\\b.*)$|^(.*\\bspec\\b.*)$|^(.*\\bdescribe\\b.*)$|^(.*\\btest\\b.*)$|^(.*\\bapplication\\b.*)$|^(.*\\bdeps\\b.*)$|^(.*\\{.*)$|^(.*\\[.*)$|^(.*\\(.*)$|^(.*<<.*)$|^(.*%\\{.*)$|^(.*\\.\\{.*)$",
+    "increaseIndentPattern": "^(.*\\bdo\\b.*)$|^(.*\\bif\\b.*)$|^(.*\\bcase\\b.*)$|^(.*\\bwith\\b.*)$|^(.*\\bfor\\b.*)$|^(.*\\bworker\\b.*)$|^(.*\\bsupervisor\\b.*)$|^(.*\\brecord\\b.*)$|^(.*\\bspec\\b.*)$|^(.*\\bdescribe\\b.*)$|^(.*\\btest\\b.*)$|^(.*\\bapplication\\b.*)$|^(.*\\bdeps\\b.*)$|^(.*\\btype\\b.*)$|^(.*\\bopaque\\b.*)$|^(.*\\bnominal\\b.*)$|^(.*\\{.*)$|^(.*\\[.*)$|^(.*\\(.*)$|^(.*<<.*)$|^(.*%\\{.*)$|^(.*\\.\\{.*)$",
     "decreaseIndentPattern": "^(.*\\bend\\b.*)$|^(.*\\belse\\b.*)$|^(.*\\}.*)$|^(.*\\].*)$|^(.*\\).*)$|^(.*>>.*)$"
   }
 }
