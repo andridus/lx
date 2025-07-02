@@ -470,6 +470,11 @@ pub fn (mut vc VariableChecker) mark_variable_used(name string) {
 pub fn (mut vc VariableChecker) check_unused_variables() {
 	for scope in vc.scope_stack {
 		for name, binding in scope.variables {
+			// Skip variables that start with underscore (wildcard pattern)
+			if name.starts_with('_') {
+				continue
+			}
+
 			if binding.defined && !binding.used {
 				error_msg := "Variable '${name}' is defined but never used"
 				suggestion := 'Remove the variable assignment or use the variable in an expression'

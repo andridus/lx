@@ -7,7 +7,8 @@ import lexer
 fn (mut sp StatementParser) parse_statement_block() ?[]ast.Stmt {
 	mut statements := []ast.Stmt{}
 
-	for {
+	for !sp.is_at_end() {
+		// Check for end keywords that should break
 		if sp.current is lexer.KeywordToken {
 			keyword_token := sp.current as lexer.KeywordToken
 			if keyword_token.value == .end_ {
@@ -18,8 +19,30 @@ fn (mut sp StatementParser) parse_statement_block() ?[]ast.Stmt {
 			}
 		}
 
-		stmt := sp.parse_statement()?
-		statements << stmt
+		// Check for pattern tokens that indicate next case
+		if sp.current is lexer.IntToken || sp.current is lexer.StringToken
+			|| sp.current is lexer.IdentToken {
+			// Look ahead to see if this is a pattern (followed by ->)
+			mut lookahead_pos := sp.position + 1
+			if lookahead_pos < sp.tokens.len {
+				if sp.tokens[lookahead_pos] is lexer.OperatorToken {
+					op_token := sp.tokens[lookahead_pos] as lexer.OperatorToken
+					if op_token.value == .arrow {
+						// This is a pattern for the next case
+						break
+					}
+				}
+			}
+		}
+
+		// Parse expression (including control flow) and wrap it in ExprStmt
+		expr := sp.parse_clause_expression()?
+		statements << ast.ExprStmt{
+			expr: expr
+		}
+
+		// Break after parsing one expression for case bodies
+		break
 	}
 
 	return statements

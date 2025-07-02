@@ -1082,7 +1082,7 @@ fn (mut tc TypeChecker) infer_expression_type(expr ast.Expr) TypeExpr {
 			return tc.infer_if_expression_type(expr)
 		}
 		ast.CaseExpr {
-			return make_type_var('a')
+			return tc.infer_case_expression_type(expr)
 		}
 		ast.WithExpr {
 			return make_type_var('a')
@@ -1380,4 +1380,72 @@ fn (mut tc TypeChecker) infer_if_expression_type(expr ast.IfExpr) TypeExpr {
 
 	// If both are type variables, return a generic type
 	return make_type_var('a')
+}
+
+// infer_case_expression_type infers the type of a case expression
+fn (mut tc TypeChecker) infer_case_expression_type(expr ast.CaseExpr) TypeExpr {
+	if expr.cases.len == 0 {
+		return nil_type
+	}
+
+	// Infer types from all case branches
+	mut case_types := []TypeExpr{}
+	for case_clause in expr.cases {
+		if case_clause.body.len > 0 {
+			// Get the type of the last statement in the case body
+			last_stmt := case_clause.body[case_clause.body.len - 1]
+			if last_stmt is ast.ExprStmt {
+				case_type := tc.infer_expression_type(last_stmt.expr)
+				case_types << case_type
+			} else {
+				case_types << nil_type
+			}
+		} else {
+			case_types << nil_type
+		}
+	}
+
+	// If all cases have the same type, return that type
+	if case_types.len > 0 {
+		first_type_str := case_types[0].str()
+		mut all_same := true
+		for case_type in case_types[1..] {
+			if case_type.str() != first_type_str {
+				all_same = false
+				break
+			}
+		}
+		if all_same && !first_type_str.starts_with('a') {
+			return case_types[0]
+		}
+	}
+
+	// Find the most specific common type
+	mut result_type := TypeExpr(nil_type)
+	for case_type in case_types {
+		case_type_str := case_type.str()
+		if case_type_str != 'nil' && !case_type_str.starts_with('a') {
+			if result_type.str() == 'nil' {
+				result_type = case_type
+			} else if result_type.str() != case_type_str {
+				// Different types, use precedence: string > integer > float > boolean > atom
+				precedence_map := {
+					'string':  5
+					'integer': 4
+					'float':   3
+					'boolean': 2
+					'atom':    1
+				}
+
+				result_precedence := precedence_map[result_type.str()] or { 0 }
+				case_precedence := precedence_map[case_type_str] or { 0 }
+
+				if case_precedence > result_precedence {
+					result_type = case_type
+				}
+			}
+		}
+	}
+
+	return if result_type.str() == 'nil' { make_type_var('a') } else { result_type }
 }

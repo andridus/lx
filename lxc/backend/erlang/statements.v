@@ -118,6 +118,9 @@ fn (gen ErlangGenerator) infer_expression_return_type_with_context(expr ast.Expr
 		ast.IfExpr {
 			gen.infer_if_expression_return_type(expr, parameters)
 		}
+		ast.CaseExpr {
+			gen.infer_case_expression_return_type(expr, parameters)
+		}
 		else {
 			'any()'
 		}
@@ -339,7 +342,8 @@ fn (gen ErlangGenerator) infer_if_expression_return_type(expr ast.IfExpr, parame
 		// Get the type of the last statement in the then branch
 		last_then_stmt := expr.then_body[expr.then_body.len - 1]
 		if last_then_stmt is ast.ExprStmt {
-			then_type = gen.infer_expression_return_type_with_context(last_then_stmt.expr, parameters)
+			then_type = gen.infer_expression_return_type_with_context(last_then_stmt.expr,
+				parameters)
 		}
 	}
 
@@ -349,7 +353,8 @@ fn (gen ErlangGenerator) infer_if_expression_return_type(expr ast.IfExpr, parame
 		// Get the type of the last statement in the else branch
 		last_else_stmt := expr.else_body[expr.else_body.len - 1]
 		if last_else_stmt is ast.ExprStmt {
-			else_type = gen.infer_expression_return_type_with_context(last_else_stmt.expr, parameters)
+			else_type = gen.infer_expression_return_type_with_context(last_else_stmt.expr,
+				parameters)
 		}
 	} else {
 		// If no else branch, the else type is nil
@@ -381,4 +386,72 @@ fn (gen ErlangGenerator) infer_if_expression_return_type(expr ast.IfExpr, parame
 
 	// If both are any(), return any()
 	return 'any()'
+}
+
+// infer_case_expression_return_type infers the return type of a case expression
+fn (gen ErlangGenerator) infer_case_expression_return_type(expr ast.CaseExpr, parameters []ast.Pattern) string {
+	if expr.cases.len == 0 {
+		return 'nil'
+	}
+
+	// Infer types from all case branches
+	mut case_types := []string{}
+	for case_clause in expr.cases {
+		if case_clause.body.len > 0 {
+			// Get the type of the last statement in the case body
+			last_stmt := case_clause.body[case_clause.body.len - 1]
+			if last_stmt is ast.ExprStmt {
+				case_type := gen.infer_expression_return_type_with_context(last_stmt.expr,
+					parameters)
+				case_types << case_type
+			} else {
+				case_types << 'nil'
+			}
+		} else {
+			case_types << 'nil'
+		}
+	}
+
+	// If all cases have the same type, return that type
+	if case_types.len > 0 {
+		first_type := case_types[0]
+		mut all_same := true
+		for case_type in case_types[1..] {
+			if case_type != first_type {
+				all_same = false
+				break
+			}
+		}
+		if all_same && first_type != 'any()' {
+			return first_type
+		}
+	}
+
+	// Find the most specific common type
+	mut result_type := 'nil'
+	for case_type in case_types {
+		if case_type != 'nil' && case_type != 'any()' {
+			if result_type == 'nil' {
+				result_type = case_type
+			} else if result_type != case_type {
+				// Different types, use precedence: string() > integer() > float() > boolean() > atom()
+				precedence_map := {
+					'string()':  5
+					'integer()': 4
+					'float()':   3
+					'boolean()': 2
+					'atom()':    1
+				}
+
+				result_precedence := precedence_map[result_type] or { 0 }
+				case_precedence := precedence_map[case_type] or { 0 }
+
+				if case_precedence > result_precedence {
+					result_type = case_type
+				}
+			}
+		}
+	}
+
+	return if result_type == 'nil' { 'any()' } else { result_type }
 }
