@@ -420,7 +420,7 @@ pub fn get_transitions() []Transition {
 			condition:  AlwaysCondition{}
 			action:     .consume_character
 		},
-		// Directive state transitions
+		// Directive state transitions - reordenadas para evitar conflitos
 		Transition{
 			from_state: .directive
 			to_state:   .initial
@@ -428,6 +428,47 @@ pub fn get_transitions() []Transition {
 				class: .newline
 			}
 			action:     .emit_token
+		},
+		Transition{
+			from_state: .directive
+			to_state:   .error
+			condition:  CharacterClassCondition{
+				class: .whitespace
+			}
+			action:     .emit_error
+		},
+		Transition{
+			from_state: .directive
+			to_state:   .error
+			condition:  CharacterClassCondition{
+				class: .operator_start
+			}
+			action:     .emit_error
+		},
+		Transition{
+			from_state: .directive
+			to_state:   .error
+			condition:  CharacterClassCondition{
+				class: .punctuation
+			}
+			action:     .emit_error
+		},
+		Transition{
+			from_state: .directive
+			to_state:   .error
+			condition:  CharacterClassCondition{
+				class: .digit
+			}
+			action:     .emit_error
+		},
+		// Diretiva válida - deve ter pelo menos um identificador após @
+		Transition{
+			from_state: .directive
+			to_state:   .directive
+			condition:  CharacterClassCondition{
+				class: .identifier_start
+			}
+			action:     .consume_character
 		},
 		Transition{
 			from_state: .directive

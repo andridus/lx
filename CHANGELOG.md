@@ -43,6 +43,12 @@
 - **Didactic Examples**: Added a comprehensive set of didactic `.lx` example files in `lxc/examples/`, covering basic to advanced features (syntax, pattern matching, functions, control flow, data structures, OTP, concurrency, specifications, testing, and a full application). All examples follow the official Lx syntax and ensure every expression is inside a function, serving as reference and test material for users and contributors.
 - **Lexer Token Refactoring**: Refactored `KeywordToken`, `OperatorToken`, and `PunctuationToken` from enums to structs with a `value` field containing the corresponding enum (`KeywordValue`, `OperatorValue`, `PunctuationValue`). Added helper functions `keyword()`, `operator()`, and `punctuation()` for simplified token creation. This improves type safety and provides a more consistent token structure throughout the lexer and parser.
 - **Função utilitária de teste**: Adicionada `assert_lx_generates_erlang(lx_code, expected_erlang)` para facilitar testes automatizados comparando código LX e o Erlang gerado. Permite escrever testes limpos e diretos usando apenas strings, sem manipulação manual de tokens.
+- **Type Aliases**: Support for type alias declarations using `type name :: type_expression`. Example: `type number :: float | integer`.
+- **Type Alias Modifiers**: Support for `opaque` and `nominal` type aliases using `type opaque name :: type_expression` and `type nominal name :: type_expression`. These generate `-opaque` and `-nominal` declarations in Erlang respectively, providing better type encapsulation and distinct type semantics.
+- **Type Annotations in Assignments**: Support for variable assignments with type annotations, e.g., `x :: int = 1`.
+- **Type Annotations in Function Parameters**: Support for annotating function parameters with types or type aliases, e.g., `def add(a :: int, b :: number) do ... end`.
+- **Automatic Spec Generation**: The compiler now automatically generates Erlang `-spec` declarations for all functions based on type annotations and intelligent type inference. Specs are positioned immediately above each function definition and use parameter context to infer accurate return types.
+- **Enhanced Type Inference**: Improved type inference system that can infer return types from function bodies, including support for tuples, lists, arithmetic operations, and variable references using parameter context.
 
 ### Fixed
 - **Fixed Variable Position Tracking**: Corrected AST position tracking for VariableExpr nodes to ensure accurate error reporting. Variable scope errors now show correct line and column positions instead of generic 0:0 positions, improving debugging experience.
@@ -70,3 +76,4 @@
 - Fixed module generation to handle dependencies and generate correct Erlang module structure
 - Fixed typechecker types tests: corrected module imports, updated usage to match the current typechecker API, and fixed string assertion for function type representation in list context (now expects 'list((T1) -> T2)'). All type system tests now pass.
 - Fixed: Assignment parsing in function bodies now correctly accepts `name = "Alice"` and similar statements, matching LX syntax reference. (2024-06-09)
+- **Assignment with Type Annotation Parsing**: Fixed parsing so that assignments with type annotations (e.g., `x :: int = 1`) are accepted inside function bodies, matching the LX syntax reference and type system.

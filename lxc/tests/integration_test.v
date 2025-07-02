@@ -101,7 +101,7 @@ fn test_pattern_matching_expressions() {
 fn test_data_structure_expressions() {
 	// Test map with different key types
 	tokens := [
-		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.record_update)),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.pipe)),
 		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbrace)),
 		lexer.Token(lexer.new_atom_token('name')),
 		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.colon)),

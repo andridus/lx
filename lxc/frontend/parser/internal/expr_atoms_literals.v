@@ -103,6 +103,9 @@ fn (mut ep ExpressionParser) parse_atom_expression() ?ast.Expr {
 				.lbracket {
 					ep.parse_list_expression()
 				}
+				.colon {
+					ep.parse_external_atom()
+				}
 				else {
 					ep.add_error('Unexpected token: ${ep.current.str()}', 'Expected expression')
 					none
@@ -112,7 +115,10 @@ fn (mut ep ExpressionParser) parse_atom_expression() ?ast.Expr {
 		lexer.OperatorToken {
 			op_token := ep.current as lexer.OperatorToken
 			match op_token.value {
-				.record_update {
+				.pipe {
+					ep.parse_map_expression()
+				}
+				.modulo {
 					ep.parse_map_expression()
 				}
 				else {
@@ -219,4 +225,26 @@ fn (mut ep ExpressionParser) parse_parenthesized_expression() ?ast.Expr {
 	ep.consume(lexer.punctuation(.rparen), 'Expected closing parenthesis')?
 
 	return expr
+}
+
+fn (mut ep ExpressionParser) parse_external_atom() ?ast.Expr {
+	ep.advance()
+	return match ep.current {
+		lexer.AtomToken {
+			ep.parse_atom_literal()
+		}
+		lexer.IdentToken {
+			ident_token := ep.current as lexer.IdentToken
+			ep.advance()
+			ast.LiteralExpr{
+				value: ast.AtomLiteral{
+					value: ident_token.value
+				}
+			}
+		}
+		else {
+			ep.add_error('Expected atom or identifier after :', 'Got ${ep.current.str()}')
+			none
+		}
+	}
 }

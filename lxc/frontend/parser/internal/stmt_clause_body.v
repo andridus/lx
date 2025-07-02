@@ -48,7 +48,7 @@ fn (mut sp StatementParser) parse_clause_body() ?[]ast.Stmt {
 		// Parse assignment statements
 		if sp.current is lexer.IdentToken && sp.peek() is lexer.OperatorToken {
 			op_token := sp.peek() as lexer.OperatorToken
-			if op_token.value == .assign {
+			if op_token.value == .assign || op_token.value == .type_cons {
 				stmt := sp.parse_assignment_statement()?
 				statements << stmt
 			} else {
@@ -125,8 +125,17 @@ fn (mut sp StatementParser) parse_assignment_statement() ?ast.Stmt {
 
 	// Save the position BEFORE consuming the identifier
 	ident_position := sp.get_current_position()
-	name := sp.current.get_value()
+	ident_token := sp.current as lexer.IdentToken
+	name := ident_token.value
 	sp.advance()
+
+	mut type_annotation := ?ast.TypeExpression(none)
+
+	// Check for type annotation
+	if sp.check(lexer.operator(.type_cons)) {
+		sp.advance() // consume '::'
+		type_annotation = sp.parse_type_expression()?
+	}
 
 	// Parse assignment operator
 	sp.consume(lexer.operator(.assign), 'Expected = in assignment')?
@@ -136,9 +145,10 @@ fn (mut sp StatementParser) parse_assignment_statement() ?ast.Stmt {
 
 	return ast.ExprStmt{
 		expr: ast.AssignExpr{
-			name:     name
-			value:    value
-			position: ident_position
+			name:            name
+			value:           value
+			type_annotation: type_annotation
+			position:        ident_position
 		}
 	}
 }

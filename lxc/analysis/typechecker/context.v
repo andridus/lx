@@ -18,18 +18,20 @@ pub fn (tb TypeBinding) str() string {
 // TypeContext represents the type environment and scope
 pub struct TypeContext {
 pub mut:
-	bindings map[string]TypeBinding
-	parent   ?&TypeContext
-	level    int // Scope level for shadowing
+	bindings     map[string]TypeBinding
+	type_aliases map[string]TypeExpr
+	parent       ?&TypeContext
+	level        int // Scope level for shadowing
 }
 
 // new_context creates a new type context
 @[heap]
 pub fn new_context() &TypeContext {
 	return &TypeContext{
-		bindings: map[string]TypeBinding{}
-		parent:   none
-		level:    0
+		bindings:     map[string]TypeBinding{}
+		type_aliases: map[string]TypeExpr{}
+		parent:       none
+		level:        0
 	}
 }
 
@@ -37,9 +39,10 @@ pub fn new_context() &TypeContext {
 pub fn (ctx &TypeContext) new_child_context() &TypeContext {
 	return unsafe {
 		&TypeContext{
-			bindings: map[string]TypeBinding{}
-			parent:   ctx
-			level:    ctx.level + 1
+			bindings:     map[string]TypeBinding{}
+			type_aliases: map[string]TypeExpr{}
+			parent:       ctx
+			level:        ctx.level + 1
 		}
 	}
 }
@@ -280,4 +283,64 @@ pub fn (env &TypeEnvironment) str() string {
 // new_type_context creates a new type context for compilation
 pub fn new_type_context() &TypeContext {
 	return new_context()
+}
+
+// register_type_alias registers a type alias in the context
+pub fn (mut ctx TypeContext) register_type_alias(name string, type_expr TypeExpr) {
+	ctx.type_aliases[name] = type_expr
+}
+
+// lookup_type_alias finds a type alias in the current context or parent contexts
+pub fn (ctx &TypeContext) lookup_type_alias(name string) ?TypeExpr {
+	// Check current context first
+	if type_expr := ctx.type_aliases[name] {
+		return type_expr
+	}
+
+	// Check parent contexts
+	if parent := ctx.parent {
+		return parent.lookup_type_alias(name)
+	}
+
+	return none
+}
+
+// has_type_alias checks if a type alias exists in the current context
+pub fn (ctx &TypeContext) has_type_alias(name string) bool {
+	return name in ctx.type_aliases
+}
+
+// has_type_alias_recursive checks if a type alias exists in any context
+pub fn (ctx &TypeContext) has_type_alias_recursive(name string) bool {
+	if ctx.has_type_alias(name) {
+		return true
+	}
+
+	if parent := ctx.parent {
+		return parent.has_type_alias_recursive(name)
+	}
+
+	return false
+}
+
+// get_all_type_aliases returns all type aliases in the current context
+pub fn (ctx &TypeContext) get_all_type_aliases() map[string]TypeExpr {
+	return ctx.type_aliases.clone()
+}
+
+// get_all_type_aliases_recursive returns all type aliases in all contexts
+pub fn (ctx &TypeContext) get_all_type_aliases_recursive() map[string]TypeExpr {
+	mut all_aliases := ctx.get_all_type_aliases()
+
+	if parent := ctx.parent {
+		parent_aliases := parent.get_all_type_aliases_recursive()
+		for name, type_expr in parent_aliases {
+			// Child context aliases take precedence
+			if name !in all_aliases {
+				all_aliases[name] = type_expr
+			}
+		}
+	}
+
+	return all_aliases
 }

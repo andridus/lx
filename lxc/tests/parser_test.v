@@ -251,7 +251,7 @@ fn test_data_structure_parsing() {
 fn test_map_parsing() {
 	// Test map with atom keys
 	tokens := [
-		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.record_update)),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.pipe)),
 		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbrace)),
 		lexer.Token(lexer.AtomToken{
 			value: 'name'

@@ -52,5 +52,10 @@ fn test_simple_addition() {
 }
 
 fn test_simple_function_string() {
-	assert_lx_generates_erlang('def f() do\n1\nend', '-module(main).\n-export([f/0]).\n\nf() ->\n1.\n')
+	assert_lx_generates_erlang('def f() do\n1\nend', '-module(main).
+-export([f/0]).\n
+-spec f() -> integer().
+f() ->
+1.\n
+')
 }

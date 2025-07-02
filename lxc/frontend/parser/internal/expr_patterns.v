@@ -63,8 +63,17 @@ fn (mut ep ExpressionParser) parse_variable_pattern() ?ast.Pattern {
 	token := ep.current
 	ep.advance()
 
+	mut type_annotation := ?ast.TypeExpression(none)
+
+	// Check for type annotation (:: Type)
+	if ep.check(lexer.operator(.type_cons)) {
+		ep.advance() // consume '::'
+		type_annotation = ep.parse_type_expression()?
+	}
+
 	return ast.VarPattern{
-		name: token.get_value()
+		name:            token.get_value()
+		type_annotation: type_annotation
 	}
 }
 

@@ -415,7 +415,7 @@ pub fn (mut vc VariableChecker) check_statement(stmt ast.Stmt) {
 				vc.exit_scope()
 			}
 		}
-		ast.RecordDefStmt, ast.TypeDefStmt {
+		ast.RecordDefStmt, ast.TypeDefStmt, ast.TypeAliasStmt {
 			// These don't involve variable scoping
 		}
 	}

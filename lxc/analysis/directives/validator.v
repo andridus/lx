@@ -25,15 +25,11 @@ pub fn (v DirectiveValidator) validate_function(func_stmt ast.FunctionStmt) []er
 			available_directives := v.registry.get_available_directives().join(', ')
 			suggestion := 'Available directives: ${available_directives}'
 
-			compilation_error := errors.new_compilation_error(
-				errors.SyntaxError{
-					message:  error_msg
-					expected: suggestion
-					found:    '@${directive}'
-				},
-				func_stmt.position,
-				error_msg
-			)
+			compilation_error := errors.new_compilation_error(errors.SyntaxError{
+				message:  error_msg
+				expected: suggestion
+				found:    '@${directive}'
+			}, func_stmt.position, error_msg)
 
 			directive_errors << compilation_error
 		}

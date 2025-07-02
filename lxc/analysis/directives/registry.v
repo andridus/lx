@@ -4,7 +4,7 @@ import ast
 import typechecker
 
 // DirectiveHandler represents a directive handler function
-pub type DirectiveHandler = fn(ast.FunctionStmt, &typechecker.TypeChecker)
+pub type DirectiveHandler = fn (ast.FunctionStmt, &typechecker.TypeChecker)
 
 // DirectiveRegistry manages all available directives
 pub struct DirectiveRegistry {

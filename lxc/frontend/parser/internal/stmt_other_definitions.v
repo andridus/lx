@@ -51,6 +51,62 @@ fn (mut sp StatementParser) parse_record_definition() ?ast.Stmt {
 	}
 }
 
+// parse_type_alias_statement_with_modifier parses type alias definitions with optional modifiers
+fn (mut sp StatementParser) parse_type_alias_statement_with_modifier() ?ast.Stmt {
+	sp.advance() // consume 'type'
+
+	// Check for optional modifier
+	mut alias_type := ast.TypeAliasType.regular
+	if sp.check(lexer.keyword(.opaque)) {
+		alias_type = ast.TypeAliasType.opaque
+		sp.advance()
+	} else if sp.check(lexer.keyword(.nominal)) {
+		alias_type = ast.TypeAliasType.nominal
+		sp.advance()
+	}
+
+	name := sp.current.get_value()
+	if !sp.current.is_identifier() {
+		sp.add_error('Expected type alias name', 'Got ${sp.current.str()}')
+		return none
+	}
+	sp.advance()
+
+	sp.consume(lexer.operator(.type_cons), 'Expected :: after type alias name')?
+
+	type_expr := sp.parse_type_expression()?
+
+	return ast.TypeAliasStmt{
+		name:       name
+		type_expr:  type_expr
+		alias_type: alias_type
+		position:   sp.get_current_position()
+	}
+}
+
+// parse_type_alias_statement parses type alias definitions (type name :: type_expression)
+fn (mut sp StatementParser) parse_type_alias_statement() ?ast.Stmt {
+	sp.advance() // consume 'type'
+
+	name := sp.current.get_value()
+	if !sp.current.is_identifier() {
+		sp.add_error('Expected type alias name', 'Got ${sp.current.str()}')
+		return none
+	}
+	sp.advance()
+
+	sp.consume(lexer.operator(.type_cons), 'Expected :: after type alias name')?
+
+	type_expr := sp.parse_type_expression()?
+
+	return ast.TypeAliasStmt{
+		name:       name
+		type_expr:  type_expr
+		alias_type: ast.TypeAliasType.regular
+		position:   sp.get_current_position()
+	}
+}
+
 // parse_worker_statement parses worker definitions
 fn (mut sp StatementParser) parse_worker_statement() ?ast.Stmt {
 	sp.advance() // consume 'worker'

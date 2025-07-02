@@ -45,13 +45,14 @@ pub fn (p PrecedenceTable) get_precedence(token lexer.OperatorToken) Precedence 
 		.minus { .term }
 		.mult { .factor }
 		.div { .factor }
+		.modulo { .factor }
 		.not_ { .unary }
 		.dot { .call }
 		.arrow { .none }
 		.send { .none }
 		.type_cons { .none }
 		.concat { .none }
-		.record_update { .none }
+		.pipe { .none }
 	}
 }
 
@@ -82,13 +83,14 @@ pub fn (p PrecedenceTable) is_left_associative(token lexer.OperatorToken) bool {
 		.minus { true }
 		.mult { true }
 		.div { true }
+		.modulo { true }
 		.not_ { false }
 		.dot { true }
 		.arrow { false }
 		.send { false }
 		.type_cons { false }
 		.concat { true }
-		.record_update { false }
+		.pipe { false }
 	}
 }
 

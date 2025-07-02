@@ -90,6 +90,9 @@ fn (mut tc TypeChecker) check_statement(stmt ast.Stmt) {
 		ast.TypeDefStmt {
 			tc.check_type_definition(stmt)
 		}
+		ast.TypeAliasStmt {
+			tc.check_type_alias_statement(stmt)
+		}
 	}
 }
 
@@ -185,12 +188,19 @@ fn (mut tc TypeChecker) check_assignment_expression(expr ast.AssignExpr) {
 	// Check the value expression first
 	tc.check_expression(expr.value)
 
-	// For now, we'll use a simple type inference
-	// In a real implementation, this would perform proper type inference
+	// Infer the type of the value
 	value_type := tc.infer_expression_type(expr.value)
 
-	// Bind the variable to the inferred type
-	tc.context.bind(expr.name, value_type, expr.position)
+	// Check type annotation if present
+	if type_annotation := expr.type_annotation {
+		tc.check_type_annotation(expr.value, type_annotation)
+		// Use the annotated type for binding
+		annotated_type := tc.convert_type_expression_to_type_expr(type_annotation)
+		tc.context.bind(expr.name, annotated_type, expr.position)
+	} else {
+		// Bind the variable to the inferred type
+		tc.context.bind(expr.name, value_type, expr.position)
+	}
 }
 
 // check_binary_expression performs type checking on a binary expression
@@ -458,8 +468,11 @@ fn (mut tc TypeChecker) check_function_statement(stmt ast.FunctionStmt) {
 	tc.context = tc.context.new_child_context()
 
 	for clause in stmt.clauses {
+		// Validate type annotations in parameters
 		for param in clause.parameters {
 			tc.check_pattern(param)
+			// Also validate type annotations specifically
+			tc.validate_pattern_type_annotations(param)
 		}
 
 		tc.check_expression(clause.guard)
@@ -477,6 +490,46 @@ fn (mut tc TypeChecker) check_function_statement(stmt ast.FunctionStmt) {
 	// Restore parent context
 	if parent := tc.context.parent {
 		tc.context = parent
+	}
+}
+
+// validate_pattern_type_annotations validates type annotations in patterns
+fn (mut tc TypeChecker) validate_pattern_type_annotations(pattern ast.Pattern) {
+	match pattern {
+		ast.VarPattern {
+			if type_annotation := pattern.type_annotation {
+				// This will trigger validation and error reporting if type is invalid
+				tc.convert_type_expression_to_type_expr(type_annotation)
+			}
+		}
+		ast.ListConsPattern {
+			tc.validate_pattern_type_annotations(pattern.head)
+			tc.validate_pattern_type_annotations(pattern.tail)
+		}
+		ast.ListLiteralPattern {
+			for element in pattern.elements {
+				tc.validate_pattern_type_annotations(element)
+			}
+		}
+		ast.TuplePattern {
+			for element in pattern.elements {
+				tc.validate_pattern_type_annotations(element)
+			}
+		}
+		ast.MapPattern {
+			for entry in pattern.entries {
+				tc.validate_pattern_type_annotations(entry.key)
+				tc.validate_pattern_type_annotations(entry.value)
+			}
+		}
+		ast.RecordPattern {
+			for field in pattern.fields {
+				tc.validate_pattern_type_annotations(field.pattern)
+			}
+		}
+		else {
+			// Other patterns don't have type annotations
+		}
 	}
 }
 
@@ -506,7 +559,7 @@ fn (mut tc TypeChecker) apply_directive(directive string, func_stmt ast.Function
 }
 
 // handle_reflection prints type information for functions
-fn (tc &TypeChecker) handle_reflection(func_stmt ast.FunctionStmt) {
+fn (mut tc TypeChecker) handle_reflection(func_stmt ast.FunctionStmt) {
 	println('=== REFLECTION INFO for function: ${func_stmt.name} ===')
 
 	for i, clause in func_stmt.clauses {
@@ -534,9 +587,8 @@ fn (tc &TypeChecker) handle_reflection(func_stmt ast.FunctionStmt) {
 						ast.VariableExpr, ast.AssignExpr, ast.BinaryExpr, ast.CallExpr,
 						ast.MatchExpr, ast.ListConsExpr, ast.ListLiteralExpr, ast.TupleExpr,
 						ast.MapLiteralExpr, ast.RecordLiteralExpr, ast.RecordAccessExpr,
-						ast.FunExpr, ast.SendExpr, ast.ReceiveExpr, ast.GuardExpr,
-						ast.UnaryExpr, ast.MapAccessExpr, ast.IfExpr, ast.CaseExpr,
-						ast.WithExpr, ast.ForExpr {
+						ast.FunExpr, ast.SendExpr, ast.ReceiveExpr, ast.GuardExpr, ast.UnaryExpr,
+						ast.MapAccessExpr, ast.IfExpr, ast.CaseExpr, ast.WithExpr, ast.ForExpr {
 							line = stmt.expr.position.line.str()
 							col = stmt.expr.position.column.str()
 						}
@@ -579,6 +631,136 @@ fn (mut tc TypeChecker) check_record_definition(stmt ast.RecordDefStmt) {
 fn (mut tc TypeChecker) check_type_definition(stmt ast.TypeDefStmt) {
 	// Type definitions are type declarations, not expressions
 	// They don't need type checking, just registration
+}
+
+// check_type_alias_statement performs type checking on type alias statements
+fn (mut tc TypeChecker) check_type_alias_statement(stmt ast.TypeAliasStmt) {
+	// Convert TypeExpression to TypeExpr for the type system
+	type_expr := tc.convert_type_expression_to_type_expr(stmt.type_expr)
+
+	// Register the type alias in the context
+	tc.context.register_type_alias(stmt.name, type_expr)
+}
+
+// convert_type_expression_to_type_expr converts AST TypeExpression to typechecker TypeExpr
+fn (mut tc TypeChecker) convert_type_expression_to_type_expr(type_expr ast.TypeExpression) TypeExpr {
+	return match type_expr {
+		ast.SimpleTypeExpr {
+			match type_expr.name {
+				'integer' {
+					integer_type
+				}
+				'float' {
+					float_type
+				}
+				'string' {
+					string_type
+				}
+				'boolean' {
+					boolean_type
+				}
+				'atom' {
+					atom_type
+				}
+				'nil' {
+					nil_type
+				}
+				'pid' {
+					make_type_constructor('pid', [])
+				}
+				'reference' {
+					make_type_constructor('reference', [])
+				}
+				'port' {
+					make_type_constructor('port', [])
+				}
+				'binary' {
+					BinaryType{
+						unit_size: 0
+					}
+				}
+				'bitstring' {
+					BinaryType{
+						unit_size: 1
+					}
+				}
+				'any' {
+					make_type_constructor('any', [])
+				}
+				else {
+					// Check if it's a registered type alias
+					if alias_type := tc.context.lookup_type_alias(type_expr.name) {
+						alias_type
+					} else {
+						// Unknown type - report error
+						error := errors.new_compilation_error(errors.TypeError{
+							message:    'Undefined type \'${type_expr.name}\''
+							expected:   'concrete type (integer, string, etc.) or defined type alias'
+							actual:     'unknown type \'${type_expr.name}\''
+							suggestion: 'You need to define this type first. Use: type ${type_expr.name} :: concrete_type (e.g., type ${type_expr.name} :: integer | string)'
+						}, type_expr.position, 'Undefined type \'${type_expr.name}\'')
+						tc.errors << error
+						// Return unknown type as fallback
+						make_type_constructor('unknown', [])
+					}
+				}
+			}
+		}
+		ast.UnionTypeExpr {
+			// For now, create a type variable representing the union
+			// A full implementation would need proper union type support
+			make_type_var('union_${type_expr.types.len}')
+		}
+		ast.ListTypeExpr {
+			element_type := tc.convert_type_expression_to_type_expr(type_expr.element_type)
+			make_list_type(element_type)
+		}
+		ast.TupleTypeExpr {
+			mut element_types := []TypeExpr{}
+			for elem_type in type_expr.element_types {
+				element_types << tc.convert_type_expression_to_type_expr(elem_type)
+			}
+			make_tuple_type(element_types)
+		}
+		ast.MapTypeExpr {
+			key_type := tc.convert_type_expression_to_type_expr(type_expr.key_type)
+			value_type := tc.convert_type_expression_to_type_expr(type_expr.value_type)
+			make_map_type(key_type, value_type)
+		}
+		ast.FunctionTypeExpr {
+			mut param_types := []TypeExpr{}
+			for param_type in type_expr.param_types {
+				param_types << tc.convert_type_expression_to_type_expr(param_type)
+			}
+			return_type := tc.convert_type_expression_to_type_expr(type_expr.return_type)
+			make_function_type(param_types, return_type)
+		}
+		ast.VariableTypeExpr {
+			// In type annotations, type variables should not be allowed unless explicitly defined
+			error := errors.new_compilation_error(errors.TypeError{
+				message:    'Undefined type \'${type_expr.name}\' in type annotation'
+				expected:   'concrete type (integer, string, etc.) or defined type alias'
+				actual:     'type variable \'${type_expr.name}\''
+				suggestion: 'You need to define this type first. Use: type ${type_expr.name} :: concrete_type (e.g., type ${type_expr.name} :: integer)'
+			}, type_expr.position, 'Undefined type \'${type_expr.name}\' in type annotation')
+			tc.errors << error
+			// Return unknown type as fallback
+			make_type_constructor('unknown', [])
+		}
+	}
+}
+
+// check_type_annotation validates type annotations in expressions
+fn (mut tc TypeChecker) check_type_annotation(expr ast.Expr, annotation ast.TypeExpression) {
+	inferred_type := tc.infer_expression_type(expr)
+	annotated_type := tc.convert_type_expression_to_type_expr(annotation)
+
+	// Try to unify the inferred type with the annotated type
+	result := tc.unifier.unify(inferred_type, annotated_type, ast.new_position(0, 0, 'unknown'))
+	if _ := result.error {
+		tc.report_error('Type mismatch: expected ${annotated_type.str()}, got ${inferred_type.str()}',
+			'Check the type annotation or the expression', ast.new_position(0, 0, 'unknown'))
+	}
 }
 
 // infer_expression_type infers the type of an expression
@@ -749,10 +931,14 @@ fn (tc &TypeChecker) print_statement_types(stmt ast.Stmt, indent string) {
 }
 
 // infer_pattern_type infers the type of a pattern
-fn (tc &TypeChecker) infer_pattern_type(pattern ast.Pattern) TypeExpr {
+fn (mut tc TypeChecker) infer_pattern_type(pattern ast.Pattern) TypeExpr {
 	return match pattern {
 		ast.VarPattern {
-			make_type_var('a')
+			if type_annotation := pattern.type_annotation {
+				tc.convert_type_expression_to_type_expr(type_annotation)
+			} else {
+				make_type_var('a')
+			}
 		}
 		ast.WildcardPattern {
 			make_type_var('_')
@@ -794,7 +980,9 @@ fn (tc &TypeChecker) infer_pattern_type(pattern ast.Pattern) TypeExpr {
 			make_type_constructor('record', [])
 		}
 		ast.BinaryPattern {
-			BinaryType{unit_size: 0}
+			BinaryType{
+				unit_size: 0
+			}
 		}
 	}
 }
@@ -814,15 +1002,11 @@ fn (tc &TypeChecker) validate_directives(module_stmt ast.ModuleStmt) []errors.Co
 					error_msg := 'Unknown directive: @${directive}'
 					suggestion := 'Available directives: ${valid_directives.join(', ')}'
 
-					compilation_error := errors.new_compilation_error(
-						errors.SyntaxError{
-							message:  error_msg
-							expected: suggestion
-							found:    '@${directive}'
-						},
-						func_stmt.position,
-						error_msg
-					)
+					compilation_error := errors.new_compilation_error(errors.SyntaxError{
+						message:  error_msg
+						expected: suggestion
+						found:    '@${directive}'
+					}, func_stmt.position, error_msg)
 
 					directive_errors << compilation_error
 				}

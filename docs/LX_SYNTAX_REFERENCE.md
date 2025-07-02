@@ -13,6 +13,7 @@ Lx is a statically scoped, expression-based functional language designed for bui
 5. Identifiers — naming conventions for variables and modules
 6. Comments — inline documentation syntax
 7. Expressions — fundamental program building blocks
+7.1. Type Aliases and Type Annotations — type aliases, variable and parameter annotations
 8. Pattern Matching — control flow via structural decomposition
 9. Function Definitions — single and multi-clause declarations
 9.1. Fun Expressions — anonymous functions with closures and higher-order support
@@ -326,6 +327,158 @@ The external call syntax provides clear disambiguation between:
 - `person.name` - record field access
 - `:io.format("msg")` - external function call
 - `format("msg")` - internal function call
+
+---
+
+### 7.1. Type Aliases and Type Annotations
+
+Lx supports type aliases and explicit type annotations for variables and function parameters, providing more control and documentation for your code's types.
+
+#### Type Aliases
+
+Type aliases allow you to define a new name for a type or a union of types. This is useful for readability and reuse.
+
+**Syntax:**
+```lx
+type name :: type_expression
+type opaque name :: type_expression
+type nominal name :: type_expression
+```
+
+**Examples:**
+```lx
+type int :: integer
+type number :: float | integer
+type id :: string | integer
+type pair :: {integer, integer}
+type user_map :: %{name: string, age: integer}
+
+# Opaque type aliases (implementation details hidden)
+type opaque user_id :: integer
+type opaque session_token :: string
+
+# Nominal type aliases (distinct types even with same structure)
+type nominal celsius :: float
+type nominal fahrenheit :: float
+```
+
+**Type Alias Modifiers:**
+
+- **`type`**: Regular type alias - the type is transparent and can be used interchangeably with its definition
+- **`opaque`**: Opaque type alias - the implementation details are hidden, providing better encapsulation and preventing direct access to the underlying type
+- **`nominal`**: Nominal type alias - creates a distinct type even if it has the same structure as another type, preventing accidental mixing of semantically different types
+
+**Benefits of Type Modifiers:**
+
+```lx
+# Regular type - transparent
+type user_id :: integer
+def get_user(id :: user_id) do ... end
+
+# Opaque type - implementation hidden
+type opaque session_token :: string
+def create_session(user :: user_id) do
+  # Internal implementation can change without affecting external code
+  generate_token()
+end
+
+# Nominal types - prevents mixing semantically different types
+type nominal celsius :: float
+type nominal fahrenheit :: float
+
+def convert_c_to_f(temp :: celsius) do
+  # This prevents accidentally passing fahrenheit to a celsius function
+  temp * 9 / 5 + 32
+end
+```
+
+**Generated Erlang Code:**
+```erlang
+-type int() :: integer().
+-opaque user_id() :: integer().
+-nominal celsius() :: float().
+```
+
+**Erlang Compatibility:**
+- All type aliases generate standard Erlang type declarations
+- `opaque` and `nominal` types are fully compatible with Erlang's type system
+- Generated specs use standard Erlang spec syntax and are compatible with Dialyzer
+- Type aliases can be used in external function calls and module dependencies
+
+You can use type aliases anywhere a type is expected, including annotations and records.
+
+#### Type Annotations in Assignments
+
+You can annotate the type of a variable at assignment time:
+
+**Syntax:**
+```lx
+x :: int = 1
+name :: string = "Alice"
+user :: user_map = %{name: "Alice", age: 30}
+```
+
+If the value does not match the annotated type, a type error will be reported at compile time.
+
+#### Type Annotations in Function Parameters
+
+Function parameters can be annotated with types or type aliases:
+
+**Syntax:**
+```lx
+def add(a :: int, b :: number) do
+  a + b
+end
+
+def greet(name :: string) do
+  "Hello, " ++ name
+end
+```
+
+You can also use type variables for generic functions:
+```lx
+def identity(x :: a) do
+  x
+end
+```
+
+#### Type Annotations in Records
+
+Record fields can be annotated with types or type aliases:
+```lx
+record Person {
+  name :: string,
+  age :: integer
+}
+```
+
+#### Summary Table
+| Context         | Syntax Example                        |
+|----------------|---------------------------------------|
+| Type alias     | `type number :: float | integer`       |
+| Assignment     | `x :: int = 1`                        |
+| Function param | `def f(a :: int) do ... end`           |
+| Record field   | `record R { f :: int }`               |
+
+#### Notes
+- Type annotations are optional; if omitted, types are inferred.
+- Type aliases can be recursive and can use unions, tuples, lists, maps, etc.
+- The `::` operator is used for both type annotation and list cons. The parser distinguishes by context.
+- Type aliases with modifiers (`opaque`, `nominal`) integrate seamlessly with the existing type system and are used in automatic spec generation.
+- All type aliases are validated at compile time and generate appropriate Erlang type declarations.
+
+#### Error Example
+```lx
+x :: string = 123  # Error: 123 is not a string
+```
+
+#### Didactic Example
+```lx
+type id :: integer | string
+def show_id(x :: id) do
+  "ID: " ++ x
+end
+```
 
 ---
 
@@ -1264,6 +1417,92 @@ children {
 ---
 
 ### 17. Specifications
+
+Function contracts for static analysis and automatic spec generation.
+
+#### Automatic Spec Generation
+
+Lx automatically generates Erlang `-spec` declarations for all functions based on type annotations and type inference:
+
+```lx
+type number :: float | integer
+
+def add(a :: integer, b :: number) do
+  {a, b}
+end
+```
+
+**Generated Erlang Code:**
+```erlang
+-type number() :: float() | integer().
+-spec add(integer(), number()) -> {integer(), number()}.
+
+add(A, B) ->
+{A, B}.
+```
+
+**Spec Generation Features:**
+- **Type Annotations**: Uses explicit type annotations from function parameters
+- **Type Inference**: Automatically infers return types from function bodies
+- **Type Aliases**: Properly uses defined type aliases (including `opaque` and `nominal`)
+- **Positioning**: Specs are generated immediately above each function definition
+- **Context Awareness**: Uses parameter context to infer variable types in return expressions
+- **Smart Inference**: Automatically infers types for arithmetic operations, comparisons, and data structure operations
+
+**Type Inference Examples:**
+```lx
+# Return type inferred as {integer(), number()}
+def add(a :: integer, b :: number) do
+  {a, b}
+end
+
+# Return type inferred as integer()
+def multiply(x :: integer, y :: integer) do
+  x * y
+end
+
+# Return type inferred as [integer()]
+def double_list(numbers :: [integer]) do
+  for n in numbers do
+    n * 2
+  end
+end
+
+# Return type inferred as boolean()
+def is_positive(x :: integer) do
+  x > 0
+end
+
+# Complex example with multiple functions and type aliases
+type opaque user_id :: integer
+type nominal celsius :: float
+
+def create_user(name :: string, age :: integer) do
+  id = generate_id()
+  %{id: id, name: name, age: age}
+end
+
+def convert_to_celsius(fahrenheit :: float) do
+  (fahrenheit - 32) * 5 / 9
+end
+```
+
+**Generated Erlang Code:**
+```erlang
+-opaque user_id() :: integer().
+-nominal celsius() :: float().
+
+-spec create_user(string(), integer()) -> #{id := user_id(), name := string(), age := integer()}.
+create_user(Name, Age) ->
+    Id = generate_id(),
+    #{id => Id, name => Name, age => Age}.
+
+-spec convert_to_celsius(float()) -> celsius().
+convert_to_celsius(Fahrenheit) ->
+    (Fahrenheit - 32) * 5 / 9.
+```
+
+#### Manual Specifications
 
 Function contracts for static analysis:
 

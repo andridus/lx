@@ -113,6 +113,9 @@ pub enum KeywordValue {
 	nil_
 	unsafe
 	record
+	type_
+	opaque
+	nominal
 	worker
 	supervisor
 	strategy
@@ -148,11 +151,12 @@ pub enum OperatorValue {
 	type_cons     // ::
 	dot           // .
 	concat        // ++
-	record_update // |
+	pipe          // |
 	plus          // +
 	minus         // -
 	mult          // *
 	div           // /
+	modulo        // %
 	eq            // ==
 	neq           // !=
 	lt            // <
@@ -260,6 +264,9 @@ pub fn (k KeywordValue) str() string {
 		.nil_ { 'nil' }
 		.unsafe { 'unsafe' }
 		.record { 'record' }
+		.type_ { 'type' }
+		.opaque { 'opaque' }
+		.nominal { 'nominal' }
 		.worker { 'worker' }
 		.supervisor { 'supervisor' }
 		.strategy { 'strategy' }
@@ -290,11 +297,12 @@ pub fn (o OperatorValue) str() string {
 		.type_cons { '::' }
 		.dot { '.' }
 		.concat { '++' }
-		.record_update { '|' }
+		.pipe { '|' }
 		.plus { '+' }
 		.minus { '-' }
 		.mult { '*' }
 		.div { '/' }
+		.modulo { '%' }
 		.eq { '==' }
 		.neq { '!=' }
 		.lt { '<' }

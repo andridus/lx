@@ -16,9 +16,10 @@ pub:
 // AssignExpr represents an assignment expression
 pub struct AssignExpr {
 pub:
-	name     string
-	value    Expr
-	position Position
+	name            string
+	value           Expr
+	type_annotation ?TypeExpression
+	position        Position
 }
 
 // BinaryExpr represents a binary operation
@@ -273,7 +274,8 @@ pub struct WildcardPattern {
 // VarPattern represents a variable pattern
 pub struct VarPattern {
 pub:
-	name string
+	name            string
+	type_annotation ?TypeExpression
 }
 
 // LiteralPattern represents a literal pattern
@@ -346,17 +348,43 @@ pub type Pattern = WildcardPattern
 // str returns a string representation of Pattern
 pub fn (p Pattern) str() string {
 	return match p {
-		WildcardPattern { 'PWildcard' }
-		VarPattern { 'PVar(${p.name})' }
-		LiteralPattern { 'PLiteral(${p.value.str()})' }
-		AtomPattern { 'PAtom(${p.value})' }
-		ListConsPattern { 'PCons(${p.head.str()}, ${p.tail.str()})' }
-		ListEmptyPattern { 'PEmpty' }
-		ListLiteralPattern { 'PList([${p.elements.map(it.str()).join(', ')}])' }
-		TuplePattern { 'PTuple([${p.elements.map(it.str()).join(', ')}])' }
-		MapPattern { 'PMap([${p.entries.map(it.str()).join(', ')}])' }
-		RecordPattern { 'PRecord(${p.name}, [${p.fields.map(it.str()).join(', ')}])' }
-		BinaryPattern { 'PBinary([${p.segments.map(it.str()).join(', ')}])' }
+		WildcardPattern {
+			'PWildcard'
+		}
+		VarPattern {
+			if type_ann := p.type_annotation {
+				'PVar(${p.name} :: ${type_ann.str()})'
+			} else {
+				'PVar(${p.name})'
+			}
+		}
+		LiteralPattern {
+			'PLiteral(${p.value.str()})'
+		}
+		AtomPattern {
+			'PAtom(${p.value})'
+		}
+		ListConsPattern {
+			'PCons(${p.head.str()}, ${p.tail.str()})'
+		}
+		ListEmptyPattern {
+			'PEmpty'
+		}
+		ListLiteralPattern {
+			'PList([${p.elements.map(it.str()).join(', ')}])'
+		}
+		TuplePattern {
+			'PTuple([${p.elements.map(it.str()).join(', ')}])'
+		}
+		MapPattern {
+			'PMap([${p.entries.map(it.str()).join(', ')}])'
+		}
+		RecordPattern {
+			'PRecord(${p.name}, [${p.fields.map(it.str()).join(', ')}])'
+		}
+		BinaryPattern {
+			'PBinary([${p.segments.map(it.str()).join(', ')}])'
+		}
 	}
 }
 
@@ -402,8 +430,29 @@ pub:
 	position   Position
 }
 
+// TypeAliasStmt represents a type alias definition (type name :: type_expression)
+pub struct TypeAliasStmt {
+pub:
+	name       string
+	type_expr  TypeExpression
+	alias_type TypeAliasType // opaque, nominal, or regular
+	position   Position
+}
+
+// TypeAliasType represents the type of type alias
+pub enum TypeAliasType {
+	regular // regular type alias
+	opaque  // opaque type alias
+	nominal // nominal type alias
+}
+
 // Stmt represents statements in LX using sum types
-pub type Stmt = ExprStmt | ModuleStmt | FunctionStmt | RecordDefStmt | TypeDefStmt
+pub type Stmt = ExprStmt
+	| ModuleStmt
+	| FunctionStmt
+	| RecordDefStmt
+	| TypeDefStmt
+	| TypeAliasStmt
 
 // str returns a string representation of Expr
 pub fn (e Expr) str() string {
@@ -415,7 +464,11 @@ pub fn (e Expr) str() string {
 			'Literal(${e.value.str()})'
 		}
 		AssignExpr {
-			'Assign(${e.name}, ${e.value.str()})'
+			if type_ann := e.type_annotation {
+				'Assign(${e.name} :: ${type_ann.str()}, ${e.value.str()})'
+			} else {
+				'Assign(${e.name}, ${e.value.str()})'
+			}
 		}
 		BinaryExpr {
 			'Binary(${e.left.str()} ${e.op.str()} ${e.right.str()})'
@@ -601,4 +654,95 @@ pub:
 	pattern  Pattern
 	value    Expr
 	position Position
+}
+
+// TypeExpression represents type expressions in type annotations and definitions
+pub type TypeExpression = SimpleTypeExpr
+	| UnionTypeExpr
+	| ListTypeExpr
+	| TupleTypeExpr
+	| MapTypeExpr
+	| FunctionTypeExpr
+	| VariableTypeExpr
+
+// SimpleTypeExpr represents a simple type like integer, string, atom
+pub struct SimpleTypeExpr {
+pub:
+	name     string
+	position Position
+}
+
+// UnionTypeExpr represents union types like integer | float
+pub struct UnionTypeExpr {
+pub:
+	types    []TypeExpression
+	position Position
+}
+
+// ListTypeExpr represents list types like list(integer)
+pub struct ListTypeExpr {
+pub:
+	element_type TypeExpression
+	position     Position
+}
+
+// TupleTypeExpr represents tuple types like {integer, string}
+pub struct TupleTypeExpr {
+pub:
+	element_types []TypeExpression
+	position      Position
+}
+
+// MapTypeExpr represents map types like map(atom, string)
+pub struct MapTypeExpr {
+pub:
+	key_type   TypeExpression
+	value_type TypeExpression
+	position   Position
+}
+
+// FunctionTypeExpr represents function types like (integer, string) -> boolean
+pub struct FunctionTypeExpr {
+pub:
+	param_types []TypeExpression
+	return_type TypeExpression
+	position    Position
+}
+
+// VariableTypeExpr represents type variables like 'a' or 'T'
+pub struct VariableTypeExpr {
+pub:
+	name     string
+	position Position
+}
+
+// str returns a string representation of TypeExpression
+pub fn (te TypeExpression) str() string {
+	return match te {
+		SimpleTypeExpr {
+			te.name
+		}
+		UnionTypeExpr {
+			te.types.map(it.str()).join(' | ')
+		}
+		ListTypeExpr {
+			'list(${te.element_type.str()})'
+		}
+		TupleTypeExpr {
+			'{${te.element_types.map(it.str()).join(', ')}}'
+		}
+		MapTypeExpr {
+			'map(${te.key_type.str()}, ${te.value_type.str()})'
+		}
+		FunctionTypeExpr {
+			if te.param_types.len == 0 {
+				'() -> ${te.return_type.str()}'
+			} else {
+				'(${te.param_types.map(it.str()).join(', ')}) -> ${te.return_type.str()}'
+			}
+		}
+		VariableTypeExpr {
+			te.name
+		}
+	}
 }

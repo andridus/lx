@@ -19,6 +19,9 @@ pub const keyword_map = {
 	'nil':          KeywordValue.nil_
 	'unsafe':       KeywordValue.unsafe
 	'record':       KeywordValue.record
+	'type':         KeywordValue.type_
+	'opaque':       KeywordValue.opaque
+	'nominal':      KeywordValue.nominal
 	'worker':       KeywordValue.worker
 	'supervisor':   KeywordValue.supervisor
 	'strategy':     KeywordValue.strategy

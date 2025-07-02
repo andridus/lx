@@ -52,6 +52,7 @@ fn (mut sp StatementParser) parse_statement() ?ast.Stmt {
 				.def { sp.parse_function_statement() }
 				.defp { sp.parse_private_function_statement() }
 				.record { sp.parse_record_definition() }
+				.type_ { sp.parse_type_alias_statement_with_modifier() }
 				.worker { sp.parse_worker_statement() }
 				.supervisor { sp.parse_supervisor_statement() }
 				.spec { sp.parse_specification_statement() }
@@ -138,6 +139,214 @@ fn (mut sp StatementParser) parse_type() ?ast.LXType {
 			ast.LXType.unknown
 		}
 	}
+}
+
+// parse_type_expression parses comprehensive type expressions for type annotations
+fn (mut sp StatementParser) parse_type_expression() ?ast.TypeExpression {
+	return sp.parse_union_type()
+}
+
+// parse_union_type parses union types (type1 | type2 | ...)
+fn (mut sp StatementParser) parse_union_type() ?ast.TypeExpression {
+	mut types := []ast.TypeExpression{}
+	types << sp.parse_primary_type()?
+
+	for sp.check_operator_value(.pipe) {
+		sp.advance() // consume '|'
+		types << sp.parse_primary_type()?
+	}
+
+	if types.len == 1 {
+		return types[0]
+	}
+
+	return ast.UnionTypeExpr{
+		types:    types
+		position: sp.get_current_position()
+	}
+}
+
+// parse_primary_type parses primary type expressions
+fn (mut sp StatementParser) parse_primary_type() ?ast.TypeExpression {
+	return match sp.current {
+		lexer.IdentToken {
+			sp.parse_named_type()
+		}
+		lexer.PunctuationToken {
+			punc_token := sp.current as lexer.PunctuationToken
+			match punc_token.value {
+				.lparen {
+					sp.parse_function_or_tuple_type()
+				}
+				.lbrace {
+					sp.parse_tuple_type()
+				}
+				else {
+					sp.add_error('Unexpected token in type expression', 'Got ${sp.current.str()}')
+					none
+				}
+			}
+		}
+		else {
+			sp.add_error('Expected type expression', 'Got ${sp.current.str()}')
+			none
+		}
+	}
+}
+
+// parse_named_type parses named types (simple, list, map, etc.)
+fn (mut sp StatementParser) parse_named_type() ?ast.TypeExpression {
+	ident_token := sp.current as lexer.IdentToken
+	name := ident_token.value
+	position := sp.get_current_position()
+	sp.advance()
+
+	// Check for parameterized types
+	if sp.check(lexer.punctuation(.lparen)) {
+		sp.advance() // consume '('
+
+		match name {
+			'list' {
+				element_type := sp.parse_type_expression()?
+				sp.consume(lexer.punctuation(.rparen), 'Expected closing parenthesis')?
+				return ast.ListTypeExpr{
+					element_type: element_type
+					position:     position
+				}
+			}
+			'map' {
+				key_type := sp.parse_type_expression()?
+				sp.consume(lexer.punctuation(.comma), 'Expected comma in map type')?
+				value_type := sp.parse_type_expression()?
+				sp.consume(lexer.punctuation(.rparen), 'Expected closing parenthesis')?
+				return ast.MapTypeExpr{
+					key_type:   key_type
+					value_type: value_type
+					position:   position
+				}
+			}
+			else {
+				sp.add_error('Unknown parameterized type: ${name}', 'Expected list or map')
+				return none
+			}
+		}
+	}
+
+	// Check if it's a type variable (single lowercase letter)
+	if name.len == 1 && name[0] >= `a` && name[0] <= `z` {
+		return ast.VariableTypeExpr{
+			name:     name
+			position: position
+		}
+	}
+
+	// Simple type
+	return ast.SimpleTypeExpr{
+		name:     name
+		position: position
+	}
+}
+
+// parse_function_or_tuple_type parses function types or parenthesized types
+fn (mut sp StatementParser) parse_function_or_tuple_type() ?ast.TypeExpression {
+	sp.advance() // consume '('
+
+	if sp.check(lexer.punctuation(.rparen)) {
+		// Empty parentheses - could be () -> ReturnType
+		sp.advance() // consume ')'
+		if sp.check(lexer.operator(.arrow)) {
+			sp.advance() // consume '->'
+			return_type := sp.parse_type_expression()?
+			return ast.FunctionTypeExpr{
+				param_types: []
+				return_type: return_type
+				position:    sp.get_current_position()
+			}
+		} else {
+			sp.add_error('Expected -> after ()', 'Got ${sp.current.str()}')
+			return none
+		}
+	}
+
+	// Parse first type
+	first_type := sp.parse_type_expression()?
+
+	if sp.check(lexer.punctuation(.comma)) {
+		// Multiple types - could be tuple or function parameters
+		mut types := [first_type]
+
+		for sp.match(lexer.punctuation(.comma)) {
+			types << sp.parse_type_expression()?
+		}
+
+		sp.consume(lexer.punctuation(.rparen), 'Expected closing parenthesis')?
+
+		// Check if it's a function type
+		if sp.check(lexer.operator(.arrow)) {
+			sp.advance() // consume '->'
+			return_type := sp.parse_type_expression()?
+			return ast.FunctionTypeExpr{
+				param_types: types
+				return_type: return_type
+				position:    sp.get_current_position()
+			}
+		} else {
+			// It's a tuple type
+			return ast.TupleTypeExpr{
+				element_types: types
+				position:      sp.get_current_position()
+			}
+		}
+	} else {
+		sp.consume(lexer.punctuation(.rparen), 'Expected closing parenthesis')?
+
+		// Check if it's a function type
+		if sp.check(lexer.operator(.arrow)) {
+			sp.advance() // consume '->'
+			return_type := sp.parse_type_expression()?
+			return ast.FunctionTypeExpr{
+				param_types: [first_type]
+				return_type: return_type
+				position:    sp.get_current_position()
+			}
+		} else {
+			// Just a parenthesized type
+			return first_type
+		}
+	}
+}
+
+// parse_tuple_type parses tuple types {type1, type2, ...}
+fn (mut sp StatementParser) parse_tuple_type() ?ast.TypeExpression {
+	sp.advance() // consume '{'
+
+	mut element_types := []ast.TypeExpression{}
+
+	if !sp.check(lexer.punctuation(.rbrace)) {
+		for {
+			element_types << sp.parse_type_expression()?
+
+			if !sp.match(lexer.punctuation(.comma)) {
+				break
+			}
+		}
+	}
+
+	sp.consume(lexer.punctuation(.rbrace), 'Expected closing brace')?
+
+	return ast.TupleTypeExpr{
+		element_types: element_types
+		position:      sp.get_current_position()
+	}
+}
+
+// check_operator_value checks if current token is a specific operator
+fn (sp StatementParser) check_operator_value(op lexer.OperatorValue) bool {
+	if sp.current is lexer.OperatorToken {
+		op_token := sp.current as lexer.OperatorToken
+		return op_token.value == op
+	}
+	return false
 }
 
 // Helper methods for error handling and position tracking

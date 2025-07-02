@@ -36,7 +36,11 @@ pub fn generate_suggestions(err CompilationError) []string {
 			generate_syntax_suggestions(err.kind.expected, err.kind.found)
 		}
 		TypeError {
-			generate_type_suggestions(err.kind.expected, err.kind.actual)
+			if err.kind.suggestion.len > 0 {
+				[err.kind.suggestion]
+			} else {
+				generate_type_suggestions(err.kind.expected, err.kind.actual)
+			}
 		}
 		UnboundVariableError {
 			generate_unbound_variable_suggestions(err.kind.variable, err.kind.similar)

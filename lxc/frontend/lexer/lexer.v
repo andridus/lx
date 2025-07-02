@@ -129,6 +129,80 @@ pub fn (mut l Lexer) next_token() Token {
 						return token
 					}
 				}
+
+				// Special handling for @: only allow as directive at start of line (ignoring spaces/tabs) and only in .initial
+				if ch == `@` && l.state != .comment {
+					if l.state == .initial {
+						mut i := l.position - 1
+						mut only_spaces := true
+						for i >= 0 && l.input[i] != `\n` && l.input[i] != `\r` {
+							if l.input[i] != ` ` && l.input[i] != `\t` {
+								only_spaces = false
+								break
+							}
+							i--
+						}
+						if only_spaces {
+							if l.position + 1 < l.input.len {
+								next_ch := l.input[l.position + 1]
+								if next_ch.is_letter() || next_ch == `_` {
+								} else {
+									l.add_error('Lexical error: Unexpected character',
+										l.get_current_position())
+									l.state = .initial
+									l.buffer = ''
+									msg := l.errors[0].message
+									l.errors.delete(0)
+									l.errors.clear()
+									l.had_error = false
+									return ErrorToken{
+										message:  msg
+										position: l.get_current_position()
+									}
+								}
+							} else {
+								// @ at end of input, emit error
+								l.add_error('Lexical error: Unexpected character', l.get_current_position())
+								l.state = .initial
+								l.buffer = ''
+								msg := l.errors[0].message
+								l.errors.delete(0)
+								l.errors.clear()
+								l.had_error = false
+								return ErrorToken{
+									message:  msg
+									position: l.get_current_position()
+								}
+							}
+						} else {
+							// @ não está no início da linha: erro
+							l.add_error('Lexical error: Unexpected character', l.get_current_position())
+							l.state = .initial
+							l.buffer = ''
+							msg := l.errors[0].message
+							l.errors.delete(0)
+							l.errors.clear()
+							l.had_error = false
+							return ErrorToken{
+								message:  msg
+								position: l.get_current_position()
+							}
+						}
+					} else {
+						// @ em qualquer outro estado: erro
+						l.add_error('Lexical error: Unexpected character', l.get_current_position())
+						l.state = .initial
+						l.buffer = ''
+						msg := l.errors[0].message
+						l.errors.delete(0)
+						l.errors.clear()
+						l.had_error = false
+						return ErrorToken{
+							message:  msg
+							position: l.get_current_position()
+						}
+					}
+				}
 			}
 			.skip_character {
 				l.position++

@@ -228,8 +228,13 @@ fn test_rebind_detection_ast() {
 	assign1 := create_assign_expr('x', ten, 1, 1)
 	assign2 := create_assign_expr('x', twenty, 2, 1)
 
+	// Use x after first assignment to avoid "never used" error
+	x_var := create_variable_expr('x')
+	use_x := create_expr_stmt(x_var)
+
 	body := [
 		ast.Stmt(create_expr_stmt(assign1)),
+		ast.Stmt(use_x), // Use x to avoid "never used" error
 		ast.Stmt(create_expr_stmt(assign2)),
 	]
 

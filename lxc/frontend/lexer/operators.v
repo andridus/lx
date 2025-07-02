@@ -9,11 +9,12 @@ pub const operator_map = {
 	'::':      OperatorValue.type_cons
 	'.':       OperatorValue.dot
 	'++':      OperatorValue.concat
-	'|':       OperatorValue.record_update
+	'|':       OperatorValue.pipe
 	'+':       OperatorValue.plus
 	'-':       OperatorValue.minus
 	'*':       OperatorValue.mult
 	'/':       OperatorValue.div
+	'%':       OperatorValue.modulo
 	'==':      OperatorValue.eq
 	'!=':      OperatorValue.neq
 	'<':       OperatorValue.lt
@@ -86,7 +87,7 @@ pub fn get_all_punctuation() []string {
 // is_single_char_operator checks if a character can be the start of an operator
 pub fn is_single_char_operator(c u8) bool {
 	return c == `=` || c == `<` || c == `>` || c == `!` || c == `:` || c == `+` || c == `-`
-		|| c == `*` || c == `/` || c == `|` || c == `.` || c == `&`
+		|| c == `*` || c == `/` || c == `|` || c == `.` || c == `&` || c == `%`
 }
 
 // is_operator_start checks if a character can be the start of an operator
@@ -101,7 +102,7 @@ pub fn get_operator_precedence(t OperatorValue) int {
 		.type_cons { 2 }
 		.concat { 3 }
 		.plus, .minus { 4 }
-		.mult, .div { 5 }
+		.mult, .div, .modulo { 5 }
 		.eq, .neq, .lt, .gt, .leq, .geq { 6 }
 		.and_, .or_, .andalso, .orelse { 7 }
 		.not_ { 8 }
@@ -113,7 +114,7 @@ pub fn get_operator_precedence(t OperatorValue) int {
 // is_left_associative checks if an operator is left associative
 pub fn is_left_associative(t OperatorValue) bool {
 	return match t {
-		.plus, .minus, .mult, .div, .concat, .and_, .or_, .andalso, .orelse { true }
+		.plus, .minus, .mult, .div, .modulo, .concat, .and_, .or_, .andalso, .orelse { true }
 		else { false }
 	}
 }
