@@ -4,8 +4,9 @@ import frontend.lexer
 import frontend.parser
 import backend.erlang
 import analysis.typechecker
+import backend.codegen
 
-fn assert_lx_generates_erlang(lx_code string, expected_erlang string) {
+fn generates_erlang(lx_code string) codegen.CodegenResult {
 	// Create lexer from string
 	mut lexer_instance := lexer.new_lexer(lx_code, 'test')
 	mut tokens := []lexer.Token{}
@@ -27,10 +28,9 @@ fn assert_lx_generates_erlang(lx_code string, expected_erlang string) {
 	module_stmt := parser_instance.parse_module() or { panic('Failed to parse function') }
 
 	// Generate Erlang code
-	erlang_gen := erlang.new_erlang_generator()
+	mut erlang_gen := erlang.new_erlang_generator()
 	type_ctx := typechecker.new_type_context()
 	codegen_result := erlang_gen.generate_module(module_stmt, type_ctx)
 
-	assert codegen_result.success
-	assert codegen_result.code == expected_erlang
+	return codegen_result
 }

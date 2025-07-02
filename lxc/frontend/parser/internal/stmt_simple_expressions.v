@@ -243,6 +243,15 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 				}
 			}
 		}
+		lexer.FloatToken {
+			token := sp.current as lexer.FloatToken
+			sp.advance()
+			ast.LiteralExpr{
+				value: ast.FloatLiteral{
+					value: token.value
+				}
+			}
+		}
 		lexer.BoolToken {
 			token := sp.current as lexer.BoolToken
 			sp.advance()

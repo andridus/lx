@@ -431,11 +431,11 @@ pub fn get_transitions() []Transition {
 		},
 		Transition{
 			from_state: .directive
-			to_state:   .error
+			to_state:   .initial
 			condition:  CharacterClassCondition{
 				class: .whitespace
 			}
-			action:     .emit_error
+			action:     .emit_token
 		},
 		Transition{
 			from_state: .directive

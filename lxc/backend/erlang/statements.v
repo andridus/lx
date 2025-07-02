@@ -35,14 +35,33 @@ fn (gen ErlangGenerator) infer_function_return_type(clause ast.FunctionClause) s
 	// Get the last statement in the body (the return value)
 	last_stmt := clause.body[clause.body.len - 1]
 
-	return match last_stmt {
+	match last_stmt {
 		ast.ExprStmt {
-			gen.infer_expression_return_type_with_context(last_stmt.expr, clause.parameters)
+			inferred_type := gen.infer_expression_return_type_with_context(last_stmt.expr,
+				clause.parameters)
+			// Check if the inferred type matches any defined type
+			matching_type := gen.find_matching_defined_type(inferred_type)
+			return if matching_type != '' { matching_type } else { inferred_type }
 		}
 		else {
 			'ok'
 		}
 	}
+	// fallback return (should never reach here)
+	return 'ok'
+}
+
+// find_matching_defined_type checks if a type expression matches any defined type
+fn (gen ErlangGenerator) find_matching_defined_type(type_expr string) string {
+	// Check each defined type to see if it matches the inferred type
+	for type_name, type_def in gen.defined_types {
+		defined_type_str := gen.generate_type_expression(type_def.type_expr)
+		if type_expr == defined_type_str {
+			// Found a match - return the type name
+			return '${type_name}()'
+		}
+	}
+	return ''
 }
 
 // infer_expression_return_type infers the return type of an expression
@@ -238,7 +257,6 @@ pub fn (gen ErlangGenerator) generate_function(func ast.FunctionStmt) string {
 		function_definitions << clause_strings.join(';\n') + '.'
 		function_definitions << '\n'
 	}
-	println(function_definitions.join(''))
 	return function_definitions.join('')
 }
 

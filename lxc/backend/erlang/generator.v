@@ -5,15 +5,23 @@ import analysis.typechecker
 import codegen { CodegenResult }
 
 // ErlangGenerator generates Erlang code from LX AST
-pub struct ErlangGenerator {}
+pub struct ErlangGenerator {
+mut:
+	defined_types map[string]ast.TypeAliasStmt // Map of type name to type definition
+}
 
 // new_erlang_generator creates a new Erlang code generator
 pub fn new_erlang_generator() ErlangGenerator {
-	return ErlangGenerator{}
+	return ErlangGenerator{
+		defined_types: map[string]ast.TypeAliasStmt{}
+	}
 }
 
 // generate_module generates a complete Erlang module (implements CodeGenerator interface)
-pub fn (gen ErlangGenerator) generate_module(module_stmt ast.ModuleStmt, type_ctx typechecker.TypeContext) CodegenResult {
+pub fn (mut gen ErlangGenerator) generate_module(module_stmt ast.ModuleStmt, type_ctx typechecker.TypeContext) CodegenResult {
+	// Collect all type definitions first
+	gen.collect_type_definitions(module_stmt.statements)
+
 	// Generate module header
 	mut code := gen.get_module_header(module_stmt.name)
 
@@ -37,6 +45,20 @@ pub fn (gen ErlangGenerator) generate_module(module_stmt ast.ModuleStmt, type_ct
 		success: true
 		errors:  []
 		code:    code
+	}
+}
+
+// collect_type_definitions collects all type alias definitions from module statements
+fn (mut gen ErlangGenerator) collect_type_definitions(statements []ast.Stmt) {
+	for stmt in statements {
+		match stmt {
+			ast.TypeAliasStmt {
+				gen.defined_types[stmt.name] = stmt
+			}
+			else {
+				// Skip non-type statements
+			}
+		}
 	}
 }
 

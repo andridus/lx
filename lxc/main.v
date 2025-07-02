@@ -60,7 +60,7 @@ fn main() {
 	}
 
 	// Generate Erlang code
-	erlang_gen := erlang.new_erlang_generator()
+	mut erlang_gen := erlang.new_erlang_generator()
 	type_ctx := typechecker.new_type_context()
 
 	codegen_result := erlang_gen.generate_module(module_stmt, type_ctx)
