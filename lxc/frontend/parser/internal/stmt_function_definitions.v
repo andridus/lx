@@ -189,7 +189,7 @@ fn (mut sp StatementParser) parse_function_clause() ?ast.FunctionClause {
 		}
 	})
 	if sp.match(lexer.keyword(.when)) {
-		guard = sp.parse_simple_expression()?
+		guard = sp.parse_expression()?
 	}
 
 	// Parse body
@@ -232,7 +232,7 @@ fn (mut sp StatementParser) parse_function_header() ?ast.FunctionClause {
 		}
 	})
 	if sp.match(lexer.keyword(.when)) {
-		guard = sp.parse_simple_expression()?
+		guard = sp.parse_expression()?
 	}
 
 	// Parse arrow
