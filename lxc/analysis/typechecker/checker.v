@@ -765,23 +765,23 @@ fn (tc &TypeChecker) format_guard_for_reflection(guard ast.Expr) string {
 					}
 				}
 				else {
-					guard.str()
+					tc.format_guard_operand(guard)
 				}
 			}
 		}
 		ast.BinaryExpr {
-			left_str := tc.format_guard_operand(guard.left)
-			right_str := tc.format_guard_operand(guard.right)
+			left_str := tc.format_guard_for_reflection(guard.left)
+			right_str := tc.format_guard_for_reflection(guard.right)
 			op_str := tc.format_guard_operator(guard.op)
 			'${left_str} ${op_str} ${right_str}'
 		}
 		ast.UnaryExpr {
-			operand_str := tc.format_guard_operand(guard.operand)
+			operand_str := tc.format_guard_for_reflection(guard.operand)
 			op_str := tc.format_guard_operator(guard.op)
 			'${op_str}${operand_str}'
 		}
 		else {
-			guard.str()
+			tc.format_guard_operand(guard)
 		}
 	}
 }
