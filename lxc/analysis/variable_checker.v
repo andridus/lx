@@ -190,8 +190,11 @@ pub fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 			vc.check_expression(expr.right)
 		}
 		ast.CallExpr {
-			// Se for chamada de função interna
-			if !expr.external && expr.function is ast.VariableExpr {
+			if expr.external {
+				for arg in expr.arguments {
+					vc.check_expression(arg)
+				}
+			} else if expr.function is ast.VariableExpr {
 				func_var := expr.function as ast.VariableExpr
 				func_name := func_var.name
 				arity := expr.arguments.len
@@ -209,11 +212,14 @@ pub fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 						suggestion: func_suggestion
 					}, func_var.position, "Function '${func_name}/${arity}' is not defined")
 				}
+				for arg in expr.arguments {
+					vc.check_expression(arg)
+				}
 			} else {
 				vc.check_expression(expr.function)
-			}
-			for arg in expr.arguments {
-				vc.check_expression(arg)
+				for arg in expr.arguments {
+					vc.check_expression(arg)
+				}
 			}
 		}
 		ast.MatchExpr {

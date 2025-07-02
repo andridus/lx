@@ -15,12 +15,9 @@ end'
 -spec simple_case() -> string().
 simple_case() ->
 case 1 of
-1 when true ->
-"one";
-2 when true ->
-"two";
-_ when true ->
-"other"
+    1 -> "one";
+    2 -> "two";
+    _ -> "other"
 end.
 
 '
@@ -45,14 +42,10 @@ end'
 -spec case_with_var(any()) -> string().
 case_with_var(X) ->
 case X of
-1 when true ->
-"um";
-2 when true ->
-"dois";
-3 when true ->
-"três";
-_ when true ->
-"qualquer"
+    1 -> "um";
+    2 -> "dois";
+    3 -> "três";
+    _ -> "qualquer"
 end.
 
 '
@@ -77,14 +70,10 @@ end'
 -spec case_with_guards(any()) -> string().
 case_with_guards(X) ->
 case X of
-X when X > 3 ->
-"maior que 3";
-2 when true ->
-"dois";
-3 when true ->
-"três";
-_ when true ->
-"qualquer"
+    X when X > 3 -> "maior que 3";
+    2 -> "dois";
+    3 -> "três";
+    _ -> "qualquer"
 end.
 
 '
@@ -108,12 +97,9 @@ end'
 -spec integer_case(any()) -> integer().
 integer_case(X) ->
 case X of
-1 when true ->
-10;
-2 when true ->
-20;
-_ when true ->
-0
+    1 -> 10;
+    2 -> 20;
+    _ -> 0
 end.
 
 '
@@ -137,12 +123,9 @@ end'
 -spec boolean_case(any()) -> boolean().
 boolean_case(X) ->
 case X of
-1 when true ->
-true;
-2 when true ->
-false;
-_ when true ->
-true
+    1 -> true;
+    2 -> false;
+    _ -> true
 end.
 
 '

@@ -342,13 +342,28 @@ fn (gen ErlangGenerator) generate_case(case_expr ast.CaseExpr) string {
 
 	for clause in case_expr.cases {
 		pattern := gen.generate_pattern(clause.pattern)
-		guard := if clause.guard != ast.Expr(ast.GuardExpr{}) {
-			' when ' + gen.generate_expression(clause.guard)
-		} else {
-			''
+
+		// Check if guard is a default "true" literal - if so, don't generate it
+		mut guard := ''
+		if clause.guard != ast.Expr(ast.GuardExpr{}) {
+			if clause.guard is ast.LiteralExpr {
+				lit_expr := clause.guard as ast.LiteralExpr
+				if lit_expr.value is ast.BooleanLiteral {
+					bool_lit := lit_expr.value as ast.BooleanLiteral
+					// Only generate guard if it's not the default "true"
+					if !bool_lit.value {
+						guard = ' when ' + gen.generate_expression(clause.guard)
+					}
+				} else {
+					guard = ' when ' + gen.generate_expression(clause.guard)
+				}
+			} else {
+				guard = ' when ' + gen.generate_expression(clause.guard)
+			}
 		}
+
 		body := clause.body.map(gen.generate_statement(it))
-		cases << '${pattern}${guard} ->\n${body.join(';\n')}'
+		cases << '    ${pattern}${guard} -> ${body.join('; ')}'
 	}
 
 	return 'case ${subject} of\n${cases.join(';\n')}\nend'
@@ -419,13 +434,28 @@ fn (gen ErlangGenerator) generate_receive(expr ast.ReceiveExpr) string {
 	mut cases := []string{}
 	for case_item in expr.cases {
 		pattern := gen.generate_pattern(case_item.pattern)
-		guard := if case_item.guard != ast.Expr(ast.GuardExpr{}) {
-			' when ' + gen.generate_expression(case_item.guard)
-		} else {
-			''
+
+		// Check if guard is a default "true" literal - if so, don't generate it
+		mut guard := ''
+		if case_item.guard != ast.Expr(ast.GuardExpr{}) {
+			if case_item.guard is ast.LiteralExpr {
+				lit_expr := case_item.guard as ast.LiteralExpr
+				if lit_expr.value is ast.BooleanLiteral {
+					bool_lit := lit_expr.value as ast.BooleanLiteral
+					// Only generate guard if it's not the default "true"
+					if !bool_lit.value {
+						guard = ' when ' + gen.generate_expression(case_item.guard)
+					}
+				} else {
+					guard = ' when ' + gen.generate_expression(case_item.guard)
+				}
+			} else {
+				guard = ' when ' + gen.generate_expression(case_item.guard)
+			}
 		}
+
 		body := case_item.body.map(gen.generate_statement(it))
-		cases << '${pattern}${guard} ->\n${body.join(';\n')}'
+		cases << '    ${pattern}${guard} -> ${body.join('; ')}'
 	}
 
 	timeout := if expr.timeout != ast.Expr(ast.GuardExpr{}) {
