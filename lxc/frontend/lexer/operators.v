@@ -2,28 +2,28 @@ module lexer
 
 // OperatorMap maps operator strings to their corresponding values
 pub const operator_map = {
-	'=':       OperatorValue.assign
-	'<-':      OperatorValue.pattern_match
-	'->':      OperatorValue.arrow
-	'!':       OperatorValue.send
-	'::':      OperatorValue.type_cons
-	'.':       OperatorValue.dot
-	'++':      OperatorValue.concat
-	'|':       OperatorValue.pipe
-	'+':       OperatorValue.plus
-	'-':       OperatorValue.minus
-	'*':       OperatorValue.mult
-	'/':       OperatorValue.div
-	'%':       OperatorValue.modulo
-	'==':      OperatorValue.eq
-	'!=':      OperatorValue.neq
-	'<':       OperatorValue.lt
-	'>':       OperatorValue.gt
-	'<=':      OperatorValue.leq
-	'>=':      OperatorValue.geq
-	'and':     OperatorValue.and_
-	'or':      OperatorValue.or_
-	'not':     OperatorValue.not_
+	'=':   OperatorValue.assign
+	'<-':  OperatorValue.pattern_match
+	'->':  OperatorValue.arrow
+	'!':   OperatorValue.send
+	'::':  OperatorValue.type_cons
+	'.':   OperatorValue.dot
+	'++':  OperatorValue.concat
+	'|':   OperatorValue.pipe
+	'+':   OperatorValue.plus
+	'-':   OperatorValue.minus
+	'*':   OperatorValue.mult
+	'/':   OperatorValue.div
+	'%':   OperatorValue.modulo
+	'==':  OperatorValue.eq
+	'!=':  OperatorValue.neq
+	'<':   OperatorValue.lt
+	'>':   OperatorValue.gt
+	'<=':  OperatorValue.leq
+	'>=':  OperatorValue.geq
+	'and': OperatorValue.and_
+	'or':  OperatorValue.or_
+	'not': OperatorValue.not_
 }
 
 // PunctuationMap maps punctuation strings to their corresponding values

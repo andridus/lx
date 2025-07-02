@@ -163,14 +163,14 @@ fn test_core_boolean_literals() {
 	mut lexer0 := lexer.new_lexer(input, 'test.lx')
 
 	token1 := lexer0.next_token()
-	assert token1 is lexer.KeywordToken
-	keyword_token1 := token1 as lexer.KeywordToken
-	assert keyword_token1.value == lexer.KeywordValue.true_
+	assert token1 is lexer.BoolToken
+	bool_token1 := token1 as lexer.BoolToken
+	assert bool_token1.value == true
 
 	token2 := lexer0.next_token()
-	assert token2 is lexer.KeywordToken
-	keyword_token2 := token2 as lexer.KeywordToken
-	assert keyword_token2.value == lexer.KeywordValue.false_
+	assert token2 is lexer.BoolToken
+	bool_token2 := token2 as lexer.BoolToken
+	assert bool_token2.value == false
 }
 
 fn test_core_atom_literals() {
@@ -334,7 +334,7 @@ fn test_core_comparison_operators() {
 }
 
 fn test_core_logical_operators() {
-	input := 'and or not andalso orelse'
+	input := 'and or not'
 	mut lexer0 := lexer.new_lexer(input, 'test.lx')
 
 	token1 := lexer0.next_token()
@@ -351,16 +351,6 @@ fn test_core_logical_operators() {
 	assert token3 is lexer.OperatorToken
 	operator_token3 := token3 as lexer.OperatorToken
 	assert operator_token3.value == lexer.OperatorValue.not_
-
-	token4 := lexer0.next_token()
-	assert token4 is lexer.OperatorToken
-	operator_token4 := token4 as lexer.OperatorToken
-	assert operator_token4.value == lexer.OperatorValue.andalso
-
-	token5 := lexer0.next_token()
-	assert token5 is lexer.OperatorToken
-	operator_token5 := token5 as lexer.OperatorToken
-	assert operator_token5.value == lexer.OperatorValue.orelse
 }
 
 fn test_punctuation() {

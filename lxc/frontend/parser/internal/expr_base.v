@@ -144,13 +144,14 @@ fn (mut ep ExpressionParser) parse_comparison_expression() ?ast.Expr {
 			else { break }
 		}
 
+		op_position := ep.get_current_position()
 		ep.advance()
 		right := ep.parse_list_cons_expression()?
 		left = ast.BinaryExpr{
 			left:     left
 			op:       op
 			right:    right
-			position: ep.get_current_position()
+			position: op_position
 		}
 	}
 

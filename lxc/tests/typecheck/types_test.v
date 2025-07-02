@@ -428,9 +428,9 @@ fn test_parse_boolean_literal() {
 
 	// Verify we have the right token
 	assert tokens.len == 1
-	assert tokens[0] is lexer.KeywordToken
-	keyword_token := tokens[0] as lexer.KeywordToken
-	assert keyword_token.value == lexer.KeywordValue.true_
+	assert tokens[0] is lexer.BoolToken
+	bool_token := tokens[0] as lexer.BoolToken
+	assert bool_token.value == true
 
 	// Test parser primary expression
 	mut expr_parser := parser.new_expression_parser(tokens)

@@ -242,26 +242,54 @@ fn (gen ErlangGenerator) translate_unary_operator(operator ast.UnaryOp, is_guard
 // is_guard indicates whether we're in a guard context
 fn (gen ErlangGenerator) translate_operator(operator ast.BinaryOp, is_guard bool) string {
 	match operator {
-		.add { return '+' }
-		.subtract { return '-' }
-		.multiply { return '*' }
-		.divide { return '/' }
-		.modulo { return 'rem' }
-		.power { return '**' }
-		.equal { return '=:=' }
-		.not_equal { return '=/=' }
-		.less_than { return '<' }
-		.greater_than { return '>' }
-		.less_equal { return '=<' }
-		.greater_equal { return '>=' }
+		.add {
+			return '+'
+		}
+		.subtract {
+			return '-'
+		}
+		.multiply {
+			return '*'
+		}
+		.divide {
+			return '/'
+		}
+		.modulo {
+			return 'rem'
+		}
+		.power {
+			return '**'
+		}
+		.equal {
+			return '=:='
+		}
+		.not_equal {
+			return '=/='
+		}
+		.less_than {
+			return '<'
+		}
+		.greater_than {
+			return '>'
+		}
+		.less_equal {
+			return '=<'
+		}
+		.greater_equal {
+			return '>='
+		}
 		.and {
 			return if is_guard { 'andalso' } else { 'and' }
 		}
 		.or {
 			return if is_guard { 'orelse' } else { 'or' }
 		}
-		.append { return '++' }
-		.cons { return '|' }
+		.append {
+			return '++'
+		}
+		.cons {
+			return '|'
+		}
 	}
 }
 

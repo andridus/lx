@@ -212,8 +212,6 @@ fn (mut tc TypeChecker) check_binary_expression(expr ast.BinaryExpr) {
 	left_type := tc.infer_expression_type(expr.left)
 	right_type := tc.infer_expression_type(expr.right)
 
-
-
 	// For now, we'll just check that both operands are numeric for arithmetic operators
 	if expr.op in [.add, .subtract, .multiply, .divide, .modulo, .power] {
 		if !tc.is_numeric_type(left_type) || !tc.is_numeric_type(right_type) {
@@ -225,10 +223,12 @@ fn (mut tc TypeChecker) check_binary_expression(expr ast.BinaryExpr) {
 	// Add new check for boolean operands in and/or
 	if expr.op in [.and, .or] {
 		if left_type.str() != 'boolean' {
-			tc.report_error('Left operand of `${expr.op.str()}` must be boolean', 'Use only boolean expressions with `${expr.op.str()}`', tc.get_expression_position(expr.left))
+			tc.report_error('Left operand of `${expr.op.str()}` must be boolean', 'Use only boolean expressions with `${expr.op.str()}`',
+				tc.get_expression_position(expr.left))
 		}
 		if right_type.str() != 'boolean' {
-			tc.report_error('Right operand of `${expr.op.str()}` must be boolean', 'Use only boolean expressions with `${expr.op.str()}`', tc.get_expression_position(expr.right))
+			tc.report_error('Right operand of `${expr.op.str()}` must be boolean', 'Use only boolean expressions with `${expr.op.str()}`',
+				tc.get_expression_position(expr.right))
 		}
 	}
 }
@@ -1131,14 +1131,21 @@ fn (mut tc TypeChecker) infer_binary_expression_type(expr ast.BinaryExpr) TypeEx
 			return make_type_var('a')
 		}
 		.equal, .not_equal, .less_than, .less_equal, .greater_than, .greater_equal {
+			// Check if operands are comparable
+			if !tc.are_types_comparable(left_type, right_type) {
+				tc.report_error('Cannot compare ${left_type.str()} with ${right_type.str()}',
+					'Use operands of compatible types', expr.position)
+			}
 			return boolean_type
 		}
 		.and, .or {
 			if left_type.str() != 'boolean' {
-				tc.report_error('Left operand of `${expr.op.str()}` must be boolean', 'Use only boolean expressions with `${expr.op.str()}`', tc.get_expression_position(expr.left))
+				tc.report_error('Left operand of `${expr.op.str()}` must be boolean',
+					'Use only boolean expressions with `${expr.op.str()}`', tc.get_expression_position(expr.left))
 			}
 			if right_type.str() != 'boolean' {
-				tc.report_error('Right operand of `${expr.op.str()}` must be boolean', 'Use only boolean expressions with `${expr.op.str()}`', tc.get_expression_position(expr.right))
+				tc.report_error('Right operand of `${expr.op.str()}` must be boolean',
+					'Use only boolean expressions with `${expr.op.str()}`', tc.get_expression_position(expr.right))
 			}
 			return boolean_type
 		}
@@ -1154,6 +1161,30 @@ fn (mut tc TypeChecker) infer_binary_expression_type(expr ast.BinaryExpr) TypeEx
 // is_numeric_type checks if a type is numeric
 fn (tc &TypeChecker) is_numeric_type(type_expr TypeExpr) bool {
 	return type_expr.str() == 'integer' || type_expr.str() == 'float'
+}
+
+// are_types_comparable checks if two types can be compared
+fn (tc &TypeChecker) are_types_comparable(left_type TypeExpr, right_type TypeExpr) bool {
+	left_str := left_type.str()
+	right_str := right_type.str()
+
+	// Same types are always comparable
+	if left_str == right_str {
+		return true
+	}
+
+	// Numeric types are comparable with each other
+	if tc.is_numeric_type(left_type) && tc.is_numeric_type(right_type) {
+		return true
+	}
+
+	// Generic types (type variables) are considered compatible for now
+	if left_str.starts_with('a') || right_str.starts_with('a') {
+		return true
+	}
+
+	// Different concrete types are not comparable
+	return false
 }
 
 // report_error adds an error to the type checker

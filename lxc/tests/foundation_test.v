@@ -157,8 +157,8 @@ fn test_binary_operators() {
 	assert ast.BinaryOp.less_equal.str() == '<='
 	assert ast.BinaryOp.greater_than.str() == '>'
 	assert ast.BinaryOp.greater_equal.str() == '>='
-	assert ast.BinaryOp.and.str() == '&&'
-	assert ast.BinaryOp.or.str() == '||'
+	assert ast.BinaryOp.and.str() == 'and'
+	assert ast.BinaryOp.or.str() == 'or'
 	assert ast.BinaryOp.cons.str() == '::'
 	assert ast.BinaryOp.append.str() == '++'
 }

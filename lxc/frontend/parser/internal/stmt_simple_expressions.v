@@ -238,8 +238,8 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 			sp.advance()
 			pos := ast.new_position(token.position.line, token.position.column, token.position.filename)
 			ast.LiteralExpr{
-				value: ast.StringLiteral{
-					value: token.value
+				value:    ast.StringLiteral{
+					value:    token.value
 					position: pos
 				}
 				position: pos
@@ -250,8 +250,8 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 			sp.advance()
 			pos := ast.new_position(token.position.line, token.position.column, token.position.filename)
 			ast.LiteralExpr{
-				value: ast.IntegerLiteral{
-					value: token.value
+				value:    ast.IntegerLiteral{
+					value:    token.value
 					position: pos
 				}
 				position: pos
@@ -262,8 +262,8 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 			sp.advance()
 			pos := ast.new_position(token.position.line, token.position.column, token.position.filename)
 			ast.LiteralExpr{
-				value: ast.FloatLiteral{
-					value: token.value
+				value:    ast.FloatLiteral{
+					value:    token.value
 					position: pos
 				}
 				position: pos
@@ -274,8 +274,8 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 			sp.advance()
 			pos := ast.new_position(token.position.line, token.position.column, token.position.filename)
 			ast.LiteralExpr{
-				value: ast.BooleanLiteral{
-					value: token.value
+				value:    ast.BooleanLiteral{
+					value:    token.value
 					position: pos
 				}
 				position: pos
@@ -286,8 +286,8 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 			sp.advance()
 			pos := ast.new_position(token.position.line, token.position.column, token.position.filename)
 			ast.LiteralExpr{
-				value: ast.AtomLiteral{
-					value: token.value
+				value:    ast.AtomLiteral{
+					value:    token.value
 					position: pos
 				}
 				position: pos
@@ -298,9 +298,10 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 			match keyword_token.value {
 				.nil_ {
 					sp.advance()
-					pos := ast.new_position(keyword_token.position.line, keyword_token.position.column, keyword_token.position.filename)
+					pos := ast.new_position(keyword_token.position.line, keyword_token.position.column,
+						keyword_token.position.filename)
 					ast.LiteralExpr{
-						value: ast.NilLiteral{
+						value:    ast.NilLiteral{
 							position: pos
 						}
 						position: pos

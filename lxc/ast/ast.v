@@ -287,7 +287,7 @@ pub:
 // AtomPattern represents an atom pattern
 pub struct AtomPattern {
 pub:
-	value string
+	value    string
 	position Position
 }
 
@@ -752,35 +752,35 @@ pub fn (te TypeExpression) str() string {
 // StringLiteral represents a string literal
 pub struct StringLiteral {
 pub:
-	value string
+	value    string
 	position Position
 }
 
 // IntegerLiteral represents an integer literal
 pub struct IntegerLiteral {
 pub:
-	value int
+	value    int
 	position Position
 }
 
 // FloatLiteral represents a float literal
 pub struct FloatLiteral {
 pub:
-	value f64
+	value    f64
 	position Position
 }
 
 // BooleanLiteral represents a boolean literal
 pub struct BooleanLiteral {
 pub:
-	value bool
+	value    bool
 	position Position
 }
 
 // AtomLiteral represents an atom literal
 pub struct AtomLiteral {
 pub:
-	value string
+	value    string
 	position Position
 }
 
