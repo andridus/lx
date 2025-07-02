@@ -105,6 +105,42 @@ end
 
 This makes the type information clearer and more faithful to the source code, especially when using domain-specific type aliases.
 
+#### Guard Expression Formatting
+
+The reflection output also provides clean, readable formatting for guard expressions. Instead of showing verbose internal AST representations, guards are displayed as simple, readable expressions.
+
+**Examples:**
+
+```lx
+@reflection
+def with_guard(x :: int) when x > 0 do
+  x
+end
+
+@reflection
+def without_guard(x :: int) do
+  x
+end
+```
+
+**Reflection output:**
+
+```
+=== REFLECTION INFO function: with_guard ===
+  with_guard(x :: int) :: int [ x > 0]
+    Var(x) :: int
+=== END REFLECTION INFO ===
+=== REFLECTION INFO function: without_guard ===
+  without_guard(x :: int) :: int
+    Var(x) :: int
+=== END REFLECTION INFO ===
+```
+
+Notice that:
+- Functions with guards show the guard expression in brackets: `[ x > 0]`
+- Functions without guards show no guard section
+- Guard expressions are displayed in a clean, readable format
+
 #### Directive Syntax Rules
 
 - Directives must start with `@` followed by the directive name

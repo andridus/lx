@@ -677,25 +677,15 @@ fn (mut tc TypeChecker) handle_reflection(func_stmt ast.FunctionStmt) {
 			}
 		}
 
-		// Build guard string - check for true literal specifically
-		guard_str := match clause.guard {
-			ast.LiteralExpr {
-				match clause.guard.value {
-					ast.BooleanLiteral {
-						if clause.guard.value.value { 'nil' } else { clause.guard.str() }
-					}
-					else {
-						clause.guard.str()
-					}
-				}
-			}
-			else {
-				clause.guard.str()
-			}
-		}
+		// Build guard string - format guard expression cleanly
+		guard_str := tc.format_guard_for_reflection(clause.guard)
 
 		// Print function signature
-		println('  ${func_stmt.name}(${params_str}) :: ${return_type_str} [guard: ${guard_str}]')
+		if guard_str == 'nil' {
+			println('  ${func_stmt.name}(${params_str}) :: ${return_type_str}')
+		} else {
+			println('  ${func_stmt.name}(${params_str}) :: ${return_type_str} [ ${guard_str}]')
+		}
 
 		// Create a temporary context with parameter bindings for body type inference
 		mut temp_context := tc.context.new_child_context()
@@ -760,6 +750,89 @@ fn (tc &TypeChecker) handle_inline(func_stmt ast.FunctionStmt) {
 // handle_deprecated marks function as deprecated
 fn (tc &TypeChecker) handle_deprecated(func_stmt ast.FunctionStmt) {
 	println('WARNING: Function ${func_stmt.name} is deprecated')
+}
+
+// format_guard_for_reflection formats guard expressions for clean reflection output
+fn (tc &TypeChecker) format_guard_for_reflection(guard ast.Expr) string {
+	return match guard {
+		ast.LiteralExpr {
+			match guard.value {
+				ast.BooleanLiteral {
+					if guard.value.value {
+						'nil'
+					} else {
+						'false'
+					}
+				}
+				else {
+					guard.str()
+				}
+			}
+		}
+		ast.BinaryExpr {
+			left_str := tc.format_guard_operand(guard.left)
+			right_str := tc.format_guard_operand(guard.right)
+			op_str := tc.format_guard_operator(guard.op)
+			'${left_str} ${op_str} ${right_str}'
+		}
+		ast.UnaryExpr {
+			operand_str := tc.format_guard_operand(guard.operand)
+			op_str := tc.format_guard_operator(guard.op)
+			'${op_str}${operand_str}'
+		}
+		else {
+			guard.str()
+		}
+	}
+}
+
+// format_guard_operand formats operands in guard expressions
+fn (tc &TypeChecker) format_guard_operand(expr ast.Expr) string {
+	return match expr {
+		ast.VariableExpr {
+			expr.name
+		}
+		ast.LiteralExpr {
+			match expr.value {
+				ast.IntegerLiteral {
+					expr.value.value.str()
+				}
+				ast.FloatLiteral {
+					expr.value.value.str()
+				}
+				ast.StringLiteral {
+					'"${expr.value.value}"'
+				}
+				ast.BooleanLiteral {
+					expr.value.value.str()
+				}
+				ast.AtomLiteral {
+					':${expr.value.value}'
+				}
+				else {
+					expr.str()
+				}
+			}
+		}
+		else {
+			expr.str()
+		}
+	}
+}
+
+// GuardOperator represents operators that can appear in guard expressions
+type GuardOperator = ast.BinaryOp | ast.UnaryOp
+
+// format_guard_operator formats operators in guard expressions
+fn (tc &TypeChecker) format_guard_operator(op GuardOperator) string {
+	return match op {
+		ast.BinaryOp {
+			op.str()
+		}
+		ast.UnaryOp {
+			op.str()
+		}
+	}
 }
 
 // check_record_definition performs type checking on a record definition

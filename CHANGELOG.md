@@ -80,3 +80,4 @@
 
 ### Changed
 - **Reflection output now preserves type aliases**: The @reflection directive now prints the original type alias (e.g., `int`) for function parameters and return types in the signature, and for parameter variables in the function body. This ensures that user-defined type aliases are shown instead of the resolved base type (e.g., `int` instead of `integer`), improving clarity and fidelity to the source code.
+- **Improved guard formatting in reflection**: The @reflection directive now displays guard expressions in a clean, readable format instead of showing the internal AST representation. Guards are shown as simple expressions (e.g., `x > 0`) rather than verbose AST nodes (e.g., `Binary(Var(x) > Literal(LInt(0)))`), making the reflection output much more user-friendly.
