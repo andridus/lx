@@ -77,3 +77,6 @@
 - Fixed typechecker types tests: corrected module imports, updated usage to match the current typechecker API, and fixed string assertion for function type representation in list context (now expects 'list((T1) -> T2)'). All type system tests now pass.
 - Fixed: Assignment parsing in function bodies now correctly accepts `name = "Alice"` and similar statements, matching LX syntax reference. (2024-06-09)
 - **Assignment with Type Annotation Parsing**: Fixed parsing so that assignments with type annotations (e.g., `x :: int = 1`) are accepted inside function bodies, matching the LX syntax reference and type system.
+
+### Changed
+- **Reflection output now preserves type aliases**: The @reflection directive now prints the original type alias (e.g., `int`) for function parameters and return types in the signature, and for parameter variables in the function body. This ensures that user-defined type aliases are shown instead of the resolved base type (e.g., `int` instead of `integer`), improving clarity and fidelity to the source code.

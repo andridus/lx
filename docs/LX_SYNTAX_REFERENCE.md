@@ -78,6 +78,33 @@ This is especially helpful when:
 - Learning about the type system behavior
 - Verifying that your code is being analyzed correctly
 
+#### Reflection Output and Type Aliases
+
+The `@reflection` directive now preserves user-defined type aliases in its output. When a function parameter or return type uses a type alias (e.g., `int`), the reflection output will show the alias name in the function signature and for parameter variables in the body, instead of the resolved base type (e.g., `integer`).
+
+**Example:**
+
+```lx
+# Define a type alias
+type int :: integer
+
+@reflection
+def convert(x :: int) do
+  x
+end
+```
+
+**Reflection output:**
+
+```
+=== REFLECTION INFO function: convert ===
+  convert(x :: int) :: int [guard: nil]
+    Var(x) :: int
+=== END REFLECTION INFO ===
+```
+
+This makes the type information clearer and more faithful to the source code, especially when using domain-specific type aliases.
+
 #### Directive Syntax Rules
 
 - Directives must start with `@` followed by the directive name

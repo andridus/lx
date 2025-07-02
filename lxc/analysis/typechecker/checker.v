@@ -558,50 +558,191 @@ fn (mut tc TypeChecker) apply_directive(directive string, func_stmt ast.Function
 	}
 }
 
+// infer_function_return_type infers the return type of a function based on its body
+fn (mut tc TypeChecker) infer_function_return_type(clause ast.FunctionClause) TypeExpr {
+	if clause.body.len == 0 {
+		return make_type_constructor('ok', [])
+	}
+
+	// Create a temporary child context for parameter bindings
+	mut temp_context := tc.context.new_child_context()
+
+	// Bind parameters to their types in the context
+	for param in clause.parameters {
+		match param {
+			ast.VarPattern {
+				param_type := tc.infer_pattern_type(param)
+				temp_context.bind(param.name, param_type, ast.new_position(0, 0, 'unknown'))
+			}
+			else {}
+		}
+	}
+
+	// Get the last statement in the body (the return value)
+	last_stmt := clause.body[clause.body.len - 1]
+
+	match last_stmt {
+		ast.ExprStmt {
+			mut temp_tc := TypeChecker{
+				context:     temp_context
+				unifier:     tc.unifier
+				errors:      tc.errors
+				environment: tc.environment
+			}
+			// Se for variável, tente encontrar o alias
+			match last_stmt.expr {
+				ast.VariableExpr {
+					for param in clause.parameters {
+						match param {
+							ast.VarPattern {
+								if param.name == last_stmt.expr.name {
+									if type_ann := param.type_annotation {
+										match type_ann {
+											ast.SimpleTypeExpr {
+												if tc.context.has_type_alias(type_ann.name) {
+													println('DEBUG: Creating TypeConstructor with name: ${type_ann.name}')
+													return make_type_constructor(type_ann.name,
+														[])
+												} else {
+													return tc.convert_type_expression_to_type_expr(type_ann)
+												}
+											}
+											else {
+												return tc.convert_type_expression_to_type_expr(type_ann)
+											}
+										}
+									}
+								}
+							}
+							else {}
+						}
+					}
+				}
+				else {}
+			}
+			return temp_tc.infer_expression_type(last_stmt.expr)
+		}
+		else {
+			return make_type_constructor('ok', [])
+		}
+	}
+}
+
 // handle_reflection prints type information for functions
 fn (mut tc TypeChecker) handle_reflection(func_stmt ast.FunctionStmt) {
-	println('=== REFLECTION INFO for function: ${func_stmt.name} ===')
+	println('=== REFLECTION INFO function: ${func_stmt.name} ===')
 
-	for i, clause in func_stmt.clauses {
-		println('Clause ${i + 1}:')
+	for clause in func_stmt.clauses {
+		// Build parameter string
+		mut param_strs := []string{}
+		for param in clause.parameters {
+			// Show the original type annotation if available, otherwise the inferred type
+			match param {
+				ast.VarPattern {
+					if type_ann := param.type_annotation {
+						param_strs << '${param.name} :: ${type_ann.str()}'
+					} else {
+						param_type := tc.infer_pattern_type(param)
+						param_strs << '${param.name} :: ${param_type.str()}'
+					}
+				}
+				else {
+					param_type := tc.infer_pattern_type(param)
+					param_strs << '${param.str()} :: ${param_type.str()}'
+				}
+			}
+		}
+		params_str := param_strs.join(', ')
 
-		// Print parameter types
-		println('  Parameters:')
-		for j, param in clause.parameters {
-			param_type := tc.infer_pattern_type(param)
-			println('    ${j + 1}. ${param.str()} :: ${param_type.str()}')
+		// Infer return type
+		return_type := tc.infer_function_return_type(clause)
+
+		// Detect if return is a variable matching a parameter with annotation
+		mut return_type_str := return_type.str()
+		last_stmt := clause.body[clause.body.len - 1]
+		if last_stmt is ast.ExprStmt {
+			stmt := last_stmt as ast.ExprStmt
+			if stmt.expr is ast.VariableExpr {
+				vexpr := stmt.expr as ast.VariableExpr
+				for param in clause.parameters {
+					if param is ast.VarPattern {
+						varp := param as ast.VarPattern
+						if varp.name == vexpr.name {
+							if type_ann := varp.type_annotation {
+								return_type_str = type_ann.str()
+							}
+						}
+					}
+				}
+			}
 		}
 
-		// Print guard type
-		guard_type := tc.infer_expression_type(clause.guard)
-		println('  Guard: ${clause.guard.str()} :: ${guard_type.str()}')
+		// Build guard string - check for true literal specifically
+		guard_str := match clause.guard {
+			ast.LiteralExpr {
+				match clause.guard.value {
+					ast.BooleanLiteral {
+						if clause.guard.value.value { 'nil' } else { clause.guard.str() }
+					}
+					else {
+						clause.guard.str()
+					}
+				}
+			}
+			else {
+				clause.guard.str()
+			}
+		}
 
-		// Print body expressions with type info, line by line
-		println('  Body (line by line):')
+		// Print function signature
+		println('  ${func_stmt.name}(${params_str}) :: ${return_type_str} [guard: ${guard_str}]')
+
+		// Create a temporary context with parameter bindings for body type inference
+		mut temp_context := tc.context.new_child_context()
+		for param in clause.parameters {
+			match param {
+				ast.VarPattern {
+					param_type := tc.infer_pattern_type(param)
+					temp_context.bind(param.name, param_type, ast.new_position(0, 0, 'unknown'))
+				}
+				else {}
+			}
+		}
+
+		// Create temporary type checker with parameter context
+		mut temp_tc := TypeChecker{
+			context:     temp_context
+			unifier:     tc.unifier
+			errors:      tc.errors
+			environment: tc.environment
+		}
+
+		// Print body expressions with proper type inference
 		for stmt in clause.body {
 			match stmt {
 				ast.ExprStmt {
-					mut line := '?'
-					mut col := '?'
-					match stmt.expr {
-						ast.VariableExpr, ast.AssignExpr, ast.BinaryExpr, ast.CallExpr,
-						ast.MatchExpr, ast.ListConsExpr, ast.ListLiteralExpr, ast.TupleExpr,
-						ast.MapLiteralExpr, ast.RecordLiteralExpr, ast.RecordAccessExpr,
-						ast.FunExpr, ast.SendExpr, ast.ReceiveExpr, ast.GuardExpr, ast.UnaryExpr,
-						ast.MapAccessExpr, ast.IfExpr, ast.CaseExpr, ast.WithExpr, ast.ForExpr {
-							line = stmt.expr.position.line.str()
-							col = stmt.expr.position.column.str()
-						}
-						else {
-							line = '?'
-							col = '?'
+					expr_type := temp_tc.infer_expression_type(stmt.expr)
+
+					// Check if this is a variable expression that matches a parameter with annotation
+					mut type_str := expr_type.str()
+					if stmt.expr is ast.VariableExpr {
+						vexpr := stmt.expr as ast.VariableExpr
+						for param in clause.parameters {
+							if param is ast.VarPattern {
+								varp := param as ast.VarPattern
+								if varp.name == vexpr.name {
+									if type_ann := varp.type_annotation {
+										type_str = type_ann.str()
+									}
+								}
+							}
 						}
 					}
-					type_str := tc.infer_expression_type(stmt.expr).str()
-					println('    [${line}:${col}] ${stmt.expr.str()} :: ${type_str}')
+
+					println('    ${stmt.expr.str()} :: ${type_str}')
 				}
 				else {
-					println('    [stmt] ${stmt.str()}')
+					println('    ${stmt.str()}')
 				}
 			}
 		}
