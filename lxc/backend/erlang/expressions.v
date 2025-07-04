@@ -80,6 +80,9 @@ pub fn (gen ErlangGenerator) generate_expression(expr ast.Expr) string {
 		ast.MatchRescueExpr {
 			return gen.generate_match_rescue(expr)
 		}
+		ast.BlockExpr {
+			return gen.generate_block_expression(expr)
+		}
 	}
 }
 
@@ -160,6 +163,9 @@ pub fn (gen ErlangGenerator) generate_expression_in_guard(expr ast.Expr) string 
 		}
 		ast.MatchRescueExpr {
 			return gen.generate_match_rescue(expr)
+		}
+		ast.BlockExpr {
+			return gen.generate_block_expression(expr)
 		}
 	}
 }
@@ -340,8 +346,8 @@ fn (gen ErlangGenerator) generate_match(match_expr ast.MatchExpr) string {
 		} else {
 			''
 		}
-		body := case_item.body.map(gen.generate_statement(it))
-		cases << '${pattern}${guard} ->\n${body.join(';\n')}'
+		body := gen.generate_block_expression(case_item.body)
+		cases << '${pattern}${guard} ->\n${body}'
 	}
 
 	return 'case ${value} of\n${cases.join(';\n')}\nend'
@@ -374,8 +380,8 @@ fn (gen ErlangGenerator) generate_case(case_expr ast.CaseExpr) string {
 			}
 		}
 
-		body := clause.body.map(gen.generate_statement(it))
-		cases << '    ${pattern}${guard} -> ${body.join('; ')}'
+		body := gen.generate_block_expression(clause.body)
+		cases << '    ${pattern}${guard} -> ${body}'
 	}
 
 	return 'case ${subject} of\n${cases.join(';\n')}\nend'
@@ -427,11 +433,11 @@ fn (gen ErlangGenerator) generate_record_access(expr ast.RecordAccessExpr) strin
 	return '${record}#${expr.field}'
 }
 
-// generate_fun_expression generates code for fun expressions
+// generate_fun_expression generates code for function expressions
 fn (gen ErlangGenerator) generate_fun_expression(expr ast.FunExpr) string {
 	parameters := expr.parameters.map(gen.generate_pattern(it))
-	body := expr.body.map(gen.generate_statement(it))
-	return 'fun(${parameters.join(', ')}) ->\n${body.join(';\n')}\nend'
+	body := gen.generate_block_expression(expr.body)
+	return 'fun(${parameters.join(', ')}) ->\n${body}\nend'
 }
 
 // generate_send generates code for message sending
@@ -466,8 +472,8 @@ fn (gen ErlangGenerator) generate_receive(expr ast.ReceiveExpr) string {
 			}
 		}
 
-		body := case_item.body.map(gen.generate_statement(it))
-		cases << '    ${pattern}${guard} -> ${body.join('; ')}'
+		body := gen.generate_block_expression(case_item.body)
+		cases << '    ${pattern}${guard} -> ${body}'
 	}
 
 	timeout := if expr.timeout != ast.Expr(ast.GuardExpr{}) {
@@ -488,36 +494,11 @@ fn (gen ErlangGenerator) generate_guard(expr ast.GuardExpr) string {
 fn (gen ErlangGenerator) generate_if_expression(expr ast.IfExpr) string {
 	condition := gen.generate_expression(expr.condition)
 
-	// Generate then body - get the last expression as the return value
-	mut then_statements := []string{}
-	for i, stmt in expr.then_body {
-		if i == expr.then_body.len - 1 {
-			// Last statement is the return value
-			then_statements << gen.generate_statement(stmt)
-		} else {
-			// Non-last statements need comma separation
-			then_statements << gen.generate_statement(stmt) + ','
-		}
-	}
-	then_body := then_statements.join('\n    ')
+	// Generate then body
+	then_body := gen.generate_block_expression(expr.then_body)
 
-	// Generate else body - get the last expression as the return value
-	mut else_statements := []string{}
-	if expr.else_body.len > 0 {
-		for i, stmt in expr.else_body {
-			if i == expr.else_body.len - 1 {
-				// Last statement is the return value
-				else_statements << gen.generate_statement(stmt)
-			} else {
-				// Non-last statements need comma separation
-				else_statements << gen.generate_statement(stmt) + ','
-			}
-		}
-	} else {
-		// If no else body, return nil
-		else_statements << 'nil'
-	}
-	else_body := else_statements.join('\n    ')
+	// Generate else body
+	else_body := gen.generate_block_expression(expr.else_body)
 
 	// In Erlang, we use case expression to implement if-else
 	return 'case ${condition} of\n    true ->\n        ${then_body};\n    false ->\n        ${else_body}\nend'
@@ -527,8 +508,7 @@ fn (gen ErlangGenerator) generate_if_expression(expr ast.IfExpr) string {
 fn (gen ErlangGenerator) generate_with_expression(expr ast.WithExpr) string {
 	// If there are no bindings, just return the body
 	if expr.bindings.len == 0 {
-		body := expr.body.map(gen.generate_statement(it))
-		return body.join(',\n')
+		return gen.generate_block_expression(expr.body)
 	}
 
 	// Generate nested case expressions for each binding
@@ -536,14 +516,10 @@ fn (gen ErlangGenerator) generate_with_expression(expr ast.WithExpr) string {
 }
 
 // generate_with_bindings generates nested case expressions recursively
-fn (gen ErlangGenerator) generate_with_bindings(bindings []ast.WithBinding, body []ast.Stmt, else_body []ast.Stmt, index int) string {
+fn (gen ErlangGenerator) generate_with_bindings(bindings []ast.WithBinding, body ast.BlockExpr, else_body ast.BlockExpr, index int) string {
 	if index >= bindings.len {
 		// We've reached the end of bindings, generate the main body
-		if body.len > 0 {
-			body_code := body.map(gen.generate_statement(it))
-			return body_code.join(',\n')
-		}
-		return 'ok'
+		return gen.generate_block_expression(body)
 	}
 
 	current_binding := bindings[index]
@@ -553,13 +529,11 @@ fn (gen ErlangGenerator) generate_with_bindings(bindings []ast.WithBinding, body
 	// Generate the next level of bindings or the final body
 	next_code := gen.generate_with_bindings(bindings, body, else_body, index + 1)
 
-	// Generate the failure branch
-	failure_branch := if else_body.len > 0 {
-		else_code := else_body.map(gen.generate_statement(it))
-		else_code.join(',\n')
-	} else {
-		// If no else_body, propagate the failed value
+	// Generate the failure branch - if else_body is empty, use "Other"
+	failure_branch := if else_body.body.len == 0 {
 		'Other'
+	} else {
+		gen.generate_block_expression(else_body)
 	}
 
 	// Format the case expression with proper indentation for nested cases
@@ -612,24 +586,45 @@ fn (gen ErlangGenerator) generate_match_rescue(expr ast.MatchRescueExpr) string 
 	value := gen.generate_expression(expr.value)
 	rescue_var := gen.capitalize_variable(expr.rescue_var)
 
-	// Generate rescue body - get the last expression as return value
-	rescue_body := if expr.rescue_body.len > 0 {
-		mut rescue_statements := []string{}
-		for i, stmt in expr.rescue_body {
-			if i == expr.rescue_body.len - 1 {
-				// Last statement is the return value
-				rescue_statements << gen.generate_statement(stmt)
-			} else {
-				// Non-last statements need comma separation
-				rescue_statements << gen.generate_statement(stmt) + ','
-			}
-		}
-		rescue_statements.join('\n        ')
-	} else {
-		rescue_var
-	}
+	// Generate rescue body
+	rescue_body := gen.generate_block_expression(expr.rescue_body)
 
 	// Note: This is a simplified version. The proper implementation should be handled
 	// at the statement level to include subsequent expressions in the success branch
 	return 'case ${value} of\n    ${pattern} ->\n        ok;\n    ${rescue_var} ->\n        ${rescue_body}\nend'
+}
+
+// generate_block_expression generates code for block expressions (do...end)
+fn (gen ErlangGenerator) generate_block_expression(expr ast.BlockExpr) string {
+	if expr.body.len == 0 {
+		return 'nil'
+	}
+
+	// Generate all statements in the block
+	mut statements := []string{}
+	for i, stmt in expr.body {
+		if i == expr.body.len - 1 {
+			statements << gen.generate_statement(stmt)
+		} else {
+			statements << gen.generate_statement(stmt) + ','
+		}
+	}
+
+	// If there's only one statement and it's a simple expression, don't use begin...end
+	if expr.body.len == 1 {
+		stmt := expr.body[0]
+		if stmt is ast.ExprStmt {
+			expr_stmt := stmt as ast.ExprStmt
+			// Check if it's a simple expression that doesn't need begin...end
+			if expr_stmt.expr is ast.LiteralExpr || expr_stmt.expr is ast.VariableExpr ||
+			   expr_stmt.expr is ast.CallExpr || expr_stmt.expr is ast.BinaryExpr ||
+			   expr_stmt.expr is ast.TupleExpr || expr_stmt.expr is ast.ListLiteralExpr ||
+			   expr_stmt.expr is ast.IfExpr || expr_stmt.expr is ast.CaseExpr {
+				return gen.generate_expression(expr_stmt.expr)
+			}
+		}
+	}
+
+	// For multiple statements or complex expressions, use begin...end
+	return 'begin\n    ${statements.join('\n    ')}\nend'
 }

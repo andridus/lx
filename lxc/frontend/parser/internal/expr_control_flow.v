@@ -21,8 +21,14 @@ fn (mut ep ExpressionParser) parse_if_expression() ?ast.Expr {
 
 	return ast.IfExpr{
 		condition: condition
-		then_body: then_body
-		else_body: else_body
+		then_body: ast.BlockExpr{
+			body: then_body
+			position: ep.get_current_position()
+		}
+		else_body: ast.BlockExpr{
+			body: else_body
+			position: ep.get_current_position()
+		}
 		position:  ep.get_current_position()
 	}
 }
@@ -54,7 +60,10 @@ fn (mut ep ExpressionParser) parse_case_expression() ?ast.Expr {
 		cases << ast.MatchCase{
 			pattern:  pattern
 			guard:    guard
-			body:     body
+			body:     ast.BlockExpr{
+				body: body
+				position: ep.get_current_position()
+			}
 			position: ep.get_current_position()
 		}
 	}
@@ -102,8 +111,14 @@ fn (mut ep ExpressionParser) parse_with_expression() ?ast.Expr {
 
 	return ast.WithExpr{
 		bindings:  bindings
-		body:      body
-		else_body: else_body
+		body:      ast.BlockExpr{
+			body: body
+			position: ep.get_current_position()
+		}
+		else_body: ast.BlockExpr{
+			body: else_body
+			position: ep.get_current_position()
+		}
 		position:  ep.get_current_position()
 	}
 }
@@ -136,7 +151,10 @@ fn (mut ep ExpressionParser) parse_for_expression() ?ast.Expr {
 		pattern:    pattern
 		collection: collection
 		guard:      guard
-		body:       body
+		body:       ast.BlockExpr{
+			body: body
+			position: ep.get_current_position()
+		}
 		position:   ep.get_current_position()
 	}
 }
@@ -166,7 +184,10 @@ fn (mut ep ExpressionParser) parse_receive_expression() ?ast.Expr {
 		cases << ast.ReceiveCase{
 			pattern:  pattern
 			guard:    guard
-			body:     body
+			body:     ast.BlockExpr{
+				body: body
+				position: ep.get_current_position()
+			}
 			position: ep.get_current_position()
 		}
 	}
@@ -263,7 +284,10 @@ fn (mut ep ExpressionParser) parse_match_rescue_expression() ?ast.Expr {
 			pattern:     pattern
 			value:       value
 			rescue_var:  rescue_var
-			rescue_body: rescue_body
+			rescue_body: ast.BlockExpr{
+				body: rescue_body
+				position: ep.get_current_position()
+			}
 			position:    ep.get_current_position()
 		}
 	} else {

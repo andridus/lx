@@ -88,6 +88,9 @@ fn (mut ep ExpressionParser) parse_atom_expression() ?ast.Expr {
 						value: ast.NilLiteral{}
 					}
 				}
+				.do_ {
+					ep.parse_block_expression()
+				}
 				else {
 					ep.add_error('Unexpected token: ${ep.current.str()}', 'Expected expression')
 					none

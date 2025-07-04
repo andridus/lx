@@ -6,6 +6,9 @@ import ast
 pub fn (gen ErlangGenerator) generate_statement(stmt ast.Stmt) string {
 	match stmt {
 		ast.ExprStmt {
+			if stmt.expr is ast.CaseExpr || stmt.expr is ast.IfExpr {
+				return gen.generate_expression(stmt.expr)
+			}
 			return gen.generate_expression(stmt.expr)
 		}
 		ast.FunctionStmt {
@@ -26,13 +29,13 @@ pub fn (gen ErlangGenerator) generate_statement(stmt ast.Stmt) string {
 	}
 }
 
-// generate_function_body generates code for function body with special handling for match rescue
+// generate_function_body generates code for function body with special handling for match rescue and block expressions
 pub fn (gen ErlangGenerator) generate_function_body(statements []ast.Stmt) string {
 	if statements.len == 0 {
 		return 'ok'
 	}
 
-	// Check for match rescue patterns
+	// Check for match rescue patterns and block expressions
 	mut result := []string{}
 	mut i := 0
 
@@ -76,6 +79,17 @@ pub fn (gen ErlangGenerator) generate_function_body(statements []ast.Stmt) strin
 				// Skip all processed statements
 				i = statements.len
 				continue
+			} else if expr_stmt.expr is ast.AssignExpr {
+				// Check if this is an assignment with a block expression
+				assign_expr := expr_stmt.expr as ast.AssignExpr
+				if assign_expr.value is ast.BlockExpr {
+					// Found a block assignment - unfold it inline
+					block_expr := assign_expr.value as ast.BlockExpr
+					unfolded := gen.generate_block_assignment_inline(assign_expr.name, block_expr)
+					result << unfolded
+					i++
+					continue
+				}
 			}
 		}
 
@@ -114,19 +128,7 @@ fn (gen ErlangGenerator) generate_match_rescue_with_continuation(expr ast.MatchR
 	rescue_var := gen.capitalize_variable(expr.rescue_var)
 
 	// Generate rescue body
-	rescue_body := if expr.rescue_body.len > 0 {
-		mut rescue_statements := []string{}
-		for i, stmt in expr.rescue_body {
-			if i == expr.rescue_body.len - 1 {
-				rescue_statements << gen.generate_statement(stmt)
-			} else {
-				rescue_statements << gen.generate_statement(stmt) + ','
-			}
-		}
-		rescue_statements.join('\n        ')
-	} else {
-		rescue_var
-	}
+	rescue_body := gen.generate_block_expression(expr.rescue_body)
 
 	// Generate success body with subsequent expressions
 	// Use the new function body generator to handle nested match rescue correctly
@@ -142,16 +144,14 @@ fn (gen ErlangGenerator) generate_match_rescue_with_continuation(expr ast.MatchR
 	return 'case ${value} of\n    ${pattern} ->\n${formatted_success_code};\n    ${rescue_var} ->\n        ${rescue_body}\nend'
 }
 
-
-
 // infer_function_return_type infers the return type of a function based on its body
 fn (gen ErlangGenerator) infer_function_return_type(clause ast.FunctionClause) string {
-	if clause.body.len == 0 {
+	if clause.body.body.len == 0 {
 		return 'ok'
 	}
 
 	// Get the last statement in the body (the return value)
-	last_stmt := clause.body[clause.body.len - 1]
+	last_stmt := clause.body.body[clause.body.body.len - 1]
 
 	match last_stmt {
 		ast.ExprStmt {
@@ -168,8 +168,6 @@ fn (gen ErlangGenerator) infer_function_return_type(clause ast.FunctionClause) s
 	// fallback return (should never reach here)
 	return 'ok'
 }
-
-
 
 // find_matching_defined_type checks if a type expression matches any defined type
 fn (gen ErlangGenerator) find_matching_defined_type(type_expr string) string {
@@ -261,8 +259,6 @@ fn (gen ErlangGenerator) extract_var_from_pattern(pattern ast.Pattern) ?string {
 		}
 	}
 }
-
-
 
 // infer_literal_return_type infers the return type of a literal
 fn (gen ErlangGenerator) infer_literal_return_type(literal ast.Literal) string {
@@ -383,8 +379,8 @@ pub fn (gen ErlangGenerator) generate_function(func ast.FunctionStmt) string {
 			} else {
 				guard = ' when ' + gen.generate_expression_in_guard(clause.guard)
 			}
-			// Use the new function body generator that handles match rescue
-			body_code := gen.generate_function_body(clause.body)
+			// Use the new function body generator that handles match rescue and block assignments
+			body_code := gen.generate_function_body(clause.body.body)
 			clause_strings << '${func.name}(${parameters.join(', ')})${guard} ->\n${body_code}'
 		}
 
@@ -467,29 +463,10 @@ fn (gen ErlangGenerator) generate_type_expression(type_expr ast.TypeExpression) 
 // infer_if_expression_return_type infers the return type of an if expression
 fn (gen ErlangGenerator) infer_if_expression_return_type(expr ast.IfExpr, parameters []ast.Pattern) string {
 	// Infer the type from the then branch
-	mut then_type := 'any()'
-	if expr.then_body.len > 0 {
-		// Get the type of the last statement in the then branch
-		last_then_stmt := expr.then_body[expr.then_body.len - 1]
-		if last_then_stmt is ast.ExprStmt {
-			then_type = gen.infer_expression_return_type_with_context(last_then_stmt.expr,
-				parameters)
-		}
-	}
+	then_type := gen.infer_block_return_type(expr.then_body, parameters)
 
 	// Infer the type from the else branch
-	mut else_type := 'any()'
-	if expr.else_body.len > 0 {
-		// Get the type of the last statement in the else branch
-		last_else_stmt := expr.else_body[expr.else_body.len - 1]
-		if last_else_stmt is ast.ExprStmt {
-			else_type = gen.infer_expression_return_type_with_context(last_else_stmt.expr,
-				parameters)
-		}
-	} else {
-		// If no else branch, the else type is nil
-		else_type = 'nil'
-	}
+	else_type := gen.infer_block_return_type(expr.else_body, parameters)
 
 	// If both branches have the same type, return that type
 	if then_type == else_type {
@@ -527,19 +504,8 @@ fn (gen ErlangGenerator) infer_case_expression_return_type(expr ast.CaseExpr, pa
 	// Infer types from all case branches
 	mut case_types := []string{}
 	for case_clause in expr.cases {
-		if case_clause.body.len > 0 {
-			// Get the type of the last statement in the case body
-			last_stmt := case_clause.body[case_clause.body.len - 1]
-			if last_stmt is ast.ExprStmt {
-				case_type := gen.infer_expression_return_type_with_context(last_stmt.expr,
-					parameters)
-				case_types << case_type
-			} else {
-				case_types << 'nil'
-			}
-		} else {
-			case_types << 'nil'
-		}
+		case_type := gen.infer_block_return_type(case_clause.body, parameters)
+		case_types << case_type
 	}
 
 	// If all cases have the same type, return that type
@@ -590,37 +556,14 @@ fn (gen ErlangGenerator) infer_case_expression_return_type(expr ast.CaseExpr, pa
 fn (gen ErlangGenerator) infer_with_expression_return_type(expr ast.WithExpr, parameters []ast.Pattern) string {
 	// If there are no bindings, infer from the body
 	if expr.bindings.len == 0 {
-		if expr.body.len > 0 {
-			last_stmt := expr.body[expr.body.len - 1]
-			if last_stmt is ast.ExprStmt {
-				return gen.infer_expression_return_type_with_context(last_stmt.expr, parameters)
-			}
-		}
-		return 'ok'
+		return gen.infer_block_return_type(expr.body, parameters)
 	}
 
 	// Infer the type from the success body
-	mut success_type := 'any()'
-	if expr.body.len > 0 {
-		last_stmt := expr.body[expr.body.len - 1]
-		if last_stmt is ast.ExprStmt {
-			success_type = gen.infer_expression_return_type_with_context(last_stmt.expr,
-				parameters)
-		}
-	}
+	success_type := gen.infer_block_return_type(expr.body, parameters)
 
 	// Infer the type from the else body
-	mut else_type := 'any()'
-	if expr.else_body.len > 0 {
-		last_else_stmt := expr.else_body[expr.else_body.len - 1]
-		if last_else_stmt is ast.ExprStmt {
-			else_type = gen.infer_expression_return_type_with_context(last_else_stmt.expr,
-				parameters)
-		}
-	} else {
-		// If no else body, the else branch can return any failed value
-		else_type = 'any()'
-	}
+	else_type := gen.infer_block_return_type(expr.else_body, parameters)
 
 	// If both branches have the same concrete type, return that type
 	if success_type == else_type && success_type != 'any()' {
@@ -668,4 +611,47 @@ fn (gen ErlangGenerator) infer_with_expression_return_type(expr ast.WithExpr, pa
 
 	// For different types, return any()
 	return 'any()'
+}
+
+// infer_block_return_type infers the return type of a block expression
+fn (gen ErlangGenerator) infer_block_return_type(block ast.BlockExpr, parameters []ast.Pattern) string {
+	if block.body.len == 0 {
+		return 'nil'
+	}
+
+	// Get the type of the last statement in the block
+	last_stmt := block.body[block.body.len - 1]
+	if last_stmt is ast.ExprStmt {
+		return gen.infer_expression_return_type_with_context(last_stmt.expr, parameters)
+	}
+
+	return 'nil'
+}
+
+// generate_block_assignment_inline generates inline code for block assignments
+fn (gen ErlangGenerator) generate_block_assignment_inline(var_name string, block ast.BlockExpr) string {
+	if block.body.len == 0 {
+		return '${gen.capitalize_variable(var_name)} = nil'
+	}
+
+	mut result := []string{}
+
+	// Add comment to mark the beginning of the block
+	result << '% Block of ${gen.capitalize_variable(var_name)}'
+
+	// Generate all statements in the block except the last one
+	for i in 0 .. block.body.len - 1 {
+		stmt := block.body[i]
+		result << gen.generate_statement(stmt) + ','
+	}
+
+	// Generate the last statement and assign it to the variable
+	last_stmt := block.body[block.body.len - 1]
+	last_expr := gen.generate_statement(last_stmt)
+	result << '${gen.capitalize_variable(var_name)} = ${last_expr}'
+
+	// Add comment to mark the end of the block
+	result << '% End Block of ${gen.capitalize_variable(var_name)}'
+
+	return result.join('\n')
 }

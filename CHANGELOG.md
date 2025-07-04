@@ -1,6 +1,16 @@
 ## [Unreleased]
 
 ### Added
+- **Block Expressions**: Complete implementation of `do...end` block expressions for creating scoped computation blocks. Features include:
+  - **Scoped Variables**: Variables defined inside blocks are scoped to that block and don't leak to outer scope
+  - **Return Value**: The last expression in a block is automatically returned as the block's value
+  - **Variable Shadowing**: Inner blocks can shadow variables from outer scopes without affecting the outer variables
+  - **Nested Support**: Blocks can be nested to any depth with proper scope isolation
+  - **Inline Generation**: Block assignments are unfolded inline in the generated Erlang code with clear comments marking block boundaries
+  - **Assignment Integration**: Block expressions can be assigned to variables: `result = do ... end`
+  - **Type Inference**: Block expressions participate in type inference, with the type determined by the last expression
+  - **Parser Integration**: Seamless integration with the expression parsing pipeline through atom expression handling
+  - **Clean Output**: Generated Erlang code is clean and readable, avoiding unnecessary `begin...end` blocks for assignments
 - **With Expressions**: Complete implementation of `with` expressions for elegant error handling and sequential pattern matching that compiles to nested Erlang `case` expressions. Features include:
   - **Sequential Pattern Matching**: Support for `with pattern <- expr, pattern2 <- expr2 do ... end` syntax with multiple bindings
   - **Else Clause Support**: Optional `else` clause for handling pattern match failures: `with pattern <- expr do ... else ... end`

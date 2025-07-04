@@ -38,6 +38,7 @@ Lx is a statically scoped, expression-based functional language designed for bui
 These reserved words define control flow, type contracts, concurrency, and OTP structure. They cannot be redefined.
 
 - **Core**: `def`, `defp`, `case`, `if`, `else`, `do`, `end`, `with`, `for`, `when`, `receive`, `after`, `true`, `false`, `nil`, `unsafe`
+- **Block Delimiters**: `do`, `end` — define code blocks for functions, control flow, and scoped expressions
 - **Data**: `record` — structured data type definitions
 - **OTP**: `worker`, `supervisor`, `strategy`, `children`, `one_for_one`, `one_for_all`, `rest_for_one`
 - **Specification**: `spec`, `requires`, `ensures`, `matches`
@@ -352,15 +353,120 @@ The compiler provides detailed error messages with suggestions for fixing variab
 
 #### Block expressions:
 
-Code blocks are now defined using `do` and `end` keywords:
+Code blocks are now defined using `do` and `end` keywords for creating scoped computation blocks:
 
 ```lx
+# Basic block expression
 result = do
   a = 1
   b = 2
   a + b  # Last expression is returned
 end
+
+# Multiple block expressions
+def calculate() do
+  result1 = do
+    x = 10
+    y = 20
+    x * y
+  end
+  result2 = do
+    a = 5
+    b = 3
+    a + b
+  end
+  result1 + result2
+end
+
+# Nested block expressions
+def complex_calculation() do
+  outer_result = do
+    inner_value = do
+      base = 10
+      multiplier = 2
+      base * multiplier
+    end
+    adjustment = 5
+    inner_value + adjustment
+  end
+  outer_result
+end
 ```
+
+**Block Expression Features:**
+- **Scoped Variables**: Variables defined inside blocks are scoped to that block and don't leak to outer scope
+- **Return Value**: The last expression in a block is automatically returned as the block's value
+- **Variable Shadowing**: Inner blocks can shadow variables from outer scopes without affecting the outer variables
+- **Assignment Integration**: Block expressions can be assigned to variables using `variable = do ... end` syntax
+- **Nested Support**: Blocks can be nested to any depth with proper scope isolation
+
+**Generated Erlang Code:**
+
+Block assignments are unfolded inline in the generated Erlang code with clear comments marking block boundaries:
+
+```lx
+# LX source
+def calculate() do
+  result = do
+    x = 10
+    y = 20
+    x * y
+  end
+  result + 5
+end
+```
+
+```erlang
+% Generated Erlang
+calculate() ->
+% Block of Result
+X = 10,
+Y = 20,
+Result = X * Y
+% End Block of Result,
+Result + 5.
+```
+
+**Multiple Block Example:**
+
+```lx
+# LX source with multiple blocks
+def multi_block() do
+  first = do
+    a = 1
+    b = 2
+    a + b
+  end
+  second = do
+    c = 3
+    d = 4
+    c * d
+  end
+  first + second
+end
+```
+
+```erlang
+% Generated Erlang with inline blocks
+multi_block() ->
+% Block of First
+A = 1,
+B = 2,
+First = A + B
+% End Block of First,
+% Block of Second
+C = 3,
+D = 4,
+Second = C * D
+% End Block of Second,
+First + Second.
+```
+
+**Benefits:**
+- **Clean Output**: Generated Erlang code is clean and readable, avoiding unnecessary `begin...end` blocks
+- **Inline Generation**: Block assignments are unfolded inline with clear comment markers
+- **Type Safety**: Block expressions participate in type inference, with the type determined by the last expression
+- **Scope Isolation**: Variables in blocks are properly scoped and don't interfere with outer scope variables
 
 #### Function calls:
 

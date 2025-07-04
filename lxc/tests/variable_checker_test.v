@@ -333,7 +333,10 @@ fn test_pattern_variable_binding() {
 				value: true
 			}
 		}
-		body:     body
+		body:     ast.BlockExpr{
+			body:     body
+			position: ast.new_position(1, 1, 'test.lx')
+		}
 		position: ast.new_position(1, 1, 'test.lx')
 	}
 
@@ -411,7 +414,10 @@ fn create_function_clause(parameters []ast.Pattern, guard ast.Expr, body []ast.S
 	return ast.FunctionClause{
 		parameters: parameters
 		guard:      guard
-		body:       body
+		body:       ast.BlockExpr{
+			body:     body
+			position: ast.new_position(line, column, 'test.lx')
+		}
 		position:   ast.new_position(line, column, 'test.lx')
 	}
 }

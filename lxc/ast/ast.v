@@ -105,7 +105,7 @@ pub:
 pub struct FunExpr {
 pub:
 	parameters []Pattern
-	body       []Stmt
+	body       BlockExpr
 	position   Position
 }
 
@@ -152,8 +152,8 @@ pub:
 pub struct IfExpr {
 pub:
 	condition Expr
-	then_body []Stmt
-	else_body []Stmt
+	then_body BlockExpr
+	else_body BlockExpr
 	position  Position
 }
 
@@ -169,8 +169,8 @@ pub:
 pub struct WithExpr {
 pub:
 	bindings  []WithBinding
-	body      []Stmt
-	else_body []Stmt
+	body      BlockExpr
+	else_body BlockExpr
 	position  Position
 }
 
@@ -180,7 +180,7 @@ pub:
 	pattern    Pattern
 	collection Expr
 	guard      Expr
-	body       []Stmt
+	body       BlockExpr
 	position   Position
 }
 
@@ -198,8 +198,15 @@ pub:
 	pattern      Pattern
 	value        Expr
 	rescue_var   string
-	rescue_body  []Stmt
+	rescue_body  BlockExpr
 	position     Position
+}
+
+// BlockExpr represents a block expression (do...end)
+pub struct BlockExpr {
+pub:
+	body     []Stmt
+	position Position
 }
 
 // Expr represents expressions in LX using sum types
@@ -228,6 +235,7 @@ pub type Expr = VariableExpr
 	| ForExpr
 	| SimpleMatchExpr
 	| MatchRescueExpr
+	| BlockExpr
 
 // BinaryOp represents binary operators
 pub enum BinaryOp {
@@ -527,7 +535,7 @@ pub fn (e Expr) str() string {
 			'Access(${e.record.str()}.${e.field})'
 		}
 		FunExpr {
-			'Fun([${e.parameters.map(it.str()).join(', ')}], [${e.body.map(it.str()).join(', ')}])'
+			'Fun([${e.parameters.map(it.str()).join(', ')}], ${e.body.str()})'
 		}
 		SendExpr {
 			'Send(${e.pid.str()}, ${e.message.str()})'
@@ -545,22 +553,25 @@ pub fn (e Expr) str() string {
 			'Access(${e.map_expr.str()}[${e.key.str()}])'
 		}
 		IfExpr {
-			'If(${e.condition.str()}, [${e.then_body.map(it.str()).join(', ')}], [${e.else_body.map(it.str()).join(', ')}])'
+			'If(${e.condition.str()}, ${e.then_body.str()}, ${e.else_body.str()})'
 		}
 		CaseExpr {
 			'Case(${e.value.str()}, [${e.cases.map(it.str()).join(', ')}])'
 		}
 		WithExpr {
-			'With([${e.bindings.map(it.str()).join(', ')}], [${e.body.map(it.str()).join(', ')}], [${e.else_body.map(it.str()).join(', ')}])'
+			'With([${e.bindings.map(it.str()).join(', ')}], ${e.body.str()}, ${e.else_body.str()})'
 		}
 		ForExpr {
-			'For(${e.pattern.str()}, ${e.collection.str()}, ${e.guard.str()}, [${e.body.map(it.str()).join(', ')}])'
+			'For(${e.pattern.str()}, ${e.collection.str()}, ${e.guard.str()}, ${e.body.str()})'
 		}
 		SimpleMatchExpr {
 			'SimpleMatch(${e.pattern.str()} <- ${e.value.str()})'
 		}
 		MatchRescueExpr {
-			'MatchRescue(${e.pattern.str()} <- ${e.value.str()} rescue ${e.rescue_var} [${e.rescue_body.map(it.str()).join(', ')}])'
+			'MatchRescue(${e.pattern.str()} <- ${e.value.str()} rescue ${e.rescue_var} ${e.rescue_body.str()})'
+		}
+		BlockExpr {
+			'Block([${e.body.map(it.str()).join(', ')}])'
 		}
 	}
 }
@@ -570,7 +581,7 @@ pub struct MatchCase {
 pub:
 	pattern  Pattern
 	guard    Expr
-	body     []Stmt
+	body     BlockExpr
 	position Position
 }
 
@@ -579,7 +590,7 @@ pub struct ReceiveCase {
 pub:
 	pattern  Pattern
 	guard    Expr
-	body     []Stmt
+	body     BlockExpr
 	position Position
 }
 
@@ -628,7 +639,7 @@ pub struct FunctionClause {
 pub:
 	parameters []Pattern
 	guard      Expr
-	body       []Stmt
+	body       BlockExpr
 	position   Position
 }
 

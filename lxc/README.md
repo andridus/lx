@@ -49,6 +49,66 @@ end
 - **Nested Support**: Full support for nested if expressions
 - **Nil Handling**: Graceful handling of missing else branches
 
+#### Block Expressions
+
+LX supports block expressions using `do...end` syntax for creating scoped computation blocks:
+
+```lx
+# Block expression with local variables
+def calculate_area(radius) do
+  result = do
+    pi = 3.14159
+    radius_squared = radius * radius
+    pi * radius_squared
+  end
+  result
+end
+
+# Nested block expressions
+def complex_calculation(x, y) do
+  first_part = do
+    temp = x * 2
+    temp + y
+  end
+
+  second_part = do
+    temp = y * 3
+    temp - x
+  end
+
+  first_part + second_part
+end
+
+# Block with variable shadowing
+def scope_example() do
+  x = 1
+  result = do
+    x = 2  # Shadows outer x
+    x + 10
+  end
+  # x is still 1 here
+  result + x
+end
+```
+
+**Features:**
+- **Scoped Variables**: Variables defined inside blocks are scoped to that block
+- **Return Value**: The last expression in a block is its return value
+- **Variable Shadowing**: Inner blocks can shadow variables from outer scopes
+- **Inline Generation**: Block assignments are unfolded inline in the generated Erlang code with clear comments
+- **Nested Support**: Blocks can be nested to any depth
+
+**Generated Erlang:**
+```erlang
+calculate_area(Radius) ->
+% Block of Result
+Pi = 3.14159,
+Radius_squared = Radius * Radius,
+Result = Pi * Radius_squared
+% End Block of Result,
+Result.
+```
+
 ### Directives System
 
 LX supports compile-time directives that provide metadata and control compilation behavior. Directives are prefixed with `@` and must be placed immediately before function definitions.

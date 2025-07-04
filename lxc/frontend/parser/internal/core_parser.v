@@ -103,3 +103,13 @@ pub fn (p Parser) has_errors() bool {
 pub fn (p Parser) get_errors() []errors.CompilationError {
 	return p.errors
 }
+
+pub fn (mut p Parser) sync_current_token() {
+	if p.position < p.tokens.len {
+		p.current = p.tokens[p.position]
+	} else {
+		p.current = lexer.EOFToken{
+			position: lexer.new_token_position(1, 1, '')
+		}
+	}
+}

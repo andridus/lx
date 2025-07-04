@@ -227,9 +227,7 @@ pub fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 			for case_ in expr.cases {
 				vc.check_pattern(case_.pattern)
 				vc.check_expression(case_.guard)
-				for stmt in case_.body {
-					vc.check_statement(stmt)
-				}
+				vc.check_block_expression(case_.body)
 			}
 		}
 		ast.ListConsExpr {
@@ -265,10 +263,7 @@ pub fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 			for param in expr.parameters {
 				vc.check_pattern(param)
 			}
-			for stmt in expr.body {
-				vc.check_statement(stmt)
-			}
-			vc.check_unused_variables()
+			vc.check_block_expression(expr.body)
 			vc.exit_scope()
 		}
 		ast.SendExpr {
@@ -279,9 +274,7 @@ pub fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 			for case_ in expr.cases {
 				vc.check_pattern(case_.pattern)
 				vc.check_expression(case_.guard)
-				for stmt in case_.body {
-					vc.check_statement(stmt)
-				}
+				vc.check_block_expression(case_.body)
 			}
 			vc.check_expression(expr.timeout)
 		}
@@ -297,25 +290,15 @@ pub fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 		}
 		ast.IfExpr {
 			vc.check_expression(expr.condition)
-			vc.enter_scope()
-			for stmt in expr.then_body {
-				vc.check_statement(stmt)
-			}
-			vc.exit_scope()
-			vc.enter_scope()
-			for stmt in expr.else_body {
-				vc.check_statement(stmt)
-			}
-			vc.exit_scope()
+			vc.check_block_expression(expr.then_body)
+			vc.check_block_expression(expr.else_body)
 		}
 		ast.CaseExpr {
 			vc.check_expression(expr.value)
 			for case_ in expr.cases {
 				vc.check_pattern(case_.pattern)
 				vc.check_expression(case_.guard)
-				for stmt in case_.body {
-					vc.check_statement(stmt)
-				}
+				vc.check_block_expression(case_.body)
 			}
 		}
 		ast.WithExpr {
@@ -323,26 +306,14 @@ pub fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 				vc.check_pattern(binding.pattern)
 				vc.check_expression(binding.value)
 			}
-			vc.enter_scope()
-			for stmt in expr.body {
-				vc.check_statement(stmt)
-			}
-			vc.exit_scope()
-			vc.enter_scope()
-			for stmt in expr.else_body {
-				vc.check_statement(stmt)
-			}
-			vc.exit_scope()
+			vc.check_block_expression(expr.body)
+			vc.check_block_expression(expr.else_body)
 		}
 		ast.ForExpr {
 			vc.check_pattern(expr.pattern)
 			vc.check_expression(expr.collection)
 			vc.check_expression(expr.guard)
-			vc.enter_scope()
-			for stmt in expr.body {
-				vc.check_statement(stmt)
-			}
-			vc.exit_scope()
+			vc.check_block_expression(expr.body)
 		}
 		ast.LiteralExpr, ast.ListEmptyExpr {
 			// No variables to check in literals
@@ -352,15 +323,10 @@ pub fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 			vc.check_pattern(expr.pattern)
 		}
 		ast.MatchRescueExpr {
-			vc.check_expression(expr.value)
-			vc.check_pattern(expr.pattern)
-			vc.enter_scope()
-			// Bind the rescue variable
-			vc.bind_variable(expr.rescue_var, expr.position)
-			for stmt in expr.rescue_body {
-				vc.check_statement(stmt)
-			}
-			vc.exit_scope()
+			vc.check_match_rescue_expression(expr)
+		}
+		ast.BlockExpr {
+			vc.check_block_expression(expr)
 		}
 	}
 }
@@ -429,9 +395,7 @@ pub fn (mut vc VariableChecker) check_statement(stmt ast.Stmt) {
 					vc.check_pattern(param)
 				}
 				vc.check_expression(clause.guard)
-				for body_stmt in clause.body {
-					vc.check_statement(body_stmt)
-				}
+				vc.check_block_expression(clause.body)
 				vc.check_unused_variables()
 				vc.exit_scope()
 			}
@@ -553,4 +517,24 @@ fn (vc &VariableChecker) infer_argument_type(arg ast.Expr) string {
 			return 'any'
 		}
 	}
+}
+
+// check_block_expression validates block expressions for variable usage
+pub fn (mut vc VariableChecker) check_block_expression(expr ast.BlockExpr) {
+	vc.enter_scope()
+	for stmt in expr.body {
+		vc.check_statement(stmt)
+	}
+	vc.exit_scope()
+}
+
+// check_match_rescue_expression validates match rescue expressions for variable usage
+pub fn (mut vc VariableChecker) check_match_rescue_expression(expr ast.MatchRescueExpr) {
+	vc.check_expression(expr.value)
+	vc.check_pattern(expr.pattern)
+	vc.enter_scope()
+	// Bind the rescue variable
+	vc.bind_variable(expr.rescue_var, expr.position)
+	vc.check_block_expression(expr.rescue_body)
+	vc.exit_scope()
 }

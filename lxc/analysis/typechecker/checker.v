@@ -174,6 +174,9 @@ fn (mut tc TypeChecker) check_expression(expr ast.Expr) {
 		ast.MatchRescueExpr {
 			tc.check_match_rescue_expression(expr)
 		}
+		ast.BlockExpr {
+			tc.check_block_expression(expr)
+		}
 	}
 }
 
@@ -256,9 +259,7 @@ fn (mut tc TypeChecker) check_match_expression(expr ast.MatchExpr) {
 		tc.check_pattern(case_.pattern)
 		tc.check_expression(case_.guard)
 
-		for stmt in case_.body {
-			tc.check_statement(stmt)
-		}
+		tc.check_block_expression(case_.body)
 	}
 }
 
@@ -310,9 +311,7 @@ fn (mut tc TypeChecker) check_fun_expression(expr ast.FunExpr) {
 		tc.check_pattern(param)
 	}
 
-	for stmt in expr.body {
-		tc.check_statement(stmt)
-	}
+	tc.check_block_expression(expr.body)
 
 	// Restore parent context
 	if parent := tc.context.parent {
@@ -332,9 +331,7 @@ fn (mut tc TypeChecker) check_receive_expression(expr ast.ReceiveExpr) {
 		tc.check_pattern(case_.pattern)
 		tc.check_expression(case_.guard)
 
-		for stmt in case_.body {
-			tc.check_statement(stmt)
-		}
+		tc.check_block_expression(case_.body)
 	}
 
 	tc.check_expression(expr.timeout)
@@ -361,17 +358,13 @@ fn (mut tc TypeChecker) check_if_expression(expr ast.IfExpr) {
 	tc.check_expression(expr.condition)
 
 	tc.context = tc.context.new_child_context()
-	for stmt in expr.then_body {
-		tc.check_statement(stmt)
-	}
+	tc.check_block_expression(expr.then_body)
 	if parent := tc.context.parent {
 		tc.context = parent
 	}
 
 	tc.context = tc.context.new_child_context()
-	for stmt in expr.else_body {
-		tc.check_statement(stmt)
-	}
+	tc.check_block_expression(expr.else_body)
 	if parent := tc.context.parent {
 		tc.context = parent
 	}
@@ -381,13 +374,18 @@ fn (mut tc TypeChecker) check_if_expression(expr ast.IfExpr) {
 fn (mut tc TypeChecker) check_case_expression(expr ast.CaseExpr) {
 	tc.check_expression(expr.value)
 
+	// Infer types from all case branches
+	mut case_types := []TypeExpr{}
+	for case_clause in expr.cases {
+		case_type := tc.infer_block_expression_type(case_clause.body)
+		case_types << case_type
+	}
+
 	for case_ in expr.cases {
 		tc.check_pattern(case_.pattern)
 		tc.check_expression(case_.guard)
 
-		for stmt in case_.body {
-			tc.check_statement(stmt)
-		}
+		tc.check_block_expression(case_.body)
 	}
 }
 
@@ -399,17 +397,13 @@ fn (mut tc TypeChecker) check_with_expression(expr ast.WithExpr) {
 	}
 
 	tc.context = tc.context.new_child_context()
-	for stmt in expr.body {
-		tc.check_statement(stmt)
-	}
+	tc.check_block_expression(expr.body)
 	if parent := tc.context.parent {
 		tc.context = parent
 	}
 
 	tc.context = tc.context.new_child_context()
-	for stmt in expr.else_body {
-		tc.check_statement(stmt)
-	}
+	tc.check_block_expression(expr.else_body)
 	if parent := tc.context.parent {
 		tc.context = parent
 	}
@@ -422,9 +416,7 @@ fn (mut tc TypeChecker) check_for_expression(expr ast.ForExpr) {
 	tc.check_expression(expr.guard)
 
 	tc.context = tc.context.new_child_context()
-	for stmt in expr.body {
-		tc.check_statement(stmt)
-	}
+	tc.check_block_expression(expr.body)
 	if parent := tc.context.parent {
 		tc.context = parent
 	}
@@ -470,9 +462,7 @@ fn (mut tc TypeChecker) check_match_rescue_expression(expr ast.MatchRescueExpr) 
 	tc.context.bind(expr.rescue_var, value_type, expr.position)
 
 	// Check the rescue body
-	for stmt in expr.rescue_body {
-		tc.check_statement(stmt)
-	}
+	tc.check_block_expression(expr.rescue_body)
 
 	// Restore parent context
 	if parent := tc.context.parent {
@@ -646,9 +636,7 @@ fn (mut tc TypeChecker) check_function_statement(stmt ast.FunctionStmt) {
 
 		tc.check_expression(clause.guard)
 
-		for body_stmt in clause.body {
-			tc.check_statement(body_stmt)
-		}
+		tc.check_block_expression(clause.body)
 	}
 
 	// Apply directives
@@ -660,6 +648,83 @@ fn (mut tc TypeChecker) check_function_statement(stmt ast.FunctionStmt) {
 	if parent := tc.context.parent {
 		tc.context = parent
 	}
+}
+
+// apply_directive applies a directive to a function
+fn (mut tc TypeChecker) apply_directive(directive string, func_stmt ast.FunctionStmt) {
+	// Remove @ prefix if present
+	directive_name := if directive.starts_with('@') {
+		directive[1..]
+	} else {
+		directive
+	}
+
+	match directive_name {
+		'reflection' {
+			tc.handle_reflection(func_stmt)
+		}
+		'inline' {
+			tc.handle_inline(func_stmt)
+		}
+		'deprecated' {
+			tc.handle_deprecated(func_stmt)
+		}
+		else {
+			// Unknown directive - this should be caught by validation
+		}
+	}
+}
+
+// handle_reflection prints type information for functions
+fn (mut tc TypeChecker) handle_reflection(func_stmt ast.FunctionStmt) {
+	println('=== REFLECTION INFO function: ${func_stmt.name} ===')
+
+	for clause in func_stmt.clauses {
+		// Build parameter string
+		mut param_strs := []string{}
+		for param in clause.parameters {
+			// Show the original type annotation if available, otherwise the inferred type
+			match param {
+				ast.VarPattern {
+					if type_ann := param.type_annotation {
+						param_strs << '${param.name} :: ${type_ann.str()}'
+					} else {
+						param_type := tc.infer_pattern_type(param)
+						param_strs << '${param.name} :: ${param_type.str()}'
+					}
+				}
+				else {
+					param_type := tc.infer_pattern_type(param)
+					param_strs << '${param.str()} :: ${param_type.str()}'
+				}
+			}
+		}
+		params_str := param_strs.join(', ')
+
+		// Build guard string
+		guard_str := 'nil'
+
+		// Print function signature
+		if guard_str == 'nil' {
+			println('  ${func_stmt.name}(${params_str}) :: any()')
+		} else {
+			println('  ${func_stmt.name}(${params_str}) :: any() [ ${guard_str}]')
+		}
+
+		println('')
+	}
+	println('=== END REFLECTION INFO ===')
+}
+
+// handle_inline marks function for inlining optimization
+fn (tc &TypeChecker) handle_inline(func_stmt ast.FunctionStmt) {
+	// TODO: Implement inlining logic
+	println('Function ${func_stmt.name} marked for inlining')
+}
+
+// handle_deprecated marks function as deprecated
+fn (tc &TypeChecker) handle_deprecated(func_stmt ast.FunctionStmt) {
+	println('WARNING: Function ${func_stmt.name} is deprecated')
 }
 
 // validate_pattern_type_annotations validates type annotations in patterns
@@ -702,397 +767,23 @@ fn (mut tc TypeChecker) validate_pattern_type_annotations(pattern ast.Pattern) {
 	}
 }
 
-// apply_directive applies a directive to a function
-fn (mut tc TypeChecker) apply_directive(directive string, func_stmt ast.FunctionStmt) {
-	// Remove @ prefix if present
-	directive_name := if directive.starts_with('@') {
-		directive[1..]
-	} else {
-		directive
-	}
-
-	match directive_name {
-		'reflection' {
-			tc.handle_reflection(func_stmt)
-		}
-		'inline' {
-			tc.handle_inline(func_stmt)
-		}
-		'deprecated' {
-			tc.handle_deprecated(func_stmt)
-		}
-		else {
-			// Unknown directive - this should be caught by validation
-		}
-	}
-}
-
-// infer_function_return_type infers the return type of a function based on its body
-fn (mut tc TypeChecker) infer_function_return_type(clause ast.FunctionClause) TypeExpr {
-	if clause.body.len == 0 {
-		return make_type_constructor('ok', [])
-	}
-
-	// Create a temporary child context for parameter bindings
-	mut temp_context := tc.context.new_child_context()
-
-	// Bind parameters to their types in the context
-	for param in clause.parameters {
-		match param {
-			ast.VarPattern {
-				param_type := tc.infer_pattern_type(param)
-				temp_context.bind(param.name, param_type, ast.new_position(0, 0, 'unknown'))
-			}
-			else {}
-		}
-	}
-
-	// Get the last statement in the body (the return value)
-	last_stmt := clause.body[clause.body.len - 1]
-
-	match last_stmt {
-		ast.ExprStmt {
-			mut temp_tc := TypeChecker{
-				context:     temp_context
-				unifier:     tc.unifier
-				errors:      tc.errors
-				environment: tc.environment
-			}
-			// Se for variável, tente encontrar o alias
-			match last_stmt.expr {
-				ast.VariableExpr {
-					for param in clause.parameters {
-						match param {
-							ast.VarPattern {
-								if param.name == last_stmt.expr.name {
-									if type_ann := param.type_annotation {
-										match type_ann {
-											ast.SimpleTypeExpr {
-												if tc.context.has_type_alias(type_ann.name) {
-													println('DEBUG: Creating TypeConstructor with name: ${type_ann.name}')
-													return make_type_constructor(type_ann.name,
-														[])
-												} else {
-													return tc.convert_type_expression_to_type_expr(type_ann)
-												}
-											}
-											else {
-												return tc.convert_type_expression_to_type_expr(type_ann)
-											}
-										}
-									}
-								}
-							}
-							else {}
-						}
-					}
-				}
-				else {}
-			}
-			return temp_tc.infer_expression_type(last_stmt.expr)
-		}
-		else {
-			return make_type_constructor('ok', [])
-		}
-	}
-}
-
-// handle_reflection prints type information for functions
-fn (mut tc TypeChecker) handle_reflection(func_stmt ast.FunctionStmt) {
-	println('=== REFLECTION INFO function: ${func_stmt.name} ===')
-
-	for clause in func_stmt.clauses {
-		// Build parameter string
-		mut param_strs := []string{}
-		for param in clause.parameters {
-			// Show the original type annotation if available, otherwise the inferred type
-			match param {
-				ast.VarPattern {
-					if type_ann := param.type_annotation {
-						param_strs << '${param.name} :: ${type_ann.str()}'
-					} else {
-						param_type := tc.infer_pattern_type(param)
-						param_strs << '${param.name} :: ${param_type.str()}'
-					}
-				}
-				else {
-					param_type := tc.infer_pattern_type(param)
-					param_strs << '${param.str()} :: ${param_type.str()}'
-				}
-			}
-		}
-		params_str := param_strs.join(', ')
-
-		// Infer return type
-		return_type := tc.infer_function_return_type(clause)
-
-		// Detect if return is a variable matching a parameter with annotation
-		mut return_type_str := return_type.str()
-		last_stmt := clause.body[clause.body.len - 1]
-		if last_stmt is ast.ExprStmt {
-			stmt := last_stmt as ast.ExprStmt
-			if stmt.expr is ast.VariableExpr {
-				vexpr := stmt.expr as ast.VariableExpr
-				for param in clause.parameters {
-					if param is ast.VarPattern {
-						varp := param as ast.VarPattern
-						if varp.name == vexpr.name {
-							if type_ann := varp.type_annotation {
-								return_type_str = type_ann.str()
-							}
-						}
-					}
-				}
-			}
-		}
-
-		// Build guard string - format guard expression cleanly
-		guard_str := tc.format_guard_for_reflection(clause.guard)
-
-		// Print function signature
-		if guard_str == 'nil' {
-			println('  ${func_stmt.name}(${params_str}) :: ${return_type_str}')
-		} else {
-			println('  ${func_stmt.name}(${params_str}) :: ${return_type_str} [ ${guard_str}]')
-		}
-
-		// Create a temporary context with parameter bindings for body type inference
-		mut temp_context := tc.context.new_child_context()
-		for param in clause.parameters {
-			match param {
-				ast.VarPattern {
-					param_type := tc.infer_pattern_type(param)
-					temp_context.bind(param.name, param_type, ast.new_position(0, 0, 'unknown'))
-				}
-				else {}
-			}
-		}
-
-		// Create temporary type checker with parameter context
-		mut temp_tc := TypeChecker{
-			context:     temp_context
-			unifier:     tc.unifier
-			errors:      tc.errors
-			environment: tc.environment
-		}
-
-		// Print body expressions with proper type inference
-		for stmt in clause.body {
-			match stmt {
-				ast.ExprStmt {
-					expr_type := temp_tc.infer_expression_type(stmt.expr)
-
-					// Check if this is a variable expression that matches a parameter with annotation
-					mut type_str := expr_type.str()
-					if stmt.expr is ast.VariableExpr {
-						vexpr := stmt.expr as ast.VariableExpr
-						for param in clause.parameters {
-							if param is ast.VarPattern {
-								varp := param as ast.VarPattern
-								if varp.name == vexpr.name {
-									if type_ann := varp.type_annotation {
-										type_str = type_ann.str()
-									}
-								}
-							}
-						}
-					}
-
-					println('    ${stmt.expr.str()} :: ${type_str}')
-				}
-				else {
-					println('    ${stmt.str()}')
-				}
-			}
-		}
-		println('')
-	}
-	println('=== END REFLECTION INFO ===')
-}
-
-// handle_inline marks function for inlining optimization
-fn (tc &TypeChecker) handle_inline(func_stmt ast.FunctionStmt) {
-	// TODO: Implement inlining logic
-	println('Function ${func_stmt.name} marked for inlining')
-}
-
-// handle_deprecated marks function as deprecated
-fn (tc &TypeChecker) handle_deprecated(func_stmt ast.FunctionStmt) {
-	println('WARNING: Function ${func_stmt.name} is deprecated')
-}
-
-// format_guard_for_reflection formats guard expressions for clean reflection output
-fn (tc &TypeChecker) format_guard_for_reflection(guard ast.Expr) string {
-	return match guard {
-		ast.LiteralExpr {
-			match guard.value {
-				ast.BooleanLiteral {
-					if guard.value.value {
-						'nil'
-					} else {
-						'false'
-					}
-				}
-				else {
-					tc.format_guard_operand(guard)
-				}
-			}
-		}
-		ast.BinaryExpr {
-			left_str := tc.format_guard_for_reflection(guard.left)
-			right_str := tc.format_guard_for_reflection(guard.right)
-			op_str := tc.format_guard_operator(guard.op)
-			'${left_str} ${op_str} ${right_str}'
-		}
-		ast.UnaryExpr {
-			operand_str := tc.format_guard_for_reflection(guard.operand)
-			op_str := tc.format_guard_operator(guard.op)
-			'${op_str}${operand_str}'
-		}
-		else {
-			tc.format_guard_operand(guard)
-		}
-	}
-}
-
-// format_guard_operand formats operands in guard expressions
-fn (tc &TypeChecker) format_guard_operand(expr ast.Expr) string {
-	return match expr {
-		ast.VariableExpr {
-			expr.name
-		}
-		ast.LiteralExpr {
-			match expr.value {
-				ast.IntegerLiteral {
-					expr.value.value.str()
-				}
-				ast.FloatLiteral {
-					expr.value.value.str()
-				}
-				ast.StringLiteral {
-					'"${expr.value.value}"'
-				}
-				ast.BooleanLiteral {
-					expr.value.value.str()
-				}
-				ast.AtomLiteral {
-					':${expr.value.value}'
-				}
-				else {
-					expr.str()
-				}
-			}
-		}
-		else {
-			expr.str()
-		}
-	}
-}
-
-// GuardOperator represents operators that can appear in guard expressions
-type GuardOperator = ast.BinaryOp | ast.UnaryOp
-
-// format_guard_operator formats operators in guard expressions
-fn (tc &TypeChecker) format_guard_operator(op GuardOperator) string {
-	return match op {
-		ast.BinaryOp {
-			// In reflection, show the LX syntax (and/or) even in guards
-			op.str()
-		}
-		ast.UnaryOp {
-			op.str()
-		}
-	}
-}
-
-// check_record_definition performs type checking on a record definition
-fn (mut tc TypeChecker) check_record_definition(stmt ast.RecordDefStmt) {
-	// Record definitions are type declarations, not expressions
-	// They don't need type checking, just registration
-}
-
-// check_type_definition performs type checking on a type definition
-fn (mut tc TypeChecker) check_type_definition(stmt ast.TypeDefStmt) {
-	// Type definitions are type declarations, not expressions
-	// They don't need type checking, just registration
-}
-
-// check_type_alias_statement performs type checking on type alias statements
-fn (mut tc TypeChecker) check_type_alias_statement(stmt ast.TypeAliasStmt) {
-	// Convert TypeExpression to TypeExpr for the type system
-	type_expr := tc.convert_type_expression_to_type_expr(stmt.type_expr)
-
-	// Register the type alias in the context
-	tc.context.register_type_alias(stmt.name, type_expr)
-}
-
 // convert_type_expression_to_type_expr converts AST TypeExpression to typechecker TypeExpr
 fn (mut tc TypeChecker) convert_type_expression_to_type_expr(type_expr ast.TypeExpression) TypeExpr {
 	return match type_expr {
 		ast.SimpleTypeExpr {
 			match type_expr.name {
-				'integer' {
-					integer_type
-				}
-				'float' {
-					float_type
-				}
-				'string' {
-					string_type
-				}
-				'boolean' {
-					boolean_type
-				}
-				'atom' {
-					atom_type
-				}
-				'nil' {
-					nil_type
-				}
-				'pid' {
-					make_type_constructor('pid', [])
-				}
-				'reference' {
-					make_type_constructor('reference', [])
-				}
-				'port' {
-					make_type_constructor('port', [])
-				}
-				'binary' {
-					BinaryType{
-						unit_size: 0
-					}
-				}
-				'bitstring' {
-					BinaryType{
-						unit_size: 1
-					}
-				}
-				'any' {
-					make_type_constructor('any', [])
-				}
-				else {
-					// Check if it's a registered type alias
-					if alias_type := tc.context.lookup_type_alias(type_expr.name) {
-						alias_type
-					} else {
-						// Unknown type - report error
-						error := errors.new_compilation_error(errors.TypeError{
-							message:    'Undefined type \'${type_expr.name}\''
-							expected:   'concrete type (integer, string, etc.) or defined type alias'
-							actual:     'unknown type \'${type_expr.name}\''
-							suggestion: 'You need to define this type first. Use: type ${type_expr.name} :: concrete_type (e.g., type ${type_expr.name} :: integer | string)'
-						}, type_expr.position, 'Undefined type \'${type_expr.name}\'')
-						tc.errors << error
-						// Return unknown type as fallback
-						make_type_constructor('unknown', [])
-					}
-				}
+				'integer' { integer_type }
+				'float' { float_type }
+				'string' { string_type }
+				'boolean' { boolean_type }
+				'atom' { atom_type }
+				'nil' { nil_type }
+				'any' { make_type_constructor('any', []) }
+				else { make_type_constructor(type_expr.name, []) }
 			}
 		}
 		ast.UnionTypeExpr {
 			// For now, create a type variable representing the union
-			// A full implementation would need proper union type support
 			make_type_var('union_${type_expr.types.len}')
 		}
 		ast.ListTypeExpr {
@@ -1120,31 +811,78 @@ fn (mut tc TypeChecker) convert_type_expression_to_type_expr(type_expr ast.TypeE
 			make_function_type(param_types, return_type)
 		}
 		ast.VariableTypeExpr {
-			// In type annotations, type variables should not be allowed unless explicitly defined
-			error := errors.new_compilation_error(errors.TypeError{
-				message:    'Undefined type \'${type_expr.name}\' in type annotation'
-				expected:   'concrete type (integer, string, etc.) or defined type alias'
-				actual:     'type variable \'${type_expr.name}\''
-				suggestion: 'You need to define this type first. Use: type ${type_expr.name} :: concrete_type (e.g., type ${type_expr.name} :: integer)'
-			}, type_expr.position, 'Undefined type \'${type_expr.name}\' in type annotation')
-			tc.errors << error
-			// Return unknown type as fallback
-			make_type_constructor('unknown', [])
+			make_type_constructor(type_expr.name, [])
 		}
 	}
 }
 
-// check_type_annotation validates type annotations in expressions
-fn (mut tc TypeChecker) check_type_annotation(expr ast.Expr, annotation ast.TypeExpression) {
-	inferred_type := tc.infer_expression_type(expr)
-	annotated_type := tc.convert_type_expression_to_type_expr(annotation)
+// validate_directives validates all directives in a module
+fn (tc &TypeChecker) validate_directives(module_stmt ast.ModuleStmt) []errors.CompilationError {
+	mut directive_errors := []errors.CompilationError{}
 
-	// Try to unify the inferred type with the annotated type
-	result := tc.unifier.unify(inferred_type, annotated_type, ast.new_position(0, 0, 'unknown'))
-	if _ := result.error {
-		tc.report_error('Type mismatch: expected ${annotated_type.str()}, got ${inferred_type.str()}',
-			'Check the type annotation or the expression', ast.new_position(0, 0, 'unknown'))
+	// Define valid directives
+	valid_directives := ['reflection', 'inline', 'deprecated']
+
+	for stmt in module_stmt.statements {
+		if stmt is ast.FunctionStmt {
+			func_stmt := stmt as ast.FunctionStmt
+			for directive in func_stmt.directives {
+				if !valid_directives.contains(directive) {
+					error_msg := 'Unknown directive: @${directive}'
+					suggestion := 'Available directives: ${valid_directives.join(', ')}'
+
+					compilation_error := errors.new_compilation_error(errors.SyntaxError{
+						message:  error_msg
+						expected: suggestion
+						found:    '@${directive}'
+					}, func_stmt.position, error_msg)
+
+					directive_errors << compilation_error
+				}
+			}
+		}
 	}
+
+	return directive_errors
+}
+
+// check_record_definition performs type checking on a record definition
+fn (mut tc TypeChecker) check_record_definition(stmt ast.RecordDefStmt) {
+	// Record definitions are type declarations, not expressions
+	// They don't need type checking, just registration
+}
+
+// check_type_definition performs type checking on a type definition
+fn (mut tc TypeChecker) check_type_definition(stmt ast.TypeDefStmt) {
+	// Type definitions are type declarations, not expressions
+	// They don't need type checking, just registration
+}
+
+// check_type_alias_statement performs type checking on type alias statements
+fn (mut tc TypeChecker) check_type_alias_statement(stmt ast.TypeAliasStmt) {
+	// Convert TypeExpression to TypeExpr for the type system
+	type_expr := tc.convert_type_expression_to_type_expr(stmt.type_expr)
+
+	// Register the type alias in the context
+	tc.context.register_type_alias(stmt.name, type_expr)
+}
+
+// check_block_expression checks a block expression for type correctness
+fn (mut tc TypeChecker) check_block_expression(expr ast.BlockExpr) {
+	for stmt in expr.body {
+		tc.check_statement(stmt)
+	}
+}
+
+// report_error adds an error to the type checker
+fn (mut tc TypeChecker) report_error(message string, suggestion string, position ast.Position) {
+	error := errors.new_compilation_error(errors.TypeError{
+		message:    message
+		expected:   ''
+		actual:     ''
+		suggestion: suggestion
+	}, position, message)
+	tc.errors << error
 }
 
 // infer_expression_type infers the type of an expression
@@ -1236,7 +974,137 @@ fn (mut tc TypeChecker) infer_expression_type(expr ast.Expr) TypeExpr {
 		ast.MatchRescueExpr {
 			return tc.infer_match_rescue_expression_type(expr)
 		}
+		ast.BlockExpr {
+			return tc.infer_block_expression_type(expr)
+		}
 	}
+}
+
+// unify_types unifies two types
+fn (mut tc TypeChecker) unify_types(type1 TypeExpr, type2 TypeExpr) TypeExpr {
+	if type1 == type2 {
+		return type1
+	}
+	// Implement unification logic here
+	return any_type
+}
+
+// infer_pattern_type infers the type of a pattern
+fn (mut tc TypeChecker) infer_pattern_type(pattern ast.Pattern) TypeExpr {
+	return match pattern {
+		ast.VarPattern {
+			if type_annotation := pattern.type_annotation {
+				tc.convert_type_expression_to_type_expr(type_annotation)
+			} else {
+				make_type_var('a')
+			}
+		}
+		ast.WildcardPattern {
+			make_type_var('_')
+		}
+		ast.LiteralPattern {
+			tc.infer_literal_type(pattern.value)
+		}
+		ast.AtomPattern {
+			atom_type
+		}
+		ast.ListEmptyPattern {
+			make_list_type(make_type_var('a'))
+		}
+		ast.ListConsPattern {
+			// For [h | t], we need to infer the element type from context
+			// If this pattern is being matched against a value, we should use that value's type
+			// For now, we'll use a more generic approach
+			head_type := tc.infer_pattern_type(pattern.head)
+			_ := tc.infer_pattern_type(pattern.tail) // tail_type - used for validation but not returned
+
+			// The pattern itself represents a list type
+			make_list_type(head_type)
+		}
+		ast.ListLiteralPattern {
+			if pattern.elements.len == 0 {
+				make_list_type(make_type_var('a'))
+			} else {
+				element_type := tc.infer_pattern_type(pattern.elements[0])
+				make_list_type(element_type)
+			}
+		}
+		ast.TuplePattern {
+			mut element_types := []TypeExpr{}
+			for element in pattern.elements {
+				element_types << tc.infer_pattern_type(element)
+			}
+			make_tuple_type(element_types)
+		}
+		ast.MapPattern {
+			make_map_type(make_type_var('k'), make_type_var('v'))
+		}
+		ast.RecordPattern {
+			make_type_constructor('record', [])
+		}
+		ast.BinaryPattern {
+			BinaryType{
+				unit_size: 0
+			}
+		}
+	}
+}
+
+// infer_block_expression_type infers the type of a block expression
+fn (mut tc TypeChecker) infer_block_expression_type(expr ast.BlockExpr) TypeExpr {
+	if expr.body.len == 0 {
+		return nil_type
+	}
+
+	// Infer the type from the last statement in the block
+	last_stmt := expr.body[expr.body.len - 1]
+	if last_stmt is ast.ExprStmt {
+		return tc.infer_expression_type(last_stmt.expr)
+	}
+
+	return nil_type
+}
+
+// check_type_annotation validates type annotations in expressions
+fn (mut tc TypeChecker) check_type_annotation(expr ast.Expr, annotation ast.TypeExpression) {
+	inferred_type := tc.infer_expression_type(expr)
+	annotated_type := tc.convert_type_expression_to_type_expr(annotation)
+
+	// Try to unify the inferred type with the annotated type
+	result := tc.unifier.unify(inferred_type, annotated_type, ast.new_position(0, 0, 'unknown'))
+	if _ := result.error {
+		tc.report_error('Type mismatch: expected ${annotated_type.str()}, got ${inferred_type.str()}',
+			'Check the type annotation or the expression', ast.new_position(0, 0, 'unknown'))
+	}
+}
+
+// is_numeric_type checks if a type is numeric
+fn (tc &TypeChecker) is_numeric_type(type_expr TypeExpr) bool {
+	return type_expr.str() == 'integer' || type_expr.str() == 'float'
+}
+
+// are_types_comparable checks if two types can be compared
+fn (tc &TypeChecker) are_types_comparable(left_type TypeExpr, right_type TypeExpr) bool {
+	left_str := left_type.str()
+	right_str := right_type.str()
+
+	// Same types are always comparable
+	if left_str == right_str {
+		return true
+	}
+
+	// Numeric types are comparable with each other
+	if tc.is_numeric_type(left_type) && tc.is_numeric_type(right_type) {
+		return true
+	}
+
+	// Generic types (type variables) are considered compatible for now
+	if left_str.starts_with('a') || right_str.starts_with('a') {
+		return true
+	}
+
+	// Different concrete types are not comparable
+	return false
 }
 
 // infer_literal_type infers the type of a literal
@@ -1304,150 +1172,6 @@ fn (mut tc TypeChecker) infer_binary_expression_type(expr ast.BinaryExpr) TypeEx
 	}
 }
 
-// is_numeric_type checks if a type is numeric
-fn (tc &TypeChecker) is_numeric_type(type_expr TypeExpr) bool {
-	return type_expr.str() == 'integer' || type_expr.str() == 'float'
-}
-
-// are_types_comparable checks if two types can be compared
-fn (tc &TypeChecker) are_types_comparable(left_type TypeExpr, right_type TypeExpr) bool {
-	left_str := left_type.str()
-	right_str := right_type.str()
-
-	// Same types are always comparable
-	if left_str == right_str {
-		return true
-	}
-
-	// Numeric types are comparable with each other
-	if tc.is_numeric_type(left_type) && tc.is_numeric_type(right_type) {
-		return true
-	}
-
-	// Generic types (type variables) are considered compatible for now
-	if left_str.starts_with('a') || right_str.starts_with('a') {
-		return true
-	}
-
-	// Different concrete types are not comparable
-	return false
-}
-
-// report_error adds an error to the type checker
-fn (mut tc TypeChecker) report_error(message string, suggestion string, position ast.Position) {
-	error := errors.new_compilation_error(errors.TypeError{
-		message:    message
-		expected:   ''
-		actual:     ''
-		suggestion: suggestion
-	}, position, message)
-	tc.errors << error
-}
-
-// print_statement_types prints type information for statements in function body
-fn (mut tc TypeChecker) print_statement_types(stmt ast.Stmt, indent string) {
-	match stmt {
-		ast.ExprStmt {
-			expr_type := tc.infer_expression_type(stmt.expr)
-			println('${indent}${stmt.expr.str()} :: ${expr_type.str()}')
-		}
-		else {
-			println('${indent}${stmt.str()}')
-		}
-	}
-}
-
-// infer_pattern_type infers the type of a pattern
-fn (mut tc TypeChecker) infer_pattern_type(pattern ast.Pattern) TypeExpr {
-	return match pattern {
-		ast.VarPattern {
-			if type_annotation := pattern.type_annotation {
-				tc.convert_type_expression_to_type_expr(type_annotation)
-			} else {
-				make_type_var('a')
-			}
-		}
-		ast.WildcardPattern {
-			make_type_var('_')
-		}
-		ast.LiteralPattern {
-			tc.infer_literal_type(pattern.value)
-		}
-		ast.AtomPattern {
-			atom_type
-		}
-		ast.ListEmptyPattern {
-			make_list_type(make_type_var('a'))
-		}
-		ast.ListConsPattern {
-			// For [h | t], we need to infer the element type from context
-			// If this pattern is being matched against a value, we should use that value's type
-			// For now, we'll use a more generic approach
-			head_type := tc.infer_pattern_type(pattern.head)
-			_ := tc.infer_pattern_type(pattern.tail) // tail_type - used for validation but not returned
-
-			// The pattern itself represents a list type
-			make_list_type(head_type)
-		}
-		ast.ListLiteralPattern {
-			if pattern.elements.len == 0 {
-				make_list_type(make_type_var('a'))
-			} else {
-				element_type := tc.infer_pattern_type(pattern.elements[0])
-				make_list_type(element_type)
-			}
-		}
-		ast.TuplePattern {
-			mut element_types := []TypeExpr{}
-			for element in pattern.elements {
-				element_types << tc.infer_pattern_type(element)
-			}
-			make_tuple_type(element_types)
-		}
-		ast.MapPattern {
-			make_map_type(make_type_var('k'), make_type_var('v'))
-		}
-		ast.RecordPattern {
-			make_type_constructor('record', [])
-		}
-		ast.BinaryPattern {
-			BinaryType{
-				unit_size: 0
-			}
-		}
-	}
-}
-
-// validate_directives validates all directives in a module
-fn (tc &TypeChecker) validate_directives(module_stmt ast.ModuleStmt) []errors.CompilationError {
-	mut directive_errors := []errors.CompilationError{}
-
-	// Define valid directives
-	valid_directives := ['reflection', 'inline', 'deprecated']
-
-	for stmt in module_stmt.statements {
-		if stmt is ast.FunctionStmt {
-			func_stmt := stmt as ast.FunctionStmt
-			for directive in func_stmt.directives {
-				if !valid_directives.contains(directive) {
-					error_msg := 'Unknown directive: @${directive}'
-					suggestion := 'Available directives: ${valid_directives.join(', ')}'
-
-					compilation_error := errors.new_compilation_error(errors.SyntaxError{
-						message:  error_msg
-						expected: suggestion
-						found:    '@${directive}'
-					}, func_stmt.position, error_msg)
-
-					directive_errors << compilation_error
-				}
-			}
-		}
-	}
-
-	return directive_errors
-}
-
 // get_expression_position safely gets the position of an expression
 fn (tc &TypeChecker) get_expression_position(expr ast.Expr) ast.Position {
 	return match expr {
@@ -1476,33 +1200,17 @@ fn (tc &TypeChecker) get_expression_position(expr ast.Expr) ast.Position {
 		ast.ForExpr { expr.position }
 		ast.SimpleMatchExpr { expr.position }
 		ast.MatchRescueExpr { expr.position }
+		ast.BlockExpr { expr.position }
 	}
 }
 
 // infer_if_expression_type infers the type of an if expression
 fn (mut tc TypeChecker) infer_if_expression_type(expr ast.IfExpr) TypeExpr {
 	// Infer the type from the then branch
-	mut then_type := TypeExpr(make_type_var('a'))
-	if expr.then_body.len > 0 {
-		// Get the type of the last statement in the then branch
-		last_then_stmt := expr.then_body[expr.then_body.len - 1]
-		if last_then_stmt is ast.ExprStmt {
-			then_type = tc.infer_expression_type(last_then_stmt.expr)
-		}
-	}
+	then_type := tc.infer_block_expression_type(expr.then_body)
 
 	// Infer the type from the else branch
-	mut else_type := TypeExpr(make_type_var('a'))
-	if expr.else_body.len > 0 {
-		// Get the type of the last statement in the else branch
-		last_else_stmt := expr.else_body[expr.else_body.len - 1]
-		if last_else_stmt is ast.ExprStmt {
-			else_type = tc.infer_expression_type(last_else_stmt.expr)
-		}
-	} else {
-		// If no else branch, the else type is nil
-		else_type = TypeExpr(nil_type)
-	}
+	else_type := tc.infer_block_expression_type(expr.else_body)
 
 	// If both branches have the same concrete type, return that type
 	then_str := then_type.str()
@@ -1543,18 +1251,8 @@ fn (mut tc TypeChecker) infer_case_expression_type(expr ast.CaseExpr) TypeExpr {
 	// Infer types from all case branches
 	mut case_types := []TypeExpr{}
 	for case_clause in expr.cases {
-		if case_clause.body.len > 0 {
-			// Get the type of the last statement in the case body
-			last_stmt := case_clause.body[case_clause.body.len - 1]
-			if last_stmt is ast.ExprStmt {
-				case_type := tc.infer_expression_type(last_stmt.expr)
-				case_types << case_type
-			} else {
-				case_types << nil_type
-			}
-		} else {
-			case_types << nil_type
-		}
+		case_type := tc.infer_block_expression_type(case_clause.body)
+		case_types << case_type
 	}
 
 	// If all cases have the same type, return that type
@@ -1613,22 +1311,8 @@ fn (mut tc TypeChecker) infer_simple_match_expression_type(expr ast.SimpleMatchE
 
 // infer_match_rescue_expression_type infers the type of a match rescue expression
 fn (mut tc TypeChecker) infer_match_rescue_expression_type(expr ast.MatchRescueExpr) TypeExpr {
-	// The match rescue expression returns either:
-	// - The pattern variable type if the pattern matches (success case)
-	// - The rescue body type if the pattern doesn't match (failure case)
-
-	// For success case, we would return the pattern variable type
-	// For failure case, we return the type of the rescue body
-
 	// Infer the type from the rescue body
-	mut rescue_type := TypeExpr(make_type_var('a'))
-	if expr.rescue_body.len > 0 {
-		// Get the type of the last statement in the rescue body
-		last_rescue_stmt := expr.rescue_body[expr.rescue_body.len - 1]
-		if last_rescue_stmt is ast.ExprStmt {
-			rescue_type = tc.infer_expression_type(last_rescue_stmt.expr)
-		}
-	}
+	rescue_type := tc.infer_block_expression_type(expr.rescue_body)
 
 	// For now, we'll return the rescue type since that's what gets returned
 	// when the pattern doesn't match (which is the common case for error handling)

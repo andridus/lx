@@ -404,6 +404,9 @@ fn (mut ep ExpressionParser) parse_primary_expression() ?ast.Expr {
 						value: ast.NilLiteral{}
 					}
 				}
+				.do_ {
+					ep.parse_block_expression()
+				}
 				else {
 					ep.add_error('Unexpected keyword in expression', 'Got ${ep.current.str()}')
 					none
@@ -640,4 +643,64 @@ fn (ep ExpressionParser) get_current_position() ast.Position {
 	// Use the current token's position if available
 	pos := ep.current.get_position()
 	return ast.new_position(pos.line, pos.column, pos.filename)
+}
+
+// parse_block_expression parses block expressions (do...end)
+fn (mut ep ExpressionParser) parse_block_expression() ?ast.Expr {
+	position := ep.get_current_position()
+	ep.advance() // consume 'do'
+
+	// Parse statements until we find 'end'
+	mut statements := []ast.Stmt{}
+
+	for !ep.check(lexer.keyword(.end_)) && !ep.is_at_end() {
+		// Skip newlines
+		if ep.current is lexer.NewlineToken {
+			ep.advance()
+			continue
+		}
+
+		// Parse assignment or expression statement
+		if ep.current is lexer.IdentToken && ep.peek() is lexer.OperatorToken {
+			op_token := ep.peek() as lexer.OperatorToken
+			if op_token.value == .assign {
+				// Parse assignment
+				ident_token := ep.current as lexer.IdentToken
+				name := ident_token.value
+				ident_position := ep.get_current_position()
+				ep.advance() // consume identifier
+
+				ep.advance() // consume '='
+				value := ep.parse_expression()?
+
+				statements << ast.ExprStmt{
+					expr: ast.AssignExpr{
+						name: name
+						value: value
+						type_annotation: none
+						position: ident_position
+					}
+				}
+			} else {
+				// Parse expression statement
+				expr := ep.parse_expression()?
+				statements << ast.ExprStmt{
+					expr: expr
+				}
+			}
+		} else {
+			// Parse expression statement
+			expr := ep.parse_expression()?
+			statements << ast.ExprStmt{
+				expr: expr
+			}
+		}
+	}
+
+	ep.consume(lexer.keyword(.end_), 'Expected end after block')?
+
+	return ast.BlockExpr{
+		body: statements
+		position: position
+	}
 }
