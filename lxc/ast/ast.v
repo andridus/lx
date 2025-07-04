@@ -195,11 +195,11 @@ pub:
 // MatchRescueExpr represents a match rescue expression
 pub struct MatchRescueExpr {
 pub:
-	pattern      Pattern
-	value        Expr
-	rescue_var   string
-	rescue_body  BlockExpr
-	position     Position
+	pattern     Pattern
+	value       Expr
+	rescue_var  string
+	rescue_body BlockExpr
+	position    Position
 }
 
 // BlockExpr represents a block expression (do...end)

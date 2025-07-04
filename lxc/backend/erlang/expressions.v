@@ -3,7 +3,7 @@ module erlang
 import ast
 
 // generate_expression generates code for a single expression
-pub fn (gen ErlangGenerator) generate_expression(expr ast.Expr) string {
+pub fn (mut gen ErlangGenerator) generate_expression(expr ast.Expr) string {
 	match expr {
 		ast.VariableExpr {
 			return gen.generate_variable(expr.name)
@@ -87,7 +87,7 @@ pub fn (gen ErlangGenerator) generate_expression(expr ast.Expr) string {
 }
 
 // generate_expression_in_guard generates code for expressions in guard context
-pub fn (gen ErlangGenerator) generate_expression_in_guard(expr ast.Expr) string {
+pub fn (mut gen ErlangGenerator) generate_expression_in_guard(expr ast.Expr) string {
 	match expr {
 		ast.VariableExpr {
 			return gen.generate_variable(expr.name)
@@ -170,9 +170,10 @@ pub fn (gen ErlangGenerator) generate_expression_in_guard(expr ast.Expr) string 
 	}
 }
 
-// generate_variable generates code for variables
+// generate_variable generates code for variables (reads)
 fn (gen ErlangGenerator) generate_variable(name string) string {
-	return gen.capitalize_variable(name)
+	// Always look up the hashed name for this variable
+	return gen.lookup_variable(name)
 }
 
 // generate_literal generates code for literal values
@@ -225,7 +226,7 @@ fn (gen ErlangGenerator) capitalize_variable(name string) string {
 }
 
 // generate_binary_expression generates code for binary expressions
-fn (gen ErlangGenerator) generate_binary_expression(expr ast.BinaryExpr) string {
+fn (mut gen ErlangGenerator) generate_binary_expression(expr ast.BinaryExpr) string {
 	left := gen.generate_expression(expr.left)
 	right := gen.generate_expression(expr.right)
 	op := gen.translate_operator(expr.op, false)
@@ -233,7 +234,7 @@ fn (gen ErlangGenerator) generate_binary_expression(expr ast.BinaryExpr) string 
 }
 
 // generate_binary_expression_in_guard generates code for binary expressions in guards
-fn (gen ErlangGenerator) generate_binary_expression_in_guard(expr ast.BinaryExpr) string {
+fn (mut gen ErlangGenerator) generate_binary_expression_in_guard(expr ast.BinaryExpr) string {
 	left := gen.generate_expression_in_guard(expr.left)
 	right := gen.generate_expression_in_guard(expr.right)
 	op := gen.translate_operator(expr.op, true)
@@ -241,7 +242,7 @@ fn (gen ErlangGenerator) generate_binary_expression_in_guard(expr ast.BinaryExpr
 }
 
 // generate_unary_expression_in_guard generates code for unary expressions in guards
-fn (gen ErlangGenerator) generate_unary_expression_in_guard(expr ast.UnaryExpr) string {
+fn (mut gen ErlangGenerator) generate_unary_expression_in_guard(expr ast.UnaryExpr) string {
 	operand := gen.generate_expression_in_guard(expr.operand)
 	op := gen.translate_unary_operator(expr.op, true)
 	return '${op}${operand}'
@@ -312,7 +313,7 @@ fn (gen ErlangGenerator) translate_operator(operator ast.BinaryOp, is_guard bool
 }
 
 // generate_function_call generates code for function calls
-fn (gen ErlangGenerator) generate_function_call(call ast.CallExpr) string {
+fn (mut gen ErlangGenerator) generate_function_call(call ast.CallExpr) string {
 	args := call.arguments.map(gen.generate_expression(it))
 	if call.external {
 		return '${call.module}:${call.function_name}(${args.join(', ')})'
@@ -329,13 +330,15 @@ fn (gen ErlangGenerator) generate_function_call(call ast.CallExpr) string {
 }
 
 // generate_assignment generates code for assignments
-fn (gen ErlangGenerator) generate_assignment(assign ast.AssignExpr) string {
+fn (mut gen ErlangGenerator) generate_assignment(assign ast.AssignExpr) string {
+	// On assignment, generate and bind a unique hashed name (not a parameter)
+	hashed := gen.bind_variable(assign.name, false)
 	value := gen.generate_expression(assign.value)
-	return '${gen.capitalize_variable(assign.name)} = ${value}'
+	return '${hashed} = ${value}'
 }
 
 // generate_match generates code for pattern matching
-fn (gen ErlangGenerator) generate_match(match_expr ast.MatchExpr) string {
+fn (mut gen ErlangGenerator) generate_match(match_expr ast.MatchExpr) string {
 	value := gen.generate_expression(match_expr.value)
 	mut cases := []string{}
 
@@ -354,7 +357,7 @@ fn (gen ErlangGenerator) generate_match(match_expr ast.MatchExpr) string {
 }
 
 // generate_case generates code for case expressions
-fn (gen ErlangGenerator) generate_case(case_expr ast.CaseExpr) string {
+fn (mut gen ErlangGenerator) generate_case(case_expr ast.CaseExpr) string {
 	subject := gen.generate_expression(case_expr.value)
 	mut cases := []string{}
 
@@ -388,26 +391,26 @@ fn (gen ErlangGenerator) generate_case(case_expr ast.CaseExpr) string {
 }
 
 // generate_list_cons generates code for list cons
-fn (gen ErlangGenerator) generate_list_cons(expr ast.ListConsExpr) string {
+fn (mut gen ErlangGenerator) generate_list_cons(expr ast.ListConsExpr) string {
 	head := gen.generate_expression(expr.head)
 	tail := gen.generate_expression(expr.tail)
 	return '[${head} | ${tail}]'
 }
 
 // generate_list_literal generates code for list literals
-fn (gen ErlangGenerator) generate_list_literal(expr ast.ListLiteralExpr) string {
+fn (mut gen ErlangGenerator) generate_list_literal(expr ast.ListLiteralExpr) string {
 	elements := expr.elements.map(gen.generate_expression(it))
 	return '[${elements.join(', ')}]'
 }
 
 // generate_tuple generates code for tuples
-fn (gen ErlangGenerator) generate_tuple(expr ast.TupleExpr) string {
+fn (mut gen ErlangGenerator) generate_tuple(expr ast.TupleExpr) string {
 	elements := expr.elements.map(gen.generate_expression(it))
 	return '{${elements.join(', ')}}'
 }
 
 // generate_map_literal generates code for map literals
-fn (gen ErlangGenerator) generate_map_literal(expr ast.MapLiteralExpr) string {
+fn (mut gen ErlangGenerator) generate_map_literal(expr ast.MapLiteralExpr) string {
 	mut entries := []string{}
 	for entry in expr.entries {
 		key := gen.generate_expression(entry.key)
@@ -418,7 +421,7 @@ fn (gen ErlangGenerator) generate_map_literal(expr ast.MapLiteralExpr) string {
 }
 
 // generate_record_literal generates code for record literals
-fn (gen ErlangGenerator) generate_record_literal(expr ast.RecordLiteralExpr) string {
+fn (mut gen ErlangGenerator) generate_record_literal(expr ast.RecordLiteralExpr) string {
 	mut fields := []string{}
 	for field in expr.fields {
 		value := gen.generate_expression(field.value)
@@ -428,27 +431,27 @@ fn (gen ErlangGenerator) generate_record_literal(expr ast.RecordLiteralExpr) str
 }
 
 // generate_record_access generates code for record access
-fn (gen ErlangGenerator) generate_record_access(expr ast.RecordAccessExpr) string {
+fn (mut gen ErlangGenerator) generate_record_access(expr ast.RecordAccessExpr) string {
 	record := gen.generate_expression(expr.record)
 	return '${record}#${expr.field}'
 }
 
 // generate_fun_expression generates code for function expressions
-fn (gen ErlangGenerator) generate_fun_expression(expr ast.FunExpr) string {
+fn (mut gen ErlangGenerator) generate_fun_expression(expr ast.FunExpr) string {
 	parameters := expr.parameters.map(gen.generate_pattern(it))
 	body := gen.generate_block_expression(expr.body)
 	return 'fun(${parameters.join(', ')}) ->\n${body}\nend'
 }
 
 // generate_send generates code for message sending
-fn (gen ErlangGenerator) generate_send(expr ast.SendExpr) string {
+fn (mut gen ErlangGenerator) generate_send(expr ast.SendExpr) string {
 	pid := gen.generate_expression(expr.pid)
 	message := gen.generate_expression(expr.message)
 	return '${pid} ! ${message}'
 }
 
 // generate_receive generates code for receive expressions
-fn (gen ErlangGenerator) generate_receive(expr ast.ReceiveExpr) string {
+fn (mut gen ErlangGenerator) generate_receive(expr ast.ReceiveExpr) string {
 	mut cases := []string{}
 	for case_item in expr.cases {
 		pattern := gen.generate_pattern(case_item.pattern)
@@ -486,12 +489,12 @@ fn (gen ErlangGenerator) generate_receive(expr ast.ReceiveExpr) string {
 }
 
 // generate_guard generates code for guard expressions
-fn (gen ErlangGenerator) generate_guard(expr ast.GuardExpr) string {
+fn (mut gen ErlangGenerator) generate_guard(expr ast.GuardExpr) string {
 	return gen.generate_expression_in_guard(expr.condition)
 }
 
 // generate_if_expression generates code for if expressions
-fn (gen ErlangGenerator) generate_if_expression(expr ast.IfExpr) string {
+fn (mut gen ErlangGenerator) generate_if_expression(expr ast.IfExpr) string {
 	condition := gen.generate_expression(expr.condition)
 
 	// Generate then body
@@ -505,7 +508,7 @@ fn (gen ErlangGenerator) generate_if_expression(expr ast.IfExpr) string {
 }
 
 // generate_with_expression generates code for with expressions
-fn (gen ErlangGenerator) generate_with_expression(expr ast.WithExpr) string {
+fn (mut gen ErlangGenerator) generate_with_expression(expr ast.WithExpr) string {
 	// If there are no bindings, just return the body
 	if expr.bindings.len == 0 {
 		return gen.generate_block_expression(expr.body)
@@ -516,7 +519,7 @@ fn (gen ErlangGenerator) generate_with_expression(expr ast.WithExpr) string {
 }
 
 // generate_with_bindings generates nested case expressions recursively
-fn (gen ErlangGenerator) generate_with_bindings(bindings []ast.WithBinding, body ast.BlockExpr, else_body ast.BlockExpr, index int) string {
+fn (mut gen ErlangGenerator) generate_with_bindings(bindings []ast.WithBinding, body ast.BlockExpr, else_body ast.BlockExpr, index int) string {
 	if index >= bindings.len {
 		// We've reached the end of bindings, generate the main body
 		return gen.generate_block_expression(body)
@@ -548,7 +551,7 @@ fn (gen ErlangGenerator) generate_with_bindings(bindings []ast.WithBinding, body
 }
 
 // indent_code adds proper indentation to code
-fn (gen ErlangGenerator) indent_code(code string, level int) string {
+fn (mut gen ErlangGenerator) indent_code(code string, level int) string {
 	if code.trim_space().len == 0 {
 		return code
 	}
@@ -570,7 +573,7 @@ fn (gen ErlangGenerator) indent_code(code string, level int) string {
 }
 
 // generate_simple_match generates code for simple match expressions
-fn (gen ErlangGenerator) generate_simple_match(expr ast.SimpleMatchExpr) string {
+fn (mut gen ErlangGenerator) generate_simple_match(expr ast.SimpleMatchExpr) string {
 	pattern := gen.generate_pattern(expr.pattern)
 	value := gen.generate_expression(expr.value)
 
@@ -581,7 +584,7 @@ fn (gen ErlangGenerator) generate_simple_match(expr ast.SimpleMatchExpr) string 
 }
 
 // generate_match_rescue generates code for match rescue expressions
-fn (gen ErlangGenerator) generate_match_rescue(expr ast.MatchRescueExpr) string {
+fn (mut gen ErlangGenerator) generate_match_rescue(expr ast.MatchRescueExpr) string {
 	pattern := gen.generate_pattern(expr.pattern)
 	value := gen.generate_expression(expr.value)
 	rescue_var := gen.capitalize_variable(expr.rescue_var)
@@ -595,7 +598,7 @@ fn (gen ErlangGenerator) generate_match_rescue(expr ast.MatchRescueExpr) string 
 }
 
 // generate_block_expression generates code for block expressions (do...end)
-fn (gen ErlangGenerator) generate_block_expression(expr ast.BlockExpr) string {
+fn (mut gen ErlangGenerator) generate_block_expression(expr ast.BlockExpr) string {
 	if expr.body.len == 0 {
 		return 'nil'
 	}
@@ -616,10 +619,10 @@ fn (gen ErlangGenerator) generate_block_expression(expr ast.BlockExpr) string {
 		if stmt is ast.ExprStmt {
 			expr_stmt := stmt as ast.ExprStmt
 			// Check if it's a simple expression that doesn't need begin...end
-			if expr_stmt.expr is ast.LiteralExpr || expr_stmt.expr is ast.VariableExpr ||
-			   expr_stmt.expr is ast.CallExpr || expr_stmt.expr is ast.BinaryExpr ||
-			   expr_stmt.expr is ast.TupleExpr || expr_stmt.expr is ast.ListLiteralExpr ||
-			   expr_stmt.expr is ast.IfExpr || expr_stmt.expr is ast.CaseExpr {
+			if expr_stmt.expr is ast.LiteralExpr || expr_stmt.expr is ast.VariableExpr
+				|| expr_stmt.expr is ast.CallExpr || expr_stmt.expr is ast.BinaryExpr
+				|| expr_stmt.expr is ast.TupleExpr || expr_stmt.expr is ast.ListLiteralExpr
+				|| expr_stmt.expr is ast.IfExpr || expr_stmt.expr is ast.CaseExpr {
 				return gen.generate_expression(expr_stmt.expr)
 			}
 		}
@@ -627,4 +630,41 @@ fn (gen ErlangGenerator) generate_block_expression(expr ast.BlockExpr) string {
 
 	// For multiple statements or complex expressions, use begin...end
 	return 'begin\n    ${statements.join('\n    ')}\nend'
+}
+
+// generate_block_assignment_inline generates inline code for block assignments
+fn (mut gen ErlangGenerator) generate_block_assignment_inline(var_name string, block ast.BlockExpr) string {
+	if block.body.len == 0 {
+		hashed := gen.bind_variable(var_name, false)
+		return '${hashed} = nil'
+	}
+
+	mut result := []string{}
+
+	// Add comment to mark the beginning of the block
+	result << '% Block of ${gen.capitalize_variable(var_name)}'
+
+	// Enter new scope for block
+	gen.enter_scope()
+
+	// Generate all statements in the block except the last one
+	for i in 0 .. block.body.len - 1 {
+		stmt := block.body[i]
+		result << gen.generate_statement(stmt) + ','
+	}
+
+	// Generate the last statement and assign it to the variable
+	last_stmt := block.body[block.body.len - 1]
+	last_expr := gen.generate_statement(last_stmt)
+	// Bind the block variable in this scope (not a parameter)
+	hashed := gen.bind_variable(var_name, false)
+	result << '${hashed} = ${last_expr}'
+
+	// Exit block scope
+	gen.exit_scope()
+
+	// Add comment to mark the end of the block
+	result << '% End Block of ${gen.capitalize_variable(var_name)}'
+
+	return result.join('\n')
 }

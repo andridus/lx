@@ -1,0 +1,7 @@
+def simple_test() do
+  result = do
+    x = 1
+    x + 1
+  end
+  result
+end

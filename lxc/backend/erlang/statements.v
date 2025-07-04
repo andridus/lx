@@ -3,7 +3,7 @@ module erlang
 import ast
 
 // generate_statement generates code for a single statement
-pub fn (gen ErlangGenerator) generate_statement(stmt ast.Stmt) string {
+pub fn (mut gen ErlangGenerator) generate_statement(stmt ast.Stmt) string {
 	match stmt {
 		ast.ExprStmt {
 			if stmt.expr is ast.CaseExpr || stmt.expr is ast.IfExpr {
@@ -30,10 +30,13 @@ pub fn (gen ErlangGenerator) generate_statement(stmt ast.Stmt) string {
 }
 
 // generate_function_body generates code for function body with special handling for match rescue and block expressions
-pub fn (gen ErlangGenerator) generate_function_body(statements []ast.Stmt) string {
+pub fn (mut gen ErlangGenerator) generate_function_body(statements []ast.Stmt) string {
 	if statements.len == 0 {
 		return 'ok'
 	}
+
+	// Enter a new scope for the function body
+	gen.enter_scope()
 
 	// Check for match rescue patterns and block expressions
 	mut result := []string{}
@@ -85,7 +88,8 @@ pub fn (gen ErlangGenerator) generate_function_body(statements []ast.Stmt) strin
 				if assign_expr.value is ast.BlockExpr {
 					// Found a block assignment - unfold it inline
 					block_expr := assign_expr.value as ast.BlockExpr
-					unfolded := gen.generate_block_assignment_inline(assign_expr.name, block_expr)
+					unfolded := gen.generate_block_assignment_inline(assign_expr.name,
+						block_expr)
 					result << unfolded
 					i++
 					continue
@@ -98,11 +102,14 @@ pub fn (gen ErlangGenerator) generate_function_body(statements []ast.Stmt) strin
 		i++
 	}
 
+	// Exit the function body scope
+	gen.exit_scope()
+
 	return result.join(',\n')
 }
 
 // generate_simple_match_with_continuation generates simple match with subsequent expressions in success branch
-fn (gen ErlangGenerator) generate_simple_match_with_continuation(expr ast.SimpleMatchExpr, subsequent_exprs []ast.Stmt) string {
+fn (mut gen ErlangGenerator) generate_simple_match_with_continuation(expr ast.SimpleMatchExpr, subsequent_exprs []ast.Stmt) string {
 	pattern := gen.generate_pattern(expr.pattern)
 	value := gen.generate_expression(expr.value)
 
@@ -122,7 +129,7 @@ fn (gen ErlangGenerator) generate_simple_match_with_continuation(expr ast.Simple
 }
 
 // generate_match_rescue_with_continuation generates match rescue with subsequent expressions in success branch
-fn (gen ErlangGenerator) generate_match_rescue_with_continuation(expr ast.MatchRescueExpr, subsequent_exprs []ast.Stmt) string {
+fn (mut gen ErlangGenerator) generate_match_rescue_with_continuation(expr ast.MatchRescueExpr, subsequent_exprs []ast.Stmt) string {
 	pattern := gen.generate_pattern(expr.pattern)
 	value := gen.generate_expression(expr.value)
 	rescue_var := gen.capitalize_variable(expr.rescue_var)
@@ -321,8 +328,8 @@ fn (gen ErlangGenerator) infer_binary_expression_return_type_with_context(expr a
 	}
 }
 
-// generate_function generates code for function definitions
-pub fn (gen ErlangGenerator) generate_function(func ast.FunctionStmt) string {
+// generate_function generates code for a function, opening a new scope for each clause
+pub fn (mut gen ErlangGenerator) generate_function(func ast.FunctionStmt) string {
 	// Group clauses by arity
 	mut clauses_by_arity := map[int][]ast.FunctionClause{}
 
@@ -364,6 +371,16 @@ pub fn (gen ErlangGenerator) generate_function(func ast.FunctionStmt) string {
 		// --- END SPEC GENERATION ---
 
 		for clause in clauses {
+			gen.enter_scope()
+			// Bind all parameters as non-hashed (is_param = true)
+			for param in clause.parameters {
+				match param {
+					ast.VarPattern {
+						_ := gen.bind_variable(param.name, true)
+					}
+					else {}
+				}
+			}
 			parameters := clause.parameters.map(gen.generate_pattern(it))
 			mut guard := ''
 			if clause.guard is ast.LiteralExpr {
@@ -381,6 +398,7 @@ pub fn (gen ErlangGenerator) generate_function(func ast.FunctionStmt) string {
 			}
 			// Use the new function body generator that handles match rescue and block assignments
 			body_code := gen.generate_function_body(clause.body.body)
+			gen.exit_scope()
 			clause_strings << '${func.name}(${parameters.join(', ')})${guard} ->\n${body_code}'
 		}
 
@@ -626,32 +644,4 @@ fn (gen ErlangGenerator) infer_block_return_type(block ast.BlockExpr, parameters
 	}
 
 	return 'nil'
-}
-
-// generate_block_assignment_inline generates inline code for block assignments
-fn (gen ErlangGenerator) generate_block_assignment_inline(var_name string, block ast.BlockExpr) string {
-	if block.body.len == 0 {
-		return '${gen.capitalize_variable(var_name)} = nil'
-	}
-
-	mut result := []string{}
-
-	// Add comment to mark the beginning of the block
-	result << '% Block of ${gen.capitalize_variable(var_name)}'
-
-	// Generate all statements in the block except the last one
-	for i in 0 .. block.body.len - 1 {
-		stmt := block.body[i]
-		result << gen.generate_statement(stmt) + ','
-	}
-
-	// Generate the last statement and assign it to the variable
-	last_stmt := block.body[block.body.len - 1]
-	last_expr := gen.generate_statement(last_stmt)
-	result << '${gen.capitalize_variable(var_name)} = ${last_expr}'
-
-	// Add comment to mark the end of the block
-	result << '% End Block of ${gen.capitalize_variable(var_name)}'
-
-	return result.join('\n')
 }

@@ -8,12 +8,16 @@ import codegen { CodegenResult }
 pub struct ErlangGenerator {
 mut:
 	defined_types map[string]ast.TypeAliasStmt // Map of type name to type definition
+	var_scopes    []map[string]string          // Stack of variable scopes: original name -> hashed name
+	next_hash     int // Counter for unique hashes
 }
 
 // new_erlang_generator creates a new Erlang code generator
 pub fn new_erlang_generator() ErlangGenerator {
 	return ErlangGenerator{
 		defined_types: map[string]ast.TypeAliasStmt{}
+		var_scopes:    [map[string]string{}]
+		next_hash:     0
 	}
 }
 
@@ -103,4 +107,61 @@ pub fn (gen ErlangGenerator) get_module_header(module_name string) string {
 
 pub fn (gen ErlangGenerator) get_module_footer() string {
 	return ''
+}
+
+// Scope management for variable hashing
+// Call this when entering a new block scope
+fn (mut gen ErlangGenerator) enter_scope() {
+	gen.var_scopes << map[string]string{}
+}
+
+// Call this when exiting a block scope
+fn (mut gen ErlangGenerator) exit_scope() {
+	if gen.var_scopes.len > 1 {
+		gen.var_scopes.delete_last()
+	}
+}
+
+// Generates and binds a unique hashed variable name for a new variable binding
+// If is_param is true, do not add hash (for function parameters only)
+fn (mut gen ErlangGenerator) bind_variable(name string, is_param bool) string {
+	if is_param {
+		// For function parameters, do not add hash
+		simple_name := gen.capitalize_variable(name)
+		gen.var_scopes.last()[name] = simple_name
+		return simple_name
+	} else {
+		// For all other variables, always add hash
+		hash := gen.generate_alphanumeric_hash()
+		gen.next_hash++
+		hashed := gen.capitalize_variable(name) + '_' + hash
+		gen.var_scopes.last()[name] = hashed
+		return hashed
+	}
+}
+
+// generate_alphanumeric_hash generates a 4-character lowercase alphanumeric hash
+fn (mut gen ErlangGenerator) generate_alphanumeric_hash() string {
+	// Use a simple algorithm to generate consistent 4-char alphanumeric strings
+	chars := 'abcdefghijklmnopqrstuvwxyz0123456789'
+	mut hash := ''
+	mut num := gen.next_hash
+
+	for _ in 0 .. 4 {
+		index := num % chars.len
+		hash += chars[index].ascii_str()
+		num = num / chars.len
+	}
+
+	return hash
+}
+
+// Looks up the hashed variable name for a given original name, searching from innermost to outermost scope
+fn (gen ErlangGenerator) lookup_variable(name string) string {
+	for i := gen.var_scopes.len - 1; i >= 0; i-- {
+		if name in gen.var_scopes[i] {
+			return gen.var_scopes[i][name]
+		}
+	}
+	return gen.capitalize_variable(name) // fallback (should not happen)
 }
