@@ -675,10 +675,10 @@ fn (mut ep ExpressionParser) parse_block_expression() ?ast.Expr {
 
 				statements << ast.ExprStmt{
 					expr: ast.AssignExpr{
-						name: name
-						value: value
+						name:            name
+						value:           value
 						type_annotation: none
-						position: ident_position
+						position:        ident_position
 					}
 				}
 			} else {
@@ -700,7 +700,7 @@ fn (mut ep ExpressionParser) parse_block_expression() ?ast.Expr {
 	ep.consume(lexer.keyword(.end_), 'Expected end after block')?
 
 	return ast.BlockExpr{
-		body: statements
+		body:     statements
 		position: position
 	}
 }

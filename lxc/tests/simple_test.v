@@ -292,8 +292,8 @@ end'
 
 -spec if_with_var() -> string().
 if_with_var() ->
-X = 10,
-case X > 5 of
+X_aaaa = 10,
+case X_aaaa > 5 of
     true ->
         "greater";
     false ->
@@ -350,10 +350,10 @@ end'
 
 -spec nested_if() -> string().
 nested_if() ->
-X = 15,
-case X > 10 of
+X_aaaa = 15,
+case X_aaaa > 10 of
     true ->
-        case X > 20 of
+        case X_aaaa > 20 of
     true ->
         "very large";
     false ->
@@ -385,9 +385,9 @@ end'
 
 -spec complex_if() -> string().
 complex_if() ->
-X = 5,
-Y = 10,
-case X + Y > 12 of
+X_aaaa = 5,
+Y_baaa = 10,
+case X_aaaa + Y_baaa > 12 of
     true ->
         "sum is greater";
     false ->

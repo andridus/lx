@@ -201,7 +201,7 @@ fn (mut sp StatementParser) parse_function_clause() ?ast.FunctionClause {
 		parameters: parameters
 		guard:      guard
 		body:       ast.BlockExpr{
-			body: body
+			body:     body
 			position: sp.get_current_position()
 		}
 		position:   sp.get_current_position()
@@ -253,7 +253,7 @@ fn (mut sp StatementParser) parse_function_header() ?ast.FunctionClause {
 		parameters: parameters
 		guard:      guard
 		body:       ast.BlockExpr{
-			body: body
+			body:     body
 			position: sp.get_current_position()
 		}
 		position:   sp.get_current_position()
