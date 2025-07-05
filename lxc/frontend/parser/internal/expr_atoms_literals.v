@@ -62,7 +62,8 @@ fn (mut ep ExpressionParser) parse_atom_expression() ?ast.Expr {
 					ep.parse_if_expression()
 				}
 				.case_ {
-					ep.parse_case_expression()
+					// Case expressions need special handling - delegate to StatementParser
+					ep.parse_case_via_statement_parser()
 				}
 				.with {
 					ep.parse_with_expression()
@@ -71,7 +72,8 @@ fn (mut ep ExpressionParser) parse_atom_expression() ?ast.Expr {
 					ep.parse_for_expression()
 				}
 				.receive {
-					ep.parse_receive_expression()
+					// Receive expressions need special handling - delegate to StatementParser
+					ep.parse_receive_via_statement_parser()
 				}
 				.record {
 					ep.parse_record_expression()
@@ -253,4 +255,50 @@ fn (mut ep ExpressionParser) parse_external_atom() ?ast.Expr {
 			none
 		}
 	}
+}
+
+// parse_receive_via_statement_parser delegates receive parsing to StatementParser
+fn (mut ep ExpressionParser) parse_receive_via_statement_parser() ?ast.Expr {
+	// Create a StatementParser with the same tokens and position
+	mut sp := StatementParser{
+		Parser: Parser{
+			tokens: ep.tokens
+			position: ep.position
+			current: ep.current
+			errors: ep.errors
+		}
+	}
+
+	// Parse the receive expression using StatementParser
+	result := sp.parse_receive_expression()?
+
+	// Update the ExpressionParser's state from StatementParser
+	ep.position = sp.position
+	ep.current = sp.current
+	ep.errors = sp.errors
+
+	return result
+}
+
+// parse_case_via_statement_parser delegates case parsing to StatementParser
+fn (mut ep ExpressionParser) parse_case_via_statement_parser() ?ast.Expr {
+	// Create a StatementParser with the same tokens and position
+	mut sp := StatementParser{
+		Parser: Parser{
+			tokens: ep.tokens
+			position: ep.position
+			current: ep.current
+			errors: ep.errors
+		}
+	}
+
+	// Parse the case expression using StatementParser
+	result := sp.parse_case_expression()?
+
+	// Update the ExpressionParser's state from StatementParser
+	ep.position = sp.position
+	ep.current = sp.current
+	ep.errors = sp.errors
+
+	return result
 }

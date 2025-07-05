@@ -159,60 +159,7 @@ fn (mut ep ExpressionParser) parse_for_expression() ?ast.Expr {
 	}
 }
 
-// parse_receive_expression parses receive expressions
-fn (mut ep ExpressionParser) parse_receive_expression() ?ast.Expr {
-	ep.advance() // consume 'receive'
-	ep.consume(lexer.keyword(.do_), 'Expected do after receive')?
 
-	mut cases := []ast.ReceiveCase{}
-	for !ep.check(lexer.keyword(.after)) && !ep.check(lexer.keyword(.end_)) {
-		pattern := ep.parse_pattern()?
-
-		mut guard := ast.Expr(ast.LiteralExpr{
-			value: ast.BooleanLiteral{
-				value: true
-			}
-		})
-		if ep.match(lexer.keyword(.when)) {
-			guard = ep.parse_expression()?
-		}
-
-		ep.consume(lexer.operator(.arrow), 'Expected -> after pattern')?
-
-		body := ep.parse_statement_block()?
-
-		cases << ast.ReceiveCase{
-			pattern:  pattern
-			guard:    guard
-			body:     ast.BlockExpr{
-				body:     body
-				position: ep.get_current_position()
-			}
-			position: ep.get_current_position()
-		}
-	}
-
-	mut timeout := ast.Expr(ast.LiteralExpr{
-		value: ast.IntegerLiteral{
-			value: 0
-		}
-	})
-	if ep.match(lexer.keyword(.after)) {
-		timeout = ep.parse_expression()?
-		ep.consume(lexer.keyword(.do_), 'Expected do after timeout')?
-		// timeout_body := ep.parse_statement_block()?
-		// For now, we'll use the timeout expression directly
-		// In a full implementation, we'd need to handle the timeout body
-	}
-
-	ep.consume(lexer.keyword(.end_), 'Expected end after receive expression')?
-
-	return ast.ReceiveExpr{
-		cases:    cases
-		timeout:  timeout
-		position: ep.get_current_position()
-	}
-}
 
 // parse_unsafe_expression parses unsafe expressions
 fn (mut ep ExpressionParser) parse_unsafe_expression() ?ast.Expr {
@@ -226,6 +173,10 @@ fn (mut ep ExpressionParser) parse_unsafe_expression() ?ast.Expr {
 	return expr
 }
 
+
+
+
+
 // parse_statement_block parses a block of statements
 fn (mut ep ExpressionParser) parse_statement_block() ?[]ast.Stmt {
 	mut statements := []ast.Stmt{}
@@ -235,6 +186,13 @@ fn (mut ep ExpressionParser) parse_statement_block() ?[]ast.Stmt {
 		if ep.check(lexer.keyword(.else_)) {
 			break
 		}
+		// Check for after keyword (in receive expressions)
+		if ep.check(lexer.keyword(.after)) {
+			break
+		}
+
+
+
 		stmt := ep.parse_statement()?
 		statements << stmt
 	}

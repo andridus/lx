@@ -84,8 +84,26 @@
   - **Comprehensive Pattern Support**: Works with tuples, lists, atoms, maps, and complex nested patterns
 - **Test Utility Functions**: Added `assert_lx_generates_erlang(lx_code, expected_erlang)` helper function for comprehensive testing of the compilation pipeline. This utility automatically handles lexing, parsing, type checking, and code generation, comparing LX source code with expected Erlang output including automatic spec generation.
 - **AST Exhaustive Pattern Matching**: Enhanced AST expression matching to include `SimpleMatchExpr` case, ensuring all expression types are properly handled in string representation and other AST operations.
+- **Enhanced Operator Precedence System**: Implemented a comprehensive operator precedence system with proper hierarchy and automatic parentheses generation. The system ensures correct parsing of complex expressions with mixed operators and generates appropriate Erlang code with parentheses when needed to preserve precedence semantics.
+- **Improved Case/Receive Expression Parsing**: Enhanced the parser to properly handle case and receive expressions with multiple statements in clause bodies. The parser now supports complex clause patterns with multiple expressions, variable bindings, and proper statement boundary detection.
+- **Erlang Precedence Compatibility**: Added an Erlang precedence system to the code generator that automatically compares LX and Erlang operator precedence, adding parentheses when needed to ensure generated Erlang code maintains the correct semantic meaning of the original LX expressions.
 
 ### Fixed
+- **Fixed Operator Precedence System**: Corrected the operator precedence hierarchy in the parser to follow the proper order: Assignment (1) → Send (2) → OR (3) → AND (4) → Comparison (5) → Arithmetic (6) → Function calls (8). Previously, the precedence was inverted with `parse_or_expression()` calling `parse_send_expression()` instead of the correct hierarchy. This fix ensures expressions like `pid ! a or b` are parsed as `(pid ! a) or b` instead of `pid ! (a or b)`, matching expected operator precedence rules.
+- **Fixed Case/Receive Multi-Statement Parsing**: Resolved parsing issues with case and receive expressions that contain multiple statements in clause bodies. The parser now correctly handles complex clause bodies with multiple expressions, allowing patterns like:
+  ```lx
+  case message do
+    {:echo, msg, from} ->
+      from ! {:response, msg}
+      log_message(msg)
+      :ok
+    :stop ->
+      cleanup()
+      "stopped"
+  end
+  ```
+- **Fixed Erlang Code Generation Precedence**: Enhanced the Erlang code generator to automatically add parentheses when needed to preserve correct operator precedence. The generator now includes an Erlang precedence system that compares LX and Erlang operator precedence, adding parentheses when the precedence differs between the two languages.
+- **Fixed Parser Expression Delegation**: Improved the parser architecture to properly delegate case and receive expression parsing to the appropriate parser components, ensuring consistent behavior between different expression types and proper handling of complex nested patterns.
 - **Fixed AST Expression Matching**: Resolved compilation error in `ast/ast.v` by adding the missing `SimpleMatchExpr` case to the expression string representation match statement. This ensures exhaustive pattern matching for all expression types and prevents compilation failures.
 - **Fixed TypeChecker Unused Variable Warning**: Corrected unused variable warning in `analysis/typechecker/checker.v` by properly handling the `tail_type` variable in list cons pattern inference. The variable is now correctly marked as used for validation purposes.
 - **Fixed Test Compilation Pipeline**: Resolved multiple test compilation failures by implementing the missing `assert_lx_generates_erlang` function in test files. This function provides a clean interface for testing the complete LX-to-Erlang compilation pipeline.

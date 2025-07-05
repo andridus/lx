@@ -120,8 +120,16 @@ pub:
 // ReceiveExpr represents message receiving
 pub struct ReceiveExpr {
 pub:
-	cases    []ReceiveCase
-	timeout  Expr
+	cases        []ReceiveCase
+	timeout      ?TimeoutClause
+	position     Position
+}
+
+// TimeoutClause represents a timeout clause in receive expressions
+pub struct TimeoutClause {
+pub:
+	timeout  Expr      // Timeout value in milliseconds
+	body     BlockExpr // Code to execute on timeout
 	position Position
 }
 
@@ -541,7 +549,12 @@ pub fn (e Expr) str() string {
 			'Send(${e.pid.str()}, ${e.message.str()})'
 		}
 		ReceiveExpr {
-			'Receive([${e.cases.map(it.str()).join(', ')}], ${e.timeout.str()})'
+			timeout_str := if timeout_clause := e.timeout {
+				timeout_clause.str()
+			} else {
+				'none'
+			}
+			'Receive([${e.cases.map(it.str()).join(', ')}], ${timeout_str})'
 		}
 		GuardExpr {
 			'Guard(${e.condition.str()})'
@@ -825,4 +838,14 @@ pub:
 pub struct NilLiteral {
 pub:
 	position Position
+}
+
+// str returns a string representation of ReceiveCase
+pub fn (rc ReceiveCase) str() string {
+	return 'ReceiveCase(${rc.pattern.str()} when ${rc.guard.str()} -> ${rc.body.str()})'
+}
+
+// str returns a string representation of TimeoutClause
+pub fn (tc TimeoutClause) str() string {
+	return 'TimeoutClause(${tc.timeout.str()} -> ${tc.body.str()})'
 }

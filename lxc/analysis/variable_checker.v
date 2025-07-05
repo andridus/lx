@@ -276,7 +276,11 @@ pub fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 				vc.check_expression(case_.guard)
 				vc.check_block_expression(case_.body)
 			}
-			vc.check_expression(expr.timeout)
+			// Check timeout clause if present
+			if timeout_clause := expr.timeout {
+				vc.check_expression(timeout_clause.timeout)
+				vc.check_block_expression(timeout_clause.body)
+			}
 		}
 		ast.GuardExpr {
 			vc.check_expression(expr.condition)

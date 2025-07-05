@@ -203,6 +203,55 @@ Syntax symbols used for operations, declarations, and structure:
 - **Block delimiters**: `do`, `end` — define code blocks for functions and control flow
 - **Separators**: `,`, `;`
 
+#### Operator Precedence
+
+Lx follows a clear operator precedence hierarchy to ensure predictable expression evaluation. Operators are listed from lowest to highest precedence:
+
+| Precedence | Operator | Description | Example |
+|------------|----------|-------------|---------|
+| 1 (lowest) | `=` | Assignment | `x = y + z` |
+| 2 | `!` | Message send | `pid ! message` |
+| 3 | `or`, `orelse`, `\|\|` | Logical OR | `a or b` |
+| 4 | `and`, `andalso`, `&&` | Logical AND | `a and b` |
+| 5 | `==`, `!=`, `<`, `>`, `<=`, `>=` | Comparison | `x == y` |
+| 6 | `+`, `-`, `++` | Addition, subtraction, concatenation | `a + b` |
+| 7 | `*`, `/` | Multiplication, division | `a * b` |
+| 8 (highest) | Function calls, field access | `f()`, `record.field` | `user.name` |
+
+**Key Rules:**
+- **Lower precedence operators** bind less tightly than higher precedence ones
+- **Parentheses** `()` can be used to override precedence
+- **Message send** has very low precedence, requiring parentheses for complex expressions
+- **Logical operators** follow standard boolean algebra precedence (`and` before `or`)
+
+**Examples:**
+```lx
+# Without parentheses - follows precedence rules
+pid ! a or b        # Equivalent to: (pid ! a) or b
+x = a + b * c       # Equivalent to: x = a + (b * c)
+a and b or c        # Equivalent to: (a and b) or c
+
+# With explicit parentheses for clarity
+pid ! (a or b)      # Send the result of (a or b) to pid
+x = (a + b) * c     # Multiply the sum by c
+a and (b or c)      # AND a with the result of (b or c)
+```
+
+**Generated Erlang Code:**
+The compiler automatically adds parentheses in the generated Erlang code when needed to preserve the correct precedence, ensuring that complex expressions evaluate correctly:
+
+```lx
+# Lx source
+pid ! a or b
+```
+
+```erlang
+% Generated Erlang with automatic parentheses
+Pid ! (A or B)
+```
+
+This ensures that the Erlang code maintains the same semantic meaning as the original Lx code, even when operator precedence differs between the two languages.
+
 ---
 
 ### 4. Literals
@@ -889,30 +938,154 @@ Guards are pure boolean expressions. Avoid complex logic here.
 
 ### 11. Message Passing
 
-Send messages to processes using `!`:
+Send messages to processes using the `!` operator:
 
 ```lx
+# Basic message sending
 pid ! {:log, "started"}
+
+# Send with complex data
+worker_pid ! {:task, %{id: 123, data: "process this"}}
+
+# Send to multiple processes
+for pid in worker_pids do
+  pid ! {:broadcast, "message for all"}
+end
+
+# Message sending with precedence considerations
+pid ! (a or b)          # Send the result of (a or b)
+(pid ! a) or b          # Send a to pid, then OR with b
 ```
 
-Returns the sent message. Useful for fire-and-forget.
+**Key Features:**
+- **Fire-and-forget**: Returns the sent message, doesn't wait for response
+- **Low precedence**: Message send has very low operator precedence
+- **Any data**: Can send any Lx data structure (atoms, tuples, maps, etc.)
+- **Process targeting**: Send to PIDs, registered names, or remote processes
+
+**Precedence Note:**
+The `!` operator has very low precedence (level 2), which means complex expressions often need parentheses:
+
+```lx
+# Without parentheses - may not behave as expected
+pid ! a + b             # Equivalent to: (pid ! a) + b
+
+# With parentheses - clearer intent
+pid ! (a + b)           # Send the sum of a and b
+```
+
+**Generated Erlang Code:**
+```lx
+# Lx source
+pid ! {:data, value}
+```
+
+```erlang
+% Generated Erlang
+Pid ! {data, Value}
+```
 
 ---
 
 ### 12. Receive Expressions
 
-Blocking pattern match for process messages:
+Blocking pattern match for process messages with support for guards, multiple statements, and timeouts:
 
 ```lx
+# Basic receive expression
 receive do
   :ready -> proceed()
-  {:data, D} -> handle(D)
+  {:data, data} -> handle(data)
+  _ -> :unknown
+end
+
+# Receive with timeout
+receive do
+  :ready -> proceed()
+  {:data, data} -> handle(data)
+end after 5000 do
+  :timeout
+end
+
+# Receive with guards
+receive do
+  {:message, msg} when is_binary(msg) -> handle_text(msg)
+  {:message, msg} when is_integer(msg) -> handle_number(msg)
+  {:error, reason} -> handle_error(reason)
+  _ -> :unknown
+end
+
+# Receive with multiple statements in clause bodies
+receive do
+  {:echo, message, from} ->
+    from ! {:response, message}
+    log_message(message)
+    :ok
+  :stop ->
+    cleanup_resources()
+    save_state()
+    "Server stopped"
+  {:timeout, duration} ->
+    set_timeout(duration)
+    :timeout_set
+  _ ->
+    log_unknown_message()
+    :error
+end after 10000 do
+  log_timeout()
+  :receive_timeout
+end
+
+# Complex pattern matching in receive
+receive do
+  {:user_action, %{user_id: id, action: action}} when id > 0 ->
+    process_user_action(id, action)
+    update_user_stats(id)
+    :processed
+  {:system_event, [event_type | event_data]} ->
+    handle_system_event(event_type, event_data)
+    broadcast_event(event_type)
+    :broadcasted
+  _ ->
+    :ignored
+end
+```
+
+**Key Features:**
+- **Selective Receive**: Only messages matching patterns are consumed
+- **Pattern Matching**: Full pattern destructuring support
+- **Guards**: Add conditional logic with `when` clauses
+- **Multiple Statements**: Each clause can contain multiple statements
+- **Timeout Support**: Use `after` clause for timeout handling
+- **Variable Binding**: Variables bound in patterns are available in clause bodies
+- **Message Queue**: Unmatched messages remain in the process mailbox
+
+**Generated Erlang Code:**
+```lx
+# Lx source
+receive do
+  {:echo, msg, from} ->
+    from ! {:response, msg}
+    :ok
+  :stop ->
+    "stopped"
 end after 5000 do
   :timeout
 end
 ```
 
-Supports guards and default cases.
+```erlang
+% Generated Erlang
+receive
+    {echo, Msg, From} ->
+        From ! {response, Msg},
+        ok;
+    stop ->
+        "stopped"
+after 5000 ->
+    timeout
+end
+```
 
 ---
 
@@ -1094,12 +1267,54 @@ end
 
 #### `case`:
 
+Pattern matching with multiple clauses and support for guards:
+
 ```lx
+# Basic case expression
 case input do
-  :ok -> handle()
+  :ok -> handle_success()
+  :error -> handle_error()
   _ -> fallback()
 end
+
+# Case with guards
+case value do
+  x when x > 0 -> "positive"
+  x when x < 0 -> "negative"
+  0 -> "zero"
+  _ -> "unknown"
+end
+
+# Complex pattern matching
+case data do
+  {user, %{age: age}} when age >= 18 -> process_adult(user)
+  {user, %{age: age}} when age < 18 -> process_minor(user)
+  [head | tail] -> process_list(head, tail)
+  %{status: :active, data: content} -> process_active(content)
+  _ -> :unknown
+end
+
+# Case with multiple statements in clause bodies
+case message do
+  {:echo, msg, from} ->
+    from ! {:response, msg}
+    log_message(msg)
+    :ok
+  :stop ->
+    cleanup()
+    "Server stopped"
+  _ ->
+    log_unknown(message)
+    :error
+end
 ```
+
+**Key Features:**
+- **Pattern Matching**: Destructure data using patterns
+- **Guards**: Add conditional logic with `when` clauses
+- **Multiple Statements**: Each clause can contain multiple statements
+- **Variable Binding**: Variables bound in patterns are available in clause bodies
+- **Exhaustive Matching**: Use `_` for catch-all cases
 
 #### `match ... rescue` (Error Handling):
 
@@ -2129,5 +2344,53 @@ LX supports both symbolic and word forms for short-circuit logical operators:
 Both forms are fully equivalent in LX and always generate the modern Erlang/BEAM operators (`andalso`, `orelse`).
 
 > Note: The classic `and`/`or` (non-short-circuit) are also available as `and`/`or` in LX, mapping to their respective Erlang forms.
+
+---
+
+## Recent Improvements
+
+### Enhanced Expression Parsing
+
+The LX compiler has been significantly improved with better expression parsing capabilities:
+
+#### Operator Precedence System
+- **Correct precedence hierarchy**: Assignment → Send → OR → AND → Comparison → Arithmetic → Function calls
+- **Automatic parentheses**: The compiler automatically adds parentheses in generated Erlang code to preserve correct precedence
+- **Complex expression support**: Handles nested expressions with mixed operators correctly
+
+#### Multi-Statement Case/Receive Bodies
+- **Multiple statements**: Case and receive expressions now support multiple statements in clause bodies
+- **Proper parsing**: Enhanced parser handles complex clause bodies with multiple expressions
+- **Variable scoping**: Correct variable scoping within clause bodies
+
+#### Parser Architecture
+- **Unified parsing**: Consistent parsing behavior between case and receive expressions
+- **Better error handling**: Improved error messages for parsing issues
+- **Robust parsing**: Enhanced parser recovery and error reporting
+
+**Example of enhanced parsing:**
+```lx
+# Complex case expression with multiple statements
+case message do
+  {:process, data, callback} ->
+    result = process_data(data)
+    callback ! {:result, result}
+    log_processing(data)
+    :ok
+  {:error, reason} ->
+    log_error(reason)
+    cleanup_resources()
+    :error
+end
+
+# Complex receive with precedence-aware message sending
+receive do
+  {:echo, msg, from} ->
+    from ! {:response, msg}
+    :ok
+end
+```
+
+These improvements ensure that LX code compiles correctly to Erlang while maintaining readable and predictable behavior.
 
 ---

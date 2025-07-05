@@ -2,6 +2,55 @@ module erlang
 
 import ast
 
+// Erlang operator precedence levels (higher number = higher precedence)
+enum ErlangPrecedence {
+	or_       = 1  // or, orelse
+	and_      = 2  // and, andalso
+	equality  = 3  // ==, /=, =:=, =/=, <, >, =<, >=
+	list_cons = 4  // |
+	add_sub   = 5  // +, -
+	mul_div   = 6  // *, /, rem
+	unary     = 7  // -, not
+	send      = 8  // !
+	call      = 9  // function calls
+	primary   = 10 // literals, variables, parentheses
+}
+
+// get_expression_precedence returns the Erlang precedence level for an expression
+fn get_expression_precedence(expr ast.Expr) ErlangPrecedence {
+	match expr {
+		ast.BinaryExpr {
+			match expr.op {
+				.or { return .or_ }
+				.and { return .and_ }
+				.equal, .not_equal, .less_than, .greater_than, .less_equal, .greater_equal { return .equality }
+				.cons { return .list_cons }
+				.add, .subtract { return .add_sub }
+				.multiply, .divide, .modulo, .power { return .mul_div }
+				.append { return .add_sub }
+			}
+		}
+		ast.UnaryExpr { return .unary }
+		ast.SendExpr { return .send }
+		ast.CallExpr { return .call }
+		ast.LiteralExpr, ast.VariableExpr, ast.TupleExpr, ast.ListLiteralExpr, ast.MapLiteralExpr { return .primary }
+		else { return .primary }
+	}
+}
+
+// generate_expression_with_precedence generates code for an expression, adding parentheses if needed
+pub fn (mut gen ErlangGenerator) generate_expression_with_precedence(expr ast.Expr, parent_precedence ErlangPrecedence) string {
+	expr_precedence := get_expression_precedence(expr)
+	code := gen.generate_expression(expr)
+
+	// Add parentheses if this expression has lower precedence than the parent
+	if int(expr_precedence) < int(parent_precedence) {
+		return '(${code})'
+	}
+
+	return code
+}
+
 // generate_expression generates code for a single expression
 pub fn (mut gen ErlangGenerator) generate_expression(expr ast.Expr) string {
 	match expr {
@@ -446,7 +495,7 @@ fn (mut gen ErlangGenerator) generate_fun_expression(expr ast.FunExpr) string {
 // generate_send generates code for message sending
 fn (mut gen ErlangGenerator) generate_send(expr ast.SendExpr) string {
 	pid := gen.generate_expression(expr.pid)
-	message := gen.generate_expression(expr.message)
+	message := gen.generate_expression_with_precedence(expr.message, .send)
 	return '${pid} ! ${message}'
 }
 
@@ -479,13 +528,16 @@ fn (mut gen ErlangGenerator) generate_receive(expr ast.ReceiveExpr) string {
 		cases << '    ${pattern}${guard} -> ${body}'
 	}
 
-	timeout := if expr.timeout != ast.Expr(ast.GuardExpr{}) {
-		' after ${gen.generate_expression(expr.timeout)} ->\ntimeout'
+	// Handle timeout clause
+	timeout_clause := if timeout_opt := expr.timeout {
+		timeout_value := gen.generate_expression(timeout_opt.timeout)
+		timeout_body := gen.generate_block_expression(timeout_opt.body)
+		'\nafter ${timeout_value} ->\n    ${timeout_body}'
 	} else {
 		''
 	}
 
-	return 'receive\n${cases.join(';\n')}${timeout}\nend'
+	return 'receive\n${cases.join(';\n')}${timeout_clause}\nend'
 }
 
 // generate_guard generates code for guard expressions

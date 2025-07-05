@@ -6,6 +6,7 @@ import lexer
 pub enum Precedence {
 	none
 	assignment // =
+	send       // ! (message send)
 	or_        // or, orelse
 	and_       // and, andalso
 	equality   // ==, !=
@@ -47,7 +48,7 @@ pub fn (p PrecedenceTable) get_precedence(token lexer.OperatorToken) Precedence 
 		.not_ { .unary }
 		.dot { .call }
 		.arrow { .none }
-		.send { .none }
+		.send { .send }
 		.type_cons { .none }
 		.concat { .none }
 		.pipe { .none }

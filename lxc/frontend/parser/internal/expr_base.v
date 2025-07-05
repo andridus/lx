@@ -84,8 +84,8 @@ pub fn (mut ep ExpressionParser) parse_assignment_expression() ?ast.Expr {
 		}
 	}
 
-	// If not an assignment, fall back to logical OR
-	return ep.parse_or_expression()
+	// If not an assignment, fall back to send expressions
+	return ep.parse_send_expression()
 }
 
 // parse_or_expression parses expressions with 'or' precedence
@@ -105,6 +105,28 @@ fn (mut ep ExpressionParser) parse_or_expression() ?ast.Expr {
 			position: ep.get_current_position()
 		}
 	}
+	return left
+}
+
+// parse_send_expression parses send expressions
+fn (mut ep ExpressionParser) parse_send_expression() ?ast.Expr {
+	mut left := ep.parse_or_expression()?
+
+	// Check for send operator
+	if ep.current is lexer.OperatorToken {
+		op_token := ep.current as lexer.OperatorToken
+		if op_token.value == .send {
+			ep.advance() // consume '!'
+			right := ep.parse_or_expression()?
+
+			return ast.SendExpr{
+				pid:      left
+				message:  right
+				position: ep.get_current_position()
+			}
+		}
+	}
+
 	return left
 }
 
@@ -204,7 +226,7 @@ fn (mut ep ExpressionParser) parse_additive_expression() ?ast.Expr {
 
 // parse_multiplicative_expression parses multiplication and division expressions
 fn (mut ep ExpressionParser) parse_multiplicative_expression() ?ast.Expr {
-	mut left := ep.parse_send_expression()?
+	mut left := ep.parse_postfix_expression()?
 
 	for ep.current is lexer.OperatorToken {
 		op_token := ep.current as lexer.OperatorToken
@@ -215,34 +237,12 @@ fn (mut ep ExpressionParser) parse_multiplicative_expression() ?ast.Expr {
 		}
 
 		ep.advance()
-		right := ep.parse_send_expression()?
+		right := ep.parse_postfix_expression()?
 		left = ast.BinaryExpr{
 			left:     left
 			op:       op
 			right:    right
 			position: ep.get_current_position()
-		}
-	}
-
-	return left
-}
-
-// parse_send_expression parses send expressions
-fn (mut ep ExpressionParser) parse_send_expression() ?ast.Expr {
-	mut left := ep.parse_postfix_expression()?
-
-	// Check for send operator
-	if ep.current is lexer.OperatorToken {
-		op_token := ep.current as lexer.OperatorToken
-		if op_token.value == .send {
-			ep.advance() // consume '!'
-			right := ep.parse_postfix_expression()?
-
-			return ast.SendExpr{
-				pid:      left
-				message:  right
-				position: ep.get_current_position()
-			}
 		}
 	}
 

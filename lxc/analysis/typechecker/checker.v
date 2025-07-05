@@ -330,11 +330,14 @@ fn (mut tc TypeChecker) check_receive_expression(expr ast.ReceiveExpr) {
 	for case_ in expr.cases {
 		tc.check_pattern(case_.pattern)
 		tc.check_expression(case_.guard)
-
 		tc.check_block_expression(case_.body)
 	}
 
-	tc.check_expression(expr.timeout)
+	// Check timeout clause if present
+	if timeout_clause := expr.timeout {
+		tc.check_expression(timeout_clause.timeout)
+		tc.check_block_expression(timeout_clause.body)
+	}
 }
 
 // check_guard_expression performs type checking on a guard expression

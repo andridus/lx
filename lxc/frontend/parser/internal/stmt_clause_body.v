@@ -463,17 +463,20 @@ fn (mut sp StatementParser) parse_receive_expression() ?ast.Expr {
 		}
 	}
 
-	mut timeout := ast.Expr(ast.LiteralExpr{
-		value: ast.IntegerLiteral{
-			value: 0
-		}
-	})
+	mut timeout := ?ast.TimeoutClause(none)
 	if sp.match(lexer.keyword(.after)) {
-		timeout = sp.parse_expression()?
-		sp.consume(lexer.keyword(.do_), 'Expected do after timeout')?
-		// timeout_body := sp.parse_statement_block()?
-		// For now, we'll use the timeout expression directly
-		// In a full implementation, we'd need to handle the timeout body
+		timeout_expr := sp.parse_expression()?
+		sp.consume(lexer.operator(.arrow), 'Expected -> after timeout expression')?
+		timeout_body := sp.parse_statement_block()?
+
+		timeout = ast.TimeoutClause{
+			timeout:  timeout_expr
+			body:     ast.BlockExpr{
+				body:     timeout_body
+				position: sp.get_current_position()
+			}
+			position: sp.get_current_position()
+		}
 	}
 
 	sp.consume(lexer.keyword(.end_), 'Expected end after receive expression')?

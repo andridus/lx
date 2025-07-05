@@ -67,6 +67,17 @@ fn (mut sp StatementParser) parse_simple_expression() ?ast.Expr {
 				op = .or
 				should_continue = true
 			}
+			.send {
+				// Handle send operator specially
+				sp.advance() // consume '!'
+				right := sp.parse_simple_atom()?
+
+				return ast.SendExpr{
+					pid:      left
+					message:  right
+					position: sp.get_current_position()
+				}
+			}
 			else {
 				break
 			}
