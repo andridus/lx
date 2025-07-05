@@ -64,7 +64,7 @@ pub fn (mut gen ErlangGenerator) generate_expression(expr ast.Expr) string {
 			return gen.generate_binary_expression(expr)
 		}
 		ast.UnaryExpr {
-			return '%% UnaryExpr not implemented'
+			return gen.generate_unary_expression(expr)
 		}
 		ast.CallExpr {
 			return gen.generate_function_call(expr)
@@ -148,7 +148,7 @@ pub fn (mut gen ErlangGenerator) generate_expression_in_guard(expr ast.Expr) str
 			return gen.generate_binary_expression_in_guard(expr)
 		}
 		ast.UnaryExpr {
-			return '%% UnaryExpr not implemented'
+			return gen.generate_unary_expression_in_guard(expr)
 		}
 		ast.CallExpr {
 			return gen.generate_function_call(expr)
@@ -288,6 +288,13 @@ fn (mut gen ErlangGenerator) generate_binary_expression_in_guard(expr ast.Binary
 	right := gen.generate_expression_in_guard(expr.right)
 	op := gen.translate_operator(expr.op, true)
 	return '${left} ${op} ${right}'
+}
+
+// generate_unary_expression generates code for unary expressions
+fn (mut gen ErlangGenerator) generate_unary_expression(expr ast.UnaryExpr) string {
+	operand := gen.generate_expression(expr.operand)
+	op := gen.translate_unary_operator(expr.op, false)
+	return '${op}${operand}'
 }
 
 // generate_unary_expression_in_guard generates code for unary expressions in guards

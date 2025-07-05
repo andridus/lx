@@ -5,6 +5,34 @@ import lexer
 
 // parse_simple_expression parses simple expressions without function calls
 fn (mut sp StatementParser) parse_simple_expression() ?ast.Expr {
+	// Check for unary operators first
+	if sp.current is lexer.OperatorToken {
+		op_token := sp.current as lexer.OperatorToken
+		match op_token.value {
+			.minus {
+				sp.advance() // consume '-'
+				operand := sp.parse_simple_expression()?
+				return ast.UnaryExpr{
+					op:       ast.UnaryOp.minus
+					operand:  operand
+					position: sp.get_current_position()
+				}
+			}
+			.not_ {
+				sp.advance() // consume 'not'
+				operand := sp.parse_simple_expression()?
+				return ast.UnaryExpr{
+					op:       ast.UnaryOp.not
+					operand:  operand
+					position: sp.get_current_position()
+				}
+			}
+			else {
+				// Not a unary operator, continue with atom
+			}
+		}
+	}
+
 	// For all cases, use the simple atom parser first
 	mut left := sp.parse_simple_atom()?
 

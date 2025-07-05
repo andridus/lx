@@ -226,7 +226,7 @@ fn (mut ep ExpressionParser) parse_additive_expression() ?ast.Expr {
 
 // parse_multiplicative_expression parses multiplication and division expressions
 fn (mut ep ExpressionParser) parse_multiplicative_expression() ?ast.Expr {
-	mut left := ep.parse_postfix_expression()?
+	mut left := ep.parse_unary_expression()?
 
 	for ep.current is lexer.OperatorToken {
 		op_token := ep.current as lexer.OperatorToken
@@ -237,7 +237,7 @@ fn (mut ep ExpressionParser) parse_multiplicative_expression() ?ast.Expr {
 		}
 
 		ep.advance()
-		right := ep.parse_postfix_expression()?
+		right := ep.parse_unary_expression()?
 		left = ast.BinaryExpr{
 			left:     left
 			op:       op
@@ -247,6 +247,39 @@ fn (mut ep ExpressionParser) parse_multiplicative_expression() ?ast.Expr {
 	}
 
 	return left
+}
+
+// parse_unary_expression parses unary expressions
+fn (mut ep ExpressionParser) parse_unary_expression() ?ast.Expr {
+	if ep.current is lexer.OperatorToken {
+		op_token := ep.current as lexer.OperatorToken
+		match op_token.value {
+			.minus {
+				ep.advance() // consume '-'
+				operand := ep.parse_unary_expression()?
+				return ast.UnaryExpr{
+					op:       ast.UnaryOp.minus
+					operand:  operand
+					position: ep.get_current_position()
+				}
+			}
+			.not_ {
+				ep.advance() // consume 'not'
+				operand := ep.parse_unary_expression()?
+				return ast.UnaryExpr{
+					op:       ast.UnaryOp.not
+					operand:  operand
+					position: ep.get_current_position()
+				}
+			}
+			else {
+				// Not a unary operator, continue to postfix
+				return ep.parse_postfix_expression()
+			}
+		}
+	}
+
+	return ep.parse_postfix_expression()
 }
 
 // parse_postfix_expression parses postfix expressions (function calls, record access, etc.)

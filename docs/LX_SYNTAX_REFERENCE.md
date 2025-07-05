@@ -197,6 +197,7 @@ Syntax symbols used for operations, declarations, and structure:
 - **Map creation**: `%{}` — create maps with `key: value` (atoms) or `key => value` (general)
 - **Map access**: `[]` — access map values with `map[key]` or `map[:atom_key]`
 - **Math**: `+`, `-`, `*`, `/`
+- **Unary**: `-` (negation), `not` (logical negation)
 - **Comparison**: `==`, `!=`, `<`, `>`, `<=`, `>=`
 - **Logic**: `and`, `or`, `not`, `andalso`, `orelse`
 - **Grouping and data**: `()`, `{}`, `[]`
@@ -216,7 +217,8 @@ Lx follows a clear operator precedence hierarchy to ensure predictable expressio
 | 5 | `==`, `!=`, `<`, `>`, `<=`, `>=` | Comparison | `x == y` |
 | 6 | `+`, `-`, `++` | Addition, subtraction, concatenation | `a + b` |
 | 7 | `*`, `/` | Multiplication, division | `a * b` |
-| 8 (highest) | Function calls, field access | `f()`, `record.field` | `user.name` |
+| 8 | `-`, `not` | Unary minus, logical negation | `-x`, `not flag` |
+| 9 (highest) | Function calls, field access | `f()`, `record.field` | `user.name` |
 
 **Key Rules:**
 - **Lower precedence operators** bind less tightly than higher precedence ones
@@ -230,11 +232,15 @@ Lx follows a clear operator precedence hierarchy to ensure predictable expressio
 pid ! a or b        # Equivalent to: (pid ! a) or b
 x = a + b * c       # Equivalent to: x = a + (b * c)
 a and b or c        # Equivalent to: (a and b) or c
+result = a + -b     # Equivalent to: result = a + (-b)
+flag = not x > 0    # Equivalent to: flag = (not x) > 0
 
 # With explicit parentheses for clarity
 pid ! (a or b)      # Send the result of (a or b) to pid
 x = (a + b) * c     # Multiply the sum by c
 a and (b or c)      # AND a with the result of (b or c)
+result = a + (-b)   # Explicit unary minus
+flag = not (x > 0)  # Logical negation of comparison
 ```
 
 **Generated Erlang Code:**
@@ -259,11 +265,31 @@ This ensures that the Erlang code maintains the same semantic meaning as the ori
 Immutable constant values available in source code:
 
 - **Strings**: `"hello"`, supports escapes (`\n`, `\t`, `\r`, `\"`, `\\`)
-- **Integers**: `42`, `-3`, `0`
-- **Floats**: `3.14`, `-1.0`
+- **Integers**: `42`, `-3`, `0`, `1024`
+- **Floats**: `3.14`, `-1.0`, `0.0`, `-42.5`
 - **Booleans**: `true`, `false`
 - **Atoms (symbols)**: `:ok`, `:error`, `:timeout`
 - **Nil/null value**: `nil`
+
+#### Numeric Literals with Unary Operators
+
+Numbers can be used with unary operators for negation and complex expressions:
+
+```lx
+# Negative literals
+negative_int = -42
+negative_float = -3.14159
+zero = -0
+
+# Unary operators in expressions
+calculation = x * -1
+result = -value + offset
+complex = -(a + b) * c
+
+# Boolean negation
+is_false = not true
+is_invalid = not (x > 0 and y < 10)
+```
 
 #### String Literals
 
@@ -2353,24 +2379,60 @@ Both forms are fully equivalent in LX and always generate the modern Erlang/BEAM
 
 The LX compiler has been significantly improved with better expression parsing capabilities:
 
+#### Unary Operators Support
+- **Negative numbers**: Full support for unary minus operator (`-`) for negative numbers and expressions
+- **Logical negation**: Support for unary `not` operator for boolean negation
+- **Proper precedence**: Unary operators have correct precedence in the operator hierarchy
+- **Expression integration**: Unary operators work seamlessly in complex expressions
+
+**Examples:**
+```lx
+# Negative numbers
+negative = -42
+calculation = x * -1
+complex_expr = a + (-b * c)
+
+# Logical negation
+flag = not condition
+result = not (x > 0 and y < 10)
+
+# In function bodies and expressions
+def calculate(x) do
+  if x > 0 do
+    -x  # Negative of positive number
+  else
+    x * -2  # Multiply by negative two
+  end
+end
+```
+
 #### Operator Precedence System
-- **Correct precedence hierarchy**: Assignment → Send → OR → AND → Comparison → Arithmetic → Function calls
+- **Correct precedence hierarchy**: Assignment → Send → OR → AND → Comparison → Arithmetic → Unary → Function calls
 - **Automatic parentheses**: The compiler automatically adds parentheses in generated Erlang code to preserve correct precedence
 - **Complex expression support**: Handles nested expressions with mixed operators correctly
+- **Unary integration**: Unary operators properly integrated into the precedence chain
 
 #### Multi-Statement Case/Receive Bodies
 - **Multiple statements**: Case and receive expressions now support multiple statements in clause bodies
 - **Proper parsing**: Enhanced parser handles complex clause bodies with multiple expressions
 - **Variable scoping**: Correct variable scoping within clause bodies
+- **Pattern detection**: Improved pattern detection for complex case/receive clauses
 
 #### Parser Architecture
 - **Unified parsing**: Consistent parsing behavior between case and receive expressions
 - **Better error handling**: Improved error messages for parsing issues
 - **Robust parsing**: Enhanced parser recovery and error reporting
+- **Unary expression parsing**: Complete implementation of unary expression parsing in both ExpressionParser and StatementParser
+
+#### Code Generation Improvements
+- **Unary code generation**: Proper Erlang code generation for unary expressions
+- **Guard context**: Correct handling of unary operators in guard expressions
+- **Type safety**: Full type checking and inference for unary expressions
+- **Operator translation**: Accurate translation of LX unary operators to Erlang equivalents
 
 **Example of enhanced parsing:**
 ```lx
-# Complex case expression with multiple statements
+# Complex case expression with multiple statements and unary operators
 case message do
   {:process, data, callback} ->
     result = process_data(data)
@@ -2381,16 +2443,63 @@ case message do
     log_error(reason)
     cleanup_resources()
     :error
+  {:timeout, duration} when duration > 0 ->
+    # Use negative timeout for retry
+    retry_with_timeout(-duration)
+    :retry
 end
 
-# Complex receive with precedence-aware message sending
+# Complex receive with precedence-aware message sending and unary operators
 receive do
   {:echo, msg, from} ->
     from ! {:response, msg}
     :ok
+  {:calculate, x, y} ->
+    result = x + (-y * 2)  # Unary minus in complex expression
+    :calculated
+  {:negate, flag} ->
+    opposite = not flag  # Unary not operator
+    :negated
+end
+
+# Unary operators in arithmetic expressions
+def complex_math(a, b, c) do
+  # Multiple unary operators with correct precedence
+  result = -a + (not b) * (-c)
+  if not (result > 0) do
+    -result
+  else
+    result
+  end
 end
 ```
 
-These improvements ensure that LX code compiles correctly to Erlang while maintaining readable and predictable behavior.
+**Generated Erlang Code:**
+```lx
+# LX source with unary operators
+def test_unary(x) do
+  negative = -42
+  result = x * -1
+  flag = not true
+  {negative, result, flag}
+end
+```
+
+```erlang
+% Generated Erlang with proper unary operator handling
+test_unary(X) ->
+    Negative = -42,
+    Result = X * -1,
+    Flag = not true,
+    {Negative, Result, Flag}.
+```
+
+#### Testing and Validation
+- **Comprehensive tests**: Added extensive test coverage for unary operators
+- **Edge cases**: Tests cover complex expressions, precedence, and integration scenarios
+- **Regression testing**: Ensures existing functionality remains intact
+- **Generated code validation**: Verifies that generated Erlang code compiles and runs correctly
+
+These improvements ensure that LX code compiles correctly to Erlang while maintaining readable and predictable behavior, with complete support for unary operators in all contexts.
 
 ---
