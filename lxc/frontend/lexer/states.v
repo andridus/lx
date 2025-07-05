@@ -5,6 +5,7 @@ pub enum LexerState {
 	initial
 	atom_start
 	identifier
+	key
 	number
 	float
 	string
@@ -23,6 +24,7 @@ pub fn (s LexerState) str() string {
 		.initial { 'initial' }
 		.atom_start { 'atom_start' }
 		.identifier { 'identifier' }
+		.key { 'key' }
 		.number { 'number' }
 		.float { 'float' }
 		.string { 'string' }
@@ -39,7 +41,7 @@ pub fn (s LexerState) str() string {
 // is_final_state checks if a state is a final state (can emit a token)
 pub fn (s LexerState) is_final_state() bool {
 	return match s {
-		.identifier, .number, .float, .string, .atom, .directive, .error, .punctuation { true }
+		.identifier, .key, .number, .float, .string, .atom, .directive, .error, .punctuation { true }
 		else { false }
 	}
 }
@@ -68,6 +70,12 @@ pub fn (current LexerState) can_transition_to(target LexerState) bool {
 			}
 		}
 		.identifier {
+			match target {
+				.initial, .key, .operator, .whitespace, .comment { true }
+				else { false }
+			}
+		}
+		.key {
 			match target {
 				.initial, .operator, .whitespace, .comment { true }
 				else { false }
@@ -146,6 +154,7 @@ pub fn (s LexerState) get_default_transition() LexerState {
 		.initial { .initial }
 		.atom_start { .atom_start }
 		.identifier { .initial }
+		.key { .initial }
 		.number { .initial }
 		.float { .initial }
 		.string { .initial }
@@ -162,7 +171,8 @@ pub fn (s LexerState) get_default_transition() LexerState {
 // is_accepting_state checks if a state can accept more input
 pub fn (s LexerState) is_accepting_state() bool {
 	return match s {
-		.identifier, .number, .float, .string, .atom, .operator, .comment, .directive, .atom_start { true }
+		.identifier, .key, .number, .float, .string, .atom, .operator, .comment, .directive,
+		.atom_start { true }
 		else { false }
 	}
 }
@@ -172,5 +182,27 @@ pub fn (s LexerState) requires_lookahead() bool {
 	return match s {
 		.operator, .atom_start { true }
 		else { false }
+	}
+}
+
+// can_transition_from checks if a state can transition from another state
+pub fn (s LexerState) can_transition_from(from LexerState) bool {
+	return match s {
+		.initial { true }
+		.identifier { from == .initial || from == .whitespace }
+		.key { from == .identifier }
+		.number { from == .initial || from == .whitespace }
+		.float { from == .number }
+		.string { from == .initial || from == .whitespace }
+		.atom { from == .atom_start }
+		.atom_start { from == .initial || from == .whitespace }
+		.operator { from == .initial || from == .whitespace || from == .atom_start }
+		.comment { from == .initial || from == .whitespace }
+		.directive { from == .initial || from == .whitespace }
+		.punctuation { from == .initial || from == .whitespace }
+		.whitespace { from == .initial || from == .identifier || from == .number || from == .float
+				|| from == .string || from == .atom || from == .operator || from == .comment
+				|| from == .directive || from == .punctuation || from == .atom_start }
+		.error { true }
 	}
 }

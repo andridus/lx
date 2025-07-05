@@ -159,8 +159,6 @@ fn (mut ep ExpressionParser) parse_for_expression() ?ast.Expr {
 	}
 }
 
-
-
 // parse_unsafe_expression parses unsafe expressions
 fn (mut ep ExpressionParser) parse_unsafe_expression() ?ast.Expr {
 	ep.advance() // consume 'unsafe'
@@ -172,10 +170,6 @@ fn (mut ep ExpressionParser) parse_unsafe_expression() ?ast.Expr {
 	// In a full implementation, we'd mark it as unsafe
 	return expr
 }
-
-
-
-
 
 // parse_statement_block parses a block of statements
 fn (mut ep ExpressionParser) parse_statement_block() ?[]ast.Stmt {

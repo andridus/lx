@@ -87,8 +87,6 @@ end.
 	assert erl1.code == expected
 }
 
-
-
 fn test_case_expression_atom_patterns() {
 	lx_code := '
 def atom_case() do
@@ -110,7 +108,7 @@ end'
 	expected := '-module(main).
 -export([atom_case/0]).
 
--spec atom_case() -> {success_msg(), count()}.
+-spec atom_case() -> {any(), any()}.
 atom_case() ->
 case ok of
     ok -> Success_msg_aaaa = "Operation successful",

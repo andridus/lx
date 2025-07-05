@@ -1629,6 +1629,59 @@ port = config["port"]
 # Access with variable keys
 key = "port"
 value = config[key]
+
+# Nested map access
+host = config[:database][:host]
+```
+
+##### Map Updates:
+
+```lx
+# Simple field update
+updated_user = %{user | age: 31}
+
+# Multiple field updates
+updated_user = %{user | age: 31, status: "active"}
+
+# Updates with general keys
+updated_config = %{config | "timeout" => 10000}
+
+# Updates with mixed key types
+updated_data = %{data | :status => "active", "modified_at" => now()}
+```
+
+##### Key Tokens:
+
+The Lx lexer automatically recognizes key tokens when an identifier is followed by a colon (`:`), creating a `KeyToken` that simplifies map creation with atom keys:
+
+```lx
+# Key token syntax (identifier:)
+user = %{ name: "Alice", age: 30 }
+
+# Equivalent to:
+user = %{ :name => "Alice", :age => 30 }
+```
+
+**Key Token Features:**
+- **Automatic recognition**: The lexer automatically detects `identifier:` as a key token
+- **Atom conversion**: Key tokens are automatically converted to atom literals
+- **Clean syntax**: Provides cleaner syntax for common atom keys
+- **Compatibility**: Works seamlessly with pattern matching and map updates
+
+##### Map Type Inference:
+
+```lx
+# Automatic type inference
+def create_user(name, age) do
+  %{name: name, age: age, active: true}
+end
+# Generates: -spec create_user(any(), any()) -> #{atom() => any()}.
+
+# Maps with uniform types
+def create_config() do
+  %{"host" => "localhost", "port" => "5432"}
+end
+# Generates: -spec create_config() -> #{string() => string()}.
 ```
 
 ##### Map Pattern Matching:
@@ -1704,13 +1757,24 @@ unsafe %{ key => value } <- dynamic_map
 # Lx source
 user = %{ name: "Alice", age: 30 }
 %{ name: user_name, age: _user_age } <- user
+updated = %{user | age: 31}
+name = user[:name]
 ```
 
 ```erlang
 % Generated Erlang
 User = #{name => "Alice", age => 30},
-#{name := User_name, age := _} = User
+#{name := User_name, age := _} = User,
+Updated = #{age => 31 | User},
+Name = maps:get(name, User)
 ```
+
+**Map Implementation Features:**
+- **Map literals**: Use Erlang's native map syntax `#{key => value}`
+- **Map access**: Compile to `maps:get(Key, Map)` function calls
+- **Map updates**: Use Erlang's map update syntax `#{key => value | BaseMap}`
+- **Pattern matching**: Use Erlang's map pattern syntax `#{key := Variable}`
+- **Type safety**: Full integration with LX's type system and automatic spec generation
 
 #### Binary/Bitstring Data:
 

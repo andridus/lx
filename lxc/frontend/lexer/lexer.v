@@ -340,6 +340,14 @@ fn (mut l Lexer) create_token_from_buffer() Token {
 				}
 			}
 		}
+		.key {
+			// Remove the colon from the end to get the key name
+			key_name := l.buffer[..l.buffer.len - 1]
+			KeyToken{
+				value:    key_name
+				position: l.start_pos
+			}
+		}
 		.number {
 			value := l.buffer.int()
 			IntToken{

@@ -206,17 +206,17 @@ fn (mut ep ExpressionParser) parse_map_pattern() ?ast.Pattern {
 	mut entries := []ast.MapPatternEntry{}
 	if !ep.check(lexer.punctuation(.rbrace)) {
 		for {
-			key := ep.parse_pattern()?
+			// Check if we have a key token (identifier:)
+			if ep.current.is_key() {
+				key_value := ep.current.get_key_value()
+				ep.advance() // consume key token
 
-			// Check for colon (atom key) or arrow (general key)
-			if ep.match(lexer.punctuation(.colon)) {
-				value := ep.parse_pattern()?
-				entries << ast.MapPatternEntry{
-					key:      key
-					value:    value
+				// Create an atom pattern for the key
+				key := ast.AtomPattern{
+					value:    key_value
 					position: ep.get_current_position()
 				}
-			} else if ep.match(lexer.operator(.arrow)) {
+
 				value := ep.parse_pattern()?
 				entries << ast.MapPatternEntry{
 					key:      key
@@ -224,8 +224,28 @@ fn (mut ep ExpressionParser) parse_map_pattern() ?ast.Pattern {
 					position: ep.get_current_position()
 				}
 			} else {
-				ep.add_error('Expected : or => in map pattern', 'Got ${ep.current.str()}')
-				return none
+				// Parse regular key pattern
+				key := ep.parse_pattern()?
+
+				// Check for fat_arrow or arrow (general key)
+				if ep.match(lexer.operator(.fat_arrow)) {
+					value := ep.parse_pattern()?
+					entries << ast.MapPatternEntry{
+						key:      key
+						value:    value
+						position: ep.get_current_position()
+					}
+				} else if ep.match(lexer.operator(.arrow)) {
+					value := ep.parse_pattern()?
+					entries << ast.MapPatternEntry{
+						key:      key
+						value:    value
+						position: ep.get_current_position()
+					}
+				} else {
+					ep.add_error('Expected : or => in map pattern', 'Got ${ep.current.str()}')
+					return none
+				}
 			}
 
 			if !ep.match(lexer.punctuation(.comma)) {

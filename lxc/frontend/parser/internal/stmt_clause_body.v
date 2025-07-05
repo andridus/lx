@@ -257,7 +257,8 @@ fn (sp StatementParser) is_last_statement_in_clause() bool {
 	// Check if the next meaningful token is a case pattern or end keyword
 	if sp.tokens[pos] is lexer.KeywordToken {
 		keyword_token := sp.tokens[pos] as lexer.KeywordToken
-		if keyword_token.value == .end_ || keyword_token.value == .else_ || keyword_token.value == .after {
+		if keyword_token.value == .end_ || keyword_token.value == .else_
+			|| keyword_token.value == .after {
 			return true
 		}
 	}

@@ -45,7 +45,7 @@ end'
 	expected := '-module(main).
 -export([tuple_case/0]).
 
--spec tuple_case() -> {a(), b()}.
+-spec tuple_case() -> {any(), any()}.
 tuple_case() ->
 case {1, 2} of
     {1, 2} -> A_aaaa = 10,

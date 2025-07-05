@@ -288,6 +288,17 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 								position:  sp.get_current_position()
 							})
 							continue
+						} else if punc_token.value == .lbracket {
+							// Map access: map[key]
+							sp.safe_advance() // consume '['
+							key := sp.parse_simple_expression()?
+							sp.consume(lexer.punctuation(.rbracket), 'Expected ]')?
+							expr = ast.Expr(ast.MapAccessExpr{
+								map_expr: expr
+								key:      key
+								position: sp.get_current_position()
+							})
+							continue
 						} else {
 							break
 						}
@@ -368,6 +379,18 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 				position: pos
 			}
 		}
+		lexer.KeyToken {
+			token := sp.current as lexer.KeyToken
+			sp.advance()
+			pos := ast.new_position(token.position.line, token.position.column, token.position.filename)
+			ast.LiteralExpr{
+				value:    ast.AtomLiteral{
+					value:    token.value
+					position: pos
+				}
+				position: pos
+			}
+		}
 		lexer.KeywordToken {
 			keyword_token := sp.current as lexer.KeywordToken
 			match keyword_token.value {
@@ -381,6 +404,19 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 						}
 						position: pos
 					}
+				}
+				else {
+					sp.add_error('Expected simple expression', 'Got ${sp.current.str()}')
+					none
+				}
+			}
+		}
+		lexer.OperatorToken {
+			op_token := sp.current as lexer.OperatorToken
+			match op_token.value {
+				.modulo {
+					// This is a map expression %{...}
+					sp.parse_map_expression()
 				}
 				else {
 					sp.add_error('Expected simple expression', 'Got ${sp.current.str()}')
@@ -409,6 +445,180 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 		else {
 			sp.add_error('Expected simple expression', 'Got ${sp.current.str()}')
 			none
+		}
+	}
+}
+
+// is_map_update_syntax checks if this is a map update syntax: %{base_map | ...}
+fn (sp StatementParser) is_map_update_syntax() bool {
+	mut pos := sp.position
+
+	// Look ahead to find a pipe operator before any colon, fat_arrow, or arrow
+	for pos < sp.tokens.len {
+		token := sp.tokens[pos]
+
+		if token is lexer.OperatorToken {
+			op_token := token as lexer.OperatorToken
+			if op_token.value == .pipe {
+				return true
+			}
+			if op_token.value == .fat_arrow || op_token.value == .arrow {
+				return false
+			}
+		}
+
+		if token is lexer.KeyToken {
+			return false
+		}
+
+		if token is lexer.PunctuationToken {
+			punc_token := token as lexer.PunctuationToken
+			if punc_token.value == .rbrace {
+				return false
+			}
+		}
+
+		pos++
+	}
+
+	return false
+}
+
+// parse_map_expression parses map expressions in statement context
+fn (mut sp StatementParser) parse_map_expression() ?ast.Expr {
+	sp.advance() // consume '%'
+	sp.consume(lexer.punctuation(.lbrace), 'Expected opening brace after %')?
+
+	mut entries := []ast.MapEntry{}
+	mut base_map := ast.Expr(ast.LiteralExpr{})
+
+	if !sp.check(lexer.punctuation(.rbrace)) {
+		// Check for map update syntax first: %{base_map | key: value, ...}
+		// Look ahead to see if this is a map update
+		if sp.is_map_update_syntax() {
+			// Parse base map
+			base_map = sp.parse_simple_expression()?
+			sp.consume(lexer.operator(.pipe), 'Expected | after base map')?
+
+			// Parse entries after the pipe
+			if !sp.check(lexer.punctuation(.rbrace)) {
+				for {
+					// Check if we have a key token (identifier:)
+					if sp.current.is_key() {
+						key_value := sp.current.get_key_value()
+						sp.advance() // consume key token
+
+						// Create an atom literal for the key
+						key := ast.LiteralExpr{
+							value:    ast.AtomLiteral{
+								value: key_value
+							}
+							position: sp.get_current_position()
+						}
+
+						value := sp.parse_simple_expression()?
+						entries << ast.MapEntry{
+							key:      key
+							value:    value
+							position: sp.get_current_position()
+						}
+					} else {
+						// Parse regular key expression
+						key := sp.parse_simple_expression()?
+
+						// Check for fat_arrow or arrow (general key)
+						if sp.match(lexer.operator(.fat_arrow)) {
+							value := sp.parse_simple_expression()?
+							entries << ast.MapEntry{
+								key:      key
+								value:    value
+								position: sp.get_current_position()
+							}
+						} else if sp.match(lexer.operator(.arrow)) {
+							value := sp.parse_simple_expression()?
+							entries << ast.MapEntry{
+								key:      key
+								value:    value
+								position: sp.get_current_position()
+							}
+						} else {
+							sp.add_error('Expected => or -> in map entry', 'Got ${sp.current.str()}')
+							return none
+						}
+					}
+
+					if !sp.match(lexer.punctuation(.comma)) {
+						break
+					}
+				}
+			}
+		} else {
+			// Regular map literal: %{key: value, key2: value2}
+			for {
+				// Check if we have a key token (identifier:)
+				if sp.current.is_key() {
+					key_value := sp.current.get_key_value()
+					sp.advance() // consume key token
+
+					// Create an atom literal for the key
+					key := ast.LiteralExpr{
+						value:    ast.AtomLiteral{
+							value: key_value
+						}
+						position: sp.get_current_position()
+					}
+
+					value := sp.parse_simple_expression()?
+					entries << ast.MapEntry{
+						key:      key
+						value:    value
+						position: sp.get_current_position()
+					}
+				} else {
+					// Parse regular key expression
+					key := sp.parse_simple_expression()?
+
+					// Check for fat_arrow or arrow (general key)
+					if sp.match(lexer.operator(.fat_arrow)) {
+						value := sp.parse_simple_expression()?
+						entries << ast.MapEntry{
+							key:      key
+							value:    value
+							position: sp.get_current_position()
+						}
+					} else if sp.match(lexer.operator(.arrow)) {
+						value := sp.parse_simple_expression()?
+						entries << ast.MapEntry{
+							key:      key
+							value:    value
+							position: sp.get_current_position()
+						}
+					} else {
+						sp.add_error('Expected => or -> in map entry', 'Got ${sp.current.str()}')
+						return none
+					}
+				}
+
+				if !sp.match(lexer.punctuation(.comma)) {
+					break
+				}
+			}
+		}
+	}
+
+	sp.consume(lexer.punctuation(.rbrace), 'Expected closing brace')?
+
+	// Check if this is a map update (has base_map) or regular map literal
+	if base_map != ast.Expr(ast.LiteralExpr{}) {
+		return ast.MapUpdateExpr{
+			base_map: base_map
+			entries:  entries
+			position: sp.get_current_position()
+		}
+	} else {
+		return ast.MapLiteralExpr{
+			entries:  entries
+			position: sp.get_current_position()
 		}
 	}
 }

@@ -251,20 +251,14 @@ fn test_data_structure_parsing() {
 fn test_map_parsing() {
 	// Test map with atom keys
 	tokens := [
-		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.pipe)),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.modulo)),
 		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbrace)),
-		lexer.Token(lexer.AtomToken{
-			value: 'name'
-		}),
-		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.colon)),
+		lexer.Token(lexer.new_key_token('name')),
 		lexer.Token(lexer.StringToken{
 			value: 'Alice'
 		}),
 		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
-		lexer.Token(lexer.AtomToken{
-			value: 'age'
-		}),
-		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.colon)),
+		lexer.Token(lexer.new_key_token('age')),
 		lexer.Token(lexer.IntToken{
 			value: 30
 		}),

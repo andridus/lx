@@ -5,6 +5,7 @@ pub const operator_map = {
 	'=':   OperatorValue.assign
 	'<-':  OperatorValue.pattern_match
 	'->':  OperatorValue.arrow
+	'=>':  OperatorValue.fat_arrow
 	'!':   OperatorValue.send
 	'::':  OperatorValue.type_cons
 	'.':   OperatorValue.dot
@@ -36,6 +37,7 @@ pub const punctuation_map = {
 	']': PunctuationValue.rbracket
 	',': PunctuationValue.comma
 	';': PunctuationValue.semicolon
+	':': PunctuationValue.colon
 }
 
 // is_operator checks if a string is an operator
@@ -103,7 +105,8 @@ pub fn get_operator_precedence(t OperatorValue) int {
 		.and_, .or_ { 7 }
 		.not_ { 8 }
 		.assign, .pattern_match { 9 }
-		else { 10 }
+		.arrow, .fat_arrow { 10 }
+		else { 11 }
 	}
 }
 

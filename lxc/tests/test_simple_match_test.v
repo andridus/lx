@@ -16,7 +16,7 @@ end'
 	expected_erlang := '-module(main).
 -export([test_basic/0]).
 
--spec test_basic() -> data().
+-spec test_basic() -> any().
 test_basic() ->
 case {ok, 123} of
     {ok, Data} ->
@@ -37,7 +37,7 @@ end'
 	expected_erlang := '-module(main).
 -export([test_cons/0]).
 
--spec test_cons() -> {h(), t()}.
+-spec test_cons() -> {any(), any()}.
 test_cons() ->
 case [1, 2, 3] of
     [H | T] ->
@@ -59,7 +59,7 @@ end'
 	expected_erlang := '-module(main).
 -export([test_sequential/0]).
 
--spec test_sequential() -> {user(), perms()}.
+-spec test_sequential() -> {any(), any()}.
 test_sequential() ->
 case get_user() of
     {ok, User} ->
@@ -87,7 +87,7 @@ end'
 	expected_erlang := '-module(main).
 -export([test_cons/0]).
 
--spec test_cons() -> {h(), t()}.
+-spec test_cons() -> {any(), any()}.
 test_cons() ->
 case [1, 2, 3] of
     [H | T] ->
@@ -227,7 +227,7 @@ end'
 	expected_erlang := '-module(main).
 -export([test_mixed/0]).
 
--spec test_mixed() -> data().
+-spec test_mixed() -> any().
 test_mixed() ->
 case get_user() of
     {ok, User} ->

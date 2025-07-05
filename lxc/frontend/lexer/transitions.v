@@ -262,6 +262,21 @@ pub fn get_transitions() []Transition {
 		},
 		Transition{
 			from_state: .identifier
+			to_state:   .key
+			condition:  CharacterCondition{
+				value: `:`
+			}
+			action:     .consume_character
+		},
+		Transition{
+			from_state: .identifier
+			to_state:   .initial
+			condition:  AlwaysCondition{}
+			action:     .emit_token
+		},
+		// Key state transitions
+		Transition{
+			from_state: .key
 			to_state:   .initial
 			condition:  AlwaysCondition{}
 			action:     .emit_token
@@ -551,5 +566,5 @@ pub fn get_final_transition(current_state LexerState) ?Transition {
 // is_punctuation_char checks if a character is a punctuation character
 fn is_punctuation_char(ch u8) bool {
 	return ch == `(` || ch == `)` || ch == `{` || ch == `}` || ch == `[` || ch == `]` || ch == `,`
-		|| ch == `;`
+		|| ch == `;` || ch == `:`
 }

@@ -11,7 +11,7 @@ end'
 	expected := '-module(main).
 -export([test_simple/0]).
 
--spec test_simple() -> value().
+-spec test_simple() -> any().
 test_simple() ->
 case {ok, 42} of
     {ok, Value} ->
@@ -63,7 +63,7 @@ end'
 	expected := '-module(main).
 -export([test_complex/0]).
 
--spec test_complex() -> {name(), age()}.
+-spec test_complex() -> {any(), any()}.
 test_complex() ->
 case {ok, "alice", 25} of
     {ok, Name, Age} ->
@@ -92,7 +92,7 @@ end'
 	expected := '-module(main).
 -export([test_sequential/0]).
 
--spec test_sequential() -> {user(), perms()}.
+-spec test_sequential() -> {any(), any()}.
 test_sequential() ->
 case {ok, "alice"} of
     {ok, User} ->
@@ -131,7 +131,7 @@ end'
 get_data() ->
 {ok, "data"}.
 
--spec test_with_call() -> data().
+-spec test_with_call() -> any().
 test_with_call() ->
 case get_data() of
     {ok, Data} ->
@@ -157,7 +157,7 @@ end'
 	expected := '-module(main).
 -export([test_list/0]).
 
--spec test_list() -> x().
+-spec test_list() -> any().
 test_list() ->
 case [42] of
     [X] ->
@@ -183,7 +183,7 @@ end'
 	expected := '-module(main).
 -export([test_cons/0]).
 
--spec test_cons() -> {h(), t()}.
+-spec test_cons() -> {any(), any()}.
 test_cons() ->
 case [1, 2, 3] of
     [H | T] ->

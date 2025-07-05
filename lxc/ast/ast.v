@@ -85,6 +85,22 @@ pub:
 	position Position
 }
 
+// MapAccessExpr represents map access expression
+pub struct MapAccessExpr {
+pub:
+	map_expr Expr
+	key      Expr
+	position Position
+}
+
+// MapUpdateExpr represents map update operations
+pub struct MapUpdateExpr {
+pub:
+	base_map Expr
+	entries  []MapEntry
+	position Position
+}
+
 // RecordLiteralExpr represents a record literal
 pub struct RecordLiteralExpr {
 pub:
@@ -120,9 +136,9 @@ pub:
 // ReceiveExpr represents message receiving
 pub struct ReceiveExpr {
 pub:
-	cases        []ReceiveCase
-	timeout      ?TimeoutClause
-	position     Position
+	cases    []ReceiveCase
+	timeout  ?TimeoutClause
+	position Position
 }
 
 // TimeoutClause represents a timeout clause in receive expressions
@@ -145,14 +161,6 @@ pub struct UnaryExpr {
 pub:
 	op       UnaryOp
 	operand  Expr
-	position Position
-}
-
-// MapAccessExpr represents map access expression
-pub struct MapAccessExpr {
-pub:
-	map_expr Expr
-	key      Expr
 	position Position
 }
 
@@ -229,6 +237,8 @@ pub type Expr = VariableExpr
 	| ListLiteralExpr
 	| TupleExpr
 	| MapLiteralExpr
+	| MapAccessExpr
+	| MapUpdateExpr
 	| RecordLiteralExpr
 	| RecordAccessExpr
 	| FunExpr
@@ -236,7 +246,6 @@ pub type Expr = VariableExpr
 	| ReceiveExpr
 	| GuardExpr
 	| UnaryExpr
-	| MapAccessExpr
 	| IfExpr
 	| CaseExpr
 	| WithExpr
@@ -565,6 +574,9 @@ pub fn (e Expr) str() string {
 		MapAccessExpr {
 			'Access(${e.map_expr.str()}[${e.key.str()}])'
 		}
+		MapUpdateExpr {
+			'MapUpdate(${e.base_map.str()}, [${e.entries.map(it.str()).join(', ')}])'
+		}
 		IfExpr {
 			'If(${e.condition.str()}, ${e.then_body.str()}, ${e.else_body.str()})'
 		}
@@ -613,6 +625,11 @@ pub:
 	key      Expr
 	value    Expr
 	position Position
+}
+
+// str returns a string representation of MapEntry
+pub fn (me MapEntry) str() string {
+	return '${me.key.str()} => ${me.value.str()}'
 }
 
 // MapPatternEntry represents a map pattern entry

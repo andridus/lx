@@ -338,6 +338,35 @@ fn (mut ep ExpressionParser) parse_postfix_expression() ?ast.Expr {
 						position:  ep.get_current_position()
 					}
 				}
+			} else if ep.check(lexer.punctuation(.lbracket)) {
+				// Map access: map[key]
+				ep.advance() // consume '['
+				key := ep.parse_expression()?
+				ep.consume(lexer.punctuation(.rbracket), 'Expected ]')?
+
+				expr = ast.MapAccessExpr{
+					map_expr: expr
+					key:      key
+					position: ep.get_current_position()
+				}
+			} else if ep.check(lexer.operator(.dot)) {
+				// Record access
+				ep.advance() // consume '.'
+
+				// Expect an identifier after the dot
+				if !ep.current.is_identifier() {
+					ep.add_error('Expected field name after .', 'Got ${ep.current.str()}')
+					return none
+				}
+
+				field_name := ep.current.get_value()
+				ep.advance()
+
+				expr = ast.RecordAccessExpr{
+					record:   expr
+					field:    field_name
+					position: ep.get_current_position()
+				}
 			} else {
 				// Regular function call
 				expr = ast.CallExpr{
@@ -345,6 +374,17 @@ fn (mut ep ExpressionParser) parse_postfix_expression() ?ast.Expr {
 					arguments: arguments
 					position:  ep.get_current_position()
 				}
+			}
+		} else if ep.check(lexer.punctuation(.lbracket)) {
+			// Map access: map[key]
+			ep.advance() // consume '['
+			key := ep.parse_expression()?
+			ep.consume(lexer.punctuation(.rbracket), 'Expected ]')?
+
+			expr = ast.MapAccessExpr{
+				map_expr: expr
+				key:      key
+				position: ep.get_current_position()
 			}
 		} else if ep.check(lexer.operator(.dot)) {
 			// Record access

@@ -32,26 +32,20 @@ pub fn (p PrecedenceTable) get_precedence(token lexer.OperatorToken) Precedence 
 	return match token.value {
 		.assign { .assignment }
 		.pattern_match { .assignment }
+		.send { .send }
 		.or_ { .or_ }
 		.and_ { .and_ }
-		.eq { .equality }
-		.neq { .equality }
-		.lt { .comparison }
-		.gt { .comparison }
-		.leq { .comparison }
-		.geq { .comparison }
-		.plus { .term }
-		.minus { .term }
-		.mult { .factor }
-		.div { .factor }
-		.modulo { .factor }
+		.eq, .neq { .equality }
+		.lt, .gt, .leq, .geq { .comparison }
+		.plus, .minus { .term }
+		.mult, .div, .modulo { .factor }
 		.not_ { .unary }
+		.concat { .term }
+		.pipe { .term }
+		.type_cons { .call }
 		.dot { .call }
 		.arrow { .none }
-		.send { .send }
-		.type_cons { .none }
-		.concat { .none }
-		.pipe { .none }
+		.fat_arrow { .none }
 	}
 }
 
@@ -68,26 +62,19 @@ pub fn (p PrecedenceTable) is_left_associative(token lexer.OperatorToken) bool {
 	return match token.value {
 		.assign { false }
 		.pattern_match { false }
+		.send { false }
 		.or_ { true }
 		.and_ { true }
-		.eq { false }
-		.neq { false }
-		.lt { false }
-		.gt { false }
-		.leq { false }
-		.geq { false }
-		.plus { true }
-		.minus { true }
-		.mult { true }
-		.div { true }
-		.modulo { true }
+		.eq, .neq, .lt, .gt, .leq, .geq { true }
+		.plus, .minus { true }
+		.mult, .div, .modulo { true }
 		.not_ { false }
-		.dot { true }
-		.arrow { false }
-		.send { false }
-		.type_cons { false }
 		.concat { true }
 		.pipe { false }
+		.type_cons { false }
+		.dot { true }
+		.arrow { false }
+		.fat_arrow { false }
 	}
 }
 

@@ -30,6 +30,9 @@ fn (mut ep ExpressionParser) parse_atom_expression() ?ast.Expr {
 		lexer.NilToken {
 			ep.parse_nil_literal()
 		}
+		lexer.KeyToken {
+			ep.parse_key_as_atom()
+		}
 		lexer.ErrorToken {
 			// Adiciona erro ao parser e avança
 			err := ep.current as lexer.ErrorToken
@@ -123,9 +126,6 @@ fn (mut ep ExpressionParser) parse_atom_expression() ?ast.Expr {
 		lexer.OperatorToken {
 			op_token := ep.current as lexer.OperatorToken
 			match op_token.value {
-				.pipe {
-					ep.parse_map_expression()
-				}
 				.modulo {
 					ep.parse_map_expression()
 				}
@@ -262,10 +262,10 @@ fn (mut ep ExpressionParser) parse_receive_via_statement_parser() ?ast.Expr {
 	// Create a StatementParser with the same tokens and position
 	mut sp := StatementParser{
 		Parser: Parser{
-			tokens: ep.tokens
+			tokens:   ep.tokens
 			position: ep.position
-			current: ep.current
-			errors: ep.errors
+			current:  ep.current
+			errors:   ep.errors
 		}
 	}
 
@@ -285,10 +285,10 @@ fn (mut ep ExpressionParser) parse_case_via_statement_parser() ?ast.Expr {
 	// Create a StatementParser with the same tokens and position
 	mut sp := StatementParser{
 		Parser: Parser{
-			tokens: ep.tokens
+			tokens:   ep.tokens
 			position: ep.position
-			current: ep.current
-			errors: ep.errors
+			current:  ep.current
+			errors:   ep.errors
 		}
 	}
 
@@ -301,4 +301,17 @@ fn (mut ep ExpressionParser) parse_case_via_statement_parser() ?ast.Expr {
 	ep.errors = sp.errors
 
 	return result
+}
+
+// parse_key_as_atom parses a key token as an atom literal
+fn (mut ep ExpressionParser) parse_key_as_atom() ?ast.Expr {
+	token := ep.current as lexer.KeyToken
+	ep.advance()
+
+	return ast.LiteralExpr{
+		value:    ast.AtomLiteral{
+			value: token.value
+		}
+		position: ast.new_position(token.position.line, token.position.column, token.position.filename)
+	}
 }

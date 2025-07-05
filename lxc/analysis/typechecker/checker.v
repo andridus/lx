@@ -126,6 +126,12 @@ fn (mut tc TypeChecker) check_expression(expr ast.Expr) {
 		ast.MapLiteralExpr {
 			tc.check_map_literal_expression(expr)
 		}
+		ast.MapAccessExpr {
+			tc.check_map_access_expression(expr)
+		}
+		ast.MapUpdateExpr {
+			tc.check_map_update_expression(expr)
+		}
 		ast.RecordLiteralExpr {
 			tc.check_record_literal_expression(expr)
 		}
@@ -146,9 +152,6 @@ fn (mut tc TypeChecker) check_expression(expr ast.Expr) {
 		}
 		ast.UnaryExpr {
 			tc.check_unary_expression(expr)
-		}
-		ast.MapAccessExpr {
-			tc.check_map_access_expression(expr)
 		}
 		ast.IfExpr {
 			tc.check_if_expression(expr)
@@ -285,6 +288,7 @@ fn (mut tc TypeChecker) check_tuple_expression(expr ast.TupleExpr) {
 
 // check_map_literal_expression performs type checking on a map literal expression
 fn (mut tc TypeChecker) check_map_literal_expression(expr ast.MapLiteralExpr) {
+	// Check all map entries
 	for entry in expr.entries {
 		tc.check_expression(entry.key)
 		tc.check_expression(entry.value)
@@ -350,7 +354,7 @@ fn (mut tc TypeChecker) check_unary_expression(expr ast.UnaryExpr) {
 	tc.check_expression(expr.operand)
 }
 
-// check_map_access_expression performs type checking on a map access expression
+// check_map_access_expression checks map access expressions
 fn (mut tc TypeChecker) check_map_access_expression(expr ast.MapAccessExpr) {
 	tc.check_expression(expr.map_expr)
 	tc.check_expression(expr.key)
@@ -935,6 +939,12 @@ fn (mut tc TypeChecker) infer_expression_type(expr ast.Expr) TypeExpr {
 		ast.MapLiteralExpr {
 			return make_map_type(make_type_var('k'), make_type_var('v'))
 		}
+		ast.MapAccessExpr {
+			return make_type_var('v')
+		}
+		ast.MapUpdateExpr {
+			return make_type_var('a')
+		}
 		ast.RecordLiteralExpr {
 			return make_type_constructor('record', [])
 		}
@@ -955,9 +965,6 @@ fn (mut tc TypeChecker) infer_expression_type(expr ast.Expr) TypeExpr {
 		}
 		ast.UnaryExpr {
 			return tc.infer_expression_type(expr.operand)
-		}
-		ast.MapAccessExpr {
-			return make_type_var('v')
 		}
 		ast.IfExpr {
 			return tc.infer_if_expression_type(expr)
@@ -1189,6 +1196,8 @@ fn (tc &TypeChecker) get_expression_position(expr ast.Expr) ast.Position {
 		ast.ListLiteralExpr { expr.position }
 		ast.TupleExpr { expr.position }
 		ast.MapLiteralExpr { expr.position }
+		ast.MapAccessExpr { expr.position }
+		ast.MapUpdateExpr { expr.position }
 		ast.RecordLiteralExpr { expr.position }
 		ast.RecordAccessExpr { expr.position }
 		ast.FunExpr { expr.position }
@@ -1196,7 +1205,6 @@ fn (tc &TypeChecker) get_expression_position(expr ast.Expr) ast.Position {
 		ast.ReceiveExpr { expr.position }
 		ast.GuardExpr { expr.position }
 		ast.UnaryExpr { expr.position }
-		ast.MapAccessExpr { expr.position }
 		ast.IfExpr { expr.position }
 		ast.CaseExpr { expr.position }
 		ast.WithExpr { expr.position }
@@ -1320,4 +1328,13 @@ fn (mut tc TypeChecker) infer_match_rescue_expression_type(expr ast.MatchRescueE
 	// For now, we'll return the rescue type since that's what gets returned
 	// when the pattern doesn't match (which is the common case for error handling)
 	return rescue_type
+}
+
+// check_map_update_expression checks map update expressions
+fn (mut tc TypeChecker) check_map_update_expression(expr ast.MapUpdateExpr) {
+	tc.check_expression(expr.base_map)
+	for entry in expr.entries {
+		tc.check_expression(entry.key)
+		tc.check_expression(entry.value)
+	}
 }

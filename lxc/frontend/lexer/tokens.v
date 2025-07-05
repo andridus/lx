@@ -31,6 +31,7 @@ pub type Token = IdentToken
 	| BoolToken
 	| AtomToken
 	| NilToken
+	| KeyToken
 	| KeywordToken
 	| OperatorToken
 	| PunctuationToken
@@ -94,6 +95,13 @@ pub:
 	position TokenPosition
 }
 
+// KeyToken represents a key literal token (identifier followed by colon)
+pub struct KeyToken {
+pub:
+	value    string
+	position TokenPosition
+}
+
 // KeywordValue represents the value of a keyword token
 pub enum KeywordValue {
 	def
@@ -149,6 +157,7 @@ pub enum OperatorValue {
 	assign        // =
 	pattern_match // <-
 	arrow         // ->
+	fat_arrow     // =>
 	send          // !
 	type_cons     // ::
 	dot           // .
@@ -234,6 +243,7 @@ pub fn (t Token) str() string {
 		BoolToken { '${t.value}' }
 		AtomToken { '${t.value}' }
 		NilToken { 'Nil' }
+		KeyToken { '${t.value}:' }
 		KeywordToken { '${t.value.str()}' }
 		OperatorToken { '${t.value.str()}' }
 		PunctuationToken { '${t.value.str()}' }
@@ -295,6 +305,7 @@ pub fn (o OperatorValue) str() string {
 		.assign { '=' }
 		.pattern_match { '<-' }
 		.arrow { '->' }
+		.fat_arrow { '=>' }
 		.send { '!' }
 		.type_cons { '::' }
 		.dot { '.' }
@@ -423,6 +434,7 @@ pub fn (t Token) get_position() TokenPosition {
 		BoolToken { t.position }
 		AtomToken { t.position }
 		NilToken { t.position }
+		KeyToken { t.position }
 		KeywordToken { t.position }
 		OperatorToken { t.position }
 		PunctuationToken { t.position }
@@ -489,6 +501,13 @@ pub fn new_nil_token() NilToken {
 	}
 }
 
+pub fn new_key_token(value string) KeyToken {
+	return KeyToken{
+		value:    value
+		position: new_token_position(1, 1, 'test')
+	}
+}
+
 pub fn new_keyword_token(value KeywordValue) KeywordToken {
 	return KeywordToken{
 		value:    value
@@ -526,5 +545,21 @@ pub fn new_error_token(message string) ErrorToken {
 	return ErrorToken{
 		message:  message
 		position: new_token_position(1, 1, 'test')
+	}
+}
+
+// is_key checks if a token is a key token
+pub fn (t Token) is_key() bool {
+	return match t {
+		KeyToken { true }
+		else { false }
+	}
+}
+
+// get_key_value returns the key value if the token is a key token
+pub fn (t Token) get_key_value() string {
+	return match t {
+		KeyToken { t.value }
+		else { '' }
 	}
 }

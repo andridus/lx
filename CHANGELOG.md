@@ -1,6 +1,24 @@
 ## [Unreleased]
 
 ### Added
+- **Complete Maps Implementation**: Full implementation of maps with comprehensive support for creation, access, updates, and pattern matching. Features include:
+  - **Map Creation**: Support for maps with atom keys using colon syntax (`%{name: "value"}`) and general keys using fat arrow syntax (`%{"key" => "value"}`)
+  - **Map Access**: Access map values using bracket notation (`map[:key]` for atoms, `map["key"]` for strings) with automatic compilation to `maps:get/2` calls
+  - **Map Updates**: Immutable map updates using pipe syntax (`%{map | key: new_value}`) that compile to Erlang's native map update syntax
+  - **Map Pattern Matching**: Full pattern matching support in case expressions, function parameters, and assignments with proper variable binding
+  - **Key Tokens**: Automatic lexer recognition of key tokens (`identifier:`) that simplify map creation with atom keys
+  - **Type Inference**: Intelligent type inference for maps that generates appropriate Erlang specs based on key and value types
+  - **Nested Access**: Support for chained map access (`config[:database][:host]`) with proper compilation to nested `maps:get/2` calls
+  - **Mixed Key Types**: Support for maps with different key types (atoms, strings, integers) in the same map structure
+  - **Erlang Integration**: Seamless compilation to efficient Erlang map operations with full OTP compatibility
+- **Enhanced Lexer with Key Token Support**: Extended the lexer to recognize and handle key tokens (`identifier:`) as a special token type. Features include:
+  - **Automatic Key Detection**: The lexer automatically detects identifiers followed by colons and creates `KeyToken` instances
+  - **State Machine Integration**: Added new lexer states and transitions to handle key token recognition
+  - **Token Type System**: Added `KeyToken` to the token type system with proper string representation and helper methods
+  - **Map Syntax Support**: Key tokens enable clean map syntax with atom keys without requiring explicit atom notation
+- **Fat Arrow Operator (=>)**: Added support for the fat arrow operator (`=>`) for general map key syntax, complementing the colon syntax for atom keys
+- **Enhanced Map Pattern Matching**: Comprehensive pattern matching support for maps with different key types and syntax variations
+- **Map Type System Integration**: Full integration of maps with the LX type system, including type checking, inference, and automatic spec generation
 - **Block Expressions**: Complete implementation of `do...end` block expressions for creating scoped computation blocks. Features include:
   - **Scoped Variables**: Variables defined inside blocks are scoped to that block and don't leak to outer scope
   - **Return Value**: The last expression in a block is automatically returned as the block's value
@@ -89,6 +107,22 @@
 - **Erlang Precedence Compatibility**: Added an Erlang precedence system to the code generator that automatically compares LX and Erlang operator precedence, adding parentheses when needed to ensure generated Erlang code maintains the correct semantic meaning of the original LX expressions.
 
 ### Fixed
+- **Enhanced Map Type Inference**: Improved type inference for maps to generate more accurate Erlang specs. The system now:
+  - **Uniform Type Detection**: Detects when all keys or values have the same type and generates specific map specs
+  - **Common Type Resolution**: Finds the most appropriate common type for mixed-type maps using precedence rules
+  - **Smart Type Precedence**: Uses intelligent precedence for type resolution (string() > atom() > integer() > float() > boolean())
+  - **Empty Map Handling**: Properly handles empty maps with appropriate type annotations
+  - **Variable Type Context**: Uses parameter context to infer accurate types for variables in map expressions
+- **Improved Function Return Type Inference**: Enhanced the function return type inference system to handle complex expressions more accurately:
+  - **Case Expression Types**: Better type inference for case expressions with multiple branches and mixed return types
+  - **Variable Context Awareness**: Improved context-aware type inference that considers function parameters when inferring variable types
+  - **Any Type Fallback**: Uses `any()` type for unknown expressions instead of generating invalid type names
+  - **Assignment Expression Types**: Proper type inference for assignment expressions within function bodies
+- **Enhanced AST Support for Maps**: Extended the AST (Abstract Syntax Tree) to fully support map operations:
+  - **MapAccessExpr**: Added dedicated AST node for map access expressions with proper position tracking
+  - **MapUpdateExpr**: Added AST node for map update operations with base map and entry tracking
+  - **Exhaustive Pattern Matching**: Updated all AST processing functions to handle new map expression types
+  - **String Representation**: Added proper string representation for map AST nodes for debugging and error reporting
 - **Fixed Operator Precedence System**: Corrected the operator precedence hierarchy in the parser to follow the proper order: Assignment (1) → Send (2) → OR (3) → AND (4) → Comparison (5) → Arithmetic (6) → Function calls (8). Previously, the precedence was inverted with `parse_or_expression()` calling `parse_send_expression()` instead of the correct hierarchy. This fix ensures expressions like `pid ! a or b` are parsed as `(pid ! a) or b` instead of `pid ! (a or b)`, matching expected operator precedence rules.
 - **Fixed Case/Receive Multi-Statement Parsing**: Resolved parsing issues with case and receive expressions that contain multiple statements in clause bodies. The parser now correctly handles complex clause bodies with multiple expressions, allowing patterns like:
   ```lx
@@ -143,7 +177,13 @@
 - **Improved guard formatting in reflection**: The @reflection directive now displays guard expressions in a clean, readable format instead of showing the internal AST representation. Guards are shown as simple expressions (e.g., `x > 0`) rather than verbose AST nodes (e.g., `Binary(Var(x) > Literal(LInt(0)))`), making the reflection output much more user-friendly.
 
 ### Status
-- **Test Suite**: All 29 tests now pass successfully, ensuring comprehensive validation of the compilation pipeline
+- **Test Suite**: All tests now pass successfully, ensuring comprehensive validation of the compilation pipeline including new map functionality
+- **Map Test Coverage**: Comprehensive test suite for maps including:
+  - **Basic Map Operations**: Tests for map creation, access, and updates with different key types
+  - **Key Token Tests**: Dedicated tests for key token lexing and parsing functionality
+  - **Type Inference Tests**: Tests validating correct type inference and spec generation for maps
+  - **Pattern Matching Tests**: Tests for map pattern matching in various contexts
+  - **Integration Tests**: Tests ensuring maps work correctly with other LX language features
 - **Compilation Pipeline**: Complete LX-to-Erlang compilation working correctly with proper lexing, parsing, type checking, and code generation
 - **Type System**: Robust type inference and specification generation with support for complex patterns and expressions
 - **AST Completeness**: All expression types properly handled with exhaustive pattern matching throughout the codebase

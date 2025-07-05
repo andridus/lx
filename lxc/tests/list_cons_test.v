@@ -11,7 +11,7 @@ end'
 	expected := '-module(main).
 -export([test_cons/0]).
 
--spec test_cons() -> {h(), t()}.
+-spec test_cons() -> {any(), any()}.
 test_cons() ->
 case [1, 2, 3] of
     [H | T] ->
@@ -37,7 +37,7 @@ end'
 	expected := '-module(main).
 -export([test_success/0]).
 
--spec test_success() -> {first(), rest()}.
+-spec test_success() -> {any(), any()}.
 test_success() ->
 case [42, 10, 5] of
     [First | Rest] ->

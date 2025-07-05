@@ -116,11 +116,11 @@ end'
 	expected := '-module(main).
 -export([print_hello/0, print_with_args/0]).
 
--spec print_hello() -> format().
+-spec print_hello() -> any().
 print_hello() ->
 io:format("Hello").
 
--spec print_with_args() -> format().
+-spec print_with_args() -> any().
 print_with_args() ->
 io:format("Hello ~s", ["World"]).
 
@@ -142,11 +142,11 @@ end'
 	expected := '-module(main).
 -export([debug_info/0, get_node/0]).
 
--spec debug_info() -> process_info().
+-spec debug_info() -> any().
 debug_info() ->
 erlang:process_info().
 
--spec get_node() -> node().
+-spec get_node() -> any().
 get_node() ->
 erlang:node().
 
@@ -203,7 +203,7 @@ end'
 	expected := '-module(main).
 -export([extract_ok_value/1, check_simple_response/1]).
 
--spec extract_ok_value(any()) -> value().
+-spec extract_ok_value(any()) -> any().
 extract_ok_value(Result) ->
 case Result of
     {ok, Value} -> Value;

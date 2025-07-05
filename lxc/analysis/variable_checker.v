@@ -245,10 +245,13 @@ pub fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 			}
 		}
 		ast.MapLiteralExpr {
-			for entry in expr.entries {
-				vc.check_expression(entry.key)
-				vc.check_expression(entry.value)
-			}
+			vc.check_map_literal_expression(expr)
+		}
+		ast.MapAccessExpr {
+			vc.check_map_access_expression(expr)
+		}
+		ast.MapUpdateExpr {
+			vc.check_map_update_expression(expr)
 		}
 		ast.RecordLiteralExpr {
 			for field in expr.fields {
@@ -287,10 +290,6 @@ pub fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 		}
 		ast.UnaryExpr {
 			vc.check_expression(expr.operand)
-		}
-		ast.MapAccessExpr {
-			vc.check_expression(expr.map_expr)
-			vc.check_expression(expr.key)
 		}
 		ast.IfExpr {
 			vc.check_expression(expr.condition)
@@ -541,4 +540,27 @@ pub fn (mut vc VariableChecker) check_match_rescue_expression(expr ast.MatchResc
 	vc.bind_variable(expr.rescue_var, expr.position)
 	vc.check_block_expression(expr.rescue_body)
 	vc.exit_scope()
+}
+
+// check_map_literal_expression checks map literal expressions
+fn (mut vc VariableChecker) check_map_literal_expression(expr ast.MapLiteralExpr) {
+	for entry in expr.entries {
+		vc.check_expression(entry.key)
+		vc.check_expression(entry.value)
+	}
+}
+
+// check_map_access_expression checks map access expressions
+fn (mut vc VariableChecker) check_map_access_expression(expr ast.MapAccessExpr) {
+	vc.check_expression(expr.map_expr)
+	vc.check_expression(expr.key)
+}
+
+// check_map_update_expression checks map update expressions
+fn (mut vc VariableChecker) check_map_update_expression(expr ast.MapUpdateExpr) {
+	vc.check_expression(expr.base_map)
+	for entry in expr.entries {
+		vc.check_expression(entry.key)
+		vc.check_expression(entry.value)
+	}
 }

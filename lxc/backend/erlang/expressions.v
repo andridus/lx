@@ -30,11 +30,63 @@ fn get_expression_precedence(expr ast.Expr) ErlangPrecedence {
 				.append { return .add_sub }
 			}
 		}
-		ast.UnaryExpr { return .unary }
-		ast.SendExpr { return .send }
-		ast.CallExpr { return .call }
-		ast.LiteralExpr, ast.VariableExpr, ast.TupleExpr, ast.ListLiteralExpr, ast.MapLiteralExpr { return .primary }
-		else { return .primary }
+		ast.UnaryExpr {
+			return .unary
+		}
+		ast.SendExpr {
+			return .send
+		}
+		ast.CallExpr {
+			return .call
+		}
+		ast.LiteralExpr, ast.VariableExpr, ast.TupleExpr, ast.ListLiteralExpr, ast.MapLiteralExpr {
+			return .primary
+		}
+		ast.MapAccessExpr, ast.MapUpdateExpr {
+			return .primary
+		}
+		ast.RecordLiteralExpr, ast.RecordAccessExpr {
+			return .primary
+		}
+		ast.IfExpr {
+			return .primary
+		}
+		ast.CaseExpr {
+			return .primary
+		}
+		ast.WithExpr {
+			return .primary
+		}
+		ast.ForExpr {
+			return .primary
+		}
+		ast.ReceiveExpr {
+			return .primary
+		}
+		ast.GuardExpr {
+			return .primary
+		}
+		ast.AssignExpr {
+			return .primary
+		}
+		ast.MatchExpr {
+			return .primary
+		}
+		ast.FunExpr {
+			return .primary
+		}
+		ast.SimpleMatchExpr {
+			return .primary
+		}
+		ast.MatchRescueExpr {
+			return .primary
+		}
+		ast.BlockExpr {
+			return .primary
+		}
+		else {
+			return .primary
+		}
 	}
 }
 
@@ -73,7 +125,7 @@ pub fn (mut gen ErlangGenerator) generate_expression(expr ast.Expr) string {
 			return gen.generate_record_access(expr)
 		}
 		ast.MapAccessExpr {
-			return '%% MapAccessExpr not implemented'
+			return gen.generate_map_access(expr)
 		}
 		ast.TupleExpr {
 			return gen.generate_tuple(expr)
@@ -89,6 +141,9 @@ pub fn (mut gen ErlangGenerator) generate_expression(expr ast.Expr) string {
 		}
 		ast.MapLiteralExpr {
 			return gen.generate_map_literal(expr)
+		}
+		ast.MapUpdateExpr {
+			return gen.generate_map_update(expr)
 		}
 		ast.RecordLiteralExpr {
 			return gen.generate_record_literal(expr)
@@ -157,7 +212,7 @@ pub fn (mut gen ErlangGenerator) generate_expression_in_guard(expr ast.Expr) str
 			return gen.generate_record_access(expr)
 		}
 		ast.MapAccessExpr {
-			return '%% MapAccessExpr not implemented'
+			return gen.generate_map_access(expr)
 		}
 		ast.TupleExpr {
 			return gen.generate_tuple(expr)
@@ -173,6 +228,9 @@ pub fn (mut gen ErlangGenerator) generate_expression_in_guard(expr ast.Expr) str
 		}
 		ast.MapLiteralExpr {
 			return gen.generate_map_literal(expr)
+		}
+		ast.MapUpdateExpr {
+			return gen.generate_map_update(expr)
 		}
 		ast.RecordLiteralExpr {
 			return gen.generate_record_literal(expr)
@@ -474,6 +532,25 @@ fn (mut gen ErlangGenerator) generate_map_literal(expr ast.MapLiteralExpr) strin
 		entries << '${key} => ${value}'
 	}
 	return '#{${entries.join(', ')}}'
+}
+
+// generate_map_access generates code for map access
+fn (mut gen ErlangGenerator) generate_map_access(expr ast.MapAccessExpr) string {
+	map_expr := gen.generate_expression(expr.map_expr)
+	key := gen.generate_expression(expr.key)
+	return 'maps:get(${key}, ${map_expr})'
+}
+
+// generate_map_update generates code for map updates
+fn (mut gen ErlangGenerator) generate_map_update(expr ast.MapUpdateExpr) string {
+	entries := expr.entries.map('${gen.generate_expression(it.key)} => ${gen.generate_expression(it.value)}').join(', ')
+
+	if expr.base_map != ast.Expr(ast.LiteralExpr{}) {
+		base := gen.generate_expression(expr.base_map)
+		return '#{${entries} | ${base}}'
+	} else {
+		return '#{${entries}}'
+	}
 }
 
 // generate_record_literal generates code for record literals

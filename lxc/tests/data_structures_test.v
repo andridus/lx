@@ -154,14 +154,12 @@ fn test_list_cons_parsing() {
 
 fn test_map_parsing() {
 	tokens := [
-		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.pipe)),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.modulo)),
 		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbrace)),
-		lexer.Token(lexer.new_atom_token('name')),
-		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.colon)),
+		lexer.Token(lexer.new_key_token('name')),
 		lexer.Token(lexer.new_string_token('Alice')),
 		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
-		lexer.Token(lexer.new_atom_token('age')),
-		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.colon)),
+		lexer.Token(lexer.new_key_token('age')),
 		lexer.Token(lexer.new_int_token(30)),
 		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbrace)),
 		lexer.Token(lexer.new_eof_token()),
@@ -183,7 +181,7 @@ fn test_map_parsing() {
 
 fn test_map_with_string_keys_parsing() {
 	tokens := [
-		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.pipe)),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.modulo)),
 		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbrace)),
 		lexer.Token(lexer.new_string_token('name')),
 		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.arrow)),
@@ -219,10 +217,9 @@ fn test_nested_data_structures() {
 		lexer.Token(lexer.new_int_token(2)),
 		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbracket)),
 		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
-		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.pipe)),
+		lexer.Token(lexer.new_operator_token(lexer.OperatorValue.modulo)),
 		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.lbrace)),
-		lexer.Token(lexer.new_atom_token('key')),
-		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.colon)),
+		lexer.Token(lexer.new_key_token('key')),
 		lexer.Token(lexer.new_string_token('value')),
 		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.rbrace)),
 		lexer.Token(lexer.new_punctuation_token(lexer.PunctuationValue.comma)),
