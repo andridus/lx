@@ -8,6 +8,12 @@ fn (mut sp StatementParser) parse_statement_block() ?[]ast.Stmt {
 	mut statements := []ast.Stmt{}
 
 	for !sp.is_at_end() {
+		// Skip newlines
+		if sp.current is lexer.NewlineToken {
+			sp.advance()
+			continue
+		}
+
 		// Check for end keywords that should break
 		if sp.current is lexer.KeywordToken {
 			keyword_token := sp.current as lexer.KeywordToken
@@ -17,21 +23,23 @@ fn (mut sp StatementParser) parse_statement_block() ?[]ast.Stmt {
 			if keyword_token.value == .else_ {
 				break
 			}
+			if keyword_token.value == .after {
+				break
+			}
 		}
 
 		// Check for pattern tokens that indicate next case
-		if sp.current is lexer.IntToken || sp.current is lexer.StringToken
-			|| sp.current is lexer.IdentToken {
-			// Look ahead to see if this is a pattern (followed by ->)
-			mut lookahead_pos := sp.position + 1
-			if lookahead_pos < sp.tokens.len {
-				if sp.tokens[lookahead_pos] is lexer.OperatorToken {
-					op_token := sp.tokens[lookahead_pos] as lexer.OperatorToken
-					if op_token.value == .arrow {
-						// This is a pattern for the next case
-						break
-					}
-				}
+		if sp.is_next_case_pattern() {
+			break
+		}
+
+		// Parse assignment statements
+		if sp.current is lexer.IdentToken && sp.peek() is lexer.OperatorToken {
+			op_token := sp.peek() as lexer.OperatorToken
+			if op_token.value == .assign || op_token.value == .type_cons {
+				stmt := sp.parse_assignment_statement()?
+				statements << stmt
+				continue
 			}
 		}
 
@@ -41,8 +49,10 @@ fn (mut sp StatementParser) parse_statement_block() ?[]ast.Stmt {
 			expr: expr
 		}
 
-		// Break after parsing one expression for case bodies
-		break
+		// If this is the last statement (expression), break to avoid infinite loop
+		if sp.is_last_statement_in_clause() {
+			break
+		}
 	}
 
 	return statements
@@ -139,6 +149,121 @@ fn (sp StatementParser) is_potential_new_clause_start() bool {
 		}
 	}
 	return false
+}
+
+// is_next_case_pattern checks if the current token starts a new case pattern
+fn (sp StatementParser) is_next_case_pattern() bool {
+	return sp.is_pattern_followed_by_arrow(sp.position)
+}
+
+// is_pattern_followed_by_arrow checks if there's a pattern at the given position followed by ->
+fn (sp StatementParser) is_pattern_followed_by_arrow(pos int) bool {
+	if pos >= sp.tokens.len {
+		return false
+	}
+
+	// Check for simple patterns (literals, identifiers, atoms)
+	if sp.tokens[pos] is lexer.IntToken || sp.tokens[pos] is lexer.StringToken
+		|| sp.tokens[pos] is lexer.IdentToken || sp.tokens[pos] is lexer.AtomToken {
+		// Look ahead to see if this is a pattern (followed by ->)
+		mut lookahead_pos := pos + 1
+		if lookahead_pos < sp.tokens.len {
+			if sp.tokens[lookahead_pos] is lexer.OperatorToken {
+				op_token := sp.tokens[lookahead_pos] as lexer.OperatorToken
+				if op_token.value == .arrow {
+					return true
+				}
+			}
+		}
+	}
+
+	// Check for tuple patterns {pattern, pattern, ...}
+	if sp.tokens[pos] is lexer.PunctuationToken {
+		punc_token := sp.tokens[pos] as lexer.PunctuationToken
+		if punc_token.value == .lbrace {
+			// Find the matching closing brace
+			mut brace_count := 1
+			mut scan_pos := pos + 1
+			for scan_pos < sp.tokens.len && brace_count > 0 {
+				if sp.tokens[scan_pos] is lexer.PunctuationToken {
+					p := sp.tokens[scan_pos] as lexer.PunctuationToken
+					if p.value == .lbrace {
+						brace_count++
+					} else if p.value == .rbrace {
+						brace_count--
+					}
+				}
+				scan_pos++
+			}
+
+			// Check if there's an arrow after the closing brace
+			if brace_count == 0 && scan_pos < sp.tokens.len {
+				if sp.tokens[scan_pos] is lexer.OperatorToken {
+					op_token := sp.tokens[scan_pos] as lexer.OperatorToken
+					if op_token.value == .arrow {
+						return true
+					}
+				}
+			}
+		}
+	}
+
+	// Check for list patterns [pattern, pattern, ...]
+	if sp.tokens[pos] is lexer.PunctuationToken {
+		punc_token := sp.tokens[pos] as lexer.PunctuationToken
+		if punc_token.value == .lbracket {
+			// Find the matching closing bracket
+			mut bracket_count := 1
+			mut scan_pos := pos + 1
+			for scan_pos < sp.tokens.len && bracket_count > 0 {
+				if sp.tokens[scan_pos] is lexer.PunctuationToken {
+					p := sp.tokens[scan_pos] as lexer.PunctuationToken
+					if p.value == .lbracket {
+						bracket_count++
+					} else if p.value == .rbracket {
+						bracket_count--
+					}
+				}
+				scan_pos++
+			}
+
+			// Check if there's an arrow after the closing bracket
+			if bracket_count == 0 && scan_pos < sp.tokens.len {
+				if sp.tokens[scan_pos] is lexer.OperatorToken {
+					op_token := sp.tokens[scan_pos] as lexer.OperatorToken
+					if op_token.value == .arrow {
+						return true
+					}
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+// is_last_statement_in_clause checks if we should stop parsing statements in a clause
+fn (sp StatementParser) is_last_statement_in_clause() bool {
+	// Skip newlines to look ahead
+	mut pos := sp.position
+	for pos < sp.tokens.len && sp.tokens[pos] is lexer.NewlineToken {
+		pos++
+	}
+
+	if pos >= sp.tokens.len {
+		return true
+	}
+
+	// Check if the next meaningful token is a case pattern or end keyword
+	if sp.tokens[pos] is lexer.KeywordToken {
+		keyword_token := sp.tokens[pos] as lexer.KeywordToken
+		if keyword_token.value == .end_ || keyword_token.value == .else_ || keyword_token.value == .after {
+			return true
+		}
+	}
+
+	// Check if next token starts a new case pattern (using the improved pattern detection)
+	return sp.is_pattern_followed_by_arrow(pos)
 }
 
 // parse_assignment_statement parses assignment statements

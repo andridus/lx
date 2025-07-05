@@ -182,6 +182,12 @@ fn (mut ep ExpressionParser) parse_statement_block() ?[]ast.Stmt {
 	mut statements := []ast.Stmt{}
 
 	for !ep.check(lexer.keyword(.end_)) && !ep.is_at_end() {
+		// Skip newlines
+		if ep.current is lexer.NewlineToken {
+			ep.advance()
+			continue
+		}
+
 		// Check for else keyword to break early
 		if ep.check(lexer.keyword(.else_)) {
 			break
@@ -191,7 +197,10 @@ fn (mut ep ExpressionParser) parse_statement_block() ?[]ast.Stmt {
 			break
 		}
 
-
+		// Check for pattern tokens that indicate next case
+		if ep.is_next_case_pattern() {
+			break
+		}
 
 		stmt := ep.parse_statement()?
 		statements << stmt
@@ -206,6 +215,97 @@ fn (mut ep ExpressionParser) parse_statement() ?ast.Stmt {
 	return ast.ExprStmt{
 		expr: expr
 	}
+}
+
+// is_next_case_pattern checks if the current token starts a new case pattern
+fn (ep ExpressionParser) is_next_case_pattern() bool {
+	return ep.is_pattern_followed_by_arrow(ep.position)
+}
+
+// is_pattern_followed_by_arrow checks if there's a pattern at the given position followed by ->
+fn (ep ExpressionParser) is_pattern_followed_by_arrow(pos int) bool {
+	if pos >= ep.tokens.len {
+		return false
+	}
+
+	// Check for simple patterns (literals, identifiers, atoms)
+	if ep.tokens[pos] is lexer.IntToken || ep.tokens[pos] is lexer.StringToken
+		|| ep.tokens[pos] is lexer.IdentToken || ep.tokens[pos] is lexer.AtomToken {
+		// Look ahead to see if this is a pattern (followed by ->)
+		mut lookahead_pos := pos + 1
+		if lookahead_pos < ep.tokens.len {
+			if ep.tokens[lookahead_pos] is lexer.OperatorToken {
+				op_token := ep.tokens[lookahead_pos] as lexer.OperatorToken
+				if op_token.value == .arrow {
+					return true
+				}
+			}
+		}
+	}
+
+	// Check for tuple patterns {pattern, pattern, ...}
+	if ep.tokens[pos] is lexer.PunctuationToken {
+		punc_token := ep.tokens[pos] as lexer.PunctuationToken
+		if punc_token.value == .lbrace {
+			// Find the matching closing brace
+			mut brace_count := 1
+			mut scan_pos := pos + 1
+			for scan_pos < ep.tokens.len && brace_count > 0 {
+				if ep.tokens[scan_pos] is lexer.PunctuationToken {
+					p := ep.tokens[scan_pos] as lexer.PunctuationToken
+					if p.value == .lbrace {
+						brace_count++
+					} else if p.value == .rbrace {
+						brace_count--
+					}
+				}
+				scan_pos++
+			}
+
+			// Check if there's an arrow after the closing brace
+			if brace_count == 0 && scan_pos < ep.tokens.len {
+				if ep.tokens[scan_pos] is lexer.OperatorToken {
+					op_token := ep.tokens[scan_pos] as lexer.OperatorToken
+					if op_token.value == .arrow {
+						return true
+					}
+				}
+			}
+		}
+	}
+
+	// Check for list patterns [pattern, pattern, ...]
+	if ep.tokens[pos] is lexer.PunctuationToken {
+		punc_token := ep.tokens[pos] as lexer.PunctuationToken
+		if punc_token.value == .lbracket {
+			// Find the matching closing bracket
+			mut bracket_count := 1
+			mut scan_pos := pos + 1
+			for scan_pos < ep.tokens.len && bracket_count > 0 {
+				if ep.tokens[scan_pos] is lexer.PunctuationToken {
+					p := ep.tokens[scan_pos] as lexer.PunctuationToken
+					if p.value == .lbracket {
+						bracket_count++
+					} else if p.value == .rbracket {
+						bracket_count--
+					}
+				}
+				scan_pos++
+			}
+
+			// Check if there's an arrow after the closing bracket
+			if bracket_count == 0 && scan_pos < ep.tokens.len {
+				if ep.tokens[scan_pos] is lexer.OperatorToken {
+					op_token := ep.tokens[scan_pos] as lexer.OperatorToken
+					if op_token.value == .arrow {
+						return true
+					}
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 // parse_match_rescue_expression parses match rescue expressions

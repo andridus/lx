@@ -655,33 +655,27 @@ fn (mut gen ErlangGenerator) generate_block_expression(expr ast.BlockExpr) strin
 		return 'nil'
 	}
 
-	// Generate all statements in the block
-	mut statements := []string{}
-	for i, stmt in expr.body {
-		if i == expr.body.len - 1 {
-			statements << gen.generate_statement(stmt)
-		} else {
-			statements << gen.generate_statement(stmt) + ','
-		}
-	}
-
-	// If there's only one statement and it's a simple expression, don't use begin...end
+	// If there's only one statement, just return it without wrapping
 	if expr.body.len == 1 {
 		stmt := expr.body[0]
-		if stmt is ast.ExprStmt {
-			expr_stmt := stmt as ast.ExprStmt
-			// Check if it's a simple expression that doesn't need begin...end
-			if expr_stmt.expr is ast.LiteralExpr || expr_stmt.expr is ast.VariableExpr
-				|| expr_stmt.expr is ast.CallExpr || expr_stmt.expr is ast.BinaryExpr
-				|| expr_stmt.expr is ast.TupleExpr || expr_stmt.expr is ast.ListLiteralExpr
-				|| expr_stmt.expr is ast.IfExpr || expr_stmt.expr is ast.CaseExpr {
-				return gen.generate_expression(expr_stmt.expr)
-			}
+		return gen.generate_statement(stmt)
+	}
+
+	// For multiple statements, generate them separated by commas
+	mut statements := []string{}
+	for i, stmt in expr.body {
+		stmt_code := gen.generate_statement(stmt)
+		if i == expr.body.len - 1 {
+			// Last statement doesn't need comma
+			statements << stmt_code
+		} else {
+			// Add comma after each statement except the last
+			statements << stmt_code
 		}
 	}
 
-	// For multiple statements or complex expressions, use begin...end
-	return 'begin\n    ${statements.join('\n    ')}\nend'
+	// Join with commas and newlines for proper Erlang syntax
+	return statements.join(',\n    ')
 }
 
 // generate_block_assignment_inline generates inline code for block assignments
