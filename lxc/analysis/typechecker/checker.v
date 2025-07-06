@@ -672,6 +672,12 @@ fn (mut tc TypeChecker) check_pattern(pattern ast.Pattern) {
 			for field in pattern.fields {
 				tc.check_pattern(field.pattern)
 			}
+			// Check if there's an assigned variable (pattern = variable)
+			if assign_var := pattern.assign_variable {
+				// Bind the assigned variable with the record type
+				record_type := make_type_constructor(pattern.name, [])
+				tc.context.bind(assign_var, record_type, ast.new_position(0, 0, ''))
+			}
 		}
 		ast.BinaryPattern {
 			// Binary patterns don't bind variables

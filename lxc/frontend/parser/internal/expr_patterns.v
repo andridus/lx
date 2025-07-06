@@ -5,6 +5,11 @@ import lexer
 
 // parse_pattern parses patterns for pattern matching
 fn (mut ep ExpressionParser) parse_pattern() ?ast.Pattern {
+	return ep.parse_base_pattern()
+}
+
+// parse_base_pattern parses the base pattern without assignment
+fn (mut ep ExpressionParser) parse_base_pattern() ?ast.Pattern {
 	return match ep.current {
 		lexer.IdentToken {
 			ep.parse_variable_pattern()
@@ -232,8 +237,8 @@ fn (mut ep ExpressionParser) parse_record_pattern() ?ast.Pattern {
 				return none
 			}
 
-			// Parse field pattern
-			field_pattern := ep.parse_pattern()?
+			// Parse field pattern (which might include assignment)
+			field_pattern := ep.parse_field_pattern()?
 
 			fields << ast.RecordPatternField{
 				name:     field_name
@@ -316,4 +321,44 @@ fn (mut ep ExpressionParser) parse_map_pattern() ?ast.Pattern {
 	return ast.MapPattern{
 		entries: entries
 	}
+}
+
+// parse_field_pattern parses field patterns that might include assignment
+fn (mut ep ExpressionParser) parse_field_pattern() ?ast.Pattern {
+	// Parse the base pattern first
+	base_pattern := ep.parse_base_pattern()?
+
+	// Check if this is followed by an assignment (pattern = variable)
+	if ep.check(lexer.operator(.assign)) {
+		ep.advance() // consume '='
+
+		// The right side should be a variable
+		if !ep.current.is_identifier() {
+			ep.add_error('Expected variable name after = in pattern', 'Got ${ep.current.str()}')
+			return none
+		}
+
+		// Create a variable pattern for the assigned variable
+		var_name := ep.current.get_value()
+		ep.advance()
+
+		// We need to create a pattern that includes both the base pattern and the variable
+		match base_pattern {
+			ast.RecordPattern {
+				// For record patterns, we add the variable to the assign_variable field
+				return ast.RecordPattern{
+					name:            base_pattern.name
+					fields:          base_pattern.fields
+					assign_variable: var_name
+				}
+			}
+			else {
+				// For other patterns, just return the base pattern
+				// The variable binding will be handled by the generator
+				return base_pattern
+			}
+		}
+	}
+
+	return base_pattern
 }

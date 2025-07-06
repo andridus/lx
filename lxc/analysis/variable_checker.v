@@ -378,6 +378,11 @@ pub fn (mut vc VariableChecker) check_pattern(pattern ast.Pattern) {
 			for field in pattern.fields {
 				vc.check_pattern(field.pattern)
 			}
+			// Check if there's an assigned variable (pattern = variable)
+			if assign_var := pattern.assign_variable {
+				position := ast.new_position(0, 0, '')
+				vc.bind_variable(assign_var, position)
+			}
 		}
 		ast.BinaryPattern {
 			// Binary patterns don't bind variables

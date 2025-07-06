@@ -380,8 +380,9 @@ pub:
 // RecordPattern represents a record pattern
 pub struct RecordPattern {
 pub:
-	name   string
-	fields []RecordPatternField
+	name            string
+	fields          []RecordPatternField
+	assign_variable ?string // Optional variable for pattern assignment (pattern = variable)
 }
 
 // BinaryPattern represents a binary pattern
