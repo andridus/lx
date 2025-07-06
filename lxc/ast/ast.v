@@ -675,7 +675,7 @@ pub:
 pub struct RecordFieldDef {
 pub:
 	name       string
-	field_type LXType
+	field_type TypeExpression
 	position   Position
 }
 
@@ -749,6 +749,7 @@ pub type TypeExpression = SimpleTypeExpr
 	| MapTypeExpr
 	| FunctionTypeExpr
 	| VariableTypeExpr
+	| RecordTypeExpr
 
 // SimpleTypeExpr represents a simple type like integer, string, atom
 pub struct SimpleTypeExpr {
@@ -801,6 +802,14 @@ pub:
 	position Position
 }
 
+// RecordTypeExpr represents record types like Person{name: string, age: integer}
+pub struct RecordTypeExpr {
+pub:
+	name     string
+	fields   map[string]TypeExpression
+	position Position
+}
+
 // str returns a string representation of TypeExpression
 pub fn (te TypeExpression) str() string {
 	return match te {
@@ -828,6 +837,14 @@ pub fn (te TypeExpression) str() string {
 		}
 		VariableTypeExpr {
 			te.name
+		}
+		RecordTypeExpr {
+			mut field_strs := []string{}
+			for field_name, field_type in te.fields {
+				field_strs << '${field_name}: ${field_type.str()}'
+			}
+			fields := field_strs.join(', ')
+			'${te.name}{${fields}}'
 		}
 	}
 }

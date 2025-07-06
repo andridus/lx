@@ -299,14 +299,18 @@ Strings are enclosed in double quotes and support escape sequences:
 # Basic strings
 message = "Hello, world!"
 
+# Strings with email addresses and special characters
+email = "user@example.com"
+path = "C:\\Users\\Name"
+
 # Escape sequences
 newline = "Line 1\nLine 2"
 tab = "Column 1\tColumn 2"
 quote = "He said \"Hello\""
 backslash = "Path: C:\\Users\\Name"
 
-# Invalid characters in strings
-# "hello@world"  # Error: @ is not allowed in strings
+# Complex strings with various characters
+complex = "Hello @world! This is a test string with symbols."
 ```
 
 **Supported escape sequences:**
@@ -316,7 +320,7 @@ backslash = "Path: C:\\Users\\Name"
 - `\"` - double quote
 - `\\` - backslash
 
-**Valid characters:** Only printable ASCII characters (32-126) are allowed in strings, excluding control characters and special symbols like `@`.
+**Valid characters:** Strings support all printable ASCII characters, including special symbols like `@` for email addresses and other common use cases.
 
 ---
 
@@ -1636,6 +1640,8 @@ host = config[:database][:host]
 
 ##### Map Updates:
 
+Maps support immutable updates using the `%{map | key: value}` syntax:
+
 ```lx
 # Simple field update
 updated_user = %{user | age: 31}
@@ -1648,7 +1654,35 @@ updated_config = %{config | "timeout" => 10000}
 
 # Updates with mixed key types
 updated_data = %{data | :status => "active", "modified_at" => now()}
+
+# Complex update patterns
+def update_user_profile(user, changes) do
+  %{user |
+    profile: %{user[:profile] |
+      updated_at: now(),
+      changes: changes
+    }
+  }
+end
 ```
+
+**Generated Erlang Code:**
+```lx
+# LX source
+updated_user = %{user | age: 31, status: "active"}
+```
+
+```erlang
+% Generated Erlang
+Updated_user = #{age => 31, status => "active" | User}
+```
+
+**Key Features:**
+- **Immutable**: Original map is unchanged, returns a new map
+- **Multiple Updates**: Can update multiple fields in a single expression
+- **Mixed Key Types**: Supports atom, string, and other key types
+- **Efficient**: Generates optimal Erlang map update syntax
+- **Type Safety**: Updates are validated when possible
 
 ##### Key Tokens:
 
@@ -1771,10 +1805,44 @@ Name = maps:get(name, User)
 
 **Map Implementation Features:**
 - **Map literals**: Use Erlang's native map syntax `#{key => value}`
-- **Map access**: Compile to `maps:get(Key, Map)` function calls
+- **Map access**: Compile to `maps:get(Key, Map)` function calls for safe access
 - **Map updates**: Use Erlang's map update syntax `#{key => value | BaseMap}`
 - **Pattern matching**: Use Erlang's map pattern syntax `#{key := Variable}`
 - **Type safety**: Full integration with LX's type system and automatic spec generation
+- **Key tokens**: Automatic conversion of `identifier:` to atom keys for cleaner syntax
+- **Mixed keys**: Support for atom, string, integer, and other key types in the same map
+
+**Practical Example:**
+```lx
+# Complete map workflow
+def user_management_example() do
+  # Create user with mixed key types
+  user = %{
+    :id => 1,
+    "name" => "Alice",
+    email: "alice@example.com",  # Key token syntax
+    profile: %{age: 30, active: true}
+  }
+
+  # Access fields
+  user_id = user[:id]
+  user_name = user["name"]
+  user_email = user[:email]
+
+  # Pattern match
+  %{:id => id, email: email, profile: %{age: age}} <- user
+
+  # Update user
+  updated_user = %{user |
+    email: "alice.smith@example.com",
+    profile: %{user[:profile] | age: 31}
+  }
+
+  {id, email, age, updated_user}
+end
+```
+
+This generates clean, efficient Erlang code that integrates seamlessly with the BEAM VM and OTP patterns.
 
 #### Binary/Bitstring Data:
 
@@ -1943,6 +2011,8 @@ Structured data types with named fields for better code organization and type sa
 
 #### Record Definition:
 
+Records are structured data types with named fields that provide type safety and efficient access patterns:
+
 ```lx
 record Person {
     name :: string,
@@ -1955,47 +2025,231 @@ record Config {
     timeout :: integer,
     retries :: integer
 }
+
+# Records with complex types
+record UserProfile {
+    id :: integer,
+    settings :: %{theme: string, language: string},
+    permissions :: [string],
+    metadata :: {string, any()}
+}
 ```
+
+**Generated Erlang Code:**
+```erlang
+-record(person, {name, age, email}).
+-record(config, {debug, timeout, retries}).
+-record(user_profile, {id, settings, permissions, metadata}).
+```
+
+**Key Features:**
+- **Type Safety**: Field types are enforced at compile time
+- **Efficient Access**: Generates optimal Erlang record operations
+- **Named Fields**: Clear, self-documenting field names
+- **Pattern Matching**: Full support for destructuring in patterns
+- **Immutable Updates**: Safe field updates that return new records
 
 #### Record Creation:
 
+Records are created using the `RecordName{field: value, ...}` syntax:
+
 ```lx
+# Basic record creation
 person = Person{name: "Alice", age: 30, email: "alice@example.com"}
 config = Config{debug: true, timeout: 5000, retries: 3}
+
+# Records with complex field values
+profile = UserProfile{
+    id: 123,
+    settings: %{theme: "dark", language: "en"},
+    permissions: ["read", "write"],
+    metadata: {"user_data", %{created_at: now()}}
+}
+
+# Records in function returns
+def create_default_user(name) do
+    Person{name: name, age: 0, email: ""}
+end
+
+# Records as function parameters
+def process_user(user :: Person) do
+    if user.age >= 18 do
+        "adult"
+    else
+        "minor"
+    end
+end
 ```
+
+**Generated Erlang Code:**
+```lx
+# LX source
+person = Person{name: "Alice", age: 30, email: "alice@example.com"}
+```
+
+```erlang
+% Generated Erlang
+Person = #person{name = "Alice", age = 30, email = "alice@example.com"}
+```
+
+**Key Features:**
+- **Type Validation**: Field types are checked at compile time
+- **All Fields Required**: All record fields must be specified during creation
+- **Efficient Creation**: Generates optimal Erlang record construction
+- **Function Integration**: Records work seamlessly with function parameters and returns
 
 #### Record Field Access:
 
+Record fields are accessed using dot notation:
+
 ```lx
+# Basic field access
 name = person.name
 age = person.age
 is_debug = config.debug
+
+# Field access in expressions
+full_name = person.name ++ " (age: " ++ string_of_int(person.age) ++ ")"
+timeout_seconds = config.timeout / 1000
+
+# Field access in function calls
+def greet_user(user) do
+    "Hello, " ++ user.name ++ "!"
+end
+
+# Nested field access (when fields contain complex types)
+def get_user_theme(profile) do
+    profile.settings[:theme]  # Access map field within record
+end
+
+# Field access in guards (when supported)
+def is_adult(person) when person.age >= 18 do
+    true
+end
+
+def is_adult(_) do
+    false
+end
 ```
+
+**Generated Erlang Code:**
+```lx
+# LX source
+name = person.name
+greeting = "Hello, " ++ person.name
+```
+
+```erlang
+% Generated Erlang
+Name = Person#person.name,
+Greeting = "Hello, " ++ Person#person.name
+```
+
+**Key Features:**
+- **Direct Access**: Efficient field access using Erlang record syntax
+- **Type Safety**: Field access is validated against record definition
+- **Expression Integration**: Field access works in any expression context
+- **Guard Support**: Can be used in guard expressions for pattern matching
 
 #### Record Updates (Immutable):
 
+Records support immutable updates using the `RecordName{record | field: value}` syntax:
+
 ```lx
 # Update single field
-older_person = {person | age: 31}
+older_person = Person{person | age: 31}
 
 # Update multiple fields
-updated_person = {person | age: 31, email: "alice.smith@example.com"}
+updated_person = Person{person | age: 31, email: "alice.smith@example.com"}
 
 # Chained updates
-final_person = {person | age: 31}
-final_person2 = {final_person | email: "new@example.com"}
+final_person = Person{person | age: 31}
+final_person2 = Person{final_person | email: "new@example.com"}
+
+# Complex update example
+def update_user_status(user, new_status) do
+  User{user | status: new_status, last_updated: now()}
+end
 ```
 
-#### Records in Pattern Matching:
+**Generated Erlang Code:**
+```lx
+# LX source
+updated_person = Person{person | age: 31, email: "new@example.com"}
+```
+
+```erlang
+% Generated Erlang
+Updated_person = Person#{age => 31, email => "new@example.com"}
+```
+
+**Key Features:**
+- **Type Safety**: Updates are validated against the record definition
+- **Immutable**: Original record is unchanged, returns a new record
+- **Multiple Fields**: Can update multiple fields in a single expression
+- **Efficient**: Generates optimal Erlang map update syntax
+- **Chainable**: Updates can be chained for complex transformations
+
+#### Record Pattern Matching:
+
+Records support comprehensive pattern matching in `case` expressions with full support for guards:
 
 ```lx
-case user {
+# Basic record pattern matching
+case user do
   Person{name: "admin", age: _} -> :admin_user
   Person{age: age} when age >= 18 -> :adult
   Person{age: age} when age < 18 -> :minor
   _ -> :unknown
-}
+end
+
+# Multiple field patterns with guards
+case person do
+  Person{name: "Eve", age: age} -> age
+  Person{age: age} when age >= 18 -> age
+  _ -> 0
+end
+
+# Complex pattern matching with multiple fields
+case contact do
+  Contact{name: name, email: email} when name != "" -> {name, email}
+  Contact{phone: phone} when phone != "" -> {"unknown", phone}
+  _ -> {"unknown", "unknown"}
+end
+
+# Pattern matching with boolean fields
+case user do
+  User{id: id, active: true} when id > 0 -> "active_user"
+  User{id: id, active: false} when id > 0 -> "inactive_user"
+  _ -> "invalid_user"
+end
 ```
+
+**Generated Erlang Code:**
+```lx
+# LX source
+case person do
+  Person{name: "Eve", age: age} -> age
+  Person{age: age} when age >= 18 -> age
+  _ -> 0
+end
+```
+
+```erlang
+% Generated Erlang
+case Person of
+    #person{name = "Eve", age = Age} -> Age;
+    #person{age = Age} when Age >= 18 -> Age;
+    _ -> 0
+end
+```
+
+**Key Features:**
+- **Pattern Extraction**: Variables bound in patterns are available in clause bodies
+- **Guard Support**: Full support for `when` clauses with complex conditions
+- **Field Selection**: Can match specific fields while ignoring others with `_`
+- **Type Safety**: Compiler validates that pattern fields exist in the record definition
+- **Erlang Compatibility**: Generates standard Erlang record patterns
 
 #### Records in OTP Workers:
 
@@ -2077,6 +2331,68 @@ worker session_manager do
   end
 end
 ```
+
+#### Records vs Maps: When to Use Each
+
+LX provides both records and maps for structured data. Here's when to use each:
+
+**Use Records When:**
+- **Fixed Structure**: You have a well-defined, stable data structure
+- **Type Safety**: You want compile-time field validation and type checking
+- **Performance**: You need optimal field access performance
+- **Documentation**: You want clear, self-documenting data structures
+- **OTP Integration**: You're building OTP components (workers, supervisors)
+
+**Use Maps When:**
+- **Dynamic Structure**: You need flexible, runtime-determined fields
+- **External Data**: You're working with JSON, APIs, or external data sources
+- **Mixed Key Types**: You need different key types (atoms, strings, integers)
+- **Partial Updates**: You frequently update subsets of fields
+- **Interoperability**: You're interfacing with external Erlang/Elixir code
+
+**Comparison Example:**
+```lx
+# Record approach - structured, type-safe
+record User {
+    id :: integer,
+    name :: string,
+    email :: string,
+    active :: boolean
+}
+
+def create_user(name, email) do
+    User{id: generate_id(), name: name, email: email, active: true}
+end
+
+def activate_user(user) do
+    User{user | active: true}
+end
+
+# Map approach - flexible, dynamic
+def create_user_map(name, email) do
+    %{
+        :id => generate_id(),
+        "name" => name,
+        "email" => email,
+        :active => true,
+        "metadata" => %{}
+    }
+end
+
+def activate_user_map(user) do
+    %{user | :active => true, "last_activated" => now()}
+end
+
+# Both approaches generate efficient Erlang code
+# Records: #user{id = 1, name = "Alice", ...}
+# Maps: #{id => 1, "name" => "Alice", ...}
+```
+
+**Best Practices:**
+- **Start with Records**: Use records for core domain data structures
+- **Use Maps for Configuration**: Maps work well for settings and configuration
+- **Combine Both**: Records can contain map fields for flexible sub-structures
+- **Consider Evolution**: Records are better for stable APIs, maps for evolving schemas
 
 ---
 

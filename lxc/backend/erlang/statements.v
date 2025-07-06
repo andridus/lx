@@ -572,6 +572,11 @@ fn (gen ErlangGenerator) generate_type_expression(type_expr ast.TypeExpression) 
 		ast.VariableTypeExpr {
 			type_expr.name
 		}
+		ast.RecordTypeExpr {
+			// For record types, we generate the record name as the type
+			// The actual record definition will be generated separately
+			'#${type_expr.name}{}'
+		}
 	}
 }
 

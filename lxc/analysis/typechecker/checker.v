@@ -859,6 +859,18 @@ fn (mut tc TypeChecker) convert_type_expression_to_type_expr(type_expr ast.TypeE
 		ast.VariableTypeExpr {
 			make_type_constructor(type_expr.name, [])
 		}
+		ast.RecordTypeExpr {
+			// Convert record type expression to a record type
+			mut fields := map[string]TypeExpr{}
+			for field_name, field_type_expr in type_expr.fields {
+				field_type := tc.convert_type_expression_to_type_expr(field_type_expr)
+				fields[field_name] = field_type
+			}
+			RecordType{
+				name:   type_expr.name
+				fields: fields
+			}
+		}
 	}
 }
 

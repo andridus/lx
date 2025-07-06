@@ -169,7 +169,7 @@ fn (mut sp StatementParser) parse_union_type() ?ast.TypeExpression {
 // parse_primary_type parses primary type expressions
 fn (mut sp StatementParser) parse_primary_type() ?ast.TypeExpression {
 	return match sp.current {
-		lexer.IdentToken {
+		lexer.IdentToken, lexer.UpperIdentToken {
 			sp.parse_named_type()
 		}
 		lexer.PunctuationToken {
@@ -196,10 +196,44 @@ fn (mut sp StatementParser) parse_primary_type() ?ast.TypeExpression {
 
 // parse_named_type parses named types (simple, list, map, etc.)
 fn (mut sp StatementParser) parse_named_type() ?ast.TypeExpression {
-	ident_token := sp.current as lexer.IdentToken
-	name := ident_token.value
+	name := sp.current.get_value()
 	position := sp.get_current_position()
 	sp.advance()
+
+	// Check for record type: RecordName{field: type, ...}
+	if sp.check(lexer.punctuation(.lbrace)) {
+		sp.advance() // consume '{'
+
+		mut fields := map[string]ast.TypeExpression{}
+
+		if !sp.check(lexer.punctuation(.rbrace)) {
+			for {
+				field_name := sp.current.get_value()
+				if !sp.current.is_identifier() {
+					sp.add_error('Expected field name in record type', 'Got ${sp.current.str()}')
+					return none
+				}
+				sp.advance()
+
+				sp.consume(lexer.operator(.type_cons), 'Expected :: after field name in record type')?
+
+				field_type := sp.parse_type_expression()?
+				fields[field_name] = field_type
+
+				if !sp.match(lexer.punctuation(.comma)) {
+					break
+				}
+			}
+		}
+
+		sp.consume(lexer.punctuation(.rbrace), 'Expected closing brace in record type')?
+
+		return ast.RecordTypeExpr{
+			name:     name
+			fields:   fields
+			position: position
+		}
+	}
 
 	// Check for parameterized types
 	if sp.check(lexer.punctuation(.lparen)) {

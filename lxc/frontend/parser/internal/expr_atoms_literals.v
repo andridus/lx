@@ -351,7 +351,6 @@ fn (mut ep ExpressionParser) parse_record_value_expression() ?ast.Expr {
 							value:    value
 							position: ep.get_current_position()
 						}
-
 					} else {
 						field_name := ep.current.get_value()
 						if !ep.current.is_identifier() {
@@ -366,7 +365,6 @@ fn (mut ep ExpressionParser) parse_record_value_expression() ?ast.Expr {
 							value:    value
 							position: ep.get_current_position()
 						}
-
 					}
 
 					if !ep.match(lexer.punctuation(.comma)) {

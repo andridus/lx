@@ -360,7 +360,6 @@ pub fn get_transitions() []Transition {
 			}
 			action:     .emit_error
 		},
-
 		Transition{
 			from_state: .string
 			to_state:   .string

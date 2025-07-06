@@ -314,6 +314,7 @@ pub fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 			for binding in expr.bindings {
 				vc.check_pattern(binding.pattern)
 				vc.check_expression(binding.value)
+				vc.check_expression(binding.guard)
 			}
 			vc.check_block_expression(expr.body)
 			vc.check_block_expression(expr.else_body)
@@ -330,6 +331,7 @@ pub fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 		ast.SimpleMatchExpr {
 			vc.check_expression(expr.value)
 			vc.check_pattern(expr.pattern)
+			vc.check_expression(expr.guard)
 		}
 		ast.MatchRescueExpr {
 			vc.check_match_rescue_expression(expr)

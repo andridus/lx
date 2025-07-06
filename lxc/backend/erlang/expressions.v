@@ -869,8 +869,6 @@ fn (mut gen ErlangGenerator) generate_block_assignment_inline(var_name string, b
 
 // generate_record_update generates code for record update expressions
 fn (mut gen ErlangGenerator) generate_record_update(expr ast.RecordUpdateExpr) string {
-
-
 	// Generate the base record expression
 	base_record := gen.generate_expression(expr.base_record)
 

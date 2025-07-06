@@ -28,7 +28,7 @@ fn (mut sp StatementParser) parse_record_definition() ?ast.Stmt {
 
 			sp.consume(lexer.operator(.type_cons), 'Expected :: after field name')?
 
-			field_type := sp.parse_type()?
+			field_type := sp.parse_type_expression()?
 
 			fields << ast.RecordFieldDef{
 				name:       field_name
