@@ -1517,36 +1517,108 @@ end.
 
 #### `for` loop (List Comprehensions):
 
+List comprehensions provide a concise way to create lists by iterating over collections and applying transformations with optional filtering.
+
+##### Basic For Expressions:
+
 ```lx
-# Simple for loop
-for x in list do
+# Simple for expression
+numbers = [1, 2, 3, 4, 5]
+doubled = for x in numbers do
   x * 2
 end
+# Result: [2, 4, 6, 8, 10]
 
-# For loop with guard
-for x in list when x > 0 do
+# For expression with guard (filtering)
+evens = for x in numbers when x > 3 do
   x * 2
 end
+# Result: [8, 10]
 
-# Complex pattern matching in for loops
-for %{name: name} = user in users when name != nil do
-  user.age
-end
-
-# Named variable with pattern matching
-for %{name: name1} = account in map_values(accounts) when name1 == name do
-  true
-end
-
-# Multiple pattern types supported
-for {key, value} in pairs when value > 10 do
-  key
-end
-
-for [head | _tail] in lists do
-  head
+# For expression with variables
+def process_data(data) do
+  for item in data do
+    transform(item)
+  end
 end
 ```
+
+##### Pattern Matching in For Expressions:
+
+```lx
+# Tuple pattern matching
+pairs = [{1, 2}, {3, 4}, {5, 6}]
+sums = for {a, b} in pairs do
+  a + b
+end
+# Result: [3, 7, 11]
+
+# Map pattern matching
+users = [%{name: "Alice", age: 30}, %{name: "Bob", age: 25}]
+names = for %{name: user_name, age: user_age} in users when user_age >= 30 do
+  user_name
+end
+# Result: ["Alice"]
+
+# List cons pattern matching
+lists = [[1, 2, 3], [4, 5], [6]]
+heads = for [head | _tail] in lists do
+  head * 10
+end
+# Result: [10, 40, 60]
+
+# Atom pattern matching
+statuses = [:ok, :error, :pending, :ok]
+successes = for :ok in statuses do
+  "success"
+end
+# Result: ["success", "success"]
+```
+
+##### Complex For Expressions:
+
+```lx
+# Multiple statements in body
+def process_items(items) do
+  for item in items do
+    result = transform(item)
+    validate(result)
+    result
+  end
+end
+
+# Nested data processing
+nested_data = [[1, 2], [3, 4], [5, 6]]
+flattened = for sublist in nested_data do
+  for x in sublist do
+    x * 2
+  end
+end
+# Result: [[2, 4], [6, 8], [10, 12]]
+```
+
+**Generated Erlang Code:**
+
+```lx
+# LX source
+for x in [1, 2, 3] when x > 1 do
+  x * 2
+end
+```
+
+```erlang
+% Generated Erlang
+[X * 2 || X <- [1, 2, 3], X > 1]
+```
+
+**Key Features:**
+- **List Comprehensions**: Compiles to efficient Erlang list comprehensions
+- **Pattern Matching**: Full support for destructuring patterns
+- **Guards**: Optional filtering with `when` clauses
+- **Type Inference**: Automatic type inference for result lists
+- **Multiple Statements**: Support for complex body expressions
+- **Nested Processing**: Can be nested for complex data transformations
+- **Performance**: Generates optimal Erlang code for list processing
 
 ---
 
@@ -1560,12 +1632,51 @@ end
 
 #### Lists:
 
+Lists are ordered collections of elements that support efficient iteration, pattern matching, and functional operations. They are one of the core data structures in LX and compile to native Erlang lists.
+
+##### List Creation:
+
 ```lx
-[1, 2, 3]
-[head | tail]
+# Simple list literals
+numbers = [1, 2, 3, 4]
+empty = []
+
+# Mixed type lists
+mixed = [1, "hello", :atom, true]
+
+# Nested lists
+matrix = [[1, 2], [3, 4], [5, 6]]
+
+# Lists with variables
+def create_list_with_vars() do
+  x = 10
+  y = 20
+  [x, y, x + y]
+end
+
+# Lists with function calls
+calculations = [length([1, 2, 3]), length([4, 5])]
 ```
 
-Used for iteration and recursion.
+##### List Assignment and Return Values:
+
+Lists can be used as function return values and assigned to variables:
+
+```lx
+# Function returning a list
+def get_numbers() do
+  [1, 2, 3, 4]
+end
+
+# List assignment
+numbers = [1, 2, 3, 4, 5]
+result = numbers
+
+# Empty list
+def empty_list() do
+  []
+end
+```
 
 ##### List Pattern Matching:
 
@@ -1590,418 +1701,111 @@ case nested_list do
   [head | [second | rest]] -> {head, second, rest}
   _ -> :unknown
 end
-```
 
-#### Maps:
-
-Maps are key-value data structures that provide efficient access and pattern matching capabilities.
-
-##### Map Creation:
-
-```lx
-# Maps with atom keys (using colon syntax)
-user = %{ name: "Alice", age: 30, active: true }
-
-# Maps with general keys (using arrow syntax)
-config = %{ "database_url" => "localhost", "port" => 5432 }
-
-# Mixed key types
-metadata = %{ :type => "user", "created_at" => "2023-01-01", 1 => "first" }
-
-# Empty map
-empty = %{}
-
-# Complex maps with nested structures
-complex = %{
-  users: [%{ name: "Alice" }, %{ name: "Bob" }],
-  config: %{ timeout: 5000 },
-  metadata: {:version, "1.0.0"}
-}
-```
-
-##### Map Access:
-
-```lx
-# Access with atom keys
-name = user[:name]
-age = user[:age]
-
-# Access with general keys
-url = config["database_url"]
-port = config["port"]
-
-# Access with variable keys
-key = "port"
-value = config[key]
-
-# Nested map access
-host = config[:database][:host]
-```
-
-##### Map Updates:
-
-Maps support immutable updates using the `%{map | key: value}` syntax:
-
-```lx
-# Simple field update
-updated_user = %{user | age: 31}
-
-# Multiple field updates
-updated_user = %{user | age: 31, status: "active"}
-
-# Updates with general keys
-updated_config = %{config | "timeout" => 10000}
-
-# Updates with mixed key types
-updated_data = %{data | :status => "active", "modified_at" => now()}
-
-# Complex update patterns
-def update_user_profile(user, changes) do
-  %{user |
-    profile: %{user[:profile] |
-      updated_at: now(),
-      changes: changes
-    }
-  }
+# List patterns in for expressions
+lists = [[1, 2, 3], [4, 5], [6]]
+heads = for [head | _tail] in lists do
+  head * 10
 end
+# Result: [10, 40, 60]
 ```
-
-**Generated Erlang Code:**
-```lx
-# LX source
-updated_user = %{user | age: 31, status: "active"}
-```
-
-```erlang
-% Generated Erlang
-Updated_user = #{age => 31, status => "active" | User}
-```
-
-**Key Features:**
-- **Immutable**: Original map is unchanged, returns a new map
-- **Multiple Updates**: Can update multiple fields in a single expression
-- **Mixed Key Types**: Supports atom, string, and other key types
-- **Efficient**: Generates optimal Erlang map update syntax
-- **Type Safety**: Updates are validated when possible
-
-##### Key Tokens:
-
-The Lx lexer automatically recognizes key tokens when an identifier is followed by a colon (`:`), creating a `KeyToken` that simplifies map creation with atom keys:
-
-```lx
-# Key token syntax (identifier:)
-user = %{ name: "Alice", age: 30 }
-
-# Equivalent to:
-user = %{ :name => "Alice", :age => 30 }
-```
-
-**Key Token Features:**
-- **Automatic recognition**: The lexer automatically detects `identifier:` as a key token
-- **Atom conversion**: Key tokens are automatically converted to atom literals
-- **Clean syntax**: Provides cleaner syntax for common atom keys
-- **Compatibility**: Works seamlessly with pattern matching and map updates
-
-##### Map Type Inference:
-
-```lx
-# Automatic type inference
-def create_user(name, age) do
-  %{name: name, age: age, active: true}
-end
-# Generates: -spec create_user(any(), any()) -> #{atom() => any()}.
-
-# Maps with uniform types
-def create_config() do
-  %{"host" => "localhost", "port" => "5432"}
-end
-# Generates: -spec create_config() -> #{string() => string()}.
-```
-
-##### Map Pattern Matching:
-
-```lx
-# Pattern matching in function parameters
-def process_user(%{ name: user_name, age: user_age }) do
-  if user_age >= 18 do
-    %{ name: user_name, status: :adult }
-  else
-    %{ name: user_name, status: :minor }
-  end
-end
-
-# Pattern matching in case expressions
-def handle_response(response) do
-  case response do
-    %{ status: :ok, data: data } -> data
-    %{ status: :error, message: msg } -> {:error, msg}
-    _ -> :unknown
-  end
-end
-
-# Nested map patterns
-data = %{ user: %{ name: "Alice", profile: %{ age: 25 } } }
-%{ user: %{ name: user_name, profile: %{ age: user_age } } } <- data
-
-# Map patterns with guards
-def validate_user(user) do
-  case user do
-    %{ age: age, name: name } when age >= 18 -> %{ name: name, status: :adult }
-    %{ age: age, name: name } when age < 18 -> %{ name: name, status: :minor }
-    _ -> :invalid
-  end
-end
-```
-
-##### Key Types and Syntax:
-
-- **Atom keys**: Use colon syntax `:key` or `key:` in patterns
-- **String keys**: Use arrow syntax `"key" =>` in creation and patterns
-- **Integer keys**: Use arrow syntax `1 =>` in creation and patterns
-- **Mixed keys**: Can combine different key types in the same map
-
-##### Pattern Matching Safety:
-
-- **Default behavior**: Both `=` and `<-` operators allow mixed key types by default
-- **Field validation**: Compiler validates that pattern fields exist in the map
-- **Missing field errors**: Clear error messages when trying to match non-existent fields
-- **Unsafe escape valve**: Use `unsafe` keyword to bypass all validations when needed
-
-##### Unsafe Pattern Matching:
-
-The `unsafe` keyword provides a complete escape valve for map pattern matching when you need to bypass all type checking and validation:
-
-```lx
-# When you're certain about the map structure but compiler can't verify it
-unsafe %{ dynamic_field: value } = runtime_generated_map
-
-# When working with external data that may have unknown fields
-unsafe %{ required_field: data, optional_field: maybe_value } <- external_data
-
-# When you need to handle maps with computed or variable keys
-key = "computed_" ++ suffix
-unsafe %{ key => value } <- dynamic_map
-```
-
-**Important**: `unsafe` completely disables type checking for that pattern match. Use it only when you're certain about the data structure and accept full responsibility for type correctness.
 
 ##### Generated Erlang Code:
 
+Lists compile directly to Erlang list syntax with full type inference:
+
 ```lx
-# Lx source
-user = %{ name: "Alice", age: 30 }
-%{ name: user_name, age: _user_age } <- user
-updated = %{user | age: 31}
-name = user[:name]
+# LX source
+def simple_list() do
+  [1, 2, 3, 4]
+end
+
+def mixed_list() do
+  [1, "hello", :atom, true]
+end
+
+def nested_list() do
+  [[1, 2], [3, 4], [5, 6]]
+end
 ```
 
 ```erlang
-% Generated Erlang
-User = #{name => "Alice", age => 30},
-#{name := User_name, age := _} = User,
-Updated = #{age => 31 | User},
-Name = maps:get(name, User)
+% Generated Erlang with automatic type specs
+-spec simple_list() -> [integer()].
+simple_list() ->
+[1, 2, 3, 4].
+
+-spec mixed_list() -> [integer()].
+mixed_list() ->
+[1, "hello", atom, true].
+
+-spec nested_list() -> [[integer()]].
+nested_list() ->
+[[1, 2], [3, 4], [5, 6]].
 ```
 
-**Map Implementation Features:**
-- **Map literals**: Use Erlang's native map syntax `#{key => value}`
-- **Map access**: Compile to `maps:get(Key, Map)` function calls for safe access
-- **Map updates**: Use Erlang's map update syntax `#{key => value | BaseMap}`
-- **Pattern matching**: Use Erlang's map pattern syntax `#{key := Variable}`
-- **Type safety**: Full integration with LX's type system and automatic spec generation
-- **Key tokens**: Automatic conversion of `identifier:` to atom keys for cleaner syntax
-- **Mixed keys**: Support for atom, string, integer, and other key types in the same map
+##### Type Inference for Lists:
 
-**Practical Example:**
-```lx
-# Complete map workflow
-def user_management_example() do
-  # Create user with mixed key types
-  user = %{
-    :id => 1,
-    "name" => "Alice",
-    email: "alice@example.com",  # Key token syntax
-    profile: %{age: 30, active: true}
-  }
+The LX compiler automatically infers list types based on their elements:
 
-  # Access fields
-  user_id = user[:id]
-  user_name = user["name"]
-  user_email = user[:email]
+- **Homogeneous lists**: `[1, 2, 3]` → `[integer()]`
+- **Empty lists**: `[]` → `[]` (empty list type)
+- **Mixed types**: `[1, "hello"]` → `[integer()]` (first element type precedence)
+- **Nested lists**: `[[1, 2], [3, 4]]` → `[[integer()]]`
+- **Variable lists**: Inferred as `[any()]` when elements have variable types
 
-  # Pattern match
-  %{:id => id, email: email, profile: %{age: age}} <- user
+##### List Operations in Context:
 
-  # Update user
-  updated_user = %{user |
-    email: "alice.smith@example.com",
-    profile: %{user[:profile] | age: 31}
-  }
-
-  {id, email, age, updated_user}
-end
-```
-
-This generates clean, efficient Erlang code that integrates seamlessly with the BEAM VM and OTP patterns.
-
-#### Binary/Bitstring Data:
-
-Binaries are efficient data structures for handling raw binary data, protocol parsing, and network communication.
-
-##### Binary Creation:
+Lists work seamlessly with all LX language features:
 
 ```lx
-# Simple binary literals
-empty = <<>>
-bytes = <<1, 2, 3, 4>>
-string_binary = <<"Hello World">>
+# Lists in assignments
+numbers = [1, 2, 3, 4, 5]
 
-# Binary with type specifiers
-integer_bin = <<42/integer>>
-float_bin = <<3.14159/float>>
-binary_spec = <<"data"/binary>>
-utf8_text = <<"Hello"/utf8>>
-signed_int = <<42/signed>>
-unsigned_int = <<42/unsigned>>
-
-# Binary with size specifications
-byte_value = <<255:8>>
-word_value = <<1024:16>>
-dword_value = <<16777216:32>>
-
-# Combined size and type
-sized_int = <<42:16/integer>>
-sized_binary = <<"test":32/binary>>
-
-# Complex binary construction
-header = <<version:8, length:16, flags:8>>
-packet = <<header/binary, "payload"/binary>>
-```
-
-##### Binary Pattern Matching:
-
-```lx
-# Basic binary pattern matching
-data = <<42, 255:8, 1024:16, "hello"/binary>>
-
-case data {
-    <<first, second:8, third:16, rest/binary>> ->
-        {first, second, third, rest}
-    _ ->
-        :error
-}
-
-# Advanced patterns with guards
-case binary_data {
-    <<first, second, rest/binary>> when first > 0 ->
-        {:valid, first, second, rest}
-    <<first/integer, _rest/binary>> ->
-        {:invalid, first}
-    _ ->
-        :unknown
-}
-
-# Protocol parsing examples
-case packet {
-    <<"HTTP/", version:2/binary, " ", status:3/binary, rest/binary>> ->
-        {:http, version, status, rest}
-    <<"GET ", path/binary>> ->
-        {:get, path}
-    _ ->
-        :unknown
-}
-
-# Binary patterns in function parameters
-def parse_header(<<version:8, length:16, data:length/binary>>) do
-  {:ok, version, length, data}
-end
-
-def parse_header(_) do
-  :error
-end
-
-# Binary pattern matching in assignments
-def extract_header(packet) do
-  <<version:8, length:16, flags:8>> = packet
-  {version, length, flags}
-end
-```
-
-##### Binary Type Specifiers:
-
-- **integer**: Signed integer (default size: 8 bits)
-- **float**: Floating point number
-- **binary**: Raw binary data
-- **utf8**: UTF-8 encoded text
-- **utf16**: UTF-16 encoded text
-- **utf32**: UTF-32 encoded text
-- **signed**: Signed integer
-- **unsigned**: Unsigned integer
-- **bits**: Bit-level data
-- **bitstring**: Variable-length bit data
-
-##### Size Specifications:
-
-```lx
-# Fixed sizes
-<<value:8>>    # 8 bits
-<<value:16>>   # 16 bits
-<<value:32>>   # 32 bits
-
-# Variable sizes
-length = 10
-<<data:length/binary>>
-
-# Combined with types
-<<number:32/integer>>
-<<text:16/utf8>>
-```
-
-##### Practical Applications:
-
-```lx
-# Network protocol parsing
-def parse_tcp_header(<<src_port:16, dst_port:16, seq:32, ack:32, rest/binary>>) do
-  {:tcp_header, src_port, dst_port, seq, ack, rest}
-end
-
-# Message encoding
-def encode_message(type_id, message) do
-  case type_id do
-    :text -> <<"TEXT"/binary, message/binary>>
-    :data -> <<"DATA"/binary, message/binary>>
-    :error -> <<"ERRO"/binary, message/binary>>
-    _ -> <<"UNKN"/binary, message/binary>>
+# Lists in function parameters
+def process_list(items) do
+  for item in items do
+    item * 2
   end
 end
 
-# File format handling
-def parse_png_chunk(<<length:32, type:4/binary, data:length/binary, crc:32>>) do
-  {:png_chunk, type, data, crc}
+# Lists with complex expressions
+def complex_list_operations() do
+  base = [1, 2, 3]
+  doubled = for x in base do x * 2 end
+  filtered = for x in doubled when x > 4 do x end
+  {base, doubled, filtered}
 end
 
-# Binary assignment pattern matching
-def process_packet(raw_data) do
-  # Extract header information using binary patterns
-  <<version:8, length:16, flags:8>> = raw_data
-
-  # Use extracted variables
-  if version == 1 do
-    {:v1, length, flags}
-  else
-    {:unsupported, version}
+# Lists in pattern matching
+def handle_data(data) do
+  case data do
+    [single] -> "one item: #{single}"
+    [first, second] -> "two items: #{first}, #{second}"
+    [head | tail] -> "many items starting with #{head}"
+    [] -> "empty list"
   end
 end
-
-# Complex binary pattern extraction
-def parse_network_frame(frame) do
-  # Extract multiple fields in one pattern match
-  <<preamble:32, header:64/binary, payload_size:16, payload:payload_size/binary, checksum:32>> = frame
-
-  # All variables are now available for use
-  {preamble, header, payload_size, payload, checksum}
-end
 ```
+
+##### Key Features:
+
+- **Native Syntax**: Direct mapping to Erlang lists with `[element, ...]` syntax
+- **Type Safety**: Automatic type inference and spec generation
+- **Pattern Matching**: Full support for destructuring with `[head | tail]` patterns
+- **For Expressions**: Seamless integration with list comprehensions
+- **Performance**: Compiles to efficient Erlang list operations
+- **Mixed Types**: Support for heterogeneous lists when needed
+- **Empty Lists**: Special handling for empty list type inference
+- **Function Integration**: Lists work as parameters, return values, and in all expressions
+
+##### Best Practices:
+
+- **Use homogeneous lists** when possible for better type safety
+- **Leverage pattern matching** for efficient list processing
+- **Combine with for expressions** for functional list transformations
+- **Use cons patterns** `[head | tail]` for recursive list processing
+- **Empty lists** are type-safe and work in all contexts
 
 ---
 

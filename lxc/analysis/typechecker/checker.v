@@ -476,12 +476,32 @@ fn (mut tc TypeChecker) check_with_expression(expr ast.WithExpr) {
 
 // check_for_expression performs type checking on a for expression
 fn (mut tc TypeChecker) check_for_expression(expr ast.ForExpr) {
-	tc.check_pattern(expr.pattern)
+	// Check the collection expression first
 	tc.check_expression(expr.collection)
+
+	// Create a new context for the for expression
+	tc.context = tc.context.new_child_context()
+
+	// Get the collection type and bind pattern variables accordingly
+	collection_type := tc.infer_expression_type(expr.collection)
+	match collection_type {
+		ListType {
+			element_type := collection_type.element_type
+			tc.check_pattern_with_value_type(expr.pattern, element_type)
+		}
+		else {
+			// For non-list types, use generic pattern checking
+			tc.check_pattern(expr.pattern)
+		}
+	}
+
+	// Check the guard expression (variables from pattern are now available)
 	tc.check_expression(expr.guard)
 
-	tc.context = tc.context.new_child_context()
+	// Check the body expression
 	tc.check_block_expression(expr.body)
+
+	// Restore parent context
 	if parent := tc.context.parent {
 		tc.context = parent
 	}
@@ -586,8 +606,25 @@ fn (mut tc TypeChecker) check_pattern_with_value_type(pattern ast.Pattern, value
 			}
 		}
 		ast.TuplePattern {
-			for element in pattern.elements {
-				tc.check_pattern(element)
+			// For tuple patterns, extract element types from value type
+			match value_type {
+				TupleType {
+					// Bind each pattern element with its corresponding type
+					for i, element in pattern.elements {
+						if i < value_type.element_types.len {
+							element_type := value_type.element_types[i]
+							tc.check_pattern_with_value_type(element, element_type)
+						} else {
+							tc.check_pattern(element)
+						}
+					}
+				}
+				else {
+					// Fallback to regular pattern checking
+					for element in pattern.elements {
+						tc.check_pattern(element)
+					}
+				}
 			}
 		}
 		ast.MapPattern {
@@ -734,6 +771,224 @@ fn (mut tc TypeChecker) check_function_clause(clause ast.FunctionClause) {
 	tc.check_expression(clause.guard)
 
 	tc.check_block_expression(clause.body)
+}
+
+// check_block_expression_with_context performs type checking on a block expression and saves variable types
+fn (mut tc TypeChecker) check_block_expression_with_context(block ast.BlockExpr, function_id string) {
+	// Create a new context for this block
+	tc.context = tc.context.new_child_context()
+
+	// Check each statement in the block
+	for stmt in block.body {
+		tc.check_statement_with_context(stmt, function_id)
+	}
+
+	// Restore parent context
+	if parent := tc.context.parent {
+		tc.context = parent
+	}
+}
+
+// check_statement_with_context performs type checking on a statement and saves variable types
+fn (mut tc TypeChecker) check_statement_with_context(stmt ast.Stmt, function_id string) {
+	match stmt {
+		ast.ExprStmt {
+			tc.check_expression_with_context(stmt.expr, function_id)
+		}
+		else {
+			// For other statements, use regular checking
+			tc.check_statement(stmt)
+		}
+	}
+}
+
+// check_expression_with_context performs type checking on an expression and saves variable types
+fn (mut tc TypeChecker) check_expression_with_context(expr ast.Expr, function_id string) {
+	match expr {
+		ast.ForExpr {
+			tc.check_for_expression_with_context(expr, function_id)
+		}
+		ast.SimpleMatchExpr {
+			tc.check_simple_match_expression_with_context(expr, function_id)
+		}
+		ast.AssignExpr {
+			tc.check_assignment_expression_with_context(expr, function_id)
+		}
+		else {
+			// For other expressions, use regular checking
+			tc.check_expression(expr)
+		}
+	}
+}
+
+// check_for_expression_with_context performs type checking on a for expression and saves variable types
+fn (mut tc TypeChecker) check_for_expression_with_context(expr ast.ForExpr, function_id string) {
+	// Check the collection expression first
+	tc.check_expression_with_context(expr.collection, function_id)
+
+	// Create a new context for the for expression
+	tc.context = tc.context.new_child_context()
+
+	// Get the collection type and bind pattern variables accordingly
+	collection_type := tc.infer_expression_type(expr.collection)
+	match collection_type {
+		ListType {
+			element_type := collection_type.element_type
+			tc.check_pattern_with_value_type_and_context(expr.pattern, element_type, function_id)
+		}
+		else {
+			// For non-list types, use generic pattern checking
+			tc.check_pattern_with_context(expr.pattern, function_id)
+		}
+	}
+
+	// Check the guard expression (variables from pattern are now available)
+	tc.check_expression_with_context(expr.guard, function_id)
+
+	// Check the body expression
+	tc.check_block_expression_with_context(expr.body, function_id)
+
+	// Restore parent context
+	if parent := tc.context.parent {
+		tc.context = parent
+	}
+}
+
+// check_simple_match_expression_with_context performs type checking on a simple match expression and saves variable types
+fn (mut tc TypeChecker) check_simple_match_expression_with_context(expr ast.SimpleMatchExpr, function_id string) {
+	// Check the value expression
+	tc.check_expression_with_context(expr.value, function_id)
+
+	// Get the type of the value being matched
+	value_type := tc.infer_expression_type(expr.value)
+
+	// Check the pattern with context of the value type (this binds variables)
+	tc.check_pattern_with_value_type_and_context(expr.pattern, value_type, function_id)
+
+	// Check the guard expression (variables from pattern are now available)
+	tc.check_expression_with_context(expr.guard, function_id)
+}
+
+// check_assignment_expression_with_context performs type checking on an assignment expression and saves variable types
+fn (mut tc TypeChecker) check_assignment_expression_with_context(expr ast.AssignExpr, function_id string) {
+	// Check the value expression first
+	tc.check_expression_with_context(expr.value, function_id)
+
+	// Infer the type of the value
+	value_type := tc.infer_expression_type(expr.value)
+
+	// Armazena o tipo da expressão para a variável (para qualquer tipo, não apenas records)
+	tc.context.store_expression_type_for_var(expr.name, value_type)
+
+	// Check type annotation if present
+	if type_annotation := expr.type_annotation {
+		tc.check_type_annotation(expr.value, type_annotation)
+		// Use the annotated type for binding
+		annotated_type := tc.convert_type_expression_to_type_expr(type_annotation)
+		tc.context.bind(expr.name, annotated_type, expr.position)
+		// Store the variable type for the generator
+		tc.context.store_function_var_type(function_id, expr.name, tc.type_expr_to_spec_string(annotated_type))
+	} else {
+		// Bind the variable to the inferred type
+		tc.context.bind(expr.name, value_type, expr.position)
+		// Store the variable type for the generator
+		tc.context.store_function_var_type(function_id, expr.name, tc.type_expr_to_spec_string(value_type))
+	}
+}
+
+// check_pattern_with_value_type_and_context performs type checking on a pattern with knowledge of the value type and saves variable types
+fn (mut tc TypeChecker) check_pattern_with_value_type_and_context(pattern ast.Pattern, value_type TypeExpr, function_id string) {
+	match pattern {
+		ast.VarPattern {
+			// Bind variable with the type from the value
+			tc.context.bind(pattern.name, value_type, pattern.position)
+			// Store the variable type for the generator
+			tc.context.store_function_var_type(function_id, pattern.name, tc.type_expr_to_spec_string(value_type))
+		}
+		ast.TuplePattern {
+			// For tuple patterns, extract element types from value type
+			match value_type {
+				TupleType {
+					// Bind each pattern element with its corresponding type
+					for i, element in pattern.elements {
+						if i < value_type.element_types.len {
+							element_type := value_type.element_types[i]
+							tc.check_pattern_with_value_type_and_context(element, element_type,
+								function_id)
+						} else {
+							tc.check_pattern_with_context(element, function_id)
+						}
+					}
+				}
+				else {
+					// Fallback to regular pattern checking
+					for element in pattern.elements {
+						tc.check_pattern_with_context(element, function_id)
+					}
+				}
+			}
+		}
+		else {
+			// For other patterns, use regular checking
+			tc.check_pattern_with_value_type(pattern, value_type)
+		}
+	}
+}
+
+// check_pattern_with_context performs type checking on a pattern and saves variable types
+fn (mut tc TypeChecker) check_pattern_with_context(pattern ast.Pattern, function_id string) {
+	match pattern {
+		ast.VarPattern {
+			// Only bind if not already bound in context
+			if _ := tc.context.lookup(pattern.name) {
+				// Variable already bound, don't override
+			} else {
+				// Bind variable with inferred type
+				param_type := tc.infer_pattern_type(pattern)
+				tc.context.bind(pattern.name, param_type, pattern.position)
+				// Store the variable type for the generator
+				tc.context.store_function_var_type(function_id, pattern.name, tc.type_expr_to_spec_string(param_type))
+			}
+		}
+		else {
+			// For other patterns, use regular checking
+			tc.check_pattern(pattern)
+		}
+	}
+}
+
+// type_expr_to_spec_string converts a TypeExpr to Erlang spec string format
+fn (tc &TypeChecker) type_expr_to_spec_string(type_expr TypeExpr) string {
+	return match type_expr {
+		TypeConstructor {
+			match type_expr.name {
+				'integer' { 'integer()' }
+				'float' { 'float()' }
+				'string' { 'string()' }
+				'boolean' { 'boolean()' }
+				'atom' { 'atom()' }
+				'nil' { 'nil' }
+				'any' { 'any()' }
+				else { 'any()' }
+			}
+		}
+		ListType {
+			'[${tc.type_expr_to_spec_string(type_expr.element_type)}]'
+		}
+		TupleType {
+			element_specs := type_expr.element_types.map(tc.type_expr_to_spec_string(it))
+			'{${element_specs.join(', ')}}'
+		}
+		MapType {
+			'map()'
+		}
+		RecordType {
+			'#${type_expr.name.to_lower()}{}'
+		}
+		else {
+			'any()'
+		}
+	}
 }
 
 // apply_directive applies a directive to a function
@@ -1060,7 +1315,7 @@ fn (mut tc TypeChecker) infer_expression_type(expr ast.Expr) TypeExpr {
 			return make_type_var('a')
 		}
 		ast.ForExpr {
-			return make_list_type(make_type_var('a'))
+			return tc.infer_for_expression_type(expr)
 		}
 		ast.SimpleMatchExpr {
 			return tc.infer_simple_match_expression_type(expr)
@@ -1157,6 +1412,38 @@ fn (mut tc TypeChecker) infer_block_expression_type(expr ast.BlockExpr) TypeExpr
 	}
 
 	return nil_type
+}
+
+// infer_for_expression_type infers the type of a for expression
+fn (mut tc TypeChecker) infer_for_expression_type(expr ast.ForExpr) TypeExpr {
+	// Create a new context for the for expression
+	tc.context = tc.context.new_child_context()
+
+	// Get the collection type and infer element type
+	collection_type := tc.infer_expression_type(expr.collection)
+
+	// Bind pattern variables based on collection type
+	match collection_type {
+		ListType {
+			element_type := collection_type.element_type
+			tc.check_pattern_with_value_type(expr.pattern, element_type)
+		}
+		else {
+			// For non-list types, use generic pattern checking
+			tc.check_pattern(expr.pattern)
+		}
+	}
+
+	// Infer the type of the body expression
+	body_type := tc.infer_block_expression_type(expr.body)
+
+	// Restore parent context
+	if parent := tc.context.parent {
+		tc.context = parent
+	}
+
+	// Return a list of the body type
+	return make_list_type(body_type)
 }
 
 // check_type_annotation validates type annotations in expressions

@@ -164,7 +164,7 @@ pub fn (mut gen ErlangGenerator) generate_expression(expr ast.Expr) string {
 			return gen.generate_with_expression(expr)
 		}
 		ast.ForExpr {
-			return '%% ForExpr not implemented'
+			return gen.generate_for_expression(expr)
 		}
 		ast.ReceiveExpr {
 			return gen.generate_receive(expr)
@@ -884,4 +884,32 @@ fn (mut gen ErlangGenerator) generate_record_update(expr ast.RecordUpdateExpr) s
 	// In modern Erlang, records are implemented as maps, so we use map update syntax
 	result := '${base_record}#{${field_updates.join(', ')}}'
 	return result
+}
+
+// generate_for_expression generates code for for expressions (list comprehensions)
+fn (mut gen ErlangGenerator) generate_for_expression(expr ast.ForExpr) string {
+	pattern := gen.generate_pattern(expr.pattern)
+	collection := gen.generate_expression(expr.collection)
+	body := gen.generate_block_expression(expr.body)
+
+	// Handle guard if present
+	guard_str := if expr.guard is ast.LiteralExpr {
+		lit_expr := expr.guard as ast.LiteralExpr
+		if lit_expr.value is ast.BooleanLiteral {
+			bool_lit := lit_expr.value as ast.BooleanLiteral
+			if bool_lit.value {
+				// Default true guard, no filter needed
+				''
+			} else {
+				', ${gen.generate_expression(expr.guard)}'
+			}
+		} else {
+			', ${gen.generate_expression(expr.guard)}'
+		}
+	} else {
+		', ${gen.generate_expression(expr.guard)}'
+	}
+
+	// Generate list comprehension
+	return '[${body} || ${pattern} <- ${collection}${guard_str}]'
 }

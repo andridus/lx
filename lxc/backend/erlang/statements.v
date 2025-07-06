@@ -1,6 +1,7 @@
 module erlang
 
 import ast
+import analysis.typechecker
 
 // generate_statement generates code for a single statement
 pub fn (mut gen ErlangGenerator) generate_statement(stmt ast.Stmt) string {
@@ -235,8 +236,21 @@ fn (gen ErlangGenerator) infer_expression_return_type_with_context(expr ast.Expr
 					else {}
 				}
 			}
-			// If not found in parameters, variables extracted from patterns are unknown
-			// In case expressions, variables from patterns should be treated as any()
+
+			// Try to get type from function_contexts (only for specific cases)
+			// For now, this is mainly used for for expressions
+			if type_ctx := gen.type_context {
+				if var_type := type_ctx.get_function_var_type(gen.current_function_id,
+					expr.name)
+				{
+					// Only use function context types for certain cases to avoid breaking existing functionality
+					if var_type != 'any()' {
+						return var_type
+					}
+				}
+			}
+
+			// If not found in parameters or context, return any()
 			'any()'
 		}
 		ast.TupleExpr {
@@ -328,6 +342,11 @@ fn (gen ErlangGenerator) infer_expression_return_type_with_context(expr ast.Expr
 			// Return the same record type as the base record
 			'#${expr.record_name.to_lower()}{}'
 		}
+		ast.ForExpr {
+			// For expressions return a list of the body type
+			body_type := gen.infer_for_expression_body_type(expr, parameters)
+			'[${body_type}]'
+		}
 		else {
 			'any()'
 		}
@@ -409,6 +428,10 @@ fn (gen ErlangGenerator) infer_binary_expression_return_type_with_context(expr a
 
 // generate_function generates code for a function, opening a new scope for each clause
 pub fn (mut gen ErlangGenerator) generate_function(func ast.FunctionStmt) string {
+	// Store the current function ID for type lookups
+	original_function_id := gen.current_function_id
+	gen.current_function_id = func.id
+
 	// Get the function-specific type context
 	mut function_type_context := unsafe { nil }
 	if type_ctx := gen.type_context {
@@ -501,8 +524,9 @@ pub fn (mut gen ErlangGenerator) generate_function(func ast.FunctionStmt) string
 		function_definitions << '\n'
 	}
 
-	// Restore the original type context
+	// Restore the original type context and function ID
 	gen.type_context = original_type_context
+	gen.current_function_id = original_function_id
 
 	return function_definitions.join('')
 }
@@ -920,5 +944,150 @@ fn (gen ErlangGenerator) find_common_type_for_values(type1 string, type2 string)
 		return type1
 	} else {
 		return type2
+	}
+}
+
+// infer_for_expression_body_type infers the body type of a for expression
+fn (gen ErlangGenerator) infer_for_expression_body_type(expr ast.ForExpr, parameters []ast.Pattern) string {
+	// First, infer the type of the collection
+	collection_type := gen.infer_expression_return_type_with_context(expr.collection,
+		parameters)
+
+	// Extract element type from collection type
+	mut element_type := 'any()'
+	if collection_type.starts_with('[') && collection_type.ends_with(']') {
+		// Extract element type from [element_type] format
+		element_type = collection_type[1..collection_type.len - 1]
+	}
+
+	// Create modified patterns with inferred types
+	mut for_parameters := []ast.Pattern{}
+	for_parameters << gen.create_typed_pattern(expr.pattern, element_type)
+
+	// Infer the body type with the modified parameters
+	return gen.infer_block_return_type(expr.body, for_parameters)
+}
+
+// create_typed_pattern creates a pattern with type information based on the element type
+fn (gen ErlangGenerator) create_typed_pattern(pattern ast.Pattern, element_type string) ast.Pattern {
+	match pattern {
+		ast.VarPattern {
+			// Create a VarPattern with the inferred type
+			type_annotation := ast.SimpleTypeExpr{
+				name:     element_type.replace('()', '')
+				position: pattern.position
+			}
+			return ast.VarPattern{
+				name:            pattern.name
+				position:        pattern.position
+				type_annotation: type_annotation
+			}
+		}
+		ast.TuplePattern {
+			// For tuple patterns, extract individual element types
+			mut element_types := []string{}
+			if element_type.starts_with('{') && element_type.ends_with('}') {
+				// Parse tuple type like "{integer(), integer()}"
+				inner_types := element_type[1..element_type.len - 1]
+				// Better parsing - handle nested types and spaces
+				element_types = gen.parse_tuple_element_types(inner_types)
+			} else {
+				// If we can't parse the tuple type, use any() for all elements
+				for _ in pattern.elements {
+					element_types << 'any()'
+				}
+			}
+
+			// Create typed patterns for each tuple element
+			mut typed_elements := []ast.Pattern{}
+			for i, elem_pattern in pattern.elements {
+				elem_type := if i < element_types.len { element_types[i] } else { 'any()' }
+				typed_elements << gen.create_typed_pattern(elem_pattern, elem_type)
+			}
+
+			return ast.TuplePattern{
+				elements: typed_elements
+			}
+		}
+		else {
+			// For other patterns, return as-is
+			return pattern
+		}
+	}
+}
+
+// parse_tuple_element_types parses tuple element types from a string like "integer(), integer()"
+fn (gen ErlangGenerator) parse_tuple_element_types(types_str string) []string {
+	mut result := []string{}
+	mut current := ''
+	mut paren_count := 0
+
+	for ch in types_str {
+		match ch {
+			`(` {
+				paren_count++
+				current += ch.ascii_str()
+			}
+			`)` {
+				paren_count--
+				current += ch.ascii_str()
+			}
+			`,` {
+				if paren_count == 0 {
+					result << current.trim_space()
+					current = ''
+				} else {
+					current += ch.ascii_str()
+				}
+			}
+			else {
+				current += ch.ascii_str()
+			}
+		}
+	}
+
+	if current.trim_space() != '' {
+		result << current.trim_space()
+	}
+
+	return result
+}
+
+// convert_type_expr_to_spec_string converts a TypeExpr to a spec string
+fn (gen ErlangGenerator) convert_type_expr_to_spec_string(type_expr typechecker.TypeExpr) string {
+	return match type_expr {
+		typechecker.TypeVar {
+			'any()'
+		}
+		typechecker.TypeConstructor {
+			match type_expr.name {
+				'integer' { 'integer()' }
+				'float' { 'float()' }
+				'string' { 'string()' }
+				'boolean' { 'boolean()' }
+				'atom' { 'atom()' }
+				'nil' { 'nil' }
+				else { '${type_expr.name}()' }
+			}
+		}
+		typechecker.ListType {
+			'[${gen.convert_type_expr_to_spec_string(type_expr.element_type)}]'
+		}
+		typechecker.TupleType {
+			element_specs := type_expr.element_types.map(gen.convert_type_expr_to_spec_string(it))
+			'{${element_specs.join(', ')}}'
+		}
+		typechecker.MapType {
+			'#{${gen.convert_type_expr_to_spec_string(type_expr.key_type)} => ${gen.convert_type_expr_to_spec_string(type_expr.value_type)}}'
+		}
+		typechecker.FunctionType {
+			'fun()'
+		}
+		typechecker.RecordType {
+			'#${type_expr.name}{}'
+		}
+		typechecker.BinaryType {
+			'binary()'
+		}
 	}
 }

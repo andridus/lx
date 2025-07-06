@@ -393,6 +393,9 @@ fn (mut sp StatementParser) parse_clause_expression() ?ast.Expr {
 				.lbrace {
 					sp.parse_tuple_expression()
 				}
+				.lbracket {
+					sp.parse_list_expression()
+				}
 				else {
 					sp.add_error('Unexpected punctuation', 'Got ${sp.current.str()}')
 					none

@@ -7,19 +7,21 @@ import codegen { CodegenResult }
 // ErlangGenerator generates Erlang code from LX AST
 pub struct ErlangGenerator {
 mut:
-	defined_types map[string]ast.TypeAliasStmt // Map of type name to type definition
-	var_scopes    []map[string]string          // Stack of variable scopes: original name -> hashed name
-	next_hash     int                       // Counter for unique hashes
-	type_context  ?&typechecker.TypeContext // Type context for record type information
+	defined_types       map[string]ast.TypeAliasStmt // Map of type name to type definition
+	var_scopes          []map[string]string          // Stack of variable scopes: original name -> hashed name
+	next_hash           int                       // Counter for unique hashes
+	type_context        ?&typechecker.TypeContext // Type context for record type information
+	current_function_id string                    // Current function ID for type lookups
 }
 
 // new_erlang_generator creates a new Erlang code generator
 pub fn new_erlang_generator() ErlangGenerator {
 	return ErlangGenerator{
-		defined_types: map[string]ast.TypeAliasStmt{}
-		var_scopes:    [map[string]string{}]
-		next_hash:     0
-		type_context:  none
+		defined_types:       map[string]ast.TypeAliasStmt{}
+		var_scopes:          [map[string]string{}]
+		next_hash:           0
+		type_context:        none
+		current_function_id: ''
 	}
 }
 
