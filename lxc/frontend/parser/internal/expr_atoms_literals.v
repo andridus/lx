@@ -10,7 +10,13 @@ fn (mut ep ExpressionParser) parse_atom_expression() ?ast.Expr {
 			ep.parse_identifier_expression()
 		}
 		lexer.UpperIdentToken {
-			ep.parse_identifier_expression()
+			if ep.peek() is lexer.PunctuationToken {
+				punc := ep.peek() as lexer.PunctuationToken
+				if punc.value == .lbrace {
+					return ep.parse_record_value_expression()
+				}
+			}
+			return ep.parse_identifier_expression()
 		}
 		lexer.StringToken {
 			ep.parse_string_literal()
@@ -313,5 +319,118 @@ fn (mut ep ExpressionParser) parse_key_as_atom() ?ast.Expr {
 			value: token.value
 		}
 		position: ast.new_position(token.position.line, token.position.column, token.position.filename)
+	}
+}
+
+fn (mut ep ExpressionParser) parse_record_value_expression() ?ast.Expr {
+	record_name := ep.current.get_value()
+	ep.advance()
+	ep.consume(lexer.punctuation(.lbrace), 'Expected opening brace after record name')?
+
+	// Check if this is a record update: RecordName{var | field: value, ...}
+	// Look ahead to see if the first token is followed by |
+	if !ep.check(lexer.punctuation(.rbrace)) {
+		// Parse the first expression (should be the base record variable)
+		base_record := ep.parse_atom_expression()?
+
+		// Check if next token is pipe operator
+		if ep.check(lexer.operator(.pipe)) {
+			ep.advance() // consume '|'
+
+			// Parse fields after the pipe
+			mut fields := []ast.RecordField{}
+			if !ep.check(lexer.punctuation(.rbrace)) {
+				for {
+					if ep.current is lexer.KeyToken {
+						token := ep.current as lexer.KeyToken
+						field_name := token.value
+						ep.advance()
+						value := ep.parse_expression()?
+						fields << ast.RecordField{
+							name:     field_name
+							value:    value
+							position: ep.get_current_position()
+						}
+
+					} else {
+						field_name := ep.current.get_value()
+						if !ep.current.is_identifier() {
+							ep.add_error('Expected field name', 'Got ${ep.current.str()}')
+							return none
+						}
+						ep.advance()
+						ep.consume(lexer.punctuation(.colon), 'Expected colon after field name')?
+						value := ep.parse_expression()?
+						fields << ast.RecordField{
+							name:     field_name
+							value:    value
+							position: ep.get_current_position()
+						}
+
+					}
+
+					if !ep.match(lexer.punctuation(.comma)) {
+						break
+					}
+				}
+			}
+
+			ep.consume(lexer.punctuation(.rbrace), 'Expected closing brace for record update')?
+
+			return ast.RecordUpdateExpr{
+				record_name: record_name
+				base_record: base_record
+				fields:      fields
+				position:    ep.get_current_position()
+			}
+		}
+	}
+
+	// This is a regular record literal: RecordName{field: value, ...}
+	// Reset position to after the opening brace
+	ep.position -= 1 // Go back to the opening brace
+	ep.current = ep.tokens[ep.position]
+
+	mut fields := []ast.RecordField{}
+	if !ep.check(lexer.punctuation(.rbrace)) {
+		for {
+			if ep.current is lexer.KeyToken {
+				token := ep.current as lexer.KeyToken
+				field_name := token.value
+				ep.advance()
+				value := ep.parse_expression()?
+				fields << ast.RecordField{
+					name:     field_name
+					value:    value
+					position: ep.get_current_position()
+				}
+			} else {
+				field_name := ep.current.get_value()
+				if !ep.current.is_identifier() {
+					ep.add_error('Expected field name', 'Got ${ep.current.str()}')
+					return none
+				}
+				ep.advance()
+				ep.consume(lexer.punctuation(.colon), 'Expected colon after field name')?
+				value := ep.parse_expression()?
+				fields << ast.RecordField{
+					name:     field_name
+					value:    value
+					position: ep.get_current_position()
+				}
+			}
+
+			if !ep.match(lexer.punctuation(.comma)) {
+				break
+			}
+		}
+	}
+
+	ep.consume(lexer.punctuation(.rbrace), 'Expected closing brace for record value')?
+
+	return ast.RecordLiteralExpr{
+		name:     record_name
+		fields:   fields
+		position: ep.get_current_position()
 	}
 }

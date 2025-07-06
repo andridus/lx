@@ -9,7 +9,8 @@ pub struct ErlangGenerator {
 mut:
 	defined_types map[string]ast.TypeAliasStmt // Map of type name to type definition
 	var_scopes    []map[string]string          // Stack of variable scopes: original name -> hashed name
-	next_hash     int // Counter for unique hashes
+	next_hash     int                       // Counter for unique hashes
+	type_context  ?&typechecker.TypeContext // Type context for record type information
 }
 
 // new_erlang_generator creates a new Erlang code generator
@@ -18,11 +19,14 @@ pub fn new_erlang_generator() ErlangGenerator {
 		defined_types: map[string]ast.TypeAliasStmt{}
 		var_scopes:    [map[string]string{}]
 		next_hash:     0
+		type_context:  none
 	}
 }
 
 // generate_module generates a complete Erlang module (implements CodeGenerator interface)
-pub fn (mut gen ErlangGenerator) generate_module(module_stmt ast.ModuleStmt, type_ctx typechecker.TypeContext) CodegenResult {
+pub fn (mut gen ErlangGenerator) generate_module(module_stmt ast.ModuleStmt, type_ctx &typechecker.TypeContext) CodegenResult {
+	// Store the type context for use in expression generation
+	gen.type_context = unsafe { type_ctx }
 	// Collect all type definitions first
 	gen.collect_type_definitions(module_stmt.statements)
 

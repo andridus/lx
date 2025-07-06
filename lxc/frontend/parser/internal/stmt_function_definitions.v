@@ -2,6 +2,7 @@ module internal
 
 import ast
 import lexer
+import rand
 
 // collect_pending_directives collects directive tokens that precede the current position
 fn (mut sp StatementParser) collect_pending_directives() []string {
@@ -80,6 +81,7 @@ pub fn (mut sp StatementParser) parse_function_statement() ?ast.Stmt {
 		}
 
 		return ast.FunctionStmt{
+			id:         rand.uuid_v4()
 			name:       name
 			clauses:    clauses
 			is_private: false
@@ -92,6 +94,7 @@ pub fn (mut sp StatementParser) parse_function_statement() ?ast.Stmt {
 	if sp.check(lexer.punctuation(.lparen)) {
 		clause := sp.parse_function_clause()?
 		return ast.FunctionStmt{
+			id:         rand.uuid_v4()
 			name:       name
 			clauses:    [clause]
 			is_private: false
@@ -156,6 +159,7 @@ fn (mut sp StatementParser) parse_private_function_statement() ?ast.Stmt {
 	}
 
 	return ast.FunctionStmt{
+		id:         rand.uuid_v4()
 		name:       name
 		clauses:    clauses
 		is_private: true

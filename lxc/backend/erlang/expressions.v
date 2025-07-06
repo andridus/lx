@@ -84,6 +84,9 @@ fn get_expression_precedence(expr ast.Expr) ErlangPrecedence {
 		ast.BlockExpr {
 			return .primary
 		}
+		ast.RecordUpdateExpr {
+			return .primary
+		}
 		else {
 			return .primary
 		}
@@ -147,6 +150,9 @@ pub fn (mut gen ErlangGenerator) generate_expression(expr ast.Expr) string {
 		}
 		ast.RecordLiteralExpr {
 			return gen.generate_record_literal(expr)
+		}
+		ast.RecordUpdateExpr {
+			return gen.generate_record_update(expr)
 		}
 		ast.IfExpr {
 			return gen.generate_if_expression(expr)
@@ -234,6 +240,9 @@ pub fn (mut gen ErlangGenerator) generate_expression_in_guard(expr ast.Expr) str
 		}
 		ast.RecordLiteralExpr {
 			return gen.generate_record_literal(expr)
+		}
+		ast.RecordUpdateExpr {
+			return gen.generate_record_update(expr)
 		}
 		ast.IfExpr {
 			return gen.generate_if_expression(expr)
@@ -485,7 +494,6 @@ fn (mut gen ErlangGenerator) generate_case(case_expr ast.CaseExpr) string {
 				lit_expr := clause.guard as ast.LiteralExpr
 				if lit_expr.value is ast.BooleanLiteral {
 					bool_lit := lit_expr.value as ast.BooleanLiteral
-					// Only generate guard if it's not the default "true"
 					if !bool_lit.value {
 						guard = ' when ' + gen.generate_expression(clause.guard)
 					}
@@ -547,7 +555,7 @@ fn (mut gen ErlangGenerator) generate_map_update(expr ast.MapUpdateExpr) string 
 
 	if expr.base_map != ast.Expr(ast.LiteralExpr{}) {
 		base := gen.generate_expression(expr.base_map)
-		return '#{${entries} | ${base}}'
+		return '${base}#{${entries}}'
 	} else {
 		return '#{${entries}}'
 	}
@@ -558,15 +566,31 @@ fn (mut gen ErlangGenerator) generate_record_literal(expr ast.RecordLiteralExpr)
 	mut fields := []string{}
 	for field in expr.fields {
 		value := gen.generate_expression(field.value)
-		fields << '${field.name}: ${value}'
+		fields << '${field.name} = ${value}'
 	}
-	return '#${expr.name}{${fields.join(', ')}}'
+	return '#${expr.name.to_lower()}{${fields.join(', ')}}'
 }
 
 // generate_record_access generates code for record access
 fn (mut gen ErlangGenerator) generate_record_access(expr ast.RecordAccessExpr) string {
 	record := gen.generate_expression(expr.record)
-	return '${record}#${expr.field}'
+
+	// Get the record type from the type context (set by typechecker)
+	record_name := if type_ctx := gen.type_context {
+		if record_type := type_ctx.get_record_type(expr) {
+			record_type.to_lower()
+		} else {
+			// Fallback to a default record name if type context is not available
+			// This can happen when typechecker is not run or when record type is not properly stored
+			'unknown_record'
+		}
+	} else {
+		// Fallback to a default record name if type context is not available
+		'unknown_record'
+	}
+
+	// In Erlang, record access uses: Record#record_name.field
+	return '${record}#${record_name}.${expr.field}'
 }
 
 // generate_fun_expression generates code for function expressions
@@ -665,6 +689,29 @@ fn (mut gen ErlangGenerator) generate_with_bindings(bindings []ast.WithBinding, 
 	pattern := gen.generate_pattern(current_binding.pattern)
 	value := gen.generate_expression(current_binding.value)
 
+	// Generate guard clause if present
+	guard_clause := match current_binding.guard {
+		ast.LiteralExpr {
+			// Check if it's the default true guard
+			match current_binding.guard.value {
+				ast.BooleanLiteral {
+					if current_binding.guard.value.value {
+						// Default true guard, no need to generate when clause
+						''
+					} else {
+						' when ${gen.generate_expression_in_guard(current_binding.guard)}'
+					}
+				}
+				else {
+					' when ${gen.generate_expression_in_guard(current_binding.guard)}'
+				}
+			}
+		}
+		else {
+			' when ${gen.generate_expression_in_guard(current_binding.guard)}'
+		}
+	}
+
 	// Generate the next level of bindings or the final body
 	next_code := gen.generate_with_bindings(bindings, body, else_body, index + 1)
 
@@ -679,10 +726,10 @@ fn (mut gen ErlangGenerator) generate_with_bindings(bindings []ast.WithBinding, 
 	if next_code.contains('case') {
 		// This is a nested case, format it properly
 		indented_next := next_code.split('\n').map('        ${it}').join('\n')
-		return 'case ${value} of\n    ${pattern} ->\n${indented_next};\n    Other ->\n        ${failure_branch}\nend'
+		return 'case ${value} of\n    ${pattern}${guard_clause} ->\n${indented_next};\n    Other ->\n        ${failure_branch}\nend'
 	} else {
 		// This is the final case, format normally
-		return 'case ${value} of\n    ${pattern} ->\n        ${next_code};\n    Other ->\n        ${failure_branch}\nend'
+		return 'case ${value} of\n    ${pattern}${guard_clause} ->\n        ${next_code};\n    Other ->\n        ${failure_branch}\nend'
 	}
 }
 
@@ -710,13 +757,34 @@ fn (mut gen ErlangGenerator) indent_code(code string, level int) string {
 
 // generate_simple_match generates code for simple match expressions
 fn (mut gen ErlangGenerator) generate_simple_match(expr ast.SimpleMatchExpr) string {
-	pattern := gen.generate_pattern(expr.pattern)
+	gen.enter_scope()
+	pattern := gen.generate_pattern_with_binding(expr.pattern)
+
+	// Generate guard clause if present
+	mut guard_clause := ''
+	if expr.guard != ast.Expr(ast.GuardExpr{}) {
+		if expr.guard is ast.LiteralExpr {
+			lit_expr := expr.guard as ast.LiteralExpr
+			if lit_expr.value is ast.BooleanLiteral {
+				bool_lit := lit_expr.value as ast.BooleanLiteral
+				// Only generate guard if it's not the default "true"
+				if !bool_lit.value {
+					guard_clause = ' when ' + gen.generate_expression_in_guard(expr.guard)
+				}
+			} else {
+				guard_clause = ' when ' + gen.generate_expression_in_guard(expr.guard)
+			}
+		} else {
+			guard_clause = ' when ' + gen.generate_expression_in_guard(expr.guard)
+		}
+	}
+	gen.exit_scope()
+
 	value := gen.generate_expression(expr.value)
 
 	// Simple match returns the original value if pattern doesn't match
-	// Note: This is a simplified version. The proper implementation should be handled
-	// at the statement level to include subsequent expressions in the success branch
-	return 'case ${value} of\n    ${pattern} ->\n        ${value};\n    Other ->\n        Other\nend'
+	// Note: This é uma versão simplificada. O correto seria tratar no nível de statements.
+	return 'case ${value} of\n    ${pattern}${guard_clause} ->\n        ${value};\n    Other ->\n        Other\nend'
 }
 
 // generate_match_rescue generates code for match rescue expressions
@@ -797,4 +865,25 @@ fn (mut gen ErlangGenerator) generate_block_assignment_inline(var_name string, b
 	result << '% End Block of ${gen.capitalize_variable(var_name)}'
 
 	return result.join('\n')
+}
+
+// generate_record_update generates code for record update expressions
+fn (mut gen ErlangGenerator) generate_record_update(expr ast.RecordUpdateExpr) string {
+
+
+	// Generate the base record expression
+	base_record := gen.generate_expression(expr.base_record)
+
+	// Generate the updated fields
+	mut field_updates := []string{}
+	for field in expr.fields {
+		field_value := gen.generate_expression(field.value)
+		field_updates << '${field.name} => ${field_value}'
+	}
+
+	// In modern Erlang, records are implemented as maps, so we use map update syntax
+
+	// In modern Erlang, records are implemented as maps, so we use map update syntax
+	result := '${base_record}#{${field_updates.join(', ')}}'
+	return result
 }

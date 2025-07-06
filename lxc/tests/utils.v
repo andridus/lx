@@ -27,9 +27,14 @@ fn generates_erlang(lx_code string) codegen.CodegenResult {
 	mut parser_instance := parser.new_main_parser(tokens)
 	module_stmt := parser_instance.parse_module() or { panic('Failed to parse function') }
 
+	// Run typechecker
+	mut type_ctx := typechecker.new_type_context()
+	mut type_checker := typechecker.new_type_checker()
+	type_checker.context = type_ctx
+	type_checker.check_module(module_stmt)
+
 	// Generate Erlang code
 	mut erlang_gen := erlang.new_erlang_generator()
-	type_ctx := typechecker.new_type_context()
 	codegen_result := erlang_gen.generate_module(module_stmt, type_ctx)
 
 	return codegen_result

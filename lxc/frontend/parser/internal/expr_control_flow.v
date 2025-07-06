@@ -84,12 +84,23 @@ fn (mut ep ExpressionParser) parse_with_expression() ?ast.Expr {
 	mut bindings := []ast.WithBinding{}
 	for !ep.check(lexer.keyword(.do_)) {
 		pattern := ep.parse_pattern()?
+
+		mut guard := ast.Expr(ast.LiteralExpr{
+			value: ast.BooleanLiteral{
+				value: true
+			}
+		})
+		if ep.match(lexer.keyword(.when)) {
+			guard = ep.parse_expression()?
+		}
+
 		ep.consume(lexer.operator(.pattern_match), 'Expected <- in with binding')?
 		value := ep.parse_expression()?
 
 		bindings << ast.WithBinding{
 			pattern:  pattern
 			value:    value
+			guard:    guard
 			position: ep.get_current_position()
 		}
 
@@ -309,6 +320,16 @@ fn (mut ep ExpressionParser) parse_match_rescue_expression() ?ast.Expr {
 	ep.advance() // consume 'match'
 
 	pattern := ep.parse_pattern()?
+
+	mut guard := ast.Expr(ast.LiteralExpr{
+		value: ast.BooleanLiteral{
+			value: true
+		}
+	})
+	if ep.match(lexer.keyword(.when)) {
+		guard = ep.parse_expression()?
+	}
+
 	ep.consume(lexer.operator(.pattern_match), 'Expected <- in match expression')?
 	value := ep.parse_expression()?
 
@@ -347,6 +368,7 @@ fn (mut ep ExpressionParser) parse_match_rescue_expression() ?ast.Expr {
 		return ast.SimpleMatchExpr{
 			pattern:  pattern
 			value:    value
+			guard:    guard
 			position: ep.get_current_position()
 		}
 	}

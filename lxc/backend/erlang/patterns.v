@@ -46,9 +46,69 @@ pub fn (gen ErlangGenerator) generate_pattern(pattern ast.Pattern) string {
 			mut fields := []string{}
 			for field in pattern.fields {
 				value := gen.generate_pattern(field.pattern)
-				fields << '${field.name}: ${value}'
+				fields << '${field.name} = ${value}'
 			}
-			return '#${pattern.name}{${fields.join(', ')}}'
+			return '#${pattern.name.to_lower()}{${fields.join(', ')}}'
+		}
+		ast.BinaryPattern {
+			mut segments := []string{}
+			for segment in pattern.segments {
+				segments << '${segment.size}:${segment.unit}'
+			}
+			return '<<${segments.join(', ')}>>'
+		}
+	}
+}
+
+// generate_pattern_with_binding generates code for patterns and binds variables to scope
+pub fn (mut gen ErlangGenerator) generate_pattern_with_binding(pattern ast.Pattern) string {
+	match pattern {
+		ast.WildcardPattern {
+			return '_'
+		}
+		ast.VarPattern {
+			// Bind the variable to the scope and return capitalized name
+			hashed := gen.bind_variable(pattern.name, true)
+			return hashed
+		}
+		ast.LiteralPattern {
+			return gen.generate_literal(pattern.value)
+		}
+		ast.AtomPattern {
+			return pattern.value
+		}
+		ast.ListConsPattern {
+			head := gen.generate_pattern_with_binding(pattern.head)
+			tail := gen.generate_pattern_with_binding(pattern.tail)
+			return '[${head} | ${tail}]'
+		}
+		ast.ListEmptyPattern {
+			return '[]'
+		}
+		ast.ListLiteralPattern {
+			elements := pattern.elements.map(gen.generate_pattern_with_binding(it))
+			return '[${elements.join(', ')}]'
+		}
+		ast.TuplePattern {
+			elements := pattern.elements.map(gen.generate_pattern_with_binding(it))
+			return '{${elements.join(', ')}}'
+		}
+		ast.MapPattern {
+			mut entries := []string{}
+			for entry in pattern.entries {
+				key := gen.generate_pattern_with_binding(entry.key)
+				value := gen.generate_pattern_with_binding(entry.value)
+				entries << '${key} => ${value}'
+			}
+			return '#{${entries.join(', ')}}'
+		}
+		ast.RecordPattern {
+			mut fields := []string{}
+			for field in pattern.fields {
+				value := gen.generate_pattern_with_binding(field.pattern)
+				fields << '${field.name} = ${value}'
+			}
+			return '#${pattern.name.to_lower()}{${fields.join(', ')}}'
 		}
 		ast.BinaryPattern {
 			mut segments := []string{}

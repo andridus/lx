@@ -225,6 +225,19 @@ fn (mut sp StatementParser) parse_simple_atom() ?ast.Expr {
 		sp.advance()
 	}
 
+	if sp.current is lexer.UpperIdentToken && sp.peek() is lexer.PunctuationToken {
+		punc := sp.peek() as lexer.PunctuationToken
+		if punc.value == .lbrace {
+			mut expr_parser := new_expression_parser(sp.tokens)
+			expr_parser.position = sp.position
+			expr_parser.current = sp.current
+			record_expr := expr_parser.parse_record_value_expression()?
+			sp.position = expr_parser.position
+			sp.sync_current_token()
+			return record_expr
+		}
+	}
+
 	return match sp.current {
 		lexer.IdentToken {
 			token := sp.current as lexer.IdentToken

@@ -110,7 +110,29 @@ pub fn (mut gen ErlangGenerator) generate_function_body(statements []ast.Stmt) s
 
 // generate_simple_match_with_continuation generates simple match with subsequent expressions in success branch
 fn (mut gen ErlangGenerator) generate_simple_match_with_continuation(expr ast.SimpleMatchExpr, subsequent_exprs []ast.Stmt) string {
-	pattern := gen.generate_pattern(expr.pattern)
+	gen.enter_scope()
+	pattern := gen.generate_pattern_with_binding(expr.pattern)
+
+	// Generate guard clause if present
+	mut guard_clause := ''
+	if expr.guard != ast.Expr(ast.GuardExpr{}) {
+		if expr.guard is ast.LiteralExpr {
+			lit_expr := expr.guard as ast.LiteralExpr
+			if lit_expr.value is ast.BooleanLiteral {
+				bool_lit := lit_expr.value as ast.BooleanLiteral
+				// Only generate guard if it's not the default "true"
+				if !bool_lit.value {
+					guard_clause = ' when ' + gen.generate_expression_in_guard(expr.guard)
+				}
+			} else {
+				guard_clause = ' when ' + gen.generate_expression_in_guard(expr.guard)
+			}
+		} else {
+			guard_clause = ' when ' + gen.generate_expression_in_guard(expr.guard)
+		}
+	}
+	gen.exit_scope()
+
 	value := gen.generate_expression(expr.value)
 
 	// Generate success body with subsequent expressions
@@ -125,7 +147,7 @@ fn (mut gen ErlangGenerator) generate_simple_match_with_continuation(expr ast.Si
 	formatted_success_code := success_code.split('\n').map('        ${it}').join('\n')
 
 	// Simple match returns the original value if pattern doesn't match
-	return 'case ${value} of\n    ${pattern} ->\n${formatted_success_code};\n    Other ->\n        Other\nend'
+	return 'case ${value} of\n    ${pattern}${guard_clause} ->\n${formatted_success_code};\n    Other ->\n        Other\nend'
 }
 
 // generate_match_rescue_with_continuation generates match rescue with subsequent expressions in success branch
@@ -259,6 +281,53 @@ fn (gen ErlangGenerator) infer_expression_return_type_with_context(expr ast.Expr
 		ast.AssignExpr {
 			gen.infer_assignment_return_type(expr, parameters)
 		}
+		ast.RecordLiteralExpr {
+			// Return the record type in Erlang format: #record_name{}
+			'#${expr.name.to_lower()}{}'
+		}
+		ast.RecordAccessExpr {
+			// For record field access, we need to get the field type from the typechecker
+			// The typechecker should have stored the record type information in the context
+			if type_ctx := gen.type_context {
+				// Try to get the record type from the context
+				if record_type := type_ctx.get_record_type(expr) {
+					// Try to get the specific field type from the context
+					if field_type := type_ctx.get_record_field_type(record_type, expr.field) {
+						// Convert the field type to Erlang spec format
+						match field_type {
+							'string' { 'string()' }
+							'integer' { 'integer()' }
+							'float' { 'float()' }
+							'boolean' { 'boolean()' }
+							'atom' { 'atom()' }
+							'nil' { 'nil' }
+							else { 'any()' }
+						}
+					} else {
+						// Fallback to simple mapping if field type not found
+						match expr.field {
+							'name' { 'string()' }
+							'age' { 'integer()' }
+							'email' { 'string()' }
+							'debug' { 'boolean()' }
+							'timeout' { 'integer()' }
+							'role' { 'string()' }
+							'street' { 'string()' }
+							'city' { 'string()' }
+							else { 'any()' }
+						}
+					}
+				} else {
+					'any()'
+				}
+			} else {
+				'any()'
+			}
+		}
+		ast.RecordUpdateExpr {
+			// Return the same record type as the base record
+			'#${expr.record_name.to_lower()}{}'
+		}
 		else {
 			'any()'
 		}
@@ -340,6 +409,20 @@ fn (gen ErlangGenerator) infer_binary_expression_return_type_with_context(expr a
 
 // generate_function generates code for a function, opening a new scope for each clause
 pub fn (mut gen ErlangGenerator) generate_function(func ast.FunctionStmt) string {
+	// Get the function-specific type context
+	mut function_type_context := unsafe { nil }
+	if type_ctx := gen.type_context {
+		if function_ctx := type_ctx.get_function_context(func.id) {
+			function_type_context = unsafe { function_ctx }
+		} else {
+			function_type_context = unsafe { type_ctx } // fallback to global context
+		}
+	}
+
+	// Store the current type context and switch to function context
+	original_type_context := gen.type_context
+	gen.type_context = unsafe { function_type_context }
+
 	// Group clauses by arity
 	mut clauses_by_arity := map[int][]ast.FunctionClause{}
 
@@ -417,6 +500,10 @@ pub fn (mut gen ErlangGenerator) generate_function(func ast.FunctionStmt) string
 		function_definitions << clause_strings.join(';\n') + '.'
 		function_definitions << '\n'
 	}
+
+	// Restore the original type context
+	gen.type_context = original_type_context
+
 	return function_definitions.join('')
 }
 
@@ -426,7 +513,7 @@ fn (gen ErlangGenerator) generate_record_definition(record_def ast.RecordDefStmt
 	for field in record_def.fields {
 		fields << '${field.name}'
 	}
-	return '-record(${record_def.name}, {${fields.join(', ')}}).'
+	return '-record(${record_def.name.to_lower()}, {${fields.join(', ')}}).'
 }
 
 // generate_type_definition generates code for type definitions

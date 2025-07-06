@@ -44,7 +44,7 @@ end'
 
 	result := generates_erlang(lx_code)
 	assert result.success
-	assert result.code.contains('#{age => 31 | User}')
+	assert result.code.contains('User#{age => 31}')
 	println('✓ Map update: passed')
 }
 
@@ -56,7 +56,7 @@ end'
 
 	result := generates_erlang(lx_code)
 	assert result.success
-	assert result.code.contains('#{"status" => "active" | User}')
+	assert result.code.contains('User#{"status" => "active"}')
 	println('✓ Map update with fat arrow: passed')
 }
 

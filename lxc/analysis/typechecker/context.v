@@ -18,20 +18,24 @@ pub fn (tb TypeBinding) str() string {
 // TypeContext represents the type environment and scope
 pub struct TypeContext {
 pub mut:
-	bindings     map[string]TypeBinding
-	type_aliases map[string]TypeExpr
-	parent       ?&TypeContext
-	level        int // Scope level for shadowing
+	bindings          map[string]TypeBinding
+	type_aliases      map[string]TypeExpr
+	record_types      map[string]string       // Maps record access expressions to their types
+	function_contexts map[string]&TypeContext // Maps function IDs to their type contexts
+	parent            ?&TypeContext
+	level             int // Scope level for shadowing
 }
 
 // new_context creates a new type context
 @[heap]
 pub fn new_context() &TypeContext {
 	return &TypeContext{
-		bindings:     map[string]TypeBinding{}
-		type_aliases: map[string]TypeExpr{}
-		parent:       none
-		level:        0
+		bindings:          map[string]TypeBinding{}
+		type_aliases:      map[string]TypeExpr{}
+		record_types:      map[string]string{}
+		function_contexts: map[string]&TypeContext{}
+		parent:            none
+		level:             0
 	}
 }
 
@@ -39,10 +43,11 @@ pub fn new_context() &TypeContext {
 pub fn (ctx &TypeContext) new_child_context() &TypeContext {
 	return unsafe {
 		&TypeContext{
-			bindings:     map[string]TypeBinding{}
-			type_aliases: map[string]TypeExpr{}
-			parent:       ctx
-			level:        ctx.level + 1
+			bindings:          map[string]TypeBinding{}
+			type_aliases:      map[string]TypeExpr{}
+			function_contexts: map[string]&TypeContext{}
+			parent:            ctx
+			level:             ctx.level + 1
 		}
 	}
 }
@@ -128,6 +133,90 @@ pub fn (ctx &TypeContext) str() string {
 	}
 
 	return result
+}
+
+pub fn (mut ctx TypeContext) store_record_type(expr ast.RecordAccessExpr, record_type string) {
+	key := '${expr.record.str()}.${expr.field}'
+	ctx.record_types[key] = record_type
+}
+
+pub fn (mut ctx TypeContext) store_record_type_for_expr(expr ast.RecordLiteralExpr, record_type string) {
+	key := '${expr.name}'
+	ctx.record_types[key] = record_type
+}
+
+pub fn (mut ctx TypeContext) store_record_type_for_update_expr(expr ast.RecordUpdateExpr, record_type string) {
+	key := '${expr.record_name}'
+	ctx.record_types[key] = record_type
+}
+
+// store_record_field_type stores the type of a specific field in a record
+pub fn (mut ctx TypeContext) store_record_field_type(record_name string, field_name string, field_type string) {
+	key := '${record_name}.${field_name}'
+	ctx.record_types[key] = field_type
+}
+
+// get_record_field_type gets the type of a specific field in a record
+pub fn (ctx &TypeContext) get_record_field_type(record_name string, field_name string) ?string {
+	key := '${record_name}.${field_name}'
+	if field_type := ctx.record_types[key] {
+		return field_type
+	}
+
+	if parent := ctx.parent {
+		return parent.get_record_field_type(record_name, field_name)
+	}
+
+	return none
+}
+
+// get_record_type_from_expr gets the record type from an expression
+pub fn (ctx &TypeContext) get_record_type_from_expr(expr ast.Expr) ?string {
+	if expr is ast.VariableExpr {
+		var_expr := expr as ast.VariableExpr
+		if record_type := ctx.record_types[var_expr.name] {
+			return record_type
+		}
+	}
+
+	if parent := ctx.parent {
+		return parent.get_record_type_from_expr(expr)
+	}
+
+	return none
+}
+
+pub fn (ctx &TypeContext) get_record_type(expr ast.RecordAccessExpr) ?string {
+	if expr.record is ast.VariableExpr {
+		var_expr := expr.record as ast.VariableExpr
+		if record_type := ctx.record_types[var_expr.name] {
+			return record_type
+		}
+
+		if parent := ctx.parent {
+			return parent.get_record_type(expr)
+		}
+	}
+
+	// Try to get record type from record literal expressions
+	if expr.record is ast.RecordLiteralExpr {
+		record_expr := expr.record as ast.RecordLiteralExpr
+		if record_type := ctx.record_types[record_expr.name] {
+			return record_type
+		}
+	}
+
+	key := '${expr.record.str()}.${expr.field}'
+
+	if record_type := ctx.record_types[key] {
+		return record_type
+	}
+
+	if parent := ctx.parent {
+		return parent.get_record_type(expr)
+	}
+
+	return none
 }
 
 // TypeScope represents a lexical scope for type checking
@@ -343,4 +432,56 @@ pub fn (ctx &TypeContext) get_all_type_aliases_recursive() map[string]TypeExpr {
 	}
 
 	return all_aliases
+}
+
+// store_expression_type_for_var armazena o tipo de qualquer expressão para uma variável
+pub fn (mut ctx TypeContext) store_expression_type_for_var(var_name string, type_expr TypeExpr) {
+	ctx.record_types[var_name] = type_expr.str()
+}
+
+// store_record_type_for_var associa o tipo do record ao nome da variável
+pub fn (mut ctx TypeContext) store_record_type_for_var(var_name string, record_type string) {
+	ctx.record_types[var_name] = record_type
+}
+
+// store_function_context stores the type context for a specific function
+pub fn (mut ctx TypeContext) store_function_context(function_id string, function_context &TypeContext) {
+	ctx.function_contexts[function_id] = unsafe { function_context }
+}
+
+// get_function_context retrieves the type context for a specific function
+pub fn (ctx &TypeContext) get_function_context(function_id string) ?&TypeContext {
+	if function_context := ctx.function_contexts[function_id] {
+		return function_context
+	}
+
+	// Check parent contexts
+	if parent := ctx.parent {
+		return parent.get_function_context(function_id)
+	}
+
+	return none
+}
+
+// store_function_var_type armazena o tipo de uma variável de função específica
+pub fn (mut ctx TypeContext) store_function_var_type(function_id string, var_name string, type_str string) {
+	key := '${function_id}:${var_name}'
+	ctx.record_types[key] = type_str
+}
+
+// get_function_var_type recupera o tipo de uma variável de função específica
+pub fn (ctx &TypeContext) get_function_var_type(function_id string, var_name string) ?string {
+	key := '${function_id}:${var_name}'
+
+	// Check current context first
+	if record_type := ctx.record_types[key] {
+		return record_type
+	}
+
+	// Check parent contexts
+	if parent := ctx.parent {
+		return parent.get_function_var_type(function_id, var_name)
+	}
+
+	return none
 }

@@ -172,8 +172,12 @@ pub fn (s LexerState) get_default_transition() LexerState {
 pub fn (s LexerState) is_accepting_state() bool {
 	return match s {
 		.identifier, .key, .number, .float, .string, .atom, .operator, .comment, .directive,
-		.atom_start { true }
-		else { false }
+		.atom_start {
+			true
+		}
+		else {
+			false
+		}
 	}
 }
 
@@ -188,21 +192,49 @@ pub fn (s LexerState) requires_lookahead() bool {
 // can_transition_from checks if a state can transition from another state
 pub fn (s LexerState) can_transition_from(from LexerState) bool {
 	return match s {
-		.initial { true }
-		.identifier { from == .initial || from == .whitespace }
-		.key { from == .identifier }
-		.number { from == .initial || from == .whitespace }
-		.float { from == .number }
-		.string { from == .initial || from == .whitespace }
-		.atom { from == .atom_start }
-		.atom_start { from == .initial || from == .whitespace }
-		.operator { from == .initial || from == .whitespace || from == .atom_start }
-		.comment { from == .initial || from == .whitespace }
-		.directive { from == .initial || from == .whitespace }
-		.punctuation { from == .initial || from == .whitespace }
-		.whitespace { from == .initial || from == .identifier || from == .number || from == .float
+		.initial {
+			true
+		}
+		.identifier {
+			from == .initial || from == .whitespace
+		}
+		.key {
+			from == .identifier
+		}
+		.number {
+			from == .initial || from == .whitespace
+		}
+		.float {
+			from == .number
+		}
+		.string {
+			from == .initial || from == .whitespace
+		}
+		.atom {
+			from == .atom_start
+		}
+		.atom_start {
+			from == .initial || from == .whitespace
+		}
+		.operator {
+			from == .initial || from == .whitespace || from == .atom_start
+		}
+		.comment {
+			from == .initial || from == .whitespace
+		}
+		.directive {
+			from == .initial || from == .whitespace
+		}
+		.punctuation {
+			from == .initial || from == .whitespace
+		}
+		.whitespace {
+			from == .initial || from == .identifier || from == .number || from == .float
 				|| from == .string || from == .atom || from == .operator || from == .comment
-				|| from == .directive || from == .punctuation || from == .atom_start }
-		.error { true }
+				|| from == .directive || from == .punctuation || from == .atom_start
+		}
+		.error {
+			true
+		}
 	}
 }

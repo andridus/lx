@@ -10,6 +10,13 @@ fn (mut ep ExpressionParser) parse_pattern() ?ast.Pattern {
 			ep.parse_variable_pattern()
 		}
 		lexer.UpperIdentToken {
+			// Check if this is a record pattern: RecordName{field: pattern, ...}
+			if ep.peek() is lexer.PunctuationToken {
+				punc := ep.peek() as lexer.PunctuationToken
+				if punc.value == .lbrace {
+					return ep.parse_record_pattern()
+				}
+			}
 			ep.parse_variable_pattern()
 		}
 		lexer.StringToken {
@@ -195,6 +202,56 @@ fn (mut ep ExpressionParser) parse_list_pattern() ?ast.Pattern {
 
 	return ast.ListLiteralPattern{
 		elements: elements
+	}
+}
+
+// parse_record_pattern parses record patterns: RecordName{field: pattern, ...}
+fn (mut ep ExpressionParser) parse_record_pattern() ?ast.Pattern {
+	record_name := ep.current.get_value()
+	ep.advance() // consume record name
+	ep.consume(lexer.punctuation(.lbrace), 'Expected opening brace after record name')?
+
+	mut fields := []ast.RecordPatternField{}
+	if !ep.check(lexer.punctuation(.rbrace)) {
+		for {
+			// Parse field name
+			mut field_name := ''
+
+			// Check if this is a key token (field:)
+			if ep.current.is_key() {
+				field_name = ep.current.get_key_value()
+				ep.advance() // consume key token
+			} else if ep.current.is_identifier() {
+				field_name = ep.current.get_value()
+				ep.advance()
+
+				// Expect colon after field name
+				ep.consume(lexer.punctuation(.colon), 'Expected colon after field name')?
+			} else {
+				ep.add_error('Expected field name in record pattern', 'Got ${ep.current.str()}')
+				return none
+			}
+
+			// Parse field pattern
+			field_pattern := ep.parse_pattern()?
+
+			fields << ast.RecordPatternField{
+				name:     field_name
+				pattern:  field_pattern
+				position: ep.get_current_position()
+			}
+
+			if !ep.match(lexer.punctuation(.comma)) {
+				break
+			}
+		}
+	}
+
+	ep.consume(lexer.punctuation(.rbrace), 'Expected closing brace for record pattern')?
+
+	return ast.RecordPattern{
+		name:   record_name
+		fields: fields
 	}
 }
 

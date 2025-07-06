@@ -3,7 +3,6 @@ module main
 import os
 import compiler
 import backend.erlang
-import analysis.typechecker
 import analysis.linter
 import ast
 
@@ -36,10 +35,11 @@ fn main() {
 	if debug_tokens {
 		comp.debug_tokens = true
 	}
-	mut module_stmt := comp.compile_file(input_file) or {
+	compile_result := comp.compile_file(input_file) or {
 		eprintln(err)
 		exit(1)
 	}
+	mut module_stmt := compile_result.module_stmt
 
 	// Override the module name with the file name
 	module_stmt = ast.ModuleStmt{
@@ -61,9 +61,7 @@ fn main() {
 
 	// Generate Erlang code
 	mut erlang_gen := erlang.new_erlang_generator()
-	type_ctx := typechecker.new_type_context()
-
-	codegen_result := erlang_gen.generate_module(module_stmt, type_ctx)
+	codegen_result := erlang_gen.generate_module(module_stmt, compile_result.type_context)
 
 	if !codegen_result.success {
 		eprintln('Code generation failed')

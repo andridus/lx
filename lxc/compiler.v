@@ -20,6 +20,13 @@ pub:
 	warnings    []string
 }
 
+// Resultado do compilador com AST e contexto de tipos
+pub struct CompileResult {
+pub:
+	module_stmt  ast.ModuleStmt
+	type_context &typechecker.TypeContext
+}
+
 // Compiler represents the main compiler for LX language
 pub struct Compiler {
 pub mut:
@@ -42,7 +49,7 @@ pub fn new_compiler() Compiler {
 }
 
 // compile_file compiles a single file
-pub fn (mut comp Compiler) compile_file(file_path string) !ast.ModuleStmt {
+pub fn (mut comp Compiler) compile_file(file_path string) !CompileResult {
 	comp.file_path = file_path
 
 	// Read the source file
@@ -142,7 +149,10 @@ pub fn (mut comp Compiler) compile_file(file_path string) !ast.ModuleStmt {
 	}
 
 	println('Compiled ${file_path} successfully')
-	return module_stmt
+	return CompileResult{
+		module_stmt:  module_stmt
+		type_context: type_checker.context
+	}
 }
 
 // compile_string compiles a string of source code

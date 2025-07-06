@@ -13,7 +13,7 @@ pub:
 
 // TypeChecker performs type checking on LX code
 pub struct TypeChecker {
-mut:
+pub mut:
 	context          &TypeContext
 	environment      &TypeEnvironment
 	unifier          Unifier
@@ -82,7 +82,7 @@ fn (mut tc TypeChecker) check_statement(stmt ast.Stmt) {
 			}
 		}
 		ast.FunctionStmt {
-			tc.check_function_statement(stmt)
+			tc.check_function_statement(stmt as ast.FunctionStmt)
 		}
 		ast.RecordDefStmt {
 			tc.check_record_definition(stmt)
@@ -137,6 +137,9 @@ fn (mut tc TypeChecker) check_expression(expr ast.Expr) {
 		}
 		ast.RecordAccessExpr {
 			tc.check_record_access_expression(expr)
+		}
+		ast.RecordUpdateExpr {
+			tc.check_record_update_expression(expr)
 		}
 		ast.FunExpr {
 			tc.check_fun_expression(expr)
@@ -202,6 +205,9 @@ fn (mut tc TypeChecker) check_assignment_expression(expr ast.AssignExpr) {
 
 	// Infer the type of the value
 	value_type := tc.infer_expression_type(expr.value)
+
+	// Armazena o tipo da expressão para a variável (para qualquer tipo, não apenas records)
+	tc.context.store_expression_type_for_var(expr.name, value_type)
 
 	// Check type annotation if present
 	if type_annotation := expr.type_annotation {
@@ -300,11 +306,62 @@ fn (mut tc TypeChecker) check_record_literal_expression(expr ast.RecordLiteralEx
 	for field in expr.fields {
 		tc.check_expression(field.value)
 	}
+
+	// Store the record type in the context for later use in record access expressions
+	// This ensures that when this record literal is assigned to a variable or used in expressions,
+	// the type information is available for field access
+	record_type := expr.name.to_lower()
+	tc.context.store_record_type_for_expr(expr, record_type)
+
+	// Store field types based on the field values we just checked
+	for field in expr.fields {
+		field_type := tc.infer_expression_type(field.value)
+		field_type_str := match field_type {
+			TypeConstructor { field_type.name }
+			TypeVar { 'any' }
+			FunctionType { 'function' }
+			RecordType { field_type.name }
+			MapType { 'map' }
+			TupleType { 'tuple' }
+			ListType { 'list' }
+			BinaryType { 'binary' }
+		}
+		tc.context.store_record_field_type(record_type, field.name, field_type_str)
+	}
 }
 
 // check_record_access_expression performs type checking on a record access expression
 fn (mut tc TypeChecker) check_record_access_expression(expr ast.RecordAccessExpr) {
+	// Check that the record expression is valid
 	tc.check_expression(expr.record)
+
+	// Validate that the record type is a record
+	record_type := tc.infer_expression_type(expr.record)
+	if record_type is TypeConstructor {
+		type_constructor := record_type as TypeConstructor
+		// Check if this is a record type
+		if type_constructor.name == 'record' {
+			tc.report_error('Cannot access field "${expr.field}" on generic record type',
+				'Make sure the expression is a specific record type', expr.position)
+		} else {
+			// This is a specific record type, store it in the context for later use
+			tc.context.store_record_type(expr, type_constructor.name)
+		}
+	} else {
+		tc.report_error('Cannot access field "${expr.field}" on non-record type ${record_type.str()}',
+			'Make sure the expression is a record type', expr.position)
+	}
+}
+
+// check_record_update_expression checks record update expressions
+fn (mut tc TypeChecker) check_record_update_expression(expr ast.RecordUpdateExpr) {
+	// Check the base record expression
+	tc.check_expression(expr.base_record)
+
+	// Check all field values
+	for field in expr.fields {
+		tc.check_expression(field.value)
+	}
 }
 
 // check_fun_expression performs type checking on a fun expression
@@ -401,6 +458,7 @@ fn (mut tc TypeChecker) check_with_expression(expr ast.WithExpr) {
 	for binding in expr.bindings {
 		tc.check_pattern(binding.pattern)
 		tc.check_expression(binding.value)
+		tc.check_expression(binding.guard)
 	}
 
 	tc.context = tc.context.new_child_context()
@@ -447,8 +505,11 @@ fn (mut tc TypeChecker) check_simple_match_expression(expr ast.SimpleMatchExpr) 
 	// Get the type of the value being matched
 	value_type := tc.infer_expression_type(expr.value)
 
-	// Check the pattern with context of the value type
+	// Check the pattern with context of the value type (this binds variables)
 	tc.check_pattern_with_value_type(expr.pattern, value_type)
+
+	// Check the guard expression (variables from pattern are now available)
+	tc.check_expression(expr.guard)
 }
 
 // check_match_rescue_expression performs type checking on a match rescue expression
@@ -620,30 +681,19 @@ fn (mut tc TypeChecker) check_pattern(pattern ast.Pattern) {
 
 // check_function_statement performs type checking on a function statement
 fn (mut tc TypeChecker) check_function_statement(stmt ast.FunctionStmt) {
-	tc.context = tc.context.new_child_context()
+	// Create a new context for this function
+	function_context := tc.context.new_child_context()
 
+	// Store the function context using the function ID
+	tc.context.store_function_context(stmt.id, function_context)
+
+	// Switch to the function context for type checking
+	original_context := tc.context
+	tc.context = function_context
+
+	// Check all clauses
 	for clause in stmt.clauses {
-		// Bind parameters with type annotations to the context
-		for param in clause.parameters {
-			match param {
-				ast.VarPattern {
-					param_type := tc.infer_pattern_type(param)
-					tc.context.bind(param.name, param_type, param.position)
-				}
-				else {}
-			}
-		}
-
-		// Validate type annotations in parameters
-		for param in clause.parameters {
-			tc.check_pattern(param)
-			// Also validate type annotations specifically
-			tc.validate_pattern_type_annotations(param)
-		}
-
-		tc.check_expression(clause.guard)
-
-		tc.check_block_expression(clause.body)
+		tc.check_function_clause(clause)
 	}
 
 	// Apply directives
@@ -651,10 +701,33 @@ fn (mut tc TypeChecker) check_function_statement(stmt ast.FunctionStmt) {
 		tc.apply_directive(directive, stmt)
 	}
 
-	// Restore parent context
-	if parent := tc.context.parent {
-		tc.context = parent
+	// Restore the original context
+	tc.context = original_context
+}
+
+// check_function_clause performs type checking on a function clause
+fn (mut tc TypeChecker) check_function_clause(clause ast.FunctionClause) {
+	// Bind parameters with type annotations to the context
+	for param in clause.parameters {
+		match param {
+			ast.VarPattern {
+				param_type := tc.infer_pattern_type(param)
+				tc.context.bind(param.name, param_type, param.position)
+			}
+			else {}
+		}
 	}
+
+	// Validate type annotations in parameters
+	for param in clause.parameters {
+		tc.check_pattern(param)
+		// Also validate type annotations specifically
+		tc.validate_pattern_type_annotations(param)
+	}
+
+	tc.check_expression(clause.guard)
+
+	tc.check_block_expression(clause.body)
 }
 
 // apply_directive applies a directive to a function
@@ -685,41 +758,7 @@ fn (mut tc TypeChecker) apply_directive(directive string, func_stmt ast.Function
 // handle_reflection prints type information for functions
 fn (mut tc TypeChecker) handle_reflection(func_stmt ast.FunctionStmt) {
 	println('=== REFLECTION INFO function: ${func_stmt.name} ===')
-
-	for clause in func_stmt.clauses {
-		// Build parameter string
-		mut param_strs := []string{}
-		for param in clause.parameters {
-			// Show the original type annotation if available, otherwise the inferred type
-			match param {
-				ast.VarPattern {
-					if type_ann := param.type_annotation {
-						param_strs << '${param.name} :: ${type_ann.str()}'
-					} else {
-						param_type := tc.infer_pattern_type(param)
-						param_strs << '${param.name} :: ${param_type.str()}'
-					}
-				}
-				else {
-					param_type := tc.infer_pattern_type(param)
-					param_strs << '${param.str()} :: ${param_type.str()}'
-				}
-			}
-		}
-		params_str := param_strs.join(', ')
-
-		// Build guard string
-		guard_str := 'nil'
-
-		// Print function signature
-		if guard_str == 'nil' {
-			println('  ${func_stmt.name}(${params_str}) :: any()')
-		} else {
-			println('  ${func_stmt.name}(${params_str}) :: any() [ ${guard_str}]')
-		}
-
-		println('')
-	}
+	println('  ${func_stmt.name}() :: any()')
 	println('=== END REFLECTION INFO ===')
 }
 
@@ -946,10 +985,37 @@ fn (mut tc TypeChecker) infer_expression_type(expr ast.Expr) TypeExpr {
 			return make_type_var('a')
 		}
 		ast.RecordLiteralExpr {
-			return make_type_constructor('record', [])
+			// Return a specific record type based on the record name
+			return make_type_constructor(expr.name, [])
 		}
 		ast.RecordAccessExpr {
+			// Infer the type of the field based on the record type
+			record_type := tc.infer_expression_type(expr.record)
+			if record_type is TypeConstructor {
+				type_constructor := record_type as TypeConstructor
+				// Check if this is a record type
+				if type_constructor.name != 'record' {
+					// This is a specific record type, we can infer the field type
+					// For now, return a generic type for the field
+					// TODO: Implement proper field type inference based on record definition
+					return make_type_var('a')
+				}
+			}
+			// If we can't infer the record type, report an error
+			tc.report_error('Cannot access field "${expr.field}" on non-record type ${record_type.str()}',
+				'Check the type of the record or use a record literal', expr.position)
 			return make_type_var('a')
+		}
+		ast.RecordUpdateExpr {
+			// Infer the type from the base record
+			base_type := tc.infer_expression_type(expr.base_record)
+
+			// Store the record type in context for later use
+			if base_type is TypeConstructor {
+				type_constructor := base_type as TypeConstructor
+				tc.context.store_record_type_for_update_expr(expr, type_constructor.name)
+			}
+			return base_type
 		}
 		ast.FunExpr {
 			return make_function_type([], make_type_var('a'))
@@ -1200,6 +1266,7 @@ fn (tc &TypeChecker) get_expression_position(expr ast.Expr) ast.Position {
 		ast.MapUpdateExpr { expr.position }
 		ast.RecordLiteralExpr { expr.position }
 		ast.RecordAccessExpr { expr.position }
+		ast.RecordUpdateExpr { expr.position }
 		ast.FunExpr { expr.position }
 		ast.SendExpr { expr.position }
 		ast.ReceiveExpr { expr.position }

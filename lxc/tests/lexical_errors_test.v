@@ -446,9 +446,9 @@ fn test_invalid_character_in_string() {
 	mut lexer0 := lexer.new_lexer(input, 'test.lx')
 
 	token := lexer0.next_token()
-	assert token is lexer.ErrorToken
-	error_token := token as lexer.ErrorToken
-	assert error_token.message.contains('Lexical error:')
+	assert token is lexer.StringToken
+	string_token := token as lexer.StringToken
+	assert string_token.value == 'hello@world'
 }
 
 fn test_invalid_character_in_number() {

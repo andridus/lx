@@ -162,6 +162,58 @@ fn (sp StatementParser) is_pattern_followed_by_arrow(pos int) bool {
 		return false
 	}
 
+	// Check for record patterns: UpperIdent{...}
+	if sp.tokens[pos] is lexer.UpperIdentToken {
+		mut scan_pos := pos + 1
+		if scan_pos < sp.tokens.len && sp.tokens[scan_pos] is lexer.PunctuationToken {
+			punc := sp.tokens[scan_pos] as lexer.PunctuationToken
+			if punc.value == .lbrace {
+				// Find the matching closing brace
+				mut brace_count := 1
+				scan_pos++
+				for scan_pos < sp.tokens.len && brace_count > 0 {
+					if sp.tokens[scan_pos] is lexer.PunctuationToken {
+						p := sp.tokens[scan_pos] as lexer.PunctuationToken
+						if p.value == .lbrace {
+							brace_count++
+						} else if p.value == .rbrace {
+							brace_count--
+						}
+					}
+					scan_pos++
+				}
+
+				// After closing brace, check for optional 'when' clause
+				if brace_count == 0 && scan_pos < sp.tokens.len {
+					if sp.tokens[scan_pos] is lexer.KeywordToken {
+						keyword := sp.tokens[scan_pos] as lexer.KeywordToken
+						if keyword.value == .when {
+							// Skip the when clause to find the arrow
+							scan_pos++
+							// Skip until we find the arrow
+							for scan_pos < sp.tokens.len {
+								if sp.tokens[scan_pos] is lexer.OperatorToken {
+									op := sp.tokens[scan_pos] as lexer.OperatorToken
+									if op.value == .arrow {
+										return true
+									}
+								}
+								scan_pos++
+							}
+						}
+					}
+					// Check for direct arrow after closing brace
+					if sp.tokens[scan_pos] is lexer.OperatorToken {
+						op_token := sp.tokens[scan_pos] as lexer.OperatorToken
+						if op_token.value == .arrow {
+							return true
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// Check for simple patterns (literals, identifiers, atoms)
 	if sp.tokens[pos] is lexer.IntToken || sp.tokens[pos] is lexer.StringToken
 		|| sp.tokens[pos] is lexer.IdentToken || sp.tokens[pos] is lexer.AtomToken {
@@ -481,12 +533,23 @@ fn (mut sp StatementParser) parse_with_expression() ?ast.Expr {
 	mut bindings := []ast.WithBinding{}
 	for !sp.check(lexer.keyword(.do_)) {
 		pattern := sp.parse_pattern()?
+
+		mut guard := ast.Expr(ast.LiteralExpr{
+			value: ast.BooleanLiteral{
+				value: true
+			}
+		})
+		if sp.match(lexer.keyword(.when)) {
+			guard = sp.parse_expression()?
+		}
+
 		sp.consume(lexer.operator(.pattern_match), 'Expected <- in with binding')?
 		value := sp.parse_expression()?
 
 		bindings << ast.WithBinding{
 			pattern:  pattern
 			value:    value
+			guard:    guard
 			position: sp.get_current_position()
 		}
 
@@ -621,6 +684,16 @@ fn (mut sp StatementParser) parse_match_rescue_expression() ?ast.Expr {
 	sp.advance() // consume 'match'
 
 	pattern := sp.parse_pattern()?
+
+	mut guard := ast.Expr(ast.LiteralExpr{
+		value: ast.BooleanLiteral{
+			value: true
+		}
+	})
+	if sp.match(lexer.keyword(.when)) {
+		guard = sp.parse_expression()?
+	}
+
 	sp.consume(lexer.operator(.pattern_match), 'Expected <- in match expression')?
 	value := sp.parse_expression()?
 
@@ -659,6 +732,7 @@ fn (mut sp StatementParser) parse_match_rescue_expression() ?ast.Expr {
 		return ast.SimpleMatchExpr{
 			pattern:  pattern
 			value:    value
+			guard:    guard
 			position: sp.get_current_position()
 		}
 	}

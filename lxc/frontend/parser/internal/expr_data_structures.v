@@ -51,6 +51,12 @@ fn (mut ep ExpressionParser) parse_list_expression() ?ast.Expr {
 // parse_map_expression parses map expressions
 fn (mut ep ExpressionParser) parse_map_expression() ?ast.Expr {
 	ep.advance() // consume '%'
+
+	// Check if this is a record update: %RecordName{...}
+	if ep.current is lexer.UpperIdentToken {
+		return ep.parse_record_update_expression()
+	}
+
 	ep.consume(lexer.punctuation(.lbrace), 'Expected opening brace after %')?
 
 	mut entries := []ast.MapEntry{}
@@ -193,6 +199,71 @@ fn (mut ep ExpressionParser) parse_map_expression() ?ast.Expr {
 	}
 }
 
+// parse_record_update_expression parses record update expressions: %RecordName{base_record | field: value, ...}
+fn (mut ep ExpressionParser) parse_record_update_expression() ?ast.Expr {
+	// The current token is UpperIdentToken (record name)
+	record_name := ep.current.get_value()
+	ep.advance() // consume record name
+
+	ep.consume(lexer.punctuation(.lbrace), 'Expected opening brace after record name')?
+
+	// Parse base record expression - should stop at pipe operator
+	base_record := ep.parse_atom_expression()?
+
+	// Expect pipe operator
+	if !ep.check(lexer.operator(.pipe)) {
+		ep.add_error('Expected | after base record in record update', 'Got ${ep.current.str()}')
+		return none
+	}
+	ep.advance() // consume '|'
+
+	// Parse fields after the pipe
+	mut fields := []ast.RecordField{}
+	if !ep.check(lexer.punctuation(.rbrace)) {
+		for {
+			if ep.current is lexer.KeyToken {
+				token := ep.current as lexer.KeyToken
+				field_name := token.value
+				ep.advance() // consume KeyToken
+				value := ep.parse_expression()?
+				fields << ast.RecordField{
+					name:     field_name
+					value:    value
+					position: ep.get_current_position()
+				}
+			} else {
+				field_name := ep.current.get_value()
+				if !ep.current.is_identifier() {
+					ep.add_error('Expected field name', 'Got ${ep.current.str()}')
+					return none
+				}
+				ep.advance()
+				ep.consume(lexer.punctuation(.colon), 'Expected colon after field name')?
+				value := ep.parse_expression()?
+				fields << ast.RecordField{
+					name:     field_name
+					value:    value
+					position: ep.get_current_position()
+				}
+			}
+
+			if !ep.match(lexer.punctuation(.comma)) {
+				break
+			}
+		}
+	}
+
+	ep.consume(lexer.punctuation(.rbrace), 'Expected closing brace for record update')?
+
+	// Return the proper RecordUpdateExpr
+	return ast.RecordUpdateExpr{
+		record_name: record_name
+		base_record: base_record
+		fields:      fields
+		position:    ep.get_current_position()
+	}
+}
+
 // parse_record_expression parses record expressions
 fn (mut ep ExpressionParser) parse_record_expression() ?ast.Expr {
 	ep.advance() // consume 'record'
@@ -210,20 +281,30 @@ fn (mut ep ExpressionParser) parse_record_expression() ?ast.Expr {
 	mut fields := []ast.RecordField{}
 	if !ep.check(lexer.punctuation(.rbrace)) {
 		for {
-			field_name := ep.current.get_value()
-			if !ep.current.is_identifier() {
-				ep.add_error('Expected field name', 'Got ${ep.current.str()}')
-				return none
-			}
-			ep.advance()
-
-			ep.consume(lexer.punctuation(.colon), 'Expected colon after field name')?
-
-			value := ep.parse_expression()?
-			fields << ast.RecordField{
-				name:     field_name
-				value:    value
-				position: ep.get_current_position()
+			if ep.current is lexer.KeyToken {
+				token := ep.current as lexer.KeyToken
+				field_name := token.value
+				ep.advance() // consome KeyToken
+				value := ep.parse_expression()?
+				fields << ast.RecordField{
+					name:     field_name
+					value:    value
+					position: ep.get_current_position()
+				}
+			} else {
+				field_name := ep.current.get_value()
+				if !ep.current.is_identifier() {
+					ep.add_error('Expected field name', 'Got [0;31m${ep.current.str()}[0m')
+					return none
+				}
+				ep.advance()
+				ep.consume(lexer.punctuation(.colon), 'Expected colon after field name')?
+				value := ep.parse_expression()?
+				fields << ast.RecordField{
+					name:     field_name
+					value:    value
+					position: ep.get_current_position()
+				}
 			}
 
 			if !ep.match(lexer.punctuation(.comma)) {

@@ -64,7 +64,7 @@ end'
 
 -spec update_age(any()) -> any().
 update_age(User) ->
-#{age => 31 | User}.
+User#{age => 31}.
 
 '
 	erl1 := generates_erlang(lx_code)
@@ -82,7 +82,7 @@ end'
 
 -spec update_user(any()) -> any().
 update_user(User) ->
-#{"status" => "active" | User}.
+User#{"status" => "active"}.
 
 '
 	erl1 := generates_erlang(lx_code)

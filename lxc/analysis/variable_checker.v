@@ -261,6 +261,12 @@ pub fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 		ast.RecordAccessExpr {
 			vc.check_expression(expr.record)
 		}
+		ast.RecordUpdateExpr {
+			vc.check_expression(expr.base_record)
+			for field in expr.fields {
+				vc.check_expression(field.value)
+			}
+		}
 		ast.FunExpr {
 			vc.enter_scope()
 			for param in expr.parameters {

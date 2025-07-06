@@ -1,5 +1,7 @@
 module main
 
+import utils
+
 fn test_with_expression_simple() {
 	lx_code := '
 def func_a() do
@@ -144,6 +146,39 @@ end'
 -spec no_bindings() -> string().
 no_bindings() ->
 "success".
+
+'
+	erl1 := generates_erlang(lx_code)
+	assert erl1.success
+	assert erl1.code == expected
+}
+
+fn test_with_expression_with_guards() {
+	lx_code := '
+record User {
+  id :: integer,
+  active :: boolean
+}
+
+def check_user_status(user) do
+	with User{id: id, active: true} when id > 0 <- user do
+		"active_user"
+	else
+		"inactive_user"
+	end
+end'
+	expected := '-module(main).
+-export([check_user_status/1]).
+
+-record(user, {id, active}).
+-spec check_user_status(any()) -> string().
+check_user_status(User) ->
+case User of
+    #user{id = Id, active = true} when Id > 0 ->
+        "active_user";
+    Other ->
+        "inactive_user"
+end.
 
 '
 	erl1 := generates_erlang(lx_code)

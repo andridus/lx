@@ -117,6 +117,15 @@ pub:
 	position Position
 }
 
+// RecordUpdateExpr represents record update operations
+pub struct RecordUpdateExpr {
+pub:
+	record_name string
+	base_record Expr
+	fields      []RecordField
+	position    Position
+}
+
 // FunExpr represents a function definition
 pub struct FunExpr {
 pub:
@@ -205,6 +214,7 @@ pub struct SimpleMatchExpr {
 pub:
 	pattern  Pattern
 	value    Expr
+	guard    Expr
 	position Position
 }
 
@@ -241,6 +251,7 @@ pub type Expr = VariableExpr
 	| MapUpdateExpr
 	| RecordLiteralExpr
 	| RecordAccessExpr
+	| RecordUpdateExpr
 	| FunExpr
 	| SendExpr
 	| ReceiveExpr
@@ -454,6 +465,7 @@ pub mut:
 // FunctionStmt represents a function statement
 pub struct FunctionStmt {
 pub:
+	id         string // Unique function identifier
 	name       string
 	clauses    []FunctionClause
 	is_private bool
@@ -550,6 +562,9 @@ pub fn (e Expr) str() string {
 		}
 		RecordAccessExpr {
 			'Access(${e.record.str()}.${e.field})'
+		}
+		RecordUpdateExpr {
+			'RecordUpdate(${e.record_name}, ${e.base_record.str()}, [${e.fields.map(it.str()).join(', ')}])'
 		}
 		FunExpr {
 			'Fun([${e.parameters.map(it.str()).join(', ')}], ${e.body.str()})'
@@ -722,6 +737,7 @@ pub struct WithBinding {
 pub:
 	pattern  Pattern
 	value    Expr
+	guard    Expr
 	position Position
 }
 
