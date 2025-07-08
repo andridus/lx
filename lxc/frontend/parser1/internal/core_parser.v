@@ -10,8 +10,8 @@ import errors
 
 // ParsingContext defines the strict parsing contexts as per grammar specification
 pub enum ParsingContext {
-	mod         // for program and block_top_level - only module_statements allowed
-	expression  // for block_expression, function bodies - expressions allowed
+	mod        // for program and block_top_level - only module_statements allowed
+	expression // for block_expression, function bodies - expressions allowed
 }
 
 // ========================================
@@ -145,7 +145,7 @@ fn (mut p LXParser) consume(expected lexer.Token, error_message string) ?lexer.T
 // ========================================
 
 // with_context temporarily changes parsing context
-fn (mut p LXParser) with_context[T](new_context ParsingContext, parse_fn fn(mut LXParser) ?T) ?T {
+fn (mut p LXParser) with_context[T](new_context ParsingContext, parse_fn fn (mut LXParser) ?T) ?T {
 	old_context := p.context
 	p.context = new_context
 	defer {
@@ -162,15 +162,11 @@ fn (mut p LXParser) with_context[T](new_context ParsingContext, parse_fn fn(mut 
 // add_error adds a parsing error
 fn (mut p LXParser) add_error(message string, context string) {
 	pos := p.get_current_position()
-	comp_error := errors.new_compilation_error(
-		errors.ErrorKind(errors.SyntaxError{
-			message:  message
-			expected: context
-			found:    p.current.str()
-		}),
-		pos,
-		'${message}: ${context}'
-	)
+	comp_error := errors.new_compilation_error(errors.ErrorKind(errors.SyntaxError{
+		message:  message
+		expected: context
+		found:    p.current.str()
+	}), pos, '${message}: ${context}')
 	p.errors << comp_error
 }
 
@@ -199,21 +195,21 @@ fn (mut p LXParser) skip_newlines() {
 // Helper functions for creating tokens
 fn keyword_token(kw lexer.KeywordValue) lexer.Token {
 	return lexer.KeywordToken{
-		value: kw
+		value:    kw
 		position: lexer.new_token_position(0, 0, '')
 	}
 }
 
 fn punctuation_token(punct lexer.PunctuationValue) lexer.Token {
 	return lexer.PunctuationToken{
-		value: punct
+		value:    punct
 		position: lexer.new_token_position(0, 0, '')
 	}
 }
 
 fn operator_token(op lexer.OperatorValue) lexer.Token {
 	return lexer.OperatorToken{
-		value: op
+		value:    op
 		position: lexer.new_token_position(0, 0, '')
 	}
 }

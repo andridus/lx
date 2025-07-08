@@ -122,7 +122,7 @@ fn (mut p LXParser) parse_integer_pattern() ?ast.Pattern {
 
 	return ast.LiteralPattern{
 		value: ast.IntegerLiteral{
-			value: int(value)
+			value:    int(value)
 			position: position
 		}
 	}
@@ -136,7 +136,7 @@ fn (mut p LXParser) parse_float_pattern() ?ast.Pattern {
 
 	return ast.LiteralPattern{
 		value: ast.FloatLiteral{
-			value: value
+			value:    value
 			position: position
 		}
 	}
@@ -150,7 +150,7 @@ fn (mut p LXParser) parse_string_pattern() ?ast.Pattern {
 
 	return ast.LiteralPattern{
 		value: ast.StringLiteral{
-			value: value
+			value:    value
 			position: position
 		}
 	}
@@ -164,7 +164,7 @@ fn (mut p LXParser) parse_boolean_pattern() ?ast.Pattern {
 
 	return ast.LiteralPattern{
 		value: ast.BooleanLiteral{
-			value: value
+			value:    value
 			position: position
 		}
 	}
@@ -307,9 +307,9 @@ fn (mut p LXParser) parse_record_pattern() ?ast.Pattern {
 	p.consume(punctuation_token(.rbrace), 'Expected } after record pattern')?
 
 	return ast.RecordPattern{
-		name:             record_name
-		fields:           fields
-		assign_variable:  ''
+		name:            record_name
+		fields:          fields
+		assign_variable: ''
 	}
 }
 

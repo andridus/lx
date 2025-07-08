@@ -414,7 +414,10 @@ fn (mut p LXParser) parse_module_header() ?ModuleHeaderInfo {
 	// Parse module name (currently not used, but consume it)
 	if !p.current.is_identifier() {
 		p.add_error('Expected module name', 'Got ${p.current.str()}')
-		return ModuleHeaderInfo{exports: exports, imports: imports}
+		return ModuleHeaderInfo{
+			exports: exports
+			imports: imports
+		}
 	}
 	p.advance()
 
@@ -450,7 +453,10 @@ fn (mut p LXParser) parse_module_header() ?ModuleHeaderInfo {
 
 	p.consume(punctuation_token(.lbrace), 'Expected opening brace')?
 
-	return ModuleHeaderInfo{exports: exports, imports: imports}
+	return ModuleHeaderInfo{
+		exports: exports
+		imports: imports
+	}
 }
 
 // parse_import_statement parses import statements

@@ -67,7 +67,7 @@ fn (mut p LXParser) parse_single_function_clause() ?ast.FunctionClause {
 		})?
 	}
 
-		// Parse function body as block expression (expression context)
+	// Parse function body as block expression (expression context)
 	body_expr := p.with_context(.expression, fn (mut parser LXParser) ?ast.Expr {
 		return parser.parse_block_expression()
 	})?
@@ -77,7 +77,9 @@ fn (mut p LXParser) parse_single_function_clause() ?ast.FunctionClause {
 		body_expr as ast.BlockExpr
 	} else {
 		ast.BlockExpr{
-			body: [ast.ExprStmt{expr: body_expr}]
+			body:     [ast.ExprStmt{
+				expr: body_expr
+			}]
 			position: position
 		}
 	}
@@ -178,7 +180,7 @@ fn (mut p LXParser) parse_function_header() ?ast.FunctionClause {
 	p.consume(operator_token(.arrow), 'Expected -> after function header')?
 	p.skip_newlines()
 
-		// Parse clause body as expression list (expression context)
+	// Parse clause body as expression list (expression context)
 	body_expr := p.with_context(.expression, fn (mut parser LXParser) ?ast.Expr {
 		return parser.parse_clause_body_expressions()
 	})?
@@ -188,7 +190,9 @@ fn (mut p LXParser) parse_function_header() ?ast.FunctionClause {
 		body_expr as ast.BlockExpr
 	} else {
 		ast.BlockExpr{
-			body: [ast.ExprStmt{expr: body_expr}]
+			body:     [ast.ExprStmt{
+				expr: body_expr
+			}]
 			position: position
 		}
 	}

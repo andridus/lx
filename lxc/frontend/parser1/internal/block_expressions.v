@@ -20,7 +20,7 @@ pub fn (mut p LXParser) parse_block_expression() ?ast.Expr {
 
 	position := p.get_current_position()
 
-		// Consume 'do' keyword
+	// Consume 'do' keyword
 	p.consume(keyword_token(.do_), 'Expected do to start block expression')?
 	p.skip_newlines()
 
@@ -66,7 +66,7 @@ pub fn (mut p LXParser) parse_block_top_level() ?[]ast.Stmt {
 		return none
 	}
 
-		// Consume 'do' keyword
+	// Consume 'do' keyword
 	p.consume(keyword_token(.do_), 'Expected do to start block')?
 	p.skip_newlines()
 
@@ -222,12 +222,12 @@ fn (mut p LXParser) parse_equality_expression() ?ast.Expr {
 
 // ========================================
 // COMPARISON EXPRESSIONS
-// Grammar: comparison_expression ::= additive_expression { ('<' | '>' | '<=' | '>=') additive_expression }
+// Grammar: comparison_expression ::= arithmetic_expression { ('<' | '>' | '<=' | '>=') arithmetic_expression }
 // ========================================
 
 // parse_comparison_expression parses comparison expressions
 fn (mut p LXParser) parse_comparison_expression() ?ast.Expr {
-	mut left := p.parse_additive_expression()?
+	mut left := p.parse_arithmetic_expression()?
 
 	for {
 		mut op := ast.BinaryOp.add
@@ -249,7 +249,7 @@ fn (mut p LXParser) parse_comparison_expression() ?ast.Expr {
 
 		if matched {
 			p.advance() // consume operator
-			right := p.parse_additive_expression()?
+			right := p.parse_arithmetic_expression()?
 			left = ast.BinaryExpr{
 				left:     left
 				op:       op
@@ -266,13 +266,13 @@ fn (mut p LXParser) parse_comparison_expression() ?ast.Expr {
 
 // ========================================
 // ARITHMETIC EXPRESSIONS
-// Grammar: additive_expression ::= multiplicative_expression { ('+' | '-') multiplicative_expression }
-// Grammar: multiplicative_expression ::= unary_expression { ('*' | '/') unary_expression }
+// Grammar: arithmetic_expression ::= term { ('+' | '-') term }
+// Grammar: term ::= factor { ('*' | '/') factor }
 // ========================================
 
-// parse_additive_expression parses addition and subtraction
-fn (mut p LXParser) parse_additive_expression() ?ast.Expr {
-	mut left := p.parse_multiplicative_expression()?
+// parse_arithmetic_expression parses addition and subtraction
+fn (mut p LXParser) parse_arithmetic_expression() ?ast.Expr {
+	mut left := p.parse_term()?
 
 	for {
 		mut op := ast.BinaryOp.add
@@ -288,7 +288,7 @@ fn (mut p LXParser) parse_additive_expression() ?ast.Expr {
 
 		if matched {
 			p.advance() // consume operator
-			right := p.parse_multiplicative_expression()?
+			right := p.parse_term()?
 			left = ast.BinaryExpr{
 				left:     left
 				op:       op
@@ -303,8 +303,8 @@ fn (mut p LXParser) parse_additive_expression() ?ast.Expr {
 	return left
 }
 
-// parse_multiplicative_expression parses multiplication and division
-fn (mut p LXParser) parse_multiplicative_expression() ?ast.Expr {
+// parse_term parses multiplication and division
+fn (mut p LXParser) parse_term() ?ast.Expr {
 	mut left := p.parse_unary_expression()?
 
 	for {
@@ -338,7 +338,7 @@ fn (mut p LXParser) parse_multiplicative_expression() ?ast.Expr {
 
 // ========================================
 // UNARY EXPRESSIONS
-// Grammar: unary_expression ::= ('-' | 'not') unary_expression | primary_expression
+// Grammar: unary_expression ::= ('-' | 'not') unary_expression | postfix_expression
 // ========================================
 
 // parse_unary_expression parses unary expressions
@@ -363,7 +363,116 @@ fn (mut p LXParser) parse_unary_expression() ?ast.Expr {
 		}
 	}
 
-	return p.parse_primary_expression()
+	return p.parse_postfix_expression()
+}
+
+// ========================================
+// POSTFIX EXPRESSIONS
+// Grammar: postfix_expression ::= primary_expression { postfix_operator }
+// Grammar: postfix_operator ::= '(' argument_list ')' | '.' identifier | '[' expression ']'
+// ========================================
+
+// parse_postfix_expression parses postfix expressions (function calls, field access, etc.)
+fn (mut p LXParser) parse_postfix_expression() ?ast.Expr {
+	mut expr := p.parse_primary_expression()?
+
+	// Handle postfix operations
+	for {
+		// Function call: expr(args)
+		if p.check(punctuation_token(.lparen)) {
+			p.advance() // consume '('
+			mut arguments := []ast.Expr{}
+
+			if !p.check(punctuation_token(.rparen)) {
+				for {
+					arguments << p.parse_expression()?
+					if !p.match(punctuation_token(.comma)) {
+						break
+					}
+				}
+			}
+
+			p.consume(punctuation_token(.rparen), 'Expected closing parenthesis')?
+
+			// Check if this is an external function call (atom.function pattern)
+			if expr is ast.RecordAccessExpr {
+				record_access := expr as ast.RecordAccessExpr
+				if record_access.record is ast.LiteralExpr {
+					lit_expr := record_access.record as ast.LiteralExpr
+					if lit_expr.value is ast.AtomLiteral {
+						atom_lit := lit_expr.value as ast.AtomLiteral
+						// This is an external call: :module.function()
+						expr = ast.CallExpr{
+							function:      ast.LiteralExpr{
+								value: ast.NilLiteral{}
+							} // placeholder
+							external:      true
+							module:        atom_lit.value
+							function_name: record_access.field
+							arguments:     arguments
+							position:      p.get_current_position()
+						}
+					} else {
+						// Regular function call
+						expr = ast.CallExpr{
+							function:  expr
+							arguments: arguments
+							position:  p.get_current_position()
+						}
+					}
+				} else {
+					// Regular function call
+					expr = ast.CallExpr{
+						function:  expr
+						arguments: arguments
+						position:  p.get_current_position()
+					}
+				}
+			} else {
+				// Regular function call
+				expr = ast.CallExpr{
+					function:  expr
+					arguments: arguments
+					position:  p.get_current_position()
+				}
+			}
+		}
+		// Field access: expr.field
+		else if p.check(operator_token(.dot)) {
+			p.advance() // consume '.'
+
+			// Expect an identifier after the dot
+			if !p.current.is_identifier() {
+				p.add_error('Expected field name after .', 'Got ${p.current.str()}')
+				return none
+			}
+
+			field_name := p.current.get_value()
+			p.advance()
+
+			expr = ast.RecordAccessExpr{
+				record:   expr
+				field:    field_name
+				position: p.get_current_position()
+			}
+		}
+		// Map access: expr[key]
+		else if p.check(punctuation_token(.lbracket)) {
+			p.advance() // consume '['
+			key := p.parse_expression()?
+			p.consume(punctuation_token(.rbracket), 'Expected ]')?
+
+			expr = ast.MapAccessExpr{
+				map_expr: expr
+				key:      key
+				position: p.get_current_position()
+			}
+		} else {
+			break
+		}
+	}
+
+	return expr
 }
 
 // ========================================
@@ -407,6 +516,9 @@ fn (mut p LXParser) parse_primary_expression() ?ast.Expr {
 				.lbracket {
 					p.parse_list_expression()
 				}
+				.colon {
+					p.parse_external_atom()
+				}
 				else {
 					p.add_error('Unexpected punctuation in expression', 'Got ${p.current.str()}')
 					none
@@ -425,6 +537,12 @@ fn (mut p LXParser) parse_primary_expression() ?ast.Expr {
 				.case_ {
 					p.parse_case_expression()
 				}
+				.with {
+					p.parse_with_expression()
+				}
+				.match_ {
+					p.parse_match_expression()
+				}
 				else {
 					p.add_error('Unexpected keyword in expression', 'Got ${p.current.str()}')
 					none
@@ -433,6 +551,44 @@ fn (mut p LXParser) parse_primary_expression() ?ast.Expr {
 		}
 		else {
 			p.add_error('Unexpected token in expression', 'Got ${p.current.str()}')
+			none
+		}
+	}
+}
+
+// ========================================
+// EXTERNAL ATOM PARSING
+// Grammar: external_atom ::= ':' (atom | identifier)
+// ========================================
+
+// parse_external_atom parses external atoms like :io, :module_name
+fn (mut p LXParser) parse_external_atom() ?ast.Expr {
+	position := p.get_current_position()
+	p.advance() // consume ':'
+
+	return match p.current {
+		lexer.AtomToken {
+			value := p.current.get_value()
+			p.advance()
+			ast.LiteralExpr{
+				value:    ast.AtomLiteral{
+					value: value
+				}
+				position: position
+			}
+		}
+		lexer.IdentToken {
+			value := p.current.get_value()
+			p.advance()
+			ast.LiteralExpr{
+				value:    ast.AtomLiteral{
+					value: value
+				}
+				position: position
+			}
+		}
+		else {
+			p.add_error('Expected atom or identifier after :', 'Got ${p.current.str()}')
 			none
 		}
 	}
@@ -461,7 +617,7 @@ fn (mut p LXParser) parse_integer_literal() ?ast.Expr {
 	p.advance()
 
 	return ast.LiteralExpr{
-		value: ast.IntegerLiteral{
+		value:    ast.IntegerLiteral{
 			value: int(value)
 		}
 		position: position
@@ -475,7 +631,7 @@ fn (mut p LXParser) parse_float_literal() ?ast.Expr {
 	p.advance()
 
 	return ast.LiteralExpr{
-		value: ast.FloatLiteral{
+		value:    ast.FloatLiteral{
 			value: value
 		}
 		position: position
@@ -489,7 +645,7 @@ fn (mut p LXParser) parse_string_literal() ?ast.Expr {
 	p.advance()
 
 	return ast.LiteralExpr{
-		value: ast.StringLiteral{
+		value:    ast.StringLiteral{
 			value: value
 		}
 		position: position
@@ -503,7 +659,7 @@ fn (mut p LXParser) parse_boolean_literal() ?ast.Expr {
 	p.advance()
 
 	return ast.LiteralExpr{
-		value: ast.BooleanLiteral{
+		value:    ast.BooleanLiteral{
 			value: value
 		}
 		position: position
@@ -517,7 +673,7 @@ fn (mut p LXParser) parse_atom_literal() ?ast.Expr {
 	p.advance()
 
 	return ast.LiteralExpr{
-		value: ast.AtomLiteral{
+		value:    ast.AtomLiteral{
 			value: value
 		}
 		position: position
@@ -530,7 +686,7 @@ fn (mut p LXParser) parse_nil_literal() ?ast.Expr {
 	p.advance()
 
 	return ast.LiteralExpr{
-		value: ast.NilLiteral{}
+		value:    ast.NilLiteral{}
 		position: position
 	}
 }
@@ -597,14 +753,25 @@ fn (mut p LXParser) parse_list_expression() ?ast.Expr {
 	}
 }
 
+// ========================================
+// CONTROL FLOW EXPRESSIONS
+// These are placeholder implementations - full implementation would be more complex
+// ========================================
+
 // parse_if_expression parses if expressions
 fn (mut p LXParser) parse_if_expression() ?ast.Expr {
 	position := p.get_current_position()
 	p.advance() // consume 'if'
 
 	condition := p.parse_expression()?
+	p.consume(keyword_token(.do_), 'Expected do after if condition')?
 
-	then_body_expr := p.parse_block_expression()?
+	// Parse then body in expression context
+	then_body_expr := p.with_context(.expression, fn (mut parser LXParser) ?ast.Expr {
+		return parser.parse_block_expression()
+	})?
+
+	// Convert to BlockExpr if needed
 	then_body := if then_body_expr is ast.BlockExpr {
 		then_body_expr as ast.BlockExpr
 	} else {
@@ -620,7 +787,11 @@ fn (mut p LXParser) parse_if_expression() ?ast.Expr {
 	}
 
 	if p.match(keyword_token(.else_)) {
-		else_body_expr := p.parse_block_expression()?
+		else_body_expr := p.with_context(.expression, fn (mut parser LXParser) ?ast.Expr {
+			return parser.parse_block_expression()
+		})?
+
+		// Convert to BlockExpr if needed
 		else_body = if else_body_expr is ast.BlockExpr {
 			else_body_expr as ast.BlockExpr
 		} else {
@@ -630,6 +801,8 @@ fn (mut p LXParser) parse_if_expression() ?ast.Expr {
 			}
 		}
 	}
+
+	p.consume(keyword_token(.end_), 'Expected end after if expression')?
 
 	return ast.IfExpr{
 		condition: condition
@@ -645,51 +818,162 @@ fn (mut p LXParser) parse_case_expression() ?ast.Expr {
 	p.advance() // consume 'case'
 
 	value := p.parse_expression()?
-
 	p.consume(keyword_token(.do_), 'Expected do after case value')?
 
 	mut cases := []ast.MatchCase{}
 
 	for !p.check(keyword_token(.end_)) && !p.is_at_end() {
-		p.skip_newlines()
-
-		if p.check(keyword_token(.end_)) {
-			break
-		}
-
-		// Parse pattern -> body
 		pattern := p.parse_pattern()?
+
+		mut guard := ast.Expr(ast.LiteralExpr{
+			value: ast.BooleanLiteral{
+				value: true
+			}
+		})
+
+		if p.match(keyword_token(.when)) {
+			guard = p.parse_expression()?
+		}
 
 		p.consume(operator_token(.arrow), 'Expected -> after pattern')?
 
-				// Parse case body as expression
-		body_expr := p.parse_expression()?
+		body_expr := p.with_context(.expression, fn (mut parser LXParser) ?ast.Expr {
+			return parser.parse_expression()
+		})?
 
-		// Convert expression to BlockExpr if needed
-		body_block := if body_expr is ast.BlockExpr {
+		// Convert to BlockExpr if needed
+		body := if body_expr is ast.BlockExpr {
 			body_expr as ast.BlockExpr
 		} else {
 			ast.BlockExpr{
 				body: [ast.ExprStmt{expr: body_expr}]
-				position: p.get_current_position()
+				position: position
 			}
 		}
 
 		cases << ast.MatchCase{
 			pattern:  pattern
-			guard:    ast.LiteralExpr{value: ast.BooleanLiteral{value: true, position: position}, position: position}
-			body:     body_block
+			guard:    guard
+			body:     body
 			position: p.get_current_position()
 		}
-
-		p.skip_newlines()
 	}
 
-	p.consume(keyword_token(.end_), 'Expected end after case')?
+	p.consume(keyword_token(.end_), 'Expected end after case expression')?
 
 	return ast.CaseExpr{
 		value:    value
 		cases:    cases
+		position: position
+	}
+}
+
+// parse_with_expression parses with expressions
+fn (mut p LXParser) parse_with_expression() ?ast.Expr {
+	position := p.get_current_position()
+	p.advance() // consume 'with'
+
+	mut bindings := []ast.WithBinding{}
+
+	for !p.check(keyword_token(.do_)) {
+		pattern := p.parse_pattern()?
+
+		mut guard := ast.Expr(ast.LiteralExpr{
+			value: ast.BooleanLiteral{
+				value: true
+			}
+		})
+
+		if p.match(keyword_token(.when)) {
+			guard = p.parse_expression()?
+		}
+
+		p.consume(operator_token(.pattern_match), 'Expected <- in with binding')?
+		value := p.parse_expression()?
+
+		bindings << ast.WithBinding{
+			pattern:  pattern
+			value:    value
+			guard:    guard
+			position: p.get_current_position()
+		}
+
+		if !p.match(punctuation_token(.comma)) {
+			break
+		}
+	}
+
+	p.consume(keyword_token(.do_), 'Expected do after with bindings')?
+
+	body_expr := p.with_context(.expression, fn (mut parser LXParser) ?ast.Expr {
+		return parser.parse_block_expression()
+	})?
+
+	// Convert to BlockExpr if needed
+	body := if body_expr is ast.BlockExpr {
+		body_expr as ast.BlockExpr
+	} else {
+		ast.BlockExpr{
+			body: [ast.ExprStmt{expr: body_expr}]
+			position: position
+		}
+	}
+
+	mut else_body := ast.BlockExpr{
+		body: []
+		position: position
+	}
+
+	if p.match(keyword_token(.else_)) {
+		else_body_expr := p.with_context(.expression, fn (mut parser LXParser) ?ast.Expr {
+			return parser.parse_block_expression()
+		})?
+
+		// Convert to BlockExpr if needed
+		else_body = if else_body_expr is ast.BlockExpr {
+			else_body_expr as ast.BlockExpr
+		} else {
+			ast.BlockExpr{
+				body: [ast.ExprStmt{expr: else_body_expr}]
+				position: position
+			}
+		}
+	}
+
+	p.consume(keyword_token(.end_), 'Expected end after with expression')?
+
+	return ast.WithExpr{
+		bindings:  bindings
+		body:      body
+		else_body: else_body
+		position:  position
+	}
+}
+
+// parse_match_expression parses match expressions
+fn (mut p LXParser) parse_match_expression() ?ast.Expr {
+	position := p.get_current_position()
+	p.advance() // consume 'match'
+
+	pattern := p.parse_pattern()?
+
+	mut guard := ast.Expr(ast.LiteralExpr{
+		value: ast.BooleanLiteral{
+			value: true
+		}
+	})
+
+	if p.match(keyword_token(.when)) {
+		guard = p.parse_expression()?
+	}
+
+	p.consume(operator_token(.pattern_match), 'Expected <- in match expression')?
+	value := p.parse_expression()?
+
+	return ast.SimpleMatchExpr{
+		pattern:  pattern
+		value:    value
+		guard:    guard
 		position: position
 	}
 }
