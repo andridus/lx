@@ -1,7 +1,5 @@
 module main
 
-import utils
-
 fn test_with_expression_simple() {
 	lx_code := '
 def func_a() do
@@ -44,9 +42,7 @@ case func_a() of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_with_expression_with_else() {
@@ -93,9 +89,7 @@ case func_a() of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_with_expression_single_binding() {
@@ -128,9 +122,7 @@ case get_value() of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_with_expression_no_bindings() {
@@ -148,9 +140,7 @@ no_bindings() ->
 "success".
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_with_expression_with_guards() {
@@ -181,7 +171,5 @@ case User of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }

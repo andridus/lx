@@ -1,7 +1,5 @@
 module main
 
-import utils
-
 fn test_for_expression_simple() {
 	lx_code := '
 def simple_for() do
@@ -17,9 +15,7 @@ simple_for() ->
 [X * 2 || X <- [1, 2, 3]].
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_for_expression_with_guard() {
@@ -37,9 +33,7 @@ for_with_guard() ->
 [X * 3 || X <- [1, 2, 3, 4, 5], X > 3].
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_for_expression_with_variable() {
@@ -59,9 +53,7 @@ Numbers_aaaa = [1, 2, 3, 4],
 [N + 1 || N <- Numbers_aaaa].
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_for_expression_tuple_pattern() {
@@ -81,9 +73,7 @@ Pairs_aaaa = [{1, 2}, {3, 4}, {5, 6}],
 [A + B || {A, B} <- Pairs_aaaa].
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_for_expression_complex_body() {
@@ -103,9 +93,7 @@ for_complex_body() ->
     Result_aaaa + 1 || X <- [1, 2, 3]].
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_for_expression_nested_data() {
@@ -125,9 +113,7 @@ Data_aaaa = [[1, 2], [3, 4], [5, 6]],
 [length(Sublist) || Sublist <- Data_aaaa].
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_for_expression_with_map_pattern() {
@@ -147,9 +133,7 @@ Users_aaaa = [#{name => "Alice", age => 30}, #{name => "Bob", age => 25}],
 [User_name || #{name => User_name, age => User_age} <- Users_aaaa, User_age >= 30].
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_for_expression_string_result() {
@@ -169,9 +153,7 @@ Names_aaaa = ["Alice", "Bob", "Charlie"],
 [Name || Name <- Names_aaaa].
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_for_expression_atom_pattern() {
@@ -191,9 +173,7 @@ Statuses_aaaa = [ok, error, pending, ok],
 ["success" || ok <- Statuses_aaaa].
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_for_expression_list_cons_pattern() {
@@ -213,9 +193,7 @@ Lists_aaaa = [[1, 2, 3], [4, 5], [6]],
 [Head * 10 || [Head | _tail] <- Lists_aaaa].
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_simple_list_literal() {
@@ -231,9 +209,7 @@ simple_list() ->
 [1, 2, 3, 4].
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_empty_list_literal() {
@@ -249,9 +225,7 @@ empty_list() ->
 [].
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_mixed_type_list_literal() {
@@ -267,9 +241,7 @@ mixed_list() ->
 [1, "hello", atom, true].
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_nested_list_literal() {
@@ -285,9 +257,7 @@ nested_list() ->
 [[1, 2], [3, 4], [5, 6]].
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_list_with_variables() {
@@ -303,9 +273,7 @@ list_with_vars() ->
 [1, 2, 3].
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_list_assignment() {
@@ -323,9 +291,7 @@ Numbers_aaaa = [1, 2, 3, 4, 5],
 Numbers_aaaa.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_list_with_function_calls() {
@@ -341,7 +307,5 @@ list_with_calls() ->
 [length([1, 2, 3]), length([4, 5])].
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }

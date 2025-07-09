@@ -33,13 +33,11 @@ pub fn new_parser(tokens []lexer.Token) Parser {
 pub fn (mut p Parser) parse_program() ?ast.ModuleStmt {
 	// Create internal parser with proper context
 	mut internal_parser := internal.new_lx_parser(p.lexer_tokens)
-
 	// Parse the complete program
 	result := internal_parser.parse_program_statements() or {
 		p.errors << internal_parser.get_errors()
 		return none
 	}
-
 	// Copy any errors from internal parser
 	p.errors << internal_parser.get_errors()
 

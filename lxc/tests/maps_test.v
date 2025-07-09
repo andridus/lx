@@ -13,7 +13,7 @@ test_map() ->
 #{name => "John", age => 30}.
 
 '
-	erl1 := generates_erlang(lx_code)
+	erl1 := generates_erlang_result(lx_code)
 	assert erl1.success
 	assert erl1.code == expected
 }
@@ -31,7 +31,7 @@ test_map() ->
 #{"name" => "John", "age" => 30}.
 
 '
-	erl1 := generates_erlang(lx_code)
+	erl1 := generates_erlang_result(lx_code)
 	assert erl1.success
 	assert erl1.code == expected
 }
@@ -49,7 +49,7 @@ get_name(User) ->
 maps:get(name, User).
 
 '
-	erl1 := generates_erlang(lx_code)
+	erl1 := generates_erlang_result(lx_code)
 	assert erl1.success
 	assert erl1.code == expected
 }
@@ -67,7 +67,7 @@ update_age(User) ->
 User#{age => 31}.
 
 '
-	erl1 := generates_erlang(lx_code)
+	erl1 := generates_erlang_result(lx_code)
 	assert erl1.success
 	assert erl1.code == expected
 }
@@ -85,7 +85,7 @@ update_user(User) ->
 User#{"status" => "active"}.
 
 '
-	erl1 := generates_erlang(lx_code)
+	erl1 := generates_erlang_result(lx_code)
 	assert erl1.success
 	assert erl1.code == expected
 }
@@ -109,7 +109,7 @@ case User of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
+	erl1 := generates_erlang_result(lx_code)
 	assert erl1.success
 	assert erl1.code == expected
 }
@@ -133,7 +133,7 @@ case Data of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
+	erl1 := generates_erlang_result(lx_code)
 	assert erl1.success
 	assert erl1.code == expected
 }
@@ -151,7 +151,7 @@ get_db_host(Config) ->
 maps:get(host, maps:get(database, Config)).
 
 '
-	erl1 := generates_erlang(lx_code)
+	erl1 := generates_erlang_result(lx_code)
 	assert erl1.success
 	assert erl1.code == expected
 }
@@ -183,7 +183,7 @@ case UpdatedUser of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
+	erl1 := generates_erlang_result(lx_code)
 	assert erl1.success
 	assert erl1.code == expected
 }
@@ -202,7 +202,7 @@ empty_map() ->
 #{}.
 
 '
-	erl1 := generates_erlang(lx_code)
+	erl1 := generates_erlang_result(lx_code)
 	assert erl1.success
 	assert erl1.code == expected
 }
@@ -220,7 +220,7 @@ create_user(Name, Age) ->
 #{name => Name, age => Age, active => true}.
 
 '
-	erl1 := generates_erlang(lx_code)
+	erl1 := generates_erlang_result(lx_code)
 	assert erl1.success
 	assert erl1.code == expected
 }

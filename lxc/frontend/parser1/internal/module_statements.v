@@ -37,7 +37,7 @@ pub fn (mut p LXParser) parse_program_statements() ?ast.ModuleStmt {
 			break
 		}
 
-		stmt := p.parse_module_statement()?
+		stmt := p.parse_module_statement() or { return none }
 		statements << stmt
 	}
 
@@ -127,7 +127,7 @@ fn (mut p LXParser) parse_function_definition() ?ast.Stmt {
 	p.advance()
 
 	// Parse function clauses
-	clauses := p.parse_function_clauses()?
+	clauses := p.parse_function_clauses() or { return none }
 
 	return ast.FunctionStmt{
 		id:         '' // Will be filled by semantic analysis
@@ -213,9 +213,19 @@ fn (mut p LXParser) parse_record_definition() ?ast.Stmt {
 // Grammar: type_definition ::= 'type' identifier '::' type_expression
 // ========================================
 
-// parse_type_definition parses type alias definitions
+// parse_type_definition parses type alias definitions with optional modifiers
 fn (mut p LXParser) parse_type_definition() ?ast.Stmt {
 	p.advance() // consume 'type'
+
+	// Check for optional modifier
+	mut alias_type := ast.TypeAliasType.regular
+	if p.check(keyword_token(.opaque)) {
+		alias_type = ast.TypeAliasType.opaque
+		p.advance()
+	} else if p.check(keyword_token(.nominal)) {
+		alias_type = ast.TypeAliasType.nominal
+		p.advance()
+	}
 
 	// Parse type name
 	if !p.current.is_identifier() {
@@ -234,7 +244,7 @@ fn (mut p LXParser) parse_type_definition() ?ast.Stmt {
 	return ast.TypeAliasStmt{
 		name:       name
 		type_expr:  type_expr
-		alias_type: .regular
+		alias_type: alias_type
 		position:   p.get_current_position()
 	}
 }

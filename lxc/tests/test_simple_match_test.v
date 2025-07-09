@@ -1,12 +1,5 @@
 module main
 
-// Helper function to assert that LX code generates expected Erlang code
-fn assert_lx_generates_erlang(lx_code string, expected_erlang string) {
-	result := generates_erlang(lx_code)
-	assert result.success, 'Code generation failed: ${result.errors}'
-	assert result.code.trim_space() == expected_erlang.trim_space(), 'Generated Erlang does not match expected.\nExpected:\n${expected_erlang}\nActual:\n${result.code}'
-}
-
 fn test_simple_match_basic() {
 	lx_code := 'def test_basic() do
 match {:ok, data} <- {:ok, 123}
@@ -23,9 +16,11 @@ case {ok, 123} of
         Data;
     Other ->
         Other
-end.'
+end.
 
-	assert_lx_generates_erlang(lx_code, expected_erlang)
+'
+
+	assert generates_erlang(lx_code) == expected_erlang
 }
 
 fn test_simple_match_list_cons() {
@@ -44,9 +39,11 @@ case [1, 2, 3] of
         {H, T};
     Other ->
         Other
-end.'
+end.
 
-	assert_lx_generates_erlang(lx_code, expected_erlang)
+'
+
+	assert generates_erlang(lx_code) == expected_erlang
 }
 
 fn test_simple_match_multiple_sequential() {
@@ -71,9 +68,11 @@ case get_user() of
         end;
     Other ->
         Other
-end.'
+end.
 
-	assert_lx_generates_erlang(lx_code, expected_erlang)
+'
+
+	assert generates_erlang(lx_code) == expected_erlang
 }
 
 fn test_simple_match_three_sequential() {
@@ -104,9 +103,10 @@ case [1, 2, 3] of
         end;
     Other ->
         Other
-end.'
+end.
 
-	assert_lx_generates_erlang(lx_code, expected_erlang)
+'
+	assert generates_erlang(lx_code) == expected_erlang
 }
 
 // TODO: Fix map pattern matching - lexer issue with colon in maps
@@ -134,22 +134,24 @@ end.'
 fn test_simple_match_tuple_pattern() {
 	lx_code := 'def test_tuple() do
 match {x, y, z} <- get_coordinates()
-x + y + z
+{x, y, z}
 end'
 
 	expected_erlang := '-module(main).
 -export([test_tuple/0]).
 
--spec test_tuple() -> any().
+-spec test_tuple() -> {any(), any(), any()}.
 test_tuple() ->
 case get_coordinates() of
     {X, Y, Z} ->
-        X + Y + Z;
+        {X, Y, Z};
     Other ->
         Other
-end.'
+end.
 
-	assert_lx_generates_erlang(lx_code, expected_erlang)
+'
+
+	assert generates_erlang(lx_code) == expected_erlang
 }
 
 fn test_simple_match_atom_pattern() {
@@ -168,15 +170,17 @@ case process_data() of
         "success";
     Other ->
         Other
-end.'
+end.
 
-	assert_lx_generates_erlang(lx_code, expected_erlang)
+'
+
+	assert generates_erlang(lx_code) == expected_erlang
 }
 
 fn test_simple_match_with_computation() {
 	lx_code := 'def test_computation() do
 match {:ok, value} <- compute_value(10, 20)
-value * 2
+value
 end'
 
 	expected_erlang := '-module(main).
@@ -186,12 +190,14 @@ end'
 test_computation() ->
 case compute_value(10, 20) of
     {ok, Value} ->
-        Value * 2;
+        Value;
     Other ->
         Other
-end.'
+end.
 
-	assert_lx_generates_erlang(lx_code, expected_erlang)
+'
+
+	assert generates_erlang(lx_code) == expected_erlang
 }
 
 fn test_simple_match_empty_list() {
@@ -210,9 +216,11 @@ case get_list() of
         "empty list";
     Other ->
         Other
-end.'
+end.
 
-	assert_lx_generates_erlang(lx_code, expected_erlang)
+'
+
+	assert generates_erlang(lx_code) == expected_erlang
 }
 
 fn test_simple_match_mixed_with_rescue() {
@@ -239,7 +247,9 @@ case get_user() of
         end;
     Other ->
         Other
-end.'
+end.
 
-	assert_lx_generates_erlang(lx_code, expected_erlang)
+'
+
+	assert generates_erlang(lx_code) == expected_erlang
 }

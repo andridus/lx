@@ -5,15 +5,13 @@ fn test_simple_function_string() {
 def f() do
 1
 end'
-	erl1 := generates_erlang(lx_code)
 	expected := '-module(main).
 -export([f/0]).\n
 -spec f() -> integer().
 f() ->
 1.\n
 '
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_type_alias_basic() {
@@ -31,9 +29,7 @@ f() ->
 1.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_type_alias_opaque() {
@@ -50,9 +46,7 @@ f() ->
 1.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_type_alias_nominal() {
@@ -69,9 +63,7 @@ f() ->
 1.0.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_type_alias_union_does_not_return() {
@@ -87,9 +79,7 @@ f() ->
 "test".
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_type_alias_with_function_params() {
@@ -106,9 +96,7 @@ add(A, B) ->
 {A, B}.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 // fn test_type_alias_opaque_with_function() {
@@ -166,9 +154,7 @@ create_pair(X, Y) ->
 {X, Y}.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 // fn test_type_alias_with_list() {
@@ -272,9 +258,7 @@ case true of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_if_expression_with_variable() {
@@ -301,9 +285,7 @@ case X_aaaa > 5 of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_if_expression_without_else() {
@@ -326,9 +308,7 @@ case false of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_if_expression_nested() {
@@ -364,9 +344,7 @@ end;
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_if_expression_complex_condition() {
@@ -395,7 +373,5 @@ case X_aaaa + Y_baaa > 12 of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }

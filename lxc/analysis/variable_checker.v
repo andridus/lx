@@ -198,7 +198,22 @@ pub fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 				func_var := expr.function as ast.VariableExpr
 				func_name := func_var.name
 				arity := expr.arguments.len
-				if !vc.has_function_recursive(func_name) {
+				println('[DEBUG] VariableChecker: Checking function call for ${func_name} with arity ${arity}')
+				println('[DEBUG] VariableChecker: has_function_recursive(${func_name}) = ${vc.has_function_recursive(func_name)}')
+				println('[DEBUG] VariableChecker: has_binding_recursive(${func_name}) = ${vc.has_binding_recursive(func_name)}')
+				if vc.has_function_recursive(func_name) {
+					println('[DEBUG] VariableChecker: Found function ${func_name}, checking arguments')
+					for arg in expr.arguments {
+						vc.check_expression(arg)
+					}
+				} else if vc.has_binding_recursive(func_name) {
+					println('[DEBUG] VariableChecker: Found variable ${func_name}, checking as variable call')
+					vc.check_variable_expression(func_var)
+					for arg in expr.arguments {
+						vc.check_expression(arg)
+					}
+				} else {
+					println('[DEBUG] VariableChecker: Neither function nor variable ${func_name} found')
 					mut params := []string{}
 					for i, arg in expr.arguments {
 						param_type := vc.infer_argument_type(arg)
@@ -212,11 +227,11 @@ pub fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 						suggestion: func_suggestion
 					}, func_var.position, "Function '${func_name}/${arity}' is not defined")
 				}
-				for arg in expr.arguments {
-					vc.check_expression(arg)
-				}
 			} else {
-				vc.check_expression(expr.function)
+				// Só checa expr.function se NÃO for VariableExpr (ou seja, chamada dinâmica, etc)
+				if expr.function !is ast.VariableExpr {
+					vc.check_expression(expr.function)
+				}
 				for arg in expr.arguments {
 					vc.check_expression(arg)
 				}

@@ -26,9 +26,7 @@ case 1 of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_case_expression_with_variable() {
@@ -54,9 +52,7 @@ case X of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_case_expression_with_guards_simple() {
@@ -82,9 +78,7 @@ case X of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_case_expression_atom_patterns() {
@@ -123,9 +117,7 @@ case ok of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_case_expression_single_statement() {
@@ -149,7 +141,5 @@ case 1 of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }

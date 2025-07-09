@@ -19,9 +19,7 @@ create_person() ->
 #person{name = "Alice", age = 30}.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_record_field_access() {
@@ -45,9 +43,7 @@ Person_aaaa = #person{name = "Bob", age = 25},
 Person_aaaa#person.name.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_record_update_single_field() {
@@ -71,9 +67,7 @@ Person_aaaa = #person{name = "Charlie", age = 35},
 Person_aaaa#{age => 36}.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_record_update_multiple_fields() {
@@ -98,9 +92,7 @@ Person_aaaa = #person{name = "David", age = 40, email = "david@old.com"},
 Person_aaaa#{age => 41, email => "david@new.com"}.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_record_patterns_simple() {
@@ -128,9 +120,7 @@ case User of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_record_patterns_with_case_and_guards() {
@@ -162,9 +152,7 @@ case Person_aaaa of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_record_patterns_multiple_fields() {
@@ -195,9 +183,7 @@ case Contact of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 // fn test_record_patterns_with() {

@@ -49,8 +49,8 @@ pub fn (gen ErlangGenerator) generate_pattern(pattern ast.Pattern) string {
 				fields << '${field.name} = ${value}'
 			}
 
-			// Check if this pattern has an assigned variable
-			if assign_var := pattern.assign_variable {
+			assign_var := pattern.assign_variable or { '' }
+			if assign_var != '' {
 				capitalized_var := gen.capitalize_variable(assign_var)
 				return '#${pattern.name.to_lower()}{${fields.join(', ')}} = ${capitalized_var}'
 			}
@@ -74,7 +74,7 @@ pub fn (mut gen ErlangGenerator) generate_pattern_with_binding(pattern ast.Patte
 			return '_'
 		}
 		ast.VarPattern {
-			// Bind the variable to the scope and return capitalized name
+			// Bind the variable to the scope e retorne o nome capitalizado
 			hashed := gen.bind_variable(pattern.name, true)
 			return hashed
 		}
@@ -115,13 +115,11 @@ pub fn (mut gen ErlangGenerator) generate_pattern_with_binding(pattern ast.Patte
 				value := gen.generate_pattern_with_binding(field.pattern)
 				fields << '${field.name} = ${value}'
 			}
-
-			// Check if this pattern has an assigned variable
-			if assign_var := pattern.assign_variable {
+			assign_var := pattern.assign_variable or { '' }
+			if assign_var != '' {
 				capitalized_var := gen.bind_variable(assign_var, true)
 				return '#${pattern.name.to_lower()}{${fields.join(', ')}} = ${capitalized_var}'
 			}
-
 			return '#${pattern.name.to_lower()}{${fields.join(', ')}}'
 		}
 		ast.BinaryPattern {

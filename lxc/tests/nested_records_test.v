@@ -1,7 +1,5 @@
 module main
 
-import utils
-
 fn test_nested_records_basic() {
 	lx_code := '
 record Profile {
@@ -34,9 +32,7 @@ case User of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_multiple_nested_records() {
@@ -79,9 +75,7 @@ case User of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_nested_records_with_guards() {
@@ -117,9 +111,7 @@ case User of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_record_with_list_of_custom_types() {
@@ -147,9 +139,7 @@ create_company() ->
 #company{name = "Tech Corp", employees = []}.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_deeply_nested_records() {
@@ -197,9 +187,7 @@ case Person of
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_nested_records_creation() {
@@ -226,7 +214,5 @@ create_user() ->
 #user{name = "John", profile = #profile{age = 25}}.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }

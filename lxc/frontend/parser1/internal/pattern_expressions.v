@@ -307,9 +307,8 @@ fn (mut p LXParser) parse_record_pattern() ?ast.Pattern {
 	p.consume(punctuation_token(.rbrace), 'Expected } after record pattern')?
 
 	return ast.RecordPattern{
-		name:            record_name
-		fields:          fields
-		assign_variable: ''
+		name:   record_name
+		fields: fields
 	}
 }
 

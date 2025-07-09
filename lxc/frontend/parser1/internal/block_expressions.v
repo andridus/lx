@@ -52,6 +52,41 @@ pub fn (mut p LXParser) parse_block_expression() ?ast.Expr {
 	}
 }
 
+pub fn (mut p LXParser) parse_block_expression_with_delimiter(delimiters []lexer.Token) ?ast.Expr {
+	// Must be in expression context
+	if p.context != .expression {
+		p.add_error('Block expressions only allowed in expression context', 'Invalid context')
+		return none
+	}
+
+	position := p.get_current_position()
+
+	// Parse expression list
+	mut statements := []ast.Stmt{}
+
+	for !is_delimiter(p.current, delimiters) && !p.is_at_end() {
+		p.skip_newlines()
+
+		if is_delimiter(p.current, delimiters) {
+			break
+		}
+
+		// Parse expression and wrap in statement
+		expr := p.parse_expression()?
+		statements << ast.ExprStmt{
+			expr: expr
+		}
+	}
+	return ast.BlockExpr{
+		body:     statements
+		position: position
+	}
+}
+
+fn is_delimiter(token lexer.Token, delimiters []lexer.Token) bool {
+	return token.str() in delimiters.map(it.str())
+}
+
 // ========================================
 // BLOCK TOP LEVEL PARSING
 // Grammar: block_top_level ::= 'do' { module_statement } 'end'
@@ -169,7 +204,6 @@ fn (mut p LXParser) parse_or_expression() ?ast.Expr {
 // parse_and_expression parses logical AND expressions
 fn (mut p LXParser) parse_and_expression() ?ast.Expr {
 	mut left := p.parse_equality_expression()?
-
 	for p.check(operator_token(.and_)) {
 		p.advance() // consume 'and'
 		right := p.parse_equality_expression()?
@@ -192,7 +226,6 @@ fn (mut p LXParser) parse_and_expression() ?ast.Expr {
 // parse_equality_expression parses equality expressions
 fn (mut p LXParser) parse_equality_expression() ?ast.Expr {
 	mut left := p.parse_comparison_expression()?
-
 	for {
 		if p.check(operator_token(.eq)) {
 			p.advance() // consume '=='
@@ -273,7 +306,6 @@ fn (mut p LXParser) parse_comparison_expression() ?ast.Expr {
 // parse_arithmetic_expression parses addition and subtraction
 fn (mut p LXParser) parse_arithmetic_expression() ?ast.Expr {
 	mut left := p.parse_term()?
-
 	for {
 		mut op := ast.BinaryOp.add
 		mut matched := false
@@ -375,10 +407,13 @@ fn (mut p LXParser) parse_unary_expression() ?ast.Expr {
 // parse_postfix_expression parses postfix expressions (function calls, field access, etc.)
 fn (mut p LXParser) parse_postfix_expression() ?ast.Expr {
 	mut expr := p.parse_primary_expression()?
-
 	// Handle postfix operations
 	for {
-		// Function call: expr(args)
+		// Check if the postfix operator is on the same line as the identifier
+		if !p.is_postfix_operator_on_same_line() {
+			break
+		}
+
 		if p.check(punctuation_token(.lparen)) {
 			p.advance() // consume '('
 			mut arguments := []ast.Expr{}
@@ -413,7 +448,7 @@ fn (mut p LXParser) parse_postfix_expression() ?ast.Expr {
 							position:      p.get_current_position()
 						}
 					} else {
-						// Regular function call
+						// This is a method call: obj.field()
 						expr = ast.CallExpr{
 							function:  expr
 							arguments: arguments
@@ -421,15 +456,31 @@ fn (mut p LXParser) parse_postfix_expression() ?ast.Expr {
 						}
 					}
 				} else {
-					// Regular function call
+					// This is a method call: obj.field()
 					expr = ast.CallExpr{
 						function:  expr
 						arguments: arguments
 						position:  p.get_current_position()
 					}
 				}
+			} else if expr is ast.VariableExpr {
+				// This is a local function call: func_a()
+				// Use atom literal instead of variable
+				var_expr := expr as ast.VariableExpr
+				func_name := var_expr.name
+				position := var_expr.position
+				expr = ast.CallExpr{
+					function:  ast.LiteralExpr{
+						value:    ast.AtomLiteral{
+							value: func_name
+						}
+						position: position
+					}
+					arguments: arguments
+					position:  p.get_current_position()
+				}
 			} else {
-				// Regular function call
+				// Regular function call (could be complex expression)
 				expr = ast.CallExpr{
 					function:  expr
 					arguments: arguments
@@ -471,8 +522,40 @@ fn (mut p LXParser) parse_postfix_expression() ?ast.Expr {
 			break
 		}
 	}
-
 	return expr
+}
+
+// is_postfix_operator_on_same_line checks if the current token is a postfix operator
+// and is on the same line as the previous expression
+fn (p &LXParser) is_postfix_operator_on_same_line() bool {
+	// Check if current token is a postfix operator
+	if !p.is_postfix_operator() {
+		return false
+	}
+
+	// Get the position of the current token
+	current_pos := p.current.get_position()
+
+	// Check if there are any newlines between the previous expression and this operator
+	// We need to look back to see if there's a newline between the last expression and current token
+	if p.position > 0 {
+		prev_token := p.tokens[p.position - 1]
+		prev_pos := prev_token.get_position()
+
+		// If the line numbers are different, they're not on the same line
+		if current_pos.line != prev_pos.line {
+			return false
+		}
+	}
+
+	return true
+}
+
+// is_postfix_operator checks if the current token is a valid postfix operator
+fn (p &LXParser) is_postfix_operator() bool {
+	return p.check(punctuation_token(.lparen)) || // function call: expr(...)
+	 p.check(operator_token(.dot)) || // field access: expr.field
+	 p.check(punctuation_token(.lbracket)) // map access: expr[...]
 }
 
 // ========================================
@@ -485,6 +568,15 @@ fn (mut p LXParser) parse_primary_expression() ?ast.Expr {
 	return match p.current {
 		lexer.IdentToken {
 			p.parse_identifier_expression()
+		}
+		lexer.UpperIdentToken {
+			if p.peek() is lexer.PunctuationToken {
+				punc := p.peek() as lexer.PunctuationToken
+				if punc.value == .lbrace {
+					return p.parse_record_value_expression()
+				}
+			}
+			return p.parse_identifier_expression()
 		}
 		lexer.IntToken {
 			p.parse_integer_literal()
@@ -528,6 +620,9 @@ fn (mut p LXParser) parse_primary_expression() ?ast.Expr {
 		lexer.KeywordToken {
 			keyword := p.current as lexer.KeywordToken
 			match keyword.value {
+				.nil_ {
+					p.parse_nil_literal()
+				}
 				.do_ {
 					p.parse_block_expression()
 				}
@@ -543,8 +638,26 @@ fn (mut p LXParser) parse_primary_expression() ?ast.Expr {
 				.match_ {
 					p.parse_match_expression()
 				}
+				.for_ {
+					p.parse_for_expression()
+				}
+				.receive {
+					p.parse_receive_expression()
+				}
 				else {
 					p.add_error('Unexpected keyword in expression', 'Got ${p.current.str()}')
+					none
+				}
+			}
+		}
+		lexer.OperatorToken {
+			op := p.current as lexer.OperatorToken
+			match op.value {
+				.modulo {
+					p.parse_map_expression()
+				}
+				else {
+					p.add_error('Unexpected operator in expression', 'Got ${p.current.str()}')
 					none
 				}
 			}
@@ -733,20 +846,49 @@ fn (mut p LXParser) parse_list_expression() ?ast.Expr {
 	position := p.get_current_position()
 	p.advance() // consume '['
 
-	mut elements := []ast.Expr{}
-
-	if !p.check(punctuation_token(.rbracket)) {
-		for {
-			elements << p.parse_expression()?
-
-			if !p.match(punctuation_token(.comma)) {
-				break
-			}
+	// Handle empty list
+	if p.check(punctuation_token(.rbracket)) {
+		p.advance() // consume ']'
+		return ast.ListLiteralExpr{
+			elements: []
+			position: position
 		}
 	}
 
-	p.consume(punctuation_token(.rbracket), 'Expected ] after list elements')?
+	mut elements := []ast.Expr{}
 
+	elements << p.parse_expression()?
+
+	for p.match(punctuation_token(.comma)) {
+		elements << p.parse_expression()?
+	}
+	if p.match(operator_token(.pipe)) {
+		tail := p.parse_expression()?
+		p.consume(punctuation_token(.rbracket), 'Expected ] after cons expression')?
+
+		if elements.len > 1 {
+			mut current_tail := tail
+			for i := elements.len - 1; i > 0; i-- {
+				current_tail = ast.ListConsExpr{
+					head:     elements[i]
+					tail:     current_tail
+					position: position
+				}
+			}
+			return ast.ListConsExpr{
+				head:     elements[0]
+				tail:     current_tail
+				position: position
+			}
+		} else {
+			return ast.ListConsExpr{
+				head:     elements[0]
+				tail:     tail
+				position: position
+			}
+		}
+	}
+	p.consume(punctuation_token(.rbracket), 'Expected ] after list elements')?
 	return ast.ListLiteralExpr{
 		elements: elements
 		position: position
@@ -766,9 +908,10 @@ fn (mut p LXParser) parse_if_expression() ?ast.Expr {
 	condition := p.parse_expression()?
 	p.consume(keyword_token(.do_), 'Expected do after if condition')?
 
-	// Parse then body in expression context
+	// Parse then body using block_expression_with_delimiter like with expressions
 	then_body_expr := p.with_context(.expression, fn (mut parser LXParser) ?ast.Expr {
-		return parser.parse_block_expression()
+		return parser.parse_block_expression_with_delimiter([
+			keyword_token(.else_), keyword_token(.end_)])
 	})?
 
 	// Convert to BlockExpr if needed
@@ -776,32 +919,35 @@ fn (mut p LXParser) parse_if_expression() ?ast.Expr {
 		then_body_expr as ast.BlockExpr
 	} else {
 		ast.BlockExpr{
-			body: [ast.ExprStmt{expr: then_body_expr}]
+			body:     [ast.ExprStmt{
+				expr: then_body_expr
+			}]
 			position: position
 		}
 	}
 
 	mut else_body := ast.BlockExpr{
-		body: []
+		body:     []
 		position: position
 	}
 
 	if p.match(keyword_token(.else_)) {
-		else_body_expr := p.with_context(.expression, fn (mut parser LXParser) ?ast.Expr {
-			return parser.parse_block_expression()
-		})?
+		else_body_expr := p.parse_block_expression_with_delimiter([
+			keyword_token(.end_),
+		])?
 
 		// Convert to BlockExpr if needed
 		else_body = if else_body_expr is ast.BlockExpr {
 			else_body_expr as ast.BlockExpr
 		} else {
 			ast.BlockExpr{
-				body: [ast.ExprStmt{expr: else_body_expr}]
+				body:     [ast.ExprStmt{
+					expr: else_body_expr
+				}]
 				position: position
 			}
 		}
 	}
-
 	p.consume(keyword_token(.end_), 'Expected end after if expression')?
 
 	return ast.IfExpr{
@@ -823,7 +969,18 @@ fn (mut p LXParser) parse_case_expression() ?ast.Expr {
 	mut cases := []ast.MatchCase{}
 
 	for !p.check(keyword_token(.end_)) && !p.is_at_end() {
-		pattern := p.parse_pattern()?
+		mut pattern := p.parse_pattern()?
+		// Check for optional assignment to variable (pattern = variable)
+		mut assign_variable := ''
+		if p.match(operator_token(.assign)) {
+			if p.current.is_identifier() {
+				assign_variable = p.current.get_value()
+				p.advance() // consume the identifier
+			} else {
+				p.add_error('Expected variable name after = in case pattern', 'Invalid syntax')
+				return none
+			}
+		}
 
 		mut guard := ast.Expr(ast.LiteralExpr{
 			value: ast.BooleanLiteral{
@@ -835,20 +992,43 @@ fn (mut p LXParser) parse_case_expression() ?ast.Expr {
 			guard = p.parse_expression()?
 		}
 
+		// If we have an assign_variable, update the pattern to include it
+		if assign_variable.len > 0 {
+			if pattern is ast.RecordPattern {
+				record_pattern := pattern as ast.RecordPattern
+				pattern = ast.RecordPattern{
+					name:            record_pattern.name
+					fields:          record_pattern.fields
+					assign_variable: assign_variable
+				}
+			}
+		}
+
 		p.consume(operator_token(.arrow), 'Expected -> after pattern')?
 
-		body_expr := p.with_context(.expression, fn (mut parser LXParser) ?ast.Expr {
-			return parser.parse_expression()
-		})?
+		// Parse block of statements for the case body
+		mut statements := []ast.Stmt{}
 
-		// Convert to BlockExpr if needed
-		body := if body_expr is ast.BlockExpr {
-			body_expr as ast.BlockExpr
-		} else {
-			ast.BlockExpr{
-				body: [ast.ExprStmt{expr: body_expr}]
-				position: position
+		for !p.check(keyword_token(.end_)) && !p.is_at_end() {
+			p.skip_newlines()
+
+			// Check for next case pattern
+			if p.is_next_case_pattern() {
+				break
 			}
+
+			// Parse expression and wrap in statement
+			expr := p.parse_expression()?
+			statements << ast.ExprStmt{
+				expr: expr
+			}
+
+			p.skip_newlines()
+		}
+
+		body := ast.BlockExpr{
+			body:     statements
+			position: p.get_current_position()
 		}
 
 		cases << ast.MatchCase{
@@ -876,7 +1056,19 @@ fn (mut p LXParser) parse_with_expression() ?ast.Expr {
 	mut bindings := []ast.WithBinding{}
 
 	for !p.check(keyword_token(.do_)) {
-		pattern := p.parse_pattern()?
+		mut pattern := p.parse_pattern()?
+
+		// Check for optional assignment to variable (pattern = variable)
+		mut assign_variable := ''
+		if p.match(operator_token(.assign)) {
+			if p.current.is_identifier() {
+				assign_variable = p.current.get_value()
+				p.advance() // consume the identifier
+			} else {
+				p.add_error('Expected variable name after = in with binding', 'Invalid syntax')
+				return none
+			}
+		}
 
 		mut guard := ast.Expr(ast.LiteralExpr{
 			value: ast.BooleanLiteral{
@@ -891,6 +1083,19 @@ fn (mut p LXParser) parse_with_expression() ?ast.Expr {
 		p.consume(operator_token(.pattern_match), 'Expected <- in with binding')?
 		value := p.parse_expression()?
 
+		// If we have an assign_variable, update the pattern to include it
+		if assign_variable.len > 0 {
+			// For record patterns, we need to set the assign_variable
+			if pattern is ast.RecordPattern {
+				record_pattern := pattern as ast.RecordPattern
+				pattern = ast.RecordPattern{
+					name:            record_pattern.name
+					fields:          record_pattern.fields
+					assign_variable: assign_variable
+				}
+			}
+		}
+
 		bindings << ast.WithBinding{
 			pattern:  pattern
 			value:    value
@@ -904,9 +1109,9 @@ fn (mut p LXParser) parse_with_expression() ?ast.Expr {
 	}
 
 	p.consume(keyword_token(.do_), 'Expected do after with bindings')?
-
 	body_expr := p.with_context(.expression, fn (mut parser LXParser) ?ast.Expr {
-		return parser.parse_block_expression()
+		return parser.parse_block_expression_with_delimiter([
+			keyword_token(.else_), keyword_token(.end_)])
 	})?
 
 	// Convert to BlockExpr if needed
@@ -914,32 +1119,35 @@ fn (mut p LXParser) parse_with_expression() ?ast.Expr {
 		body_expr as ast.BlockExpr
 	} else {
 		ast.BlockExpr{
-			body: [ast.ExprStmt{expr: body_expr}]
+			body:     [ast.ExprStmt{
+				expr: body_expr
+			}]
 			position: position
 		}
 	}
 
 	mut else_body := ast.BlockExpr{
-		body: []
+		body:     []
 		position: position
 	}
 
 	if p.match(keyword_token(.else_)) {
-		else_body_expr := p.with_context(.expression, fn (mut parser LXParser) ?ast.Expr {
-			return parser.parse_block_expression()
-		})?
+		else_body_expr := p.parse_block_expression_with_delimiter([
+			keyword_token(.end_),
+		])?
 
 		// Convert to BlockExpr if needed
 		else_body = if else_body_expr is ast.BlockExpr {
 			else_body_expr as ast.BlockExpr
 		} else {
 			ast.BlockExpr{
-				body: [ast.ExprStmt{expr: else_body_expr}]
+				body:     [ast.ExprStmt{
+					expr: else_body_expr
+				}]
 				position: position
 			}
 		}
 	}
-
 	p.consume(keyword_token(.end_), 'Expected end after with expression')?
 
 	return ast.WithExpr{
@@ -955,7 +1163,19 @@ fn (mut p LXParser) parse_match_expression() ?ast.Expr {
 	position := p.get_current_position()
 	p.advance() // consume 'match'
 
-	pattern := p.parse_pattern()?
+	mut pattern := p.parse_pattern()?
+
+	// Check for optional assignment to variable (pattern = variable)
+	mut assign_variable := ''
+	if p.match(operator_token(.assign)) {
+		if p.current.is_identifier() {
+			assign_variable = p.current.get_value()
+			p.advance() // consume the identifier
+		} else {
+			p.add_error('Expected variable name after = in match pattern', 'Invalid syntax')
+			return none
+		}
+	}
 
 	mut guard := ast.Expr(ast.LiteralExpr{
 		value: ast.BooleanLiteral{
@@ -967,13 +1187,814 @@ fn (mut p LXParser) parse_match_expression() ?ast.Expr {
 		guard = p.parse_expression()?
 	}
 
+	// If we have an assign_variable, update the pattern to include it
+	if assign_variable.len > 0 {
+		if pattern is ast.RecordPattern {
+			record_pattern := pattern as ast.RecordPattern
+			pattern = ast.RecordPattern{
+				name:            record_pattern.name
+				fields:          record_pattern.fields
+				assign_variable: assign_variable
+			}
+		}
+	}
+
 	p.consume(operator_token(.pattern_match), 'Expected <- in match expression')?
 	value := p.parse_expression()?
 
-	return ast.SimpleMatchExpr{
-		pattern:  pattern
-		value:    value
-		guard:    guard
+	// Check if this is a simple match or match rescue
+	if p.check(keyword_token(.rescue)) {
+		// Match rescue version
+		p.consume(keyword_token(.rescue), 'Expected rescue after match expression')?
+
+		// Parse rescue variable
+		if p.current !is lexer.IdentToken {
+			p.add_error('Expected variable name after rescue', 'Got ${p.current.str()}')
+			return none
+		}
+		rescue_var_token := p.current as lexer.IdentToken
+		rescue_var := rescue_var_token.value
+		p.advance()
+
+		p.consume(keyword_token(.do_), 'Expected do after rescue variable')?
+
+		rescue_body_expr := p.with_context(.expression, fn (mut parser LXParser) ?ast.Expr {
+			return parser.parse_block_expression_with_delimiter([
+				keyword_token(.end_)])
+		})?
+
+		// Convert to BlockExpr if needed
+		rescue_body := if rescue_body_expr is ast.BlockExpr {
+			rescue_body_expr as ast.BlockExpr
+		} else {
+			ast.BlockExpr{
+				body:     [ast.ExprStmt{
+					expr: rescue_body_expr
+				}]
+				position: position
+			}
+		}
+
+		p.consume(keyword_token(.end_), 'Expected end after rescue body')?
+
+		return ast.MatchRescueExpr{
+			pattern:     pattern
+			value:       value
+			rescue_var:  rescue_var
+			rescue_body: rescue_body
+			position:    position
+		}
+	} else {
+		// Simple match version
+		return ast.SimpleMatchExpr{
+			pattern:  pattern
+			value:    value
+			guard:    guard
+			position: position
+		}
+	}
+}
+
+// is_next_case_pattern checks if the current token starts a new case pattern
+fn (p &LXParser) is_next_case_pattern() bool {
+	result := p.is_pattern_followed_by_arrow(p.position)
+	return result
+}
+
+// is_pattern_followed_by_arrow checks if there's a pattern at the given position followed by ->
+fn (p &LXParser) is_pattern_followed_by_arrow(pos int) bool {
+	if pos >= p.tokens.len {
+		return false
+	}
+
+	// Check for simple patterns (literals, identifiers, atoms)
+	if p.tokens[pos] is lexer.IntToken || p.tokens[pos] is lexer.StringToken
+		|| p.tokens[pos] is lexer.IdentToken || p.tokens[pos] is lexer.AtomToken {
+		// Look ahead to see if this is a pattern (followed by ->)
+		mut lookahead_pos := pos + 1
+		if lookahead_pos < p.tokens.len {
+			if p.tokens[lookahead_pos] is lexer.OperatorToken {
+				op_token := p.tokens[lookahead_pos] as lexer.OperatorToken
+				if op_token.value == .arrow {
+					return true
+				}
+			}
+		}
+	}
+
+	// Check for record patterns RecordName{field: pattern, ...}
+	if p.tokens[pos] is lexer.UpperIdentToken {
+		// Look ahead to see if this is followed by { (record pattern)
+		mut lookahead_pos := pos + 1
+		if lookahead_pos < p.tokens.len {
+			if p.tokens[lookahead_pos] is lexer.PunctuationToken {
+				punc_token := p.tokens[lookahead_pos] as lexer.PunctuationToken
+				if punc_token.value == .lbrace {
+					// Find the matching closing brace
+					mut brace_count := 1
+					mut scan_pos := lookahead_pos + 1
+					for scan_pos < p.tokens.len && brace_count > 0 {
+						if p.tokens[scan_pos] is lexer.PunctuationToken {
+							punc := p.tokens[scan_pos] as lexer.PunctuationToken
+							if punc.value == .lbrace {
+								brace_count++
+							} else if punc.value == .rbrace {
+								brace_count--
+							}
+						}
+						scan_pos++
+					}
+
+					// Check if there's an arrow after the closing brace
+					if brace_count == 0 && scan_pos < p.tokens.len {
+						// Check for direct arrow
+						if p.tokens[scan_pos] is lexer.OperatorToken {
+							op_token := p.tokens[scan_pos] as lexer.OperatorToken
+							if op_token.value == .arrow {
+								return true
+							}
+						}
+						// Check for when followed by arrow
+						if p.tokens[scan_pos] is lexer.KeywordToken {
+							kw_token := p.tokens[scan_pos] as lexer.KeywordToken
+							if kw_token.value == .when {
+								// Look ahead for arrow after when
+								mut when_scan_pos := scan_pos + 1
+								// Skip the guard expression
+								for when_scan_pos < p.tokens.len {
+									if p.tokens[when_scan_pos] is lexer.OperatorToken {
+										op_token := p.tokens[when_scan_pos] as lexer.OperatorToken
+										if op_token.value == .arrow {
+											return true
+										}
+									}
+									when_scan_pos++
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Check for tuple patterns {pattern, pattern, ...}
+	if p.tokens[pos] is lexer.PunctuationToken {
+		punc_token := p.tokens[pos] as lexer.PunctuationToken
+		if punc_token.value == .lbrace {
+			// Find the matching closing brace
+			mut brace_count := 1
+			mut scan_pos := pos + 1
+			for scan_pos < p.tokens.len && brace_count > 0 {
+				if p.tokens[scan_pos] is lexer.PunctuationToken {
+					punc := p.tokens[scan_pos] as lexer.PunctuationToken
+					if punc.value == .lbrace {
+						brace_count++
+					} else if punc.value == .rbrace {
+						brace_count--
+					}
+				}
+				scan_pos++
+			}
+
+			// Check if there's an arrow after the closing brace
+			if brace_count == 0 && scan_pos < p.tokens.len {
+				if p.tokens[scan_pos] is lexer.OperatorToken {
+					op_token := p.tokens[scan_pos] as lexer.OperatorToken
+					if op_token.value == .arrow {
+						return true
+					}
+				}
+			}
+		}
+	}
+
+	// Check for list patterns [pattern, pattern, ...] or [head | tail]
+	if p.tokens[pos] is lexer.PunctuationToken {
+		punc_token := p.tokens[pos] as lexer.PunctuationToken
+		if punc_token.value == .lbracket {
+			// Find the matching closing bracket
+			mut bracket_count := 1
+			mut scan_pos := pos + 1
+			for scan_pos < p.tokens.len && bracket_count > 0 {
+				if p.tokens[scan_pos] is lexer.PunctuationToken {
+					punc := p.tokens[scan_pos] as lexer.PunctuationToken
+					if punc.value == .lbracket {
+						bracket_count++
+					} else if punc.value == .rbracket {
+						bracket_count--
+					}
+				}
+				scan_pos++
+			}
+
+			// Check if there's an arrow after the closing bracket
+			if bracket_count == 0 && scan_pos < p.tokens.len {
+				if p.tokens[scan_pos] is lexer.OperatorToken {
+					op_token := p.tokens[scan_pos] as lexer.OperatorToken
+					if op_token.value == .arrow {
+						return true
+					}
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+// ========================================
+// FOR EXPRESSIONS (LIST COMPREHENSIONS)
+// Grammar: for_expression ::= 'for' pattern 'in' expression ['when' expression] 'do' block_expression 'end'
+// ========================================
+
+// parse_for_expression parses for expressions (list comprehensions)
+fn (mut p LXParser) parse_for_expression() ?ast.Expr {
+	position := p.get_current_position()
+	p.advance() // consume 'for'
+
+	pattern := p.parse_pattern()?
+	// Aceita tanto KeywordToken(.in) quanto IdentToken("in")
+	if p.current is lexer.KeywordToken {
+		kw := p.current as lexer.KeywordToken
+		if kw.value == .in {
+			p.advance()
+		} else {
+			p.add_error('Expected in after pattern', 'Expected in, got ${p.current.str()}')
+			return none
+		}
+	} else if p.current is lexer.IdentToken {
+		id := p.current as lexer.IdentToken
+		if id.value == 'in' {
+			p.advance()
+		} else {
+			p.add_error('Expected in after pattern', 'Expected in, got ${p.current.str()}')
+			return none
+		}
+	} else {
+		p.add_error('Expected in after pattern', 'Expected in, got ${p.current.str()}')
+		return none
+	}
+
+	collection := p.parse_expression()?
+
+	mut guard := ast.Expr(ast.LiteralExpr{
+		value: ast.BooleanLiteral{
+			value: true
+		}
+	})
+	if p.match(keyword_token(.when)) {
+		guard = p.parse_expression()?
+	}
+
+	p.consume(keyword_token(.do_), 'Expected do after for expression')?
+
+	body_expr := p.with_context(.expression, fn (mut parser LXParser) ?ast.Expr {
+		return parser.parse_block_expression_with_delimiter([
+			keyword_token(.end_)])
+	})?
+
+	// Convert to BlockExpr if needed
+	body := if body_expr is ast.BlockExpr {
+		body_expr as ast.BlockExpr
+	} else {
+		ast.BlockExpr{
+			body:     [ast.ExprStmt{
+				expr: body_expr
+			}]
+			position: position
+		}
+	}
+
+	p.consume(keyword_token(.end_), 'Expected end after for expression')?
+
+	return ast.ForExpr{
+		pattern:    pattern
+		collection: collection
+		guard:      guard
+		body:       body
+		position:   position
+	}
+}
+
+// ========================================
+// MAP EXPRESSIONS
+// Grammar: map_expression ::= '%' '{' map_entries '}'
+// Grammar: map_entries ::= map_entry { ',' map_entry }
+// Grammar: map_entry ::= key_token expression | expression '=>' expression
+// ========================================
+
+// parse_map_expression parses map expressions
+fn (mut p LXParser) parse_map_expression() ?ast.Expr {
+	position := p.get_current_position()
+	p.advance() // consume '%'
+
+	// Check if this is a record update: %RecordName{...}
+	if p.current is lexer.UpperIdentToken {
+		return p.parse_record_update_expression()
+	}
+
+	p.consume(punctuation_token(.lbrace), 'Expected opening brace after %')?
+
+	mut entries := []ast.MapEntry{}
+	mut base_map := ast.Expr(ast.LiteralExpr{})
+
+	if !p.check(punctuation_token(.rbrace)) {
+		// Check for map update syntax first: %{base_map | key: value, ...}
+		// Look ahead to see if this is a map update
+		if p.is_map_update_syntax() {
+			// Parse base map - use a specialized parser that stops at |
+			base_map = p.parse_base_map_expression()?
+
+			// The | should be the next token
+			if !p.check(operator_token(.pipe)) {
+				p.add_error('Expected | after base map in map update', 'Got ${p.current.str()}')
+				return none
+			}
+			p.advance() // consume '|'
+
+			// Parse entries after the pipe
+			if !p.check(punctuation_token(.rbrace)) {
+				for {
+					// Check if we have a key token (identifier:)
+					if p.current.is_key() {
+						key_value := p.current.get_key_value()
+						p.advance() // consume key token
+
+						// Create an atom literal for the key
+						key := ast.LiteralExpr{
+							value:    ast.AtomLiteral{
+								value: key_value
+							}
+							position: p.get_current_position()
+						}
+
+						value := p.parse_expression()?
+						entries << ast.MapEntry{
+							key:      key
+							value:    value
+							position: p.get_current_position()
+						}
+					} else {
+						// Parse regular key expression
+						key := p.parse_expression()?
+
+						// Check for fat_arrow or arrow (general key)
+						if p.match(operator_token(.fat_arrow)) {
+							value := p.parse_expression()?
+							entries << ast.MapEntry{
+								key:      key
+								value:    value
+								position: p.get_current_position()
+							}
+						} else if p.match(operator_token(.arrow)) {
+							value := p.parse_expression()?
+							entries << ast.MapEntry{
+								key:      key
+								value:    value
+								position: p.get_current_position()
+							}
+						} else {
+							p.add_error('Expected => or -> in map entry', 'Got ${p.current.str()}')
+							return none
+						}
+					}
+
+					if !p.match(punctuation_token(.comma)) {
+						break
+					}
+				}
+			}
+		} else {
+			// Regular map literal: %{key: value, key2: value2}
+			for {
+				// Check if we have a key token (identifier:)
+				if p.current.is_key() {
+					key_value := p.current.get_key_value()
+					p.advance() // consume key token
+
+					// Create an atom literal for the key
+					key := ast.LiteralExpr{
+						value:    ast.AtomLiteral{
+							value: key_value
+						}
+						position: p.get_current_position()
+					}
+
+					value := p.parse_expression()?
+					entries << ast.MapEntry{
+						key:      key
+						value:    value
+						position: p.get_current_position()
+					}
+				} else {
+					// Parse regular key expression
+					key := p.parse_expression()?
+
+					// Check for fat_arrow or arrow (general key)
+					if p.match(operator_token(.fat_arrow)) {
+						value := p.parse_expression()?
+						entries << ast.MapEntry{
+							key:      key
+							value:    value
+							position: p.get_current_position()
+						}
+					} else if p.match(operator_token(.arrow)) {
+						value := p.parse_expression()?
+						entries << ast.MapEntry{
+							key:      key
+							value:    value
+							position: p.get_current_position()
+						}
+					} else {
+						p.add_error('Expected => or -> in map entry', 'Got ${p.current.str()}')
+						return none
+					}
+				}
+
+				if !p.match(punctuation_token(.comma)) {
+					break
+				}
+			}
+		}
+	}
+
+	p.consume(punctuation_token(.rbrace), 'Expected closing brace')?
+
+	// Check if this is a map update (has base_map) or regular map literal
+	if base_map != ast.Expr(ast.LiteralExpr{}) {
+		return ast.MapUpdateExpr{
+			base_map: base_map
+			entries:  entries
+			position: position
+		}
+	} else {
+		return ast.MapLiteralExpr{
+			entries:  entries
+			position: position
+		}
+	}
+}
+
+// is_map_update_syntax checks if the current tokens indicate map update syntax
+fn (p &LXParser) is_map_update_syntax() bool {
+	// Look ahead to see if there's a | after the opening brace
+	mut pos := p.position + 1
+	for pos < p.tokens.len {
+		if p.tokens[pos] is lexer.PunctuationToken {
+			punc := p.tokens[pos] as lexer.PunctuationToken
+			if punc.value == .rbrace {
+				return false // End of map, no update syntax
+			}
+		} else if p.tokens[pos] is lexer.OperatorToken {
+			op := p.tokens[pos] as lexer.OperatorToken
+			if op.value == .pipe {
+				return true // Found |, this is update syntax
+			}
+		}
+		pos++
+	}
+	return false
+}
+
+// parse_base_map_expression parses the base map expression in map updates
+fn (mut p LXParser) parse_base_map_expression() ?ast.Expr {
+	// Parse until we hit the | operator
+	mut pos := p.position
+	for pos < p.tokens.len {
+		if p.tokens[pos] is lexer.OperatorToken {
+			op := p.tokens[pos] as lexer.OperatorToken
+			if op.value == .pipe {
+				break
+			}
+		}
+		pos++
+	}
+
+	// For now, just parse a simple expression
+	// In a full implementation, this would parse the entire base map
+	return p.parse_expression()
+}
+
+// parse_record_update_expression parses record update expressions
+fn (mut p LXParser) parse_record_update_expression() ?ast.Expr {
+	// The current token is UpperIdentToken (record name)
+	record_name := p.current.get_value()
+	p.advance() // consume record name
+
+	p.consume(punctuation_token(.lbrace), 'Expected opening brace after record name')?
+
+	// Parse base record expression - should stop at pipe operator
+	base_record := p.parse_expression()?
+
+	// Expect pipe operator
+	if !p.check(operator_token(.pipe)) {
+		p.add_error('Expected | after base record in record update', 'Got ${p.current.str()}')
+		return none
+	}
+	p.advance() // consume '|'
+
+	// Parse fields after the pipe
+	mut fields := []ast.RecordField{}
+	if !p.check(punctuation_token(.rbrace)) {
+		for {
+			if p.current.is_key() {
+				key_value := p.current.get_key_value()
+				p.advance() // consume KeyToken
+				value := p.parse_expression()?
+				fields << ast.RecordField{
+					name:     key_value
+					value:    value
+					position: p.get_current_position()
+				}
+			} else {
+				field_name := p.current.get_value()
+				if !p.current.is_identifier() {
+					p.add_error('Expected field name', 'Got ${p.current.str()}')
+					return none
+				}
+				p.advance()
+				p.consume(punctuation_token(.colon), 'Expected colon after field name')?
+				value := p.parse_expression()?
+				fields << ast.RecordField{
+					name:     field_name
+					value:    value
+					position: p.get_current_position()
+				}
+			}
+
+			if !p.match(punctuation_token(.comma)) {
+				break
+			}
+		}
+	}
+
+	p.consume(punctuation_token(.rbrace), 'Expected closing brace for record update')?
+
+	return ast.RecordUpdateExpr{
+		record_name: record_name
+		base_record: base_record
+		fields:      fields
+		position:    p.get_current_position()
+	}
+}
+
+// ========================================
+// RECORD VALUE EXPRESSIONS
+// Grammar: record_value_expression ::= UpperIdentToken '{' record_fields '}'
+// Grammar: record_fields ::= record_field { ',' record_field }
+// Grammar: record_field ::= key_token expression | identifier ':' expression
+// ========================================
+
+// parse_record_value_expression parses record value expressions
+fn (mut p LXParser) parse_record_value_expression() ?ast.Expr {
+	position := p.get_current_position()
+	record_name := p.current.get_value()
+	p.advance()
+	p.consume(punctuation_token(.lbrace), 'Expected opening brace after record name')?
+
+	// Check if this is a record update: RecordName{var | field: value, ...}
+	// Look ahead to see if there's a pipe operator after the first expression
+	if !p.check(punctuation_token(.rbrace)) {
+		// Parse the first expression to see if it's followed by |
+		mut pos := p.position
+		mut found_pipe := false
+
+		// Look ahead to find pipe operator
+		for pos < p.tokens.len {
+			if p.tokens[pos] is lexer.OperatorToken {
+				op := p.tokens[pos] as lexer.OperatorToken
+				if op.value == .pipe {
+					found_pipe = true
+					break
+				}
+			}
+			if p.tokens[pos] is lexer.PunctuationToken {
+				punc := p.tokens[pos] as lexer.PunctuationToken
+				if punc.value == .rbrace {
+					break
+				}
+			}
+			pos++
+		}
+
+		if found_pipe {
+			// This is a record update: RecordName{var | field: value, ...}
+			// Parse the base record variable
+			base_record := p.parse_expression()?
+
+			// Expect pipe operator
+			if !p.check(operator_token(.pipe)) {
+				p.add_error('Expected | after base record in record update', 'Got ${p.current.str()}')
+				return none
+			}
+			p.advance() // consume '|'
+
+			// Parse fields after the pipe
+			mut fields := []ast.RecordField{}
+			if !p.check(punctuation_token(.rbrace)) {
+				for {
+					if p.current.is_key() {
+						key_value := p.current.get_key_value()
+						p.advance()
+						value := p.parse_expression()?
+						fields << ast.RecordField{
+							name:     key_value
+							value:    value
+							position: p.get_current_position()
+						}
+					} else {
+						field_name := p.current.get_value()
+						if !p.current.is_identifier() {
+							p.add_error('Expected field name', 'Got ${p.current.str()}')
+							return none
+						}
+						p.advance()
+						p.consume(punctuation_token(.colon), 'Expected colon after field name')?
+						value := p.parse_expression()?
+						fields << ast.RecordField{
+							name:     field_name
+							value:    value
+							position: p.get_current_position()
+						}
+					}
+
+					if !p.match(punctuation_token(.comma)) {
+						break
+					}
+				}
+			}
+
+			p.consume(punctuation_token(.rbrace), 'Expected closing brace for record update')?
+
+			return ast.RecordUpdateExpr{
+				record_name: record_name
+				base_record: base_record
+				fields:      fields
+				position:    position
+			}
+		}
+	}
+
+	// This is a regular record literal: RecordName{field: value, ...}
+	mut fields := []ast.RecordField{}
+	if !p.check(punctuation_token(.rbrace)) {
+		for {
+			if p.current.is_key() {
+				key_value := p.current.get_key_value()
+				p.advance()
+				value := p.parse_expression()?
+				fields << ast.RecordField{
+					name:     key_value
+					value:    value
+					position: p.get_current_position()
+				}
+			} else {
+				field_name := p.current.get_value()
+				if !p.current.is_identifier() {
+					p.add_error('Expected field name', 'Got ${p.current.str()}')
+					return none
+				}
+				p.advance()
+				p.consume(punctuation_token(.colon), 'Expected colon after field name')?
+				value := p.parse_expression()?
+				fields << ast.RecordField{
+					name:     field_name
+					value:    value
+					position: p.get_current_position()
+				}
+			}
+
+			if !p.match(punctuation_token(.comma)) {
+				break
+			}
+		}
+	}
+
+	p.consume(punctuation_token(.rbrace), 'Expected closing brace for record value')?
+
+	return ast.RecordLiteralExpr{
+		name:     record_name
+		fields:   fields
 		position: position
 	}
+}
+
+// ========================================
+// RECEIVE EXPRESSIONS
+// Grammar: receive_expression ::= 'receive' 'do' receive_cases ['after' expression '->' block_expression] 'end'
+// Grammar: receive_cases ::= receive_case { receive_case }
+// Grammar: receive_case ::= pattern ['when' expression] '->' block_expression
+// ========================================
+
+// parse_receive_expression parses receive expressions
+fn (mut p LXParser) parse_receive_expression() ?ast.Expr {
+	position := p.get_current_position()
+	p.advance() // consume 'receive'
+	p.consume(keyword_token(.do_), 'Expected do after receive')?
+
+	mut cases := []ast.ReceiveCase{}
+	for !p.check(keyword_token(.after)) && !p.check(keyword_token(.end_)) {
+		pattern := p.parse_pattern()?
+
+		mut guard := ast.Expr(ast.LiteralExpr{
+			value: ast.BooleanLiteral{
+				value: true
+			}
+		})
+		if p.match(keyword_token(.when)) {
+			guard = p.parse_expression()?
+		}
+
+		p.consume(operator_token(.arrow), 'Expected -> after pattern')?
+
+		// Parse block of statements for the case body
+		mut statements := []ast.Stmt{}
+
+		for !p.check(keyword_token(.end_)) && !p.check(keyword_token(.after)) && !p.is_at_end() {
+			p.skip_newlines()
+
+			// Check for next case pattern
+			if p.is_next_receive_pattern() {
+				break
+			}
+
+			// Parse expression and wrap in statement
+			expr := p.parse_expression()?
+			statements << ast.ExprStmt{
+				expr: expr
+			}
+
+			p.skip_newlines()
+		}
+
+		body := ast.BlockExpr{
+			body:     statements
+			position: p.get_current_position()
+		}
+
+		cases << ast.ReceiveCase{
+			pattern:  pattern
+			guard:    guard
+			body:     body
+			position: p.get_current_position()
+		}
+	}
+
+	mut timeout := ?ast.TimeoutClause(none)
+	if p.match(keyword_token(.after)) {
+		timeout_expr := p.parse_expression()?
+		p.consume(operator_token(.arrow), 'Expected -> after timeout expression')?
+
+		// Parse block of statements for the timeout body
+		mut timeout_statements := []ast.Stmt{}
+
+		for !p.check(keyword_token(.end_)) && !p.is_at_end() {
+			p.skip_newlines()
+
+			if p.check(keyword_token(.end_)) {
+				break
+			}
+
+			// Parse expression and wrap in statement
+			expr := p.parse_expression()?
+			timeout_statements << ast.ExprStmt{
+				expr: expr
+			}
+
+			p.skip_newlines()
+		}
+
+		timeout_body := ast.BlockExpr{
+			body:     timeout_statements
+			position: p.get_current_position()
+		}
+
+		timeout = ast.TimeoutClause{
+			timeout:  timeout_expr
+			body:     timeout_body
+			position: p.get_current_position()
+		}
+	}
+
+	p.consume(keyword_token(.end_), 'Expected end after receive expression')?
+
+	return ast.ReceiveExpr{
+		cases:    cases
+		timeout:  timeout
+		position: position
+	}
+}
+
+// is_next_receive_pattern checks if the current token starts a new receive pattern
+fn (p &LXParser) is_next_receive_pattern() bool {
+	// Similar to case patterns, but for receive
+	return p.is_pattern_followed_by_arrow(p.position)
+}
+
+// Função auxiliar para testes: permite testar parse_postfix_expression diretamente
+pub fn test_parse_postfix_expression(tokens []lexer.Token, context ParsingContext) ?ast.Expr {
+	mut parser := new_lx_parser(tokens)
+	parser.context = context
+	return parser.parse_postfix_expression()
 }

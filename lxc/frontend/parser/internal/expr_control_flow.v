@@ -248,6 +248,43 @@ fn (ep ExpressionParser) is_pattern_followed_by_arrow(pos int) bool {
 		}
 	}
 
+	// Check for record patterns RecordName{field: pattern, ...}
+	if ep.tokens[pos] is lexer.UpperIdentToken {
+		// Look ahead to see if this is followed by { (record pattern)
+		mut lookahead_pos := pos + 1
+		if lookahead_pos < ep.tokens.len {
+			if ep.tokens[lookahead_pos] is lexer.PunctuationToken {
+				punc_token := ep.tokens[lookahead_pos] as lexer.PunctuationToken
+				if punc_token.value == .lbrace {
+					// Find the matching closing brace
+					mut brace_count := 1
+					mut scan_pos := lookahead_pos + 1
+					for scan_pos < ep.tokens.len && brace_count > 0 {
+						if ep.tokens[scan_pos] is lexer.PunctuationToken {
+							p := ep.tokens[scan_pos] as lexer.PunctuationToken
+							if p.value == .lbrace {
+								brace_count++
+							} else if p.value == .rbrace {
+								brace_count--
+							}
+						}
+						scan_pos++
+					}
+
+					// Check if there's an arrow after the closing brace
+					if brace_count == 0 && scan_pos < ep.tokens.len {
+						if ep.tokens[scan_pos] is lexer.OperatorToken {
+							op_token := ep.tokens[scan_pos] as lexer.OperatorToken
+							if op_token.value == .arrow {
+								return true
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// Check for tuple patterns {pattern, pattern, ...}
 	if ep.tokens[pos] is lexer.PunctuationToken {
 		punc_token := ep.tokens[pos] as lexer.PunctuationToken

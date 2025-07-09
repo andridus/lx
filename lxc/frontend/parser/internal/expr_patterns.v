@@ -219,6 +219,25 @@ fn (mut ep ExpressionParser) parse_record_pattern() ?ast.Pattern {
 	mut fields := []ast.RecordPatternField{}
 	if !ep.check(lexer.punctuation(.rbrace)) {
 		for {
+			// if ep.current is lexer.KeywordToken {
+			// 	kw := ep.current as lexer.KeywordToken
+			// 	if kw.value == .when || kw.value == .do_ || kw.value == .else_ || kw.value == .end_ {
+			// 		break
+			// 	}
+			// }
+			// if ep.current is lexer.OperatorToken {
+			// 	op := ep.current as lexer.OperatorToken
+			// 	if op.value == .arrow {
+			// 		break
+			// 	}
+			// }
+			// if ep.check(lexer.punctuation(.rbrace)) {
+			// 	break
+			// }
+
+			// if !(ep.current.is_key() || ep.current.is_identifier()) {
+			// 	break
+			// }
 			// Parse field name
 			mut field_name := ''
 

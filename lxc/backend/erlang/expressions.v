@@ -686,13 +686,23 @@ fn (mut gen ErlangGenerator) generate_with_bindings(bindings []ast.WithBinding, 
 	}
 
 	current_binding := bindings[index]
-	pattern := gen.generate_pattern(current_binding.pattern)
+	// Use generate_pattern_with_binding only if there's an explicit assign_variable
+	pattern := if current_binding.pattern is ast.RecordPattern {
+		record_pattern := current_binding.pattern as ast.RecordPattern
+		if record_pattern.assign_variable != none {
+			gen.generate_pattern_with_binding(current_binding.pattern)
+		} else {
+			gen.generate_pattern(current_binding.pattern)
+		}
+	} else {
+		gen.generate_pattern(current_binding.pattern)
+	}
 	value := gen.generate_expression(current_binding.value)
 
 	// Generate guard clause if present
 	guard_clause := match current_binding.guard {
 		ast.LiteralExpr {
-			// Check if it's the default true guard
+			// Check if it's the default true guardz
 			match current_binding.guard.value {
 				ast.BooleanLiteral {
 					if current_binding.guard.value.value {

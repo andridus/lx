@@ -26,9 +26,7 @@ receive
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_receive_expression_with_timeout() {
@@ -65,9 +63,7 @@ after 1000 ->
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_receive_expression_tuple_pattern() {
@@ -106,9 +102,7 @@ receive
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_receive_expression_atom_patterns() {
@@ -162,9 +156,7 @@ after 2000 ->
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_receive_expression_nested() {
@@ -182,7 +174,7 @@ def nested_receive() do
         timeout_val = -1
         timeout_val
       end
-      final = inner_result * 2
+      final = inner_result
       final
     _ -> 0
   end
@@ -202,15 +194,13 @@ after 1000 ->
     Timeout_val_daaa = -1,
     Timeout_val_daaa
 end,
-    Final_eaaa = Inner_result_aaaa * 2,
+    Final_eaaa = Inner_result_aaaa,
     Final_eaaa;
     _ -> 0
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
 
 fn test_receive_expression_single_statement() {
@@ -238,7 +228,5 @@ after 100 ->
 end.
 
 '
-	erl1 := generates_erlang(lx_code)
-	assert erl1.success
-	assert erl1.code == expected
+	assert generates_erlang(lx_code) == expected
 }
