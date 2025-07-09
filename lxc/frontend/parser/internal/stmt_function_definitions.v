@@ -196,19 +196,27 @@ fn (mut sp StatementParser) parse_function_clause() ?ast.FunctionClause {
 		guard = sp.parse_expression()?
 	}
 
+	// Parse return type (optional)
+	mut return_type := ?ast.TypeExpression(none)
+	if sp.check(lexer.operator(.type_cons)) {
+		sp.advance() // consume '::'
+		return_type = sp.parse_type_expression()?
+	}
+
 	// Parse body
 	sp.consume(lexer.keyword(.do_), 'Expected do after function clause')?
 	body := sp.parse_clause_body()?
 	sp.consume(lexer.keyword(.end_), 'Expected end after function body')?
 
 	return ast.FunctionClause{
-		parameters: parameters
-		guard:      guard
-		body:       ast.BlockExpr{
+		parameters:  parameters
+		guard:       guard
+		return_type: return_type
+		body:        ast.BlockExpr{
 			body:     body
 			position: sp.get_current_position()
 		}
-		position:   sp.get_current_position()
+		position:    sp.get_current_position()
 	}
 }
 
@@ -242,6 +250,13 @@ fn (mut sp StatementParser) parse_function_header() ?ast.FunctionClause {
 		guard = sp.parse_expression()?
 	}
 
+	// Parse return type (optional)
+	mut return_type := ?ast.TypeExpression(none)
+	if sp.check(lexer.operator(.type_cons)) {
+		sp.advance() // consume '::'
+		return_type = sp.parse_type_expression()?
+	}
+
 	// Parse arrow
 	sp.consume(lexer.operator(.arrow), 'Expected -> after function header')?
 
@@ -254,13 +269,14 @@ fn (mut sp StatementParser) parse_function_header() ?ast.FunctionClause {
 	body := sp.parse_clause_body()?
 
 	return ast.FunctionClause{
-		parameters: parameters
-		guard:      guard
-		body:       ast.BlockExpr{
+		parameters:  parameters
+		guard:       guard
+		return_type: return_type
+		body:        ast.BlockExpr{
 			body:     body
 			position: sp.get_current_position()
 		}
-		position:   sp.get_current_position()
+		position:    sp.get_current_position()
 	}
 }
 

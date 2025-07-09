@@ -911,7 +911,9 @@ fn (mut p LXParser) parse_if_expression() ?ast.Expr {
 	// Parse then body using block_expression_with_delimiter like with expressions
 	then_body_expr := p.with_context(.expression, fn (mut parser LXParser) ?ast.Expr {
 		return parser.parse_block_expression_with_delimiter([
-			keyword_token(.else_), keyword_token(.end_)])
+			keyword_token(.else_),
+			keyword_token(.end_),
+		])
 	})?
 
 	// Convert to BlockExpr if needed
@@ -1111,7 +1113,9 @@ fn (mut p LXParser) parse_with_expression() ?ast.Expr {
 	p.consume(keyword_token(.do_), 'Expected do after with bindings')?
 	body_expr := p.with_context(.expression, fn (mut parser LXParser) ?ast.Expr {
 		return parser.parse_block_expression_with_delimiter([
-			keyword_token(.else_), keyword_token(.end_)])
+			keyword_token(.else_),
+			keyword_token(.end_),
+		])
 	})?
 
 	// Convert to BlockExpr if needed
@@ -1220,7 +1224,8 @@ fn (mut p LXParser) parse_match_expression() ?ast.Expr {
 
 		rescue_body_expr := p.with_context(.expression, fn (mut parser LXParser) ?ast.Expr {
 			return parser.parse_block_expression_with_delimiter([
-				keyword_token(.end_)])
+				keyword_token(.end_),
+			])
 		})?
 
 		// Convert to BlockExpr if needed
@@ -1451,7 +1456,8 @@ fn (mut p LXParser) parse_for_expression() ?ast.Expr {
 
 	body_expr := p.with_context(.expression, fn (mut parser LXParser) ?ast.Expr {
 		return parser.parse_block_expression_with_delimiter([
-			keyword_token(.end_)])
+			keyword_token(.end_),
+		])
 	})?
 
 	// Convert to BlockExpr if needed

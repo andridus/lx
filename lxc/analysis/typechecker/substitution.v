@@ -40,14 +40,22 @@ pub fn (sub &Substitution) apply(type_expr TypeExpr) TypeExpr {
 			}
 		}
 		TypeConstructor {
-			TypeConstructor{
+			mut new_parameters := []TypeExpr{}
+			for param in type_expr.parameters {
+				new_parameters << sub.apply(param)
+			}
+			return TypeConstructor{
 				name:       type_expr.name
-				parameters: type_expr.parameters.map(sub.apply(it))
+				parameters: new_parameters
 			}
 		}
 		FunctionType {
-			FunctionType{
-				parameters:  type_expr.parameters.map(sub.apply(it))
+			mut new_parameters := []TypeExpr{}
+			for param in type_expr.parameters {
+				new_parameters << sub.apply(param)
+			}
+			return FunctionType{
+				parameters:  new_parameters
 				return_type: sub.apply(type_expr.return_type)
 			}
 		}
@@ -56,29 +64,42 @@ pub fn (sub &Substitution) apply(type_expr TypeExpr) TypeExpr {
 			for field_name, field_type in type_expr.fields {
 				new_fields[field_name] = sub.apply(field_type)
 			}
-			RecordType{
+			return RecordType{
 				name:   type_expr.name
 				fields: new_fields
 			}
 		}
 		MapType {
-			MapType{
+			return MapType{
 				key_type:   sub.apply(type_expr.key_type)
 				value_type: sub.apply(type_expr.value_type)
 			}
 		}
 		TupleType {
-			TupleType{
-				element_types: type_expr.element_types.map(sub.apply(it))
+			mut new_element_types := []TypeExpr{}
+			for element_type in type_expr.element_types {
+				new_element_types << sub.apply(element_type)
+			}
+			return TupleType{
+				element_types: new_element_types
 			}
 		}
 		ListType {
-			ListType{
+			return ListType{
 				element_type: sub.apply(type_expr.element_type)
 			}
 		}
 		BinaryType {
-			type_expr
+			return type_expr
+		}
+		UnionType {
+			mut new_types := []TypeExpr{}
+			for t in type_expr.types {
+				new_types << sub.apply(t)
+			}
+			return UnionType{
+				types: new_types
+			}
 		}
 	}
 }

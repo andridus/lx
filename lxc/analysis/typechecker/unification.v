@@ -102,6 +102,9 @@ pub fn (un &Unifier) unify(left TypeExpr, right TypeExpr, position Position) Uni
 		BinaryType {
 			return un.unify_binary(left, right, position)
 		}
+		UnionType {
+			return un.unify_union(left, right, position)
+		}
 	}
 }
 
@@ -445,6 +448,24 @@ pub fn (un &Unifier) unify_binary(left BinaryType, right TypeExpr, position Posi
 				left:     left
 				right:    right
 			})
+		}
+	}
+}
+
+// unify_union unifies two union types
+fn (un &Unifier) unify_union(left UnionType, right TypeExpr, position Position) UnificationResult {
+	match right {
+		UnionType {
+			// For now, create a new union with all types from both unions
+			mut all_types := []TypeExpr{}
+			all_types << left.types
+			all_types << right.types
+			// Return success with empty substitution for now
+			return success(new_substitution())
+		}
+		else {
+			// Union with non-union type - for now, just return success
+			return success(new_substitution())
 		}
 	}
 }

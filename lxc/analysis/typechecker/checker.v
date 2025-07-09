@@ -325,6 +325,7 @@ fn (mut tc TypeChecker) check_record_literal_expression(expr ast.RecordLiteralEx
 			TupleType { 'tuple' }
 			ListType { 'list' }
 			BinaryType { 'binary' }
+			UnionType { 'union' }
 		}
 		tc.context.store_record_field_type(record_type, field.name, field_type_str)
 	}
@@ -770,7 +771,13 @@ fn (mut tc TypeChecker) check_function_clause(clause ast.FunctionClause) {
 
 	tc.check_expression(clause.guard)
 
+	// Check the function body
 	tc.check_block_expression(clause.body)
+
+	// Validate return type if specified
+	if return_type := clause.return_type {
+		tc.validate_function_return_type(clause, return_type)
+	}
 }
 
 // check_block_expression_with_context performs type checking on a block expression and saves variable types
@@ -893,6 +900,283 @@ fn (mut tc TypeChecker) check_assignment_expression_with_context(expr ast.Assign
 		tc.context.bind(expr.name, value_type, expr.position)
 		// Store the variable type for the generator
 		tc.context.store_function_var_type(function_id, expr.name, tc.type_expr_to_spec_string(value_type))
+	}
+}
+
+// validate_function_return_type validates that a function's body returns the expected type
+fn (mut tc TypeChecker) validate_function_return_type(clause ast.FunctionClause, expected_return_type ast.TypeExpression) {
+	// Infer the actual return type from the function body
+	actual_return_type := tc.infer_block_return_type(clause.body)
+
+	// Convert the expected return type to TypeExpr for comparison
+	expected_type_expr := tc.convert_type_expression_to_type_expr(expected_return_type)
+
+	// Expande aliases antes de comparar
+	actual_expanded := tc.expand_type_aliases(actual_return_type)
+	expected_expanded := tc.expand_type_aliases(expected_type_expr)
+
+	// Check if the types are compatible
+	if !tc.types_are_compatible(actual_expanded, expected_expanded) {
+		tc.report_error('Function return type mismatch', 'Expected ${expected_return_type.str()}, but function returns ${tc.type_expr_to_string(actual_return_type)}',
+			clause.position)
+	}
+}
+
+// infer_block_return_type infers the return type of a block expression
+fn (mut tc TypeChecker) infer_block_return_type(block ast.BlockExpr) TypeExpr {
+	if block.body.len == 0 {
+		return TypeConstructor{
+			name: 'unit'
+		}
+	}
+
+	// Get the last statement in the block
+	last_stmt := block.body[block.body.len - 1]
+
+	match last_stmt {
+		ast.ExprStmt {
+			return tc.infer_expression_type(last_stmt.expr)
+		}
+		else {
+			// For non-expression statements, return unit type
+			return TypeConstructor{
+				name: 'unit'
+			}
+		}
+	}
+}
+
+// types_are_compatible checks if two types are compatible
+fn (mut tc TypeChecker) types_are_compatible(actual TypeExpr, expected TypeExpr) bool {
+	if actual.str() == expected.str() {
+		return true
+	}
+
+	match actual {
+		TypeConstructor {
+			match expected {
+				TypeConstructor {
+					return tc.are_type_constructors_compatible(actual, expected)
+				}
+				else {
+					return false
+				}
+			}
+		}
+		TupleType {
+			match expected {
+				TupleType {
+					if actual.element_types.len != expected.element_types.len {
+						return false
+					}
+					for i in 0 .. actual.element_types.len {
+						if actual.element_types[i] is TypeConstructor
+							&& expected.element_types[i] is TypeConstructor {
+							a := actual.element_types[i] as TypeConstructor
+							e := expected.element_types[i] as TypeConstructor
+							if a.name != e.name {
+								return false
+							}
+						} else {
+							res := tc.types_are_compatible(actual.element_types[i], expected.element_types[i])
+							if !res {
+								return false
+							}
+						}
+					}
+					return true
+				}
+				else {
+					return false
+				}
+			}
+		}
+		UnionType {
+			for union_type in actual.types {
+				res := tc.types_are_compatible(union_type, expected)
+				if res {
+					return true
+				}
+			}
+			return false
+		}
+		TypeVar {
+			match expected {
+				TypeVar {
+					res := actual.name == expected.name
+					return res
+				}
+				else {
+					return false
+				}
+			}
+		}
+		FunctionType {
+			match expected {
+				FunctionType {
+					if actual.parameters.len != expected.parameters.len {
+						return false
+					}
+					for i in 0 .. actual.parameters.len {
+						if !tc.types_are_compatible(actual.parameters[i], expected.parameters[i]) {
+							return false
+						}
+					}
+					return tc.types_are_compatible(actual.return_type, expected.return_type)
+				}
+				else {
+					return false
+				}
+			}
+		}
+		RecordType {
+			match expected {
+				RecordType {
+					res := actual.name == expected.name
+					return res
+				}
+				else {
+					return false
+				}
+			}
+		}
+		MapType {
+			match expected {
+				MapType {
+					res := tc.types_are_compatible(actual.key_type, expected.key_type)
+						&& tc.types_are_compatible(actual.value_type, expected.value_type)
+					return res
+				}
+				else {
+					return false
+				}
+			}
+		}
+		ListType {
+			match expected {
+				ListType {
+					res := tc.types_are_compatible(actual.element_type, expected.element_type)
+					return res
+				}
+				else {
+					return false
+				}
+			}
+		}
+		BinaryType {
+			match expected {
+				BinaryType {
+					res := actual.unit_size == expected.unit_size
+					return res
+				}
+				else {
+					return false
+				}
+			}
+		}
+	}
+	return false
+}
+
+// are_type_constructors_compatible checks if two TypeConstructors are compatible
+fn (mut tc TypeChecker) are_type_constructors_compatible(actual TypeConstructor, expected TypeConstructor) bool {
+	// Se têm nomes diferentes, verificar se são compatíveis
+	if actual.name != expected.name {
+		// Verificar se um é tipo específico e outro é genérico
+		return tc.is_specific_type_compatible_with_generic(actual.name, expected.name)
+	}
+
+	// Se têm o mesmo nome, verificar parâmetros
+	if actual.parameters.len != expected.parameters.len {
+		return false
+	}
+
+	for i in 0 .. actual.parameters.len {
+		if !tc.types_are_compatible(actual.parameters[i], expected.parameters[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// is_specific_type_compatible_with_generic checks if a specific type is compatible with a generic type
+fn (tc &TypeChecker) is_specific_type_compatible_with_generic(specific string, generic string) bool {
+	// Mapeamento de tipos específicos para genéricos
+	match specific {
+		'ok', 'error', 'true', 'false' {
+			return generic == 'atom' || generic == 'any'
+		}
+		'integer' {
+			return generic == 'any'
+		}
+		'string' {
+			return generic == 'any'
+		}
+		'boolean' {
+			return generic == 'any'
+		}
+		else {
+			// Para outros tipos específicos, verificar se são compatíveis
+			return specific == generic || generic == 'any'
+		}
+	}
+}
+
+// type_expr_to_string converts a TypeExpr to a string representation
+fn (mut tc TypeChecker) type_expr_to_string(type_expr TypeExpr) string {
+	return match type_expr {
+		TypeVar {
+			if type_expr.name != '' {
+				type_expr.name
+			} else {
+				type_expr.id
+			}
+		}
+		TypeConstructor {
+			if type_expr.parameters.len > 0 {
+				params := type_expr.parameters.map(tc.type_expr_to_string(it)).join(', ')
+				'${type_expr.name}(${params})'
+			} else {
+				type_expr.name
+			}
+		}
+		FunctionType {
+			if type_expr.parameters.len > 0 {
+				params := type_expr.parameters.map(tc.type_expr_to_string(it)).join(', ')
+				'(${params}) -> ${tc.type_expr_to_string(type_expr.return_type)}'
+			} else {
+				'() -> ${tc.type_expr_to_string(type_expr.return_type)}'
+			}
+		}
+		RecordType {
+			mut field_strs := []string{}
+			for field_name, field_type in type_expr.fields {
+				field_strs << '${field_name}: ${tc.type_expr_to_string(field_type)}'
+			}
+			fields := field_strs.join(', ')
+			'${type_expr.name}{${fields}}'
+		}
+		MapType {
+			'map(${tc.type_expr_to_spec_string(type_expr.key_type)}, ${tc.type_expr_to_spec_string(type_expr.value_type)})'
+		}
+		TupleType {
+			elements := type_expr.element_types.map(tc.type_expr_to_string(it)).join(', ')
+			'(${elements})'
+		}
+		ListType {
+			'list(${tc.type_expr_to_string(type_expr.element_type)})'
+		}
+		BinaryType {
+			if type_expr.unit_size > 0 {
+				'binary(${type_expr.unit_size})'
+			} else {
+				'binary'
+			}
+		}
+		UnionType {
+			type_expr.types.map(tc.type_expr_to_string(it)).join(' | ')
+		}
 	}
 }
 
@@ -1078,20 +1362,30 @@ fn (mut tc TypeChecker) validate_pattern_type_annotations(pattern ast.Pattern) {
 fn (mut tc TypeChecker) convert_type_expression_to_type_expr(type_expr ast.TypeExpression) TypeExpr {
 	return match type_expr {
 		ast.SimpleTypeExpr {
-			match type_expr.name {
-				'integer' { integer_type }
-				'float' { float_type }
-				'string' { string_type }
-				'boolean' { boolean_type }
-				'atom' { atom_type }
-				'nil' { nil_type }
-				'any' { make_type_constructor('any', []) }
-				else { make_type_constructor(type_expr.name, []) }
+			if type_expr.name.len > 0 && type_expr.name[0].is_capital() {
+				// Para tipos capitalizados, manter o nome original (não converter para minúscula)
+				TypeExpr(make_type_constructor(type_expr.name, []))
+			} else {
+				match type_expr.name {
+					'integer' { integer_type }
+					'float' { float_type }
+					'string' { string_type }
+					'boolean' { boolean_type }
+					'atom' { atom_type }
+					'nil' { nil_type }
+					'any' { TypeExpr(make_type_constructor('any', [])) }
+					else { TypeExpr(make_type_constructor(type_expr.name, [])) }
+				}
 			}
 		}
 		ast.UnionTypeExpr {
-			// For now, create a type variable representing the union
-			make_type_var('union_${type_expr.types.len}')
+			mut union_types := []TypeExpr{}
+			for t in type_expr.types {
+				union_types << tc.convert_type_expression_to_type_expr(t)
+			}
+			UnionType{
+				types: union_types
+			}
 		}
 		ast.ListTypeExpr {
 			element_type := tc.convert_type_expression_to_type_expr(type_expr.element_type)
@@ -1282,12 +1576,11 @@ fn (mut tc TypeChecker) infer_expression_type(expr ast.Expr) TypeExpr {
 		ast.RecordUpdateExpr {
 			// Infer the type from the base record
 			base_type := tc.infer_expression_type(expr.base_record)
-
-			// Store the record type in context for later use
-			if base_type is TypeConstructor {
-				type_constructor := base_type as TypeConstructor
-				tc.context.store_record_type_for_update_expr(expr, type_constructor.name)
+			// Just infer the type of each field being updated (side effects only)
+			for field in expr.fields {
+				_ = tc.infer_expression_type(field.value)
 			}
+			// Return the base record type
 			return base_type
 		}
 		ast.FunExpr {
@@ -1504,7 +1797,8 @@ fn (tc &TypeChecker) infer_literal_type(literal ast.Literal) TypeExpr {
 			return boolean_type
 		}
 		ast.AtomLiteral {
-			return atom_type
+			// Retorna o átomo específico ao invés do tipo genérico
+			return make_type_constructor(literal.value, [])
 		}
 		ast.NilLiteral {
 			return nil_type
@@ -1709,4 +2003,56 @@ fn (mut tc TypeChecker) check_map_update_expression(expr ast.MapUpdateExpr) {
 		tc.check_expression(entry.key)
 		tc.check_expression(entry.value)
 	}
+}
+
+// Expande aliases de tipo recursivamente
+fn (tc &TypeChecker) expand_type_aliases(typ TypeExpr) TypeExpr {
+	match typ {
+		TypeConstructor {
+			// Se for um alias registrado, expande
+			if tc.context.has_type_alias_recursive(typ.name) {
+				if alias_type := tc.context.lookup_type_alias(typ.name) {
+					return tc.expand_type_aliases(alias_type)
+				}
+			}
+			return typ
+		}
+		UnionType {
+			return UnionType{
+				types: typ.types.map(tc.expand_type_aliases(it))
+			}
+		}
+		TupleType {
+			return TupleType{
+				element_types: typ.element_types.map(tc.expand_type_aliases(it))
+			}
+		}
+		ListType {
+			return ListType{
+				element_type: tc.expand_type_aliases(typ.element_type)
+			}
+		}
+		MapType {
+			return MapType{
+				key_type:   tc.expand_type_aliases(typ.key_type)
+				value_type: tc.expand_type_aliases(typ.value_type)
+			}
+		}
+		FunctionType {
+			return FunctionType{
+				parameters:  typ.parameters.map(tc.expand_type_aliases(it))
+				return_type: tc.expand_type_aliases(typ.return_type)
+			}
+		}
+		TypeVar {
+			return typ
+		}
+		RecordType {
+			return typ
+		}
+		BinaryType {
+			return typ
+		}
+	}
+	return typ
 }

@@ -683,10 +683,11 @@ pub:
 // FunctionClause represents a function clause
 pub struct FunctionClause {
 pub:
-	parameters []Pattern
-	guard      Expr
-	body       BlockExpr
-	position   Position
+	parameters  []Pattern
+	guard       Expr
+	body        BlockExpr
+	return_type ?TypeExpression
+	position    Position
 }
 
 // Import represents an import statement

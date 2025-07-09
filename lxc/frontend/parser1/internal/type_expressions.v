@@ -59,11 +59,26 @@ fn (mut p LXParser) parse_primary_type() ?ast.TypeExpression {
 				.lbrace {
 					p.parse_tuple_type()
 				}
+				.lbracket {
+					p.parse_list_literal_type()
+				}
 				else {
 					p.add_error('Unexpected punctuation in type expression', 'Got ${p.current.str()}')
 					none
 				}
 			}
+		}
+		lexer.IntToken {
+			p.parse_literal_type()
+		}
+		lexer.FloatToken {
+			p.parse_literal_type()
+		}
+		lexer.StringToken {
+			p.parse_literal_type()
+		}
+		lexer.AtomToken {
+			p.parse_literal_type()
 		}
 		else {
 			p.add_error('Expected type expression', 'Got ${p.current.str()}')
@@ -323,5 +338,53 @@ fn (mut p LXParser) parse_tuple_type() ?ast.TypeExpression {
 	return ast.TupleTypeExpr{
 		element_types: element_types
 		position:      position
+	}
+}
+
+// ========================================
+// LITERAL TYPES
+// Grammar: literal_type ::= integer | float | string | atom
+// ========================================
+
+// parse_literal_type parses literal types (1, "string", :atom, etc.)
+fn (mut p LXParser) parse_literal_type() ?ast.TypeExpression {
+	position := p.get_current_position()
+	value := p.current.get_value()
+	p.advance()
+
+	// For now, treat literals as simple types with their value as name
+	return ast.SimpleTypeExpr{
+		name:     value
+		position: position
+	}
+}
+
+// ========================================
+// LIST LITERAL TYPES
+// Grammar: list_literal_type ::= '[' type_list ']'
+// ========================================
+
+// parse_list_literal_type parses list literal types like [1, 2, 3]
+fn (mut p LXParser) parse_list_literal_type() ?ast.TypeExpression {
+	position := p.get_current_position()
+	p.advance() // consume '['
+
+	mut element_types := []ast.TypeExpression{}
+
+	if !p.check(punctuation_token(.rbracket)) {
+		for {
+			element_types << p.parse_type_expression()?
+
+			if !p.match(punctuation_token(.comma)) {
+				break
+			}
+		}
+	}
+
+	p.consume(punctuation_token(.rbracket), 'Expected ] after list literal types')?
+
+	return ast.ListTypeExpr{
+		element_type: element_types[0] // For now, use first element type
+		position:     position
 	}
 }

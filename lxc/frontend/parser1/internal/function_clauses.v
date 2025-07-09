@@ -54,6 +54,13 @@ fn (mut p LXParser) parse_single_function_clause() ?ast.FunctionClause {
 
 	p.consume(punctuation_token(.rparen), 'Expected ) after function parameters')?
 
+	// Parse optional return type
+	mut return_type := ?ast.TypeExpression(none)
+	if p.check(operator_token(.type_cons)) {
+		p.advance() // consume '::'
+		return_type = p.parse_type_expression()?
+	}
+
 	// Parse optional guard
 	mut guard := ast.Expr(ast.LiteralExpr{
 		value: ast.BooleanLiteral{
@@ -85,10 +92,11 @@ fn (mut p LXParser) parse_single_function_clause() ?ast.FunctionClause {
 	}
 
 	return ast.FunctionClause{
-		parameters: parameters
-		guard:      guard
-		body:       body
-		position:   position
+		parameters:  parameters
+		guard:       guard
+		return_type: return_type
+		body:        body
+		position:    position
 	}
 }
 
@@ -163,6 +171,13 @@ fn (mut p LXParser) parse_function_header() ?ast.FunctionClause {
 
 	p.consume(punctuation_token(.rparen), 'Expected ) after parameters')?
 
+	// Parse optional return type
+	mut return_type := ?ast.TypeExpression(none)
+	if p.check(operator_token(.type_cons)) {
+		p.advance() // consume '::'
+		return_type = p.parse_type_expression()?
+	}
+
 	// Parse optional guard
 	mut guard := ast.Expr(ast.LiteralExpr{
 		value: ast.BooleanLiteral{
@@ -198,10 +213,11 @@ fn (mut p LXParser) parse_function_header() ?ast.FunctionClause {
 	}
 
 	return ast.FunctionClause{
-		parameters: parameters
-		guard:      guard
-		body:       body
-		position:   position
+		parameters:  parameters
+		guard:       guard
+		return_type: return_type
+		body:        body
+		position:    position
 	}
 }
 

@@ -7,7 +7,7 @@ pub:
 	name string
 }
 
-// str returns a string representation of TypeVar
+// str returns the string representation of TypeVar
 pub fn (tv TypeVar) str() string {
 	return tv.id
 }
@@ -19,7 +19,7 @@ pub:
 	parameters []TypeExpr
 }
 
-// str returns a string representation of TypeConstructor
+// str returns the string representation of TypeConstructor
 pub fn (tc TypeConstructor) str() string {
 	if tc.parameters.len == 0 {
 		return tc.name
@@ -35,7 +35,7 @@ pub:
 	return_type TypeExpr
 }
 
-// str returns a string representation of FunctionType
+// str returns the string representation of FunctionType
 pub fn (ft FunctionType) str() string {
 	if ft.parameters.len == 0 {
 		return '() -> ${ft.return_type.str()}'
@@ -51,7 +51,7 @@ pub:
 	fields map[string]TypeExpr
 }
 
-// str returns a string representation of RecordType
+// str returns the string representation of RecordType
 pub fn (rt RecordType) str() string {
 	mut field_strs := []string{}
 	for field_name, field_type in rt.fields {
@@ -68,7 +68,7 @@ pub:
 	value_type TypeExpr
 }
 
-// str returns a string representation of MapType
+// str returns the string representation of MapType
 pub fn (mt MapType) str() string {
 	return 'map(${mt.key_type.str()}, ${mt.value_type.str()})'
 }
@@ -79,7 +79,7 @@ pub:
 	element_types []TypeExpr
 }
 
-// str returns a string representation of TupleType
+// str returns the string representation of TupleType
 pub fn (tt TupleType) str() string {
 	elements := tt.element_types.map(it.str()).join(', ')
 	return '(${elements})'
@@ -91,7 +91,7 @@ pub:
 	element_type TypeExpr
 }
 
-// str returns a string representation of ListType
+// str returns the string representation of ListType
 pub fn (lt ListType) str() string {
 	return 'list(${lt.element_type.str()})'
 }
@@ -102,9 +102,20 @@ pub:
 	unit_size int // Size in bits, 0 for variable size
 }
 
-// str returns a string representation of BinaryType
+// str returns the string representation of BinaryType
 pub fn (bt BinaryType) str() string {
 	return if bt.unit_size > 0 { 'binary(${bt.unit_size})' } else { 'binary' }
+}
+
+// UnionType represents a union type (e.g., {:ok, T} | {:error, string})
+pub struct UnionType {
+pub:
+	types []TypeExpr
+}
+
+// str returns a string representation of UnionType
+pub fn (ut UnionType) str() string {
+	return ut.types.map(it.str()).join(' | ')
 }
 
 // TypeExpr represents type expressions in the Hindley-Milner system
@@ -116,8 +127,9 @@ pub type TypeExpr = TypeVar
 	| TupleType
 	| ListType
 	| BinaryType
+	| UnionType
 
-// str returns a string representation of TypeExpr
+// str returns the string representation of TypeExpr
 pub fn (te TypeExpr) str() string {
 	return match te {
 		TypeVar {
@@ -167,6 +179,9 @@ pub fn (te TypeExpr) str() string {
 				'binary'
 			}
 		}
+		UnionType {
+			te.types.map(it.str()).join(' | ')
+		}
 	}
 }
 
@@ -215,6 +230,14 @@ pub fn (te TypeExpr) is_monomorphic() bool {
 			te.element_type.is_monomorphic()
 		}
 		BinaryType {
+			true
+		}
+		UnionType {
+			for t in te.types {
+				if !t.is_monomorphic() {
+					return false
+				}
+			}
 			true
 		}
 	}
@@ -267,6 +290,14 @@ pub fn (te TypeExpr) contains_type_var(var_id string) bool {
 		BinaryType {
 			false
 		}
+		UnionType {
+			for t in te.types {
+				if t.contains_type_var(var_id) {
+					return true
+				}
+			}
+			false
+		}
 	}
 }
 
@@ -316,6 +347,13 @@ pub fn (te TypeExpr) get_type_vars() []string {
 		}
 		BinaryType {
 			[]string{}
+		}
+		UnionType {
+			mut all_vars := []string{}
+			for t in te.types {
+				all_vars << t.get_type_vars()
+			}
+			all_vars
 		}
 	}
 }

@@ -188,7 +188,8 @@ fn (gen ErlangGenerator) infer_function_return_type(clause ast.FunctionClause) s
 				clause.parameters)
 			// Check if the inferred type matches any defined type
 			matching_type := gen.find_matching_defined_type(inferred_type)
-			return if matching_type != '' { matching_type } else { inferred_type }
+			result := if matching_type != '' { matching_type } else { inferred_type }
+			return result
 		}
 		else {
 			'ok'
@@ -561,14 +562,34 @@ fn (gen ErlangGenerator) generate_type_expression(type_expr ast.TypeExpression) 
 	return match type_expr {
 		ast.SimpleTypeExpr {
 			match type_expr.name {
-				'integer' { 'integer()' }
-				'float' { 'float()' }
-				'string' { 'string()' }
-				'boolean' { 'boolean()' }
-				'atom' { 'atom()' }
-				'nil' { 'nil' }
-				'any' { 'any()' }
-				else { '${type_expr.name}()' }
+				'integer' {
+					'integer()'
+				}
+				'float' {
+					'float()'
+				}
+				'string' {
+					'string()'
+				}
+				'boolean' {
+					'boolean()'
+				}
+				'atom' {
+					'atom()'
+				}
+				'nil' {
+					'nil'
+				}
+				'any' {
+					'any()'
+				}
+				else {
+					if type_expr.name.len > 0 && type_expr.name[0].is_capital() {
+						'#${type_expr.name.to_lower()}{}'
+					} else {
+						type_expr.name // átomo puro
+					}
+				}
 			}
 		}
 		ast.UnionTypeExpr {
@@ -1055,39 +1076,44 @@ fn (gen ErlangGenerator) parse_tuple_element_types(types_str string) []string {
 
 // convert_type_expr_to_spec_string converts a TypeExpr to a spec string
 fn (gen ErlangGenerator) convert_type_expr_to_spec_string(type_expr typechecker.TypeExpr) string {
-	return match type_expr {
-		typechecker.TypeVar {
-			'any()'
-		}
+	match type_expr {
 		typechecker.TypeConstructor {
-			match type_expr.name {
-				'integer' { 'integer()' }
-				'float' { 'float()' }
-				'string' { 'string()' }
-				'boolean' { 'boolean()' }
-				'atom' { 'atom()' }
-				'nil' { 'nil' }
-				else { '${type_expr.name}()' }
+			if type_expr.parameters.len > 0 {
+				params := type_expr.parameters.map(gen.convert_type_expr_to_spec_string(it)).join(', ')
+				'${type_expr.name}(${params})'
+			} else {
+				type_expr.name
+			}
+		}
+		typechecker.FunctionType {
+			if type_expr.parameters.len == 0 {
+				'fun(() -> ${gen.convert_type_expr_to_spec_string(type_expr.return_type)})'
+			} else {
+				params := type_expr.parameters.map(gen.convert_type_expr_to_spec_string(it)).join(', ')
+				'fun((${params}) -> ${gen.convert_type_expr_to_spec_string(type_expr.return_type)})'
+			}
+		}
+		typechecker.MapType {
+			'#{${gen.convert_type_expr_to_spec_string(type_expr.key_type)} => ${gen.convert_type_expr_to_spec_string(type_expr.value_type)}}'
+		}
+		typechecker.TupleType {
+			if type_expr.element_types.len == 0 {
+				'{}'
+			} else {
+				elements := type_expr.element_types.map(gen.convert_type_expr_to_spec_string(it)).join(', ')
+				'{${elements}}'
 			}
 		}
 		typechecker.ListType {
 			'[${gen.convert_type_expr_to_spec_string(type_expr.element_type)}]'
 		}
-		typechecker.TupleType {
-			element_specs := type_expr.element_types.map(gen.convert_type_expr_to_spec_string(it))
-			'{${element_specs.join(', ')}}'
+		typechecker.UnionType {
+			types := type_expr.types.map(gen.convert_type_expr_to_spec_string(it)).join(' | ')
+			types
 		}
-		typechecker.MapType {
-			'#{${gen.convert_type_expr_to_spec_string(type_expr.key_type)} => ${gen.convert_type_expr_to_spec_string(type_expr.value_type)}}'
-		}
-		typechecker.FunctionType {
-			'fun()'
-		}
-		typechecker.RecordType {
-			'#${type_expr.name}{}'
-		}
-		typechecker.BinaryType {
-			'binary()'
+		else {
+			'any()'
 		}
 	}
+	return 'any()'
 }
