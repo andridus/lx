@@ -5,19 +5,19 @@ import errors
 
 pub struct TypeChecker {
 pub mut:
-	context &TypeContext
+	context            &TypeContext
 	expression_checker ExpressionChecker
-	errors []errors.CompilationError
-	warnings []errors.CompilationError
+	errors             []errors.CompilationError
+	warnings           []errors.CompilationError
 }
 
 pub fn new_type_checker() TypeChecker {
 	context := new_type_context()
 	return TypeChecker{
-		context: &context
+		context:            &context
 		expression_checker: new_expression_checker(&context)
-		errors: []
-		warnings: []
+		errors:             []
+		warnings:           []
 	}
 }
 
@@ -33,16 +33,16 @@ pub fn (mut tc TypeChecker) check_module(module_stmt ast.ModuleStmt) TypeCheckRe
 	}
 
 	return TypeCheckResult{
-		context: tc.context
-		errors: tc.errors
+		context:  tc.context
+		errors:   tc.errors
 		warnings: tc.warnings
 	}
 }
 
 pub struct TypeCheckResult {
 pub:
-	context &TypeContext
-	errors []errors.CompilationError
+	context  &TypeContext
+	errors   []errors.CompilationError
 	warnings []errors.CompilationError
 }
 
@@ -53,7 +53,7 @@ fn (mut tc TypeChecker) check_statement(stmt ast.Stmt) {
 		ast.RecordDefStmt { tc.check_record_statement(stmt) }
 		ast.TypeDefStmt { tc.check_type_statement(stmt) }
 		ast.TypeAliasStmt { tc.check_type_alias_statement(stmt) }
-		ast.ModuleStmt { /* Module statements don't need type checking */ }
+		ast.ModuleStmt {}
 	}
 }
 
@@ -129,9 +129,14 @@ fn (mut tc TypeChecker) check_function_statement(stmt ast.FunctionStmt) {
 				} else {
 					// Criar union
 					union_str := unique_typeinfos.map(fn (t TypeInfo) string {
-						if t.generic == 'string' { return 'binary()' } else { return t.generic + '()' }
+						if t.generic == 'string' { return 'binary()'
+						 } else { return t.generic + '()'
+						 }
 					}).join(' | ')
-					param_unions << TypeInfo{ generic: 'union', value: union_str }
+					param_unions << TypeInfo{
+						generic: 'union'
+						value:   union_str
+					}
 				}
 			}
 		}
@@ -156,7 +161,10 @@ fn (mut tc TypeChecker) check_function_statement(stmt ast.FunctionStmt) {
 				}
 			}
 			union_str := union_parts.join(' | ')
-			tc.context.store_function_return_type(stmt.name, arity, TypeInfo{ generic: 'union', value: union_str })
+			tc.context.store_function_return_type(stmt.name, arity, TypeInfo{
+				generic: 'union'
+				value:   union_str
+			})
 		}
 	}
 }
@@ -196,11 +204,8 @@ fn (mut tc TypeChecker) check_function_clause_with_name(clause ast.FunctionClaus
 		actual_type := tc.expression_checker.infer_expression_type_info(clause.body)
 
 		if !types_are_compatible(expected_type, actual_type) {
-			tc.report_error(
-				'Function return type mismatch: expected ${expected_type.str()}, got ${actual_type.str()}',
-				'Make sure the function body returns the declared type',
-				clause.body.position
-			)
+			tc.report_error('Function return type mismatch: expected ${expected_type.str()}, got ${actual_type.str()}',
+				'Make sure the function body returns the declared type', clause.body.position)
 		}
 	}
 }
@@ -215,13 +220,19 @@ fn (mut tc TypeChecker) check_pattern_and_get_type(pattern ast.Pattern) TypeInfo
 				tc.context.bind(pattern.name, type_info, pattern.position)
 				return type_info
 			} else {
-				type_info := TypeInfo{ generic: 'any', value: none }
+				type_info := TypeInfo{
+					generic: 'any'
+					value:   none
+				}
 				tc.context.bind(pattern.name, type_info, pattern.position)
 				return type_info
 			}
 		}
 		ast.AtomPattern {
-			return TypeInfo{ generic: 'atom', value: pattern.value }
+			return TypeInfo{
+				generic: 'atom'
+				value:   pattern.value
+			}
 		}
 		ast.LiteralPattern {
 			return typeinfo_from_literal(pattern.value)
@@ -232,37 +243,67 @@ fn (mut tc TypeChecker) check_pattern_and_get_type(pattern ast.Pattern) TypeInfo
 				element_type := tc.check_pattern_and_get_type(element)
 				element_types << element_type.str()
 			}
-			return TypeInfo{ generic: 'tuple', value: '{${element_types.join(', ')}}' }
+			return TypeInfo{
+				generic: 'tuple'
+				value:   '{${element_types.join(', ')}}'
+			}
 		}
 		ast.ListLiteralPattern {
 			if pattern.elements.len == 0 {
-				return TypeInfo{ generic: 'list', value: 'list(any)' }
+				return TypeInfo{
+					generic: 'list'
+					value:   'list(any)'
+				}
 			}
 			first_type := tc.check_pattern_and_get_type(pattern.elements[0])
-			return TypeInfo{ generic: 'list', value: 'list(${first_type.str()})' }
+			return TypeInfo{
+				generic: 'list'
+				value:   'list(${first_type.str()})'
+			}
 		}
 		ast.ListConsPattern {
 			head_type := tc.check_pattern_and_get_type(pattern.head)
-			return TypeInfo{ generic: 'list', value: 'list(${head_type.str()})' }
+			return TypeInfo{
+				generic: 'list'
+				value:   'list(${head_type.str()})'
+			}
 		}
 		ast.ListEmptyPattern {
-			return TypeInfo{ generic: 'list', value: 'list(any)' }
+			return TypeInfo{
+				generic: 'list'
+				value:   'list(any)'
+			}
 		}
 		ast.MapPattern {
-			return TypeInfo{ generic: 'map', value: 'map(any=>any)' }
+			return TypeInfo{
+				generic: 'map'
+				value:   'map(any=>any)'
+			}
 		}
 		ast.RecordPattern {
-			return TypeInfo{ generic: 'record', value: 'record' }
+			return TypeInfo{
+				generic: 'record'
+				value:   'record'
+			}
 		}
 		ast.BinaryPattern {
-			return TypeInfo{ generic: 'bitstring', value: none }
+			return TypeInfo{
+				generic: 'bitstring'
+				value:   none
+			}
 		}
 		ast.WildcardPattern {
-			return TypeInfo{ generic: 'any', value: none }
+			return TypeInfo{
+				generic: 'any'
+				value:   none
+			}
 		}
 	}
 	// Default return in case no match (should not happen)
-	return TypeInfo{ generic: 'any', value: none }
+	return TypeInfo{
+		generic: 'any'
+		value:   none
+	}
 }
 
 // Mantém a função original para compatibilidade
@@ -288,7 +329,10 @@ fn (mut tc TypeChecker) check_pattern(pattern ast.Pattern) {
 
 fn (mut tc TypeChecker) check_variable_pattern(pattern ast.VarPattern) {
 	// Bind variable to context with a fresh type variable
-	type_info := TypeInfo{ generic: 'var', value: pattern.name }
+	type_info := TypeInfo{
+		generic: 'var'
+		value:   pattern.name
+	}
 	tc.context.bind(pattern.name, type_info, pattern.position)
 }
 
@@ -399,19 +443,31 @@ fn (mut tc TypeChecker) type_expr_to_type_info(type_expr ast.TypeExpression) Typ
 				elem_info := tc.type_expr_to_type_info(elem)
 				element_types << elem_info.str()
 			}
-			TypeInfo{ generic: 'tuple', value: '{${element_types.join(', ')}}' }
+			TypeInfo{
+				generic: 'tuple'
+				value:   '{${element_types.join(', ')}}'
+			}
 		}
 		ast.ListTypeExpr {
 			elem_info := tc.type_expr_to_type_info(type_expr.element_type)
-			TypeInfo{ generic: 'list', value: 'list(${elem_info.str()})' }
+			TypeInfo{
+				generic: 'list'
+				value:   'list(${elem_info.str()})'
+			}
 		}
 		ast.MapTypeExpr {
 			key_info := tc.type_expr_to_type_info(type_expr.key_type)
 			value_info := tc.type_expr_to_type_info(type_expr.value_type)
-			TypeInfo{ generic: 'map', value: 'map(${key_info.str()}=>${value_info.str()})' }
+			TypeInfo{
+				generic: 'map'
+				value:   'map(${key_info.str()}=>${value_info.str()})'
+			}
 		}
 		else {
-			TypeInfo{ generic: 'any', value: none }
+			TypeInfo{
+				generic: 'any'
+				value:   none
+			}
 		}
 	}
 }

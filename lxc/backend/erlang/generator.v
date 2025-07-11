@@ -9,9 +9,9 @@ pub struct ErlangGenerator {
 mut:
 	defined_types       map[string]ast.TypeAliasStmt // Map of type name to type definition
 	var_scopes          []map[string]string          // Stack of variable scopes: original name -> hashed name
-	next_hash           int                       // Counter for unique hashes
-	type_context        ?&analysis1.TypeContext  // Type context for record type information
-	current_function_id string                    // Current function ID for type lookups
+	next_hash           int                     // Counter for unique hashes
+	type_context        ?&analysis1.TypeContext // Type context for record type information
+	current_function_id string                  // Current function ID for type lookups
 }
 
 // new_erlang_generator creates a new Erlang code generator

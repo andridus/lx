@@ -31,10 +31,10 @@ fn (mut vc VariableChecker) check_statement(stmt ast.Stmt) {
 	match stmt {
 		ast.ExprStmt { vc.check_expression_statement(stmt) }
 		ast.FunctionStmt { vc.check_function_statement(stmt) }
-		ast.RecordDefStmt { /* Record definitions don't introduce variables */ }
-		ast.TypeDefStmt { /* Type definitions don't introduce variables */ }
-		ast.TypeAliasStmt { /* Type alias definitions don't introduce variables */ }
-		ast.ModuleStmt { /* Module statements don't introduce variables */ }
+		ast.RecordDefStmt {}
+		ast.TypeDefStmt {}
+		ast.TypeAliasStmt {}
+		ast.ModuleStmt {}
 	}
 }
 
@@ -45,16 +45,14 @@ fn (mut vc VariableChecker) check_expression_statement(stmt ast.ExprStmt) {
 fn (mut vc VariableChecker) check_assignment_expression(expr ast.AssignExpr) {
 	// Check for rebind in current scope
 	if vc.scope_manager.has_binding_local(expr.name) {
-		vc.report_error("Variable '${expr.name}' cannot be reassigned",
-			'Variables in LX are immutable and cannot be reassigned. Use a different variable name or restructure your code.',
+		vc.report_error("Variable '${expr.name}' cannot be reassigned", 'Variables in LX are immutable and cannot be reassigned. Use a different variable name or restructure your code.',
 			expr.position)
 		return
 	}
 
 	// Check for shadowing from parent scopes
 	if vc.scope_manager.has_binding_in_parent(expr.name) {
-		vc.report_error("Variable '${expr.name}' shadows variable from outer scope",
-			'Shadowing is not allowed in LX. Use a different variable name: ${expr.name}_inner',
+		vc.report_error("Variable '${expr.name}' shadows variable from outer scope", 'Shadowing is not allowed in LX. Use a different variable name: ${expr.name}_inner',
 			expr.position)
 		return
 	}
@@ -107,9 +105,9 @@ fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 		ast.MatchExpr { vc.check_match_expression(expr) }
 		ast.GuardExpr { vc.check_guard_expression(expr) }
 		ast.UnaryExpr { vc.check_unary_expression(expr) }
-		ast.ListEmptyExpr { /* nothing to check */ }
-		ast.SimpleMatchExpr { /* nothing to check */ }
-		ast.MatchRescueExpr { /* nothing to check */ }
+		ast.ListEmptyExpr {}
+		ast.SimpleMatchExpr {}
+		ast.MatchRescueExpr {}
 	}
 }
 
@@ -128,8 +126,7 @@ fn (mut vc VariableChecker) check_call_expression(expr ast.CallExpr) {
 fn (mut vc VariableChecker) check_variable_expression(expr ast.VariableExpr) {
 	// Check if variable is bound
 	if !vc.scope_manager.has_binding(expr.name) {
-		vc.report_error("Unbound variable '${expr.name}'",
-			'Variable must be defined before use. Check spelling or define the variable first.',
+		vc.report_error("Unbound variable '${expr.name}'", 'Variable must be defined before use. Check spelling or define the variable first.',
 			expr.position)
 		return
 	}
@@ -235,7 +232,7 @@ fn (mut vc VariableChecker) check_pattern(pattern ast.Pattern) {
 		ast.LiteralPattern { vc.check_literal_pattern(pattern) }
 		ast.TuplePattern { vc.check_tuple_pattern(pattern) }
 		ast.ListConsPattern { vc.check_list_cons_pattern(pattern) }
-		ast.ListEmptyPattern { /* nothing to check */ }
+		ast.ListEmptyPattern {}
 		ast.ListLiteralPattern { vc.check_list_literal_pattern(pattern) }
 		ast.MapPattern { vc.check_map_pattern(pattern) }
 		ast.RecordPattern { vc.check_record_pattern(pattern) }

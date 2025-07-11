@@ -5,15 +5,15 @@ import errors
 
 pub struct ExpressionChecker {
 pub mut:
-	context &TypeContext
-	errors  []errors.CompilationError
-	type_cache map[string]TypeInfo  // Cache for expression types
+	context    &TypeContext
+	errors     []errors.CompilationError
+	type_cache map[string]TypeInfo // Cache for expression types
 }
 
 pub fn new_expression_checker(context &TypeContext) ExpressionChecker {
 	return ExpressionChecker{
-		context: unsafe { context }
-		errors:  []
+		context:    unsafe { context }
+		errors:     []
 		type_cache: map[string]TypeInfo{}
 	}
 }
@@ -46,9 +46,9 @@ pub fn (mut ec ExpressionChecker) check_expression(expr ast.Expr) {
 		ast.MatchExpr { ec.check_match_expression(expr) }
 		ast.GuardExpr { ec.check_guard_expression(expr) }
 		ast.UnaryExpr { ec.check_unary_expression(expr) }
-		ast.ListEmptyExpr { /* nothing to check */ }
-		ast.SimpleMatchExpr { /* nothing to check */ }
-		ast.MatchRescueExpr { /* nothing to check */ }
+		ast.ListEmptyExpr {}
+		ast.SimpleMatchExpr {}
+		ast.MatchRescueExpr {}
 	}
 
 	// Store the inferred type in the context
@@ -92,12 +92,12 @@ fn (mut ec ExpressionChecker) validate_arithmetic_operator(op ast.BinaryOp, left
 
 fn (mut ec ExpressionChecker) validate_logical_operator(op ast.BinaryOp, left_type TypeInfo, right_type TypeInfo, position ast.Position) {
 	if left_type.generic != 'boolean' {
-		ec.report_error('Left operand of `${op.str()}` must be boolean',
-			'Use only boolean expressions with `${op.str()}`', position)
+		ec.report_error('Left operand of `${op.str()}` must be boolean', 'Use only boolean expressions with `${op.str()}`',
+			position)
 	}
 	if right_type.generic != 'boolean' {
-		ec.report_error('Right operand of `${op.str()}` must be boolean',
-			'Use only boolean expressions with `${op.str()}`', position)
+		ec.report_error('Right operand of `${op.str()}` must be boolean', 'Use only boolean expressions with `${op.str()}`',
+			position)
 	}
 }
 
@@ -289,7 +289,10 @@ fn (mut ec ExpressionChecker) check_pattern(pattern ast.Pattern) {
 fn (mut ec ExpressionChecker) check_var_pattern(pattern ast.VarPattern) {
 	// Variable patterns are always valid
 	// But we should bind them to the context with a type
-	type_info := TypeInfo{ generic: 'var', value: pattern.name }
+	type_info := TypeInfo{
+		generic: 'var'
+		value:   pattern.name
+	}
 	ec.context.bind(pattern.name, type_info, pattern.position)
 }
 
@@ -346,7 +349,9 @@ fn (mut ec ExpressionChecker) check_atom_pattern(pattern ast.AtomPattern) {
 // New TypeInfo-based pattern checking with collection type
 fn (mut ec ExpressionChecker) check_pattern_with_collection_type_info(pattern ast.Pattern, collection_type TypeInfo) {
 	match pattern {
-		ast.VarPattern { ec.check_var_pattern_with_type(pattern, collection_type) }
+		ast.VarPattern {
+			ec.check_var_pattern_with_type(pattern, collection_type)
+		}
 		ast.TuplePattern {
 			if collection_type.generic == 'tuple' {
 				// Extract tuple elements and match with pattern elements
@@ -364,15 +369,33 @@ fn (mut ec ExpressionChecker) check_pattern_with_collection_type_info(pattern as
 				}
 			}
 		}
-		ast.LiteralPattern { ec.check_literal_pattern(pattern) }
-		ast.ListConsPattern { ec.check_list_cons_pattern(pattern) }
-		ast.ListEmptyPattern { ec.check_list_empty_pattern(pattern) }
-		ast.ListLiteralPattern { ec.check_list_literal_pattern(pattern) }
-		ast.MapPattern { ec.check_map_pattern(pattern) }
-		ast.RecordPattern { ec.check_record_pattern(pattern) }
-		ast.BinaryPattern { ec.check_binary_pattern(pattern) }
-		ast.WildcardPattern { ec.check_wildcard_pattern(pattern) }
-		ast.AtomPattern { ec.check_atom_pattern(pattern) }
+		ast.LiteralPattern {
+			ec.check_literal_pattern(pattern)
+		}
+		ast.ListConsPattern {
+			ec.check_list_cons_pattern(pattern)
+		}
+		ast.ListEmptyPattern {
+			ec.check_list_empty_pattern(pattern)
+		}
+		ast.ListLiteralPattern {
+			ec.check_list_literal_pattern(pattern)
+		}
+		ast.MapPattern {
+			ec.check_map_pattern(pattern)
+		}
+		ast.RecordPattern {
+			ec.check_record_pattern(pattern)
+		}
+		ast.BinaryPattern {
+			ec.check_binary_pattern(pattern)
+		}
+		ast.WildcardPattern {
+			ec.check_wildcard_pattern(pattern)
+		}
+		ast.AtomPattern {
+			ec.check_atom_pattern(pattern)
+		}
 	}
 }
 
@@ -387,10 +410,10 @@ fn (mut ec ExpressionChecker) check_statement(stmt ast.Stmt) {
 	match stmt {
 		ast.ExprStmt { ec.check_expression(stmt.expr) }
 		ast.FunctionStmt { ec.check_function_statement(stmt) }
-		ast.RecordDefStmt { /* Record definitions don't need expression checking */ }
-		ast.TypeDefStmt { /* Type definitions don't need expression checking */ }
-		ast.TypeAliasStmt { /* Type alias definitions don't need expression checking */ }
-		ast.ModuleStmt { /* Module statements don't need expression checking */ }
+		ast.RecordDefStmt {}
+		ast.TypeDefStmt {}
+		ast.TypeAliasStmt {}
+		ast.ModuleStmt {}
 	}
 }
 
@@ -418,24 +441,41 @@ fn (mut ec ExpressionChecker) check_type_alias_statement(stmt ast.TypeAliasStmt)
 // New TypeInfo-based inference function
 fn (mut ec ExpressionChecker) infer_expression_type_info(expr ast.Expr) TypeInfo {
 	return match expr {
-		ast.VariableExpr { ec.infer_variable_type_info(expr) }
-		ast.LiteralExpr { typeinfo_from_literal(expr.value) }
-		ast.BinaryExpr { ec.infer_binary_type_info(expr) }
-		ast.CallExpr { ec.infer_call_type_info(expr) }
+		ast.VariableExpr {
+			ec.infer_variable_type_info(expr)
+		}
+		ast.LiteralExpr {
+			typeinfo_from_literal(expr.value)
+		}
+		ast.BinaryExpr {
+			ec.infer_binary_type_info(expr)
+		}
+		ast.CallExpr {
+			ec.infer_call_type_info(expr)
+		}
 		ast.TupleExpr {
 			mut element_types := []string{}
 			for element in expr.elements {
 				element_type := ec.infer_expression_type_info(element)
 				element_types << element_type.str()
 			}
-			return TypeInfo{ generic: 'tuple', value: '{${element_types.join(', ')}}' }
+			return TypeInfo{
+				generic: 'tuple'
+				value:   '{${element_types.join(', ')}}'
+			}
 		}
 		ast.RecordLiteralExpr {
-			return TypeInfo{ generic: 'record', value: expr.name }
+			return TypeInfo{
+				generic: 'record'
+				value:   expr.name
+			}
 		}
 		ast.ListLiteralExpr {
 			if expr.elements.len == 0 {
-				return TypeInfo{ generic: 'list', value: 'list(any)' }
+				return TypeInfo{
+					generic: 'list'
+					value:   'list(any)'
+				}
 			}
 
 			// Check if all elements have the same type
@@ -448,16 +488,25 @@ fn (mut ec ExpressionChecker) infer_expression_type_info(expr ast.Expr) TypeInfo
 			if element_types.len > 0 {
 				first_type := element_types[0]
 				if element_types.all(types_are_compatible(first_type, it)) {
-					return TypeInfo{ generic: 'list', value: 'list(${first_type.str()})' }
+					return TypeInfo{
+						generic: 'list'
+						value:   'list(${first_type.str()})'
+					}
 				}
 			}
 
 			// Mixed types - use any
-			return TypeInfo{ generic: 'list', value: 'list(any)' }
+			return TypeInfo{
+				generic: 'list'
+				value:   'list(any)'
+			}
 		}
 		ast.MapLiteralExpr {
 			if expr.entries.len == 0 {
-				return TypeInfo{ generic: 'map', value: 'map(any=>any)' }
+				return TypeInfo{
+					generic: 'map'
+					value:   'map(any=>any)'
+				}
 			}
 
 			// Infer key and value types from first entry
@@ -465,12 +514,18 @@ fn (mut ec ExpressionChecker) infer_expression_type_info(expr ast.Expr) TypeInfo
 			key_type := ec.infer_expression_type_info(first_entry.key)
 			value_type := ec.infer_expression_type_info(first_entry.value)
 
-			return TypeInfo{ generic: 'map', value: 'map(${key_type.str()}=>${value_type.str()})' }
+			return TypeInfo{
+				generic: 'map'
+				value:   'map(${key_type.str()}=>${value_type.str()})'
+			}
 		}
 		ast.BlockExpr {
 			// For block expressions, return the type of the last statement
 			if expr.body.len == 0 {
-				return TypeInfo{ generic: 'any', value: none }
+				return TypeInfo{
+					generic: 'any'
+					value:   none
+				}
 			}
 
 			last_stmt := expr.body[expr.body.len - 1]
@@ -479,7 +534,10 @@ fn (mut ec ExpressionChecker) infer_expression_type_info(expr ast.Expr) TypeInfo
 					ec.infer_expression_type_info(last_stmt.expr)
 				}
 				else {
-					TypeInfo{ generic: 'any', value: none }
+					TypeInfo{
+						generic: 'any'
+						value:   none
+					}
 				}
 			}
 		}
@@ -494,12 +552,18 @@ fn (mut ec ExpressionChecker) infer_expression_type_info(expr ast.Expr) TypeInfo
 			}
 
 			// Otherwise, use any
-			return TypeInfo{ generic: 'any', value: none }
+			return TypeInfo{
+				generic: 'any'
+				value:   none
+			}
 		}
 		ast.CaseExpr {
 			// For case expressions, check all branches
 			if expr.cases.len == 0 {
-				return TypeInfo{ generic: 'any', value: none }
+				return TypeInfo{
+					generic: 'any'
+					value:   none
+				}
 			}
 
 			// Use the type of the first case as reference
@@ -509,7 +573,10 @@ fn (mut ec ExpressionChecker) infer_expression_type_info(expr ast.Expr) TypeInfo
 			for case_expr in expr.cases {
 				case_type := ec.infer_expression_type_info(case_expr.body)
 				if !types_are_compatible(first_case_type, case_type) {
-					return TypeInfo{ generic: 'any', value: none }
+					return TypeInfo{
+						generic: 'any'
+						value:   none
+					}
 				}
 			}
 
@@ -521,12 +588,18 @@ fn (mut ec ExpressionChecker) infer_expression_type_info(expr ast.Expr) TypeInfo
 		}
 		ast.ForExpr {
 			// For comprehensions return list type
-			return TypeInfo{ generic: 'list', value: 'list(any)' }
+			return TypeInfo{
+				generic: 'list'
+				value:   'list(any)'
+			}
 		}
 		ast.ReceiveExpr {
 			// For receive expressions, check all cases
 			if expr.cases.len == 0 {
-				return TypeInfo{ generic: 'any', value: none }
+				return TypeInfo{
+					generic: 'any'
+					value:   none
+				}
 			}
 
 			first_case_type := ec.infer_expression_type_info(expr.cases[0].body)
@@ -534,7 +607,10 @@ fn (mut ec ExpressionChecker) infer_expression_type_info(expr ast.Expr) TypeInfo
 		}
 		ast.FunExpr {
 			// For function expressions, return function type
-			return TypeInfo{ generic: 'function', value: none }
+			return TypeInfo{
+				generic: 'function'
+				value:   none
+			}
 		}
 		ast.SendExpr {
 			// Send expressions return the message type
@@ -544,30 +620,52 @@ fn (mut ec ExpressionChecker) infer_expression_type_info(expr ast.Expr) TypeInfo
 			// For unary expressions, return based on operator
 			operand_type := ec.infer_expression_type_info(expr.operand)
 			return match expr.op {
-				.not { TypeInfo{ generic: 'boolean', value: none } }
-				.minus { operand_type }
+				.not {
+					TypeInfo{
+						generic: 'boolean'
+						value:   none
+					}
+				}
+				.minus {
+					operand_type
+				}
 			}
 		}
 		ast.ListConsExpr {
 			// List cons returns list type
 			head_type := ec.infer_expression_type_info(expr.head)
-			return TypeInfo{ generic: 'list', value: 'list(${head_type.str()})' }
+			return TypeInfo{
+				generic: 'list'
+				value:   'list(${head_type.str()})'
+			}
 		}
 		ast.MapAccessExpr {
 			// Map access returns value type - for now return any
-			return TypeInfo{ generic: 'any', value: none }
+			return TypeInfo{
+				generic: 'any'
+				value:   none
+			}
 		}
 		ast.MapUpdateExpr {
 			// Map update returns map type - for now return any
-			return TypeInfo{ generic: 'map', value: 'map(any=>any)' }
+			return TypeInfo{
+				generic: 'map'
+				value:   'map(any=>any)'
+			}
 		}
 		ast.RecordAccessExpr {
 			// Record access returns field type - for now return any
-			return TypeInfo{ generic: 'any', value: none }
+			return TypeInfo{
+				generic: 'any'
+				value:   none
+			}
 		}
 		ast.RecordUpdateExpr {
 			// Record update returns record type
-			return TypeInfo{ generic: 'record', value: expr.record_name }
+			return TypeInfo{
+				generic: 'record'
+				value:   expr.record_name
+			}
 		}
 		ast.AssignExpr {
 			// Assignment returns the value type
@@ -575,23 +673,38 @@ fn (mut ec ExpressionChecker) infer_expression_type_info(expr ast.Expr) TypeInfo
 		}
 		ast.MatchExpr {
 			// Match expressions return any for now
-			return TypeInfo{ generic: 'any', value: none }
+			return TypeInfo{
+				generic: 'any'
+				value:   none
+			}
 		}
 		ast.GuardExpr {
 			// Guard expressions return boolean
-			return TypeInfo{ generic: 'boolean', value: none }
+			return TypeInfo{
+				generic: 'boolean'
+				value:   none
+			}
 		}
 		ast.ListEmptyExpr {
 			// Empty list
-			return TypeInfo{ generic: 'list', value: 'list(any)' }
+			return TypeInfo{
+				generic: 'list'
+				value:   'list(any)'
+			}
 		}
 		ast.SimpleMatchExpr {
 			// Simple match returns any for now
-			return TypeInfo{ generic: 'any', value: none }
+			return TypeInfo{
+				generic: 'any'
+				value:   none
+			}
 		}
 		ast.MatchRescueExpr {
 			// Match rescue returns any for now
-			return TypeInfo{ generic: 'any', value: none }
+			return TypeInfo{
+				generic: 'any'
+				value:   none
+			}
 		}
 	}
 }
@@ -608,7 +721,10 @@ fn (mut ec ExpressionChecker) infer_variable_type_info(expr ast.VariableExpr) Ty
 	if binding := ec.context.lookup(expr.name) {
 		return binding.type_info
 	}
-	return TypeInfo{ generic: 'any', value: none }
+	return TypeInfo{
+		generic: 'any'
+		value:   none
+	}
 }
 
 // Legacy function for backwards compatibility - simplified
@@ -638,13 +754,22 @@ fn (mut ec ExpressionChecker) infer_binary_type_info(expr ast.BinaryExpr) TypeIn
 			return ec.infer_arithmetic_result_type_info(left_type, right_type)
 		}
 		.and, .or {
-			return TypeInfo{ generic: 'boolean', value: none }
+			return TypeInfo{
+				generic: 'boolean'
+				value:   none
+			}
 		}
 		.equal, .not_equal, .less_than, .less_equal, .greater_than, .greater_equal {
-			return TypeInfo{ generic: 'boolean', value: none }
+			return TypeInfo{
+				generic: 'boolean'
+				value:   none
+			}
 		}
 		else {
-			return TypeInfo{ generic: 'any', value: none }
+			return TypeInfo{
+				generic: 'any'
+				value:   none
+			}
 		}
 	}
 }
@@ -659,7 +784,10 @@ fn (mut ec ExpressionChecker) infer_binary_type(expr ast.BinaryExpr) TypeExpr {
 fn (mut ec ExpressionChecker) infer_call_type_info(expr ast.CallExpr) TypeInfo {
 	// For now, return any for function calls
 	// This should be enhanced with proper function type inference
-	return TypeInfo{ generic: 'any', value: none }
+	return TypeInfo{
+		generic: 'any'
+		value:   none
+	}
 }
 
 // Legacy function for backwards compatibility - simplified
@@ -672,9 +800,15 @@ fn (mut ec ExpressionChecker) infer_call_type(expr ast.CallExpr) TypeExpr {
 fn (mut ec ExpressionChecker) infer_arithmetic_result_type_info(left_type TypeInfo, right_type TypeInfo) TypeInfo {
 	// Simple arithmetic type inference
 	if left_type.generic == 'float' || right_type.generic == 'float' {
-		return TypeInfo{ generic: 'float', value: none }
+		return TypeInfo{
+			generic: 'float'
+			value:   none
+		}
 	}
-	return TypeInfo{ generic: 'integer', value: none }
+	return TypeInfo{
+		generic: 'integer'
+		value:   none
+	}
 }
 
 // Legacy function for backwards compatibility - simplified
@@ -723,12 +857,18 @@ fn (mut ec ExpressionChecker) infer_variable_type_from_collection_info(collectio
 			elem_type_str := extract_list_element_type(value)
 			return typeinfo_from_str(elem_type_str)
 		}
-		return TypeInfo{ generic: 'any', value: none }
+		return TypeInfo{
+			generic: 'any'
+			value:   none
+		}
 	}
 	if collection_type.generic == 'tuple' {
 		return collection_type
 	}
-	return TypeInfo{ generic: 'any', value: none }
+	return TypeInfo{
+		generic: 'any'
+		value:   none
+	}
 }
 
 // Legacy function for backwards compatibility - simplified

@@ -375,12 +375,12 @@ fn (mut gen ErlangGenerator) generate_binary_expression(expr ast.BinaryExpr) str
 		}
 		// Remove os "<<" e ">>" dos literais para montar corretamente
 		left_inner := if final_left.starts_with('<<') && final_left.ends_with('>>') {
-			final_left[2..final_left.len-2]
+			final_left[2..final_left.len - 2]
 		} else {
 			final_left
 		}
 		right_inner := if final_right.starts_with('<<') && final_right.ends_with('>>') {
-			final_right[2..final_right.len-2]
+			final_right[2..final_right.len - 2]
 		} else {
 			final_right
 		}

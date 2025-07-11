@@ -386,7 +386,7 @@ fn (gen ErlangGenerator) generate_type_expression(type_expr ast.TypeExpression) 
 					'float()'
 				}
 				'string' {
-					'binary()'  // Lx strings são binaries UTF-8
+					'binary()' // Lx strings são binaries UTF-8
 				}
 				'boolean' {
 					'boolean()'
@@ -486,8 +486,8 @@ fn (gen ErlangGenerator) get_block_type(block ast.BlockExpr) string {
 	// Get type from the type context
 	if type_ctx := gen.type_context {
 		if block.body.len > 0 {
-	last_stmt := block.body[block.body.len - 1]
-	if last_stmt is ast.ExprStmt {
+			last_stmt := block.body[block.body.len - 1]
+			if last_stmt is ast.ExprStmt {
 				if expr_type := type_ctx.get_expression_type(last_stmt.expr) {
 					return expr_type.str()
 				}
@@ -766,7 +766,7 @@ fn (gen ErlangGenerator) typeinfo_to_erlang_type(type_info analysis1.TypeInfo) s
 			return 'float()'
 		}
 		'string' {
-			return 'binary()'  // Lx strings são binaries UTF-8
+			return 'binary()' // Lx strings são binaries UTF-8
 		}
 		'boolean' {
 			return 'boolean()'
@@ -871,25 +871,39 @@ fn (gen ErlangGenerator) convert_type_element_to_erlang(type_element string) str
 	// Handle specific type patterns
 	if type_element.starts_with('atom(') && type_element.ends_with(')') {
 		// Extract atom value: "atom(ok)" -> "ok"
-		atom_value := type_element[5..type_element.len-1]
+		atom_value := type_element[5..type_element.len - 1]
 		return atom_value
 	}
 
 	if type_element.starts_with('record(') && type_element.ends_with(')') {
 		// Extract record name: "record(Usuario)" -> "#usuario{}"
-		record_name := type_element[7..type_element.len-1]
+		record_name := type_element[7..type_element.len - 1]
 		return '#${record_name.to_lower()}{}'
 	}
 
 	// Handle basic types
 	match type_element {
-		'integer' { return 'integer()' }
-		'float' { return 'float()' }
-		'string' { return 'binary()' }  // Lx strings são binaries UTF-8
-		'boolean' { return 'boolean()' }
-		'atom' { return 'atom()' }
-		'nil' { return 'nil' }
-		'any' { return 'any()' }
+		'integer' {
+			return 'integer()'
+		}
+		'float' {
+			return 'float()'
+		}
+		'string' {
+			return 'binary()'
+		} // Lx strings são binaries UTF-8
+		'boolean' {
+			return 'boolean()'
+		}
+		'atom' {
+			return 'atom()'
+		}
+		'nil' {
+			return 'nil'
+		}
+		'any' {
+			return 'any()'
+		}
 		else {
 			// If it's a user-defined type (starts with capital letter), treat as record
 			if type_element.len > 0 && type_element[0].is_capital() {

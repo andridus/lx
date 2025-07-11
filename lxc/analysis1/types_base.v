@@ -64,7 +64,7 @@ pub:
 pub struct TypeBinding {
 pub:
 	name      string
-	type_info TypeInfo  // Updated to use TypeInfo instead of TypeExpr
+	type_info TypeInfo // Updated to use TypeInfo instead of TypeExpr
 	position  ast.Position
 }
 
@@ -74,8 +74,8 @@ pub mut:
 	type_aliases          map[string]TypeExpr
 	record_types          map[string]string
 	function_contexts     map[string]&TypeContext
-	expression_types      map[string]TypeInfo  // Store expression types by their string representation
-	function_return_types map[string]TypeInfo  // Store function return types by func_name/arity
+	expression_types      map[string]TypeInfo   // Store expression types by their string representation
+	function_return_types map[string]TypeInfo   // Store function return types by func_name/arity
 	function_param_types  map[string][]TypeInfo // Store function parameter types by func_name/arity/params
 	parent                ?&TypeContext
 	level                 int
@@ -83,15 +83,15 @@ pub mut:
 
 pub fn new_type_context() TypeContext {
 	return TypeContext{
-		bindings:          map[string]TypeBinding{}
-		type_aliases:      map[string]TypeExpr{}
-		record_types:      map[string]string{}
-		function_contexts: map[string]&TypeContext{}
-		expression_types:  map[string]TypeInfo{}
-		parent:            none
-		level:             0
+		bindings:              map[string]TypeBinding{}
+		type_aliases:          map[string]TypeExpr{}
+		record_types:          map[string]string{}
+		function_contexts:     map[string]&TypeContext{}
+		expression_types:      map[string]TypeInfo{}
+		parent:                none
+		level:                 0
 		function_return_types: map[string]TypeInfo{}
-		function_param_types: map[string][]TypeInfo{}
+		function_param_types:  map[string][]TypeInfo{}
 	}
 }
 
@@ -121,14 +121,14 @@ pub fn (mut tc TypeContext) bind_string(name string, type_str string, position a
 
 pub fn (tc &TypeContext) enter_function(name string) TypeContext {
 	new_context := TypeContext{
-		bindings:          map[string]TypeBinding{}
-		type_aliases:      map[string]TypeExpr{}
-		record_types:      map[string]string{}
-		function_contexts: map[string]&TypeContext{}
-		parent:            unsafe { tc }
-		level:             tc.level + 1
+		bindings:              map[string]TypeBinding{}
+		type_aliases:          map[string]TypeExpr{}
+		record_types:          map[string]string{}
+		function_contexts:     map[string]&TypeContext{}
+		parent:                unsafe { tc }
+		level:                 tc.level + 1
 		function_return_types: map[string]TypeInfo{}
-		function_param_types: map[string][]TypeInfo{}
+		function_param_types:  map[string][]TypeInfo{}
 	}
 	return new_context
 }
@@ -235,7 +235,10 @@ fn create_union_type(type1 TypeInfo, type2 TypeInfo) TypeInfo {
 	}
 	// Create union type
 	union_str := '${type1.str()} | ${type2.str()}'
-	return TypeInfo{ generic: 'union', value: union_str }
+	return TypeInfo{
+		generic: 'union'
+		value:   union_str
+	}
 }
 
 // Helper function to get type string representation

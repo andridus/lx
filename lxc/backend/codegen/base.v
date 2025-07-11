@@ -1,12 +1,12 @@
 module codegen
 
 import ast
-import analysis.typechecker
+import analysis1
 
 // CodeGenerator defines the interface for all code generators
 pub interface CodeGenerator {
 	// generate_module generates code for an entire module
-	generate_module(module ast.ModuleStmt, type_ctx &typechecker.TypeContext) CodegenResult
+	generate_module(module ast.ModuleStmt, type_ctx &analysis1.TypeContext) CodegenResult
 
 	// get_file_extension returns the file extension for generated files
 	get_file_extension() string

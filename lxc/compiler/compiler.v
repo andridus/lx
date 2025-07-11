@@ -1,7 +1,7 @@
 module compiler
 
 import frontend.lexer
-import frontend.parser1
+import frontend.parser
 import os
 import ast
 import errors
@@ -100,7 +100,7 @@ pub fn (mut comp Compiler) compile(source string, file_path string) codegen.Code
 	}
 
 	// Create parser and parse the tokens into AST
-	mut parser1_instance := parser1.new_parser(tokens)
+	mut parser1_instance := parser.new_parser(tokens)
 	module_stmt0 := parser1_instance.parse_program() or { ast.ModuleStmt{} }
 
 	if parser1_instance.has_errors() {

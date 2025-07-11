@@ -663,7 +663,8 @@ fn (mut p LXParser) parse_primary_expression() ?ast.Expr {
 					p.parse_binary_expression(ast.BinaryOp.append)
 				}
 				else {
-					println('[LOG] block_expressions: Unexpected operator in expression, op = ' + op.value.str() + ', pos = ' + p.get_current_position().str())
+					println('[LOG] block_expressions: Unexpected operator in expression, op = ' +
+						op.value.str() + ', pos = ' + p.get_current_position().str())
 					p.add_error('Unexpected operator in expression', 'Got ${p.current.str()}')
 					none
 				}
