@@ -558,7 +558,6 @@ fn (mut ec ExpressionChecker) infer_expression_type_info(expr ast.Expr) TypeInfo
 			}
 		}
 		ast.CaseExpr {
-			// For case expressions, check all branches
 			if expr.cases.len == 0 {
 				return TypeInfo{
 					generic: 'any'
@@ -566,21 +565,65 @@ fn (mut ec ExpressionChecker) infer_expression_type_info(expr ast.Expr) TypeInfo
 				}
 			}
 
-			// Use the type of the first case as reference
-			first_case_type := ec.infer_expression_type_info(expr.cases[0].body)
-
-			// Check if all cases have compatible types
+			mut branch_types := []TypeInfo{}
 			for case_expr in expr.cases {
 				case_type := ec.infer_expression_type_info(case_expr.body)
-				if !types_are_compatible(first_case_type, case_type) {
+				branch_types << case_type
+			}
+
+			all_same_generic := branch_types.all(it.generic == branch_types[0].generic)
+			if all_same_generic {
+				// Check if we have exactly 2 branches with different literal values
+				if branch_types.len == 2 {
+					if value0 := branch_types[0].value {
+						if value1 := branch_types[1].value {
+							if value0 != value1 {
+								union_str := branch_types[0].str() + ' | ' + branch_types[1].str()
+								return TypeInfo{
+									generic: 'union'
+									value:   union_str
+								}
+							}
+							return branch_types[0]
+						}
+					}
 					return TypeInfo{
-						generic: 'any'
+						generic: branch_types[0].generic
 						value:   none
 					}
 				}
+
+				// For more than 2 branches, check if all have literal values
+				all_have_literals := branch_types.all(it.value != none)
+				if all_have_literals {
+					// Create union of all literal values
+					union_parts := branch_types.map(it.str())
+					union_str := union_parts.join(' | ')
+					return TypeInfo{
+						generic: 'union'
+						value:   union_str
+					}
+				}
+
+				return TypeInfo{
+					generic: branch_types[0].generic
+					value:   none
+				}
 			}
 
-			return first_case_type
+			mut seen := map[string]bool{}
+			mut unique_generics := []string{}
+			for t in branch_types {
+				if !seen[t.generic] {
+					unique_generics << t.generic
+					seen[t.generic] = true
+				}
+			}
+			union_generics := unique_generics.join(' | ')
+			return TypeInfo{
+				generic: 'union'
+				value:   union_generics
+			}
 		}
 		ast.WithExpr {
 			// For with expressions, return the type of the body

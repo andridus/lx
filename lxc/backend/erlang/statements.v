@@ -301,7 +301,7 @@ pub fn (mut gen ErlangGenerator) generate_function(func ast.FunctionStmt) string
 		} else {
 			return_type = gen.get_function_return_type(first_clause, func.name, arity)
 		}
-		spec_line := '-spec ${func.name}(${param_types.join(', ')}) -> ${return_type}.\n'
+		spec_line := '-spec ${func.name}(${param_types.join(', ')}) -> ${gen.convert_type_to_erlang_spec(return_type)}.\n'
 		// --- END SPEC GENERATION ---
 
 		for clause in clauses {
@@ -460,12 +460,53 @@ fn (gen ErlangGenerator) get_case_expression_type(expr ast.CaseExpr) string {
 	// Get type from the type context
 	if type_ctx := gen.type_context {
 		if expr_type := type_ctx.get_expression_type(expr) {
-			return expr_type.str()
+			return gen.convert_type_to_erlang_spec(expr_type.str())
 		}
 	}
 
 	// If no type information available, this is an error - type checker should have caught this
 	panic('No type found for case expression')
+}
+
+// convert_type_to_erlang_spec converts type strings to proper Erlang spec format
+fn (gen ErlangGenerator) convert_type_to_erlang_spec(type_str string) string {
+	// Handle union types like "integer(20) | integer(1) | integer(0)"
+	if type_str.contains(' | ') {
+		parts := type_str.split(' | ')
+		converted_parts := parts.map(gen.convert_single_type_to_erlang_spec(it.trim_space()))
+
+		// Detect if all parts are literals of the same base type (e.g., integer)
+		mut base_types := []string{}
+		mut literal_count := 0
+		for p in parts {
+			if p.contains('(') && p.ends_with(')') {
+				open_paren := p.index('(') or { continue }
+				base_types << p[..open_paren]
+				literal_count++
+			}
+		}
+		if base_types.len == parts.len && base_types.all(it == base_types[0]) && parts.len >= 3 {
+			// All are literals of the same type and there are 3 or more: use the generic type
+			return base_types[0] + '()'
+		}
+
+		return converted_parts.join(' | ')
+	}
+	return gen.convert_single_type_to_erlang_spec(type_str)
+}
+
+// convert_single_type_to_erlang_spec converts a single type to Erlang spec format
+fn (gen ErlangGenerator) convert_single_type_to_erlang_spec(type_str string) string {
+	// Handle types with literal values like "integer(20)" -> "20", "atom(ok)" -> "ok", etc.
+	if type_str.contains('(') && type_str.ends_with(')') {
+		open_paren := type_str.index('(') or { return type_str }
+		close_paren := type_str.last_index(')') or { return type_str }
+		if open_paren < close_paren {
+			literal_value := type_str[open_paren + 1..close_paren]
+			return literal_value
+		}
+	}
+	return type_str
 }
 
 // get_with_expression_type gets the type from the type context
