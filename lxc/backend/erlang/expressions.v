@@ -575,19 +575,8 @@ fn (mut gen ErlangGenerator) generate_record_literal(expr ast.RecordLiteralExpr)
 fn (mut gen ErlangGenerator) generate_record_access(expr ast.RecordAccessExpr) string {
 	record := gen.generate_expression(expr.record)
 
-	// Get the record type from the type context (set by typechecker)
-	record_name := if type_ctx := gen.type_context {
-		if record_type := type_ctx.get_record_type(expr) {
-			record_type.to_lower()
-		} else {
-			// Fallback to a default record name if type context is not available
-			// This can happen when typechecker is not run or when record type is not properly stored
-			'unknown_record'
-		}
-	} else {
-		// Fallback to a default record name if type context is not available
-		'unknown_record'
-	}
+	// For now, use a generic record name - this could be improved with type inference
+	record_name := 'record'
 
 	// In Erlang, record access uses: Record#record_name.field
 	return '${record}#${record_name}.${expr.field}'

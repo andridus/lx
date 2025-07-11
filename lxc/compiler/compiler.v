@@ -5,9 +5,7 @@ import frontend.parser1
 import os
 import ast
 import errors
-import analysis
-import analysis.linter
-import analysis.typechecker
+import analysis1
 import backend.codegen
 import backend.erlang
 
@@ -116,48 +114,24 @@ pub fn (mut comp Compiler) compile(source string, file_path string) codegen.Code
 		exit(1)
 	}
 
-	// Variable scope checking (after parsing, before typechecking)
-	mut var_checker := analysis.new_variable_checker()
-	result := var_checker.check_module(module_stmt0)
-	if result.errors.len > 0 {
-		source_lines := errors.load_source_lines(file_path)
-		mut formatted_errors := []string{}
-		for err in result.errors {
-			formatted_errors << error_formatter.format_error(err, source_lines)
-		}
-		println('Variable scope checking errors:\n${formatted_errors.join('\n')}')
-		exit(1)
-	}
+	// Use the new refactored analysis module
+	mut analyzer := analysis1.new_analyzer()
+	analysis_result := analyzer.analyze_module(module_stmt0)
+	println('DEBUG: analysis_result.errors.len = ${analysis_result.errors.len}')
 
-	// Linting (style and best practices checking)
-	mut linter_instance := linter.new_linter()
-	lint_result := linter_instance.lint_module(module_stmt0)
-	if lint_result.errors.len > 0 {
+	if analysis_result.errors.len > 0 {
 		source_lines := errors.load_source_lines(file_path)
 		mut formatted_errors := []string{}
-		for err in lint_result.errors {
+		for err in analysis_result.errors {
 			formatted_errors << error_formatter.format_error(err, source_lines)
 		}
-		println('Linting errors:\n' + formatted_errors.join('\n'))
-		exit(1)
-	}
-
-	// Type checking (including reflection info for @reflection functions)
-	mut type_checker := typechecker.new_type_checker()
-	type_result := type_checker.check_module(module_stmt0)
-	if type_result.errors.len > 0 {
-		source_lines := errors.load_source_lines(file_path)
-		mut formatted_errors := []string{}
-		for err in type_result.errors {
-			formatted_errors << error_formatter.format_error(err, source_lines)
-		}
-		println('Type checking errors:\n' + formatted_errors.join('\n'))
+		println('Analysis errors:\n${formatted_errors.join('\n')}')
 		exit(1)
 	}
 
 	// Generate Erlang code
 	mut erlang_gen := erlang.new_erlang_generator()
-	codegen_result := erlang_gen.generate_module(module_stmt0, type_checker.context)
+	codegen_result := erlang_gen.generate_module(module_stmt0, analysis_result.type_context)
 
 	if !codegen_result.success {
 		eprintln('Code generation failed')
