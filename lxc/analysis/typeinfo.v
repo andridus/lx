@@ -1,216 +1,175 @@
-module analysis1
+module analysis
 
 import ast
 
 // TypeInfo representa um tipo com base genérica e valor específico (quando possível)
 pub struct TypeInfo {
 pub mut:
-	generic string  // 'atom', 'integer', 'string', etc.
+	generic string  // 'atom', 'integer', 'string', 'union', 'list', 'map', 'tuple', etc.
 	value   ?string // ':ok', '1', etc. ou none
+	values  []TypeInfo // Para union types, list element types, map key/value types, tuple element types
 }
 
 // Convert TypeInfo to string representation
 pub fn (ti TypeInfo) str() string {
+	if ti.generic == 'union' && ti.values.len > 0 {
+		// Union types: join all values with |
+		return ti.values.map(it.str()).join(' | ')
+	}
+
+	if ti.generic == 'list' && ti.values.len > 0 {
+		// List types: [element_type]
+		return '[${ti.values[0].str()}]'
+	}
+
+	if ti.generic == 'map' && ti.values.len >= 2 {
+		// Map types: #{key_type => value_type}
+		return '#{${ti.values[0].str()} => ${ti.values[1].str()}}'
+	}
+
+	if ti.generic == 'tuple' && ti.values.len > 0 {
+		// Tuple types: {element1, element2, ...}
+		return '{${ti.values.map(it.str()).join(', ')}}'
+	}
+
 	if value := ti.value {
+		// Special handling for tuples - return just the value without tuple() prefix
+		if ti.generic == 'tuple' {
+			return value
+		}
 		return '${ti.generic}(${value})'
 	}
 	return ti.generic
 }
 
-// Cria um TypeInfo a partir de uma string de tipo usando a estrutura correta dos tipos nativos
-pub fn typeinfo_from_str(type_expr string) TypeInfo {
-	// Tipos básicos nativos (sempre genéricos)
-	if type_expr == 'integer' || type_expr == 'integer()' {
-		return TypeInfo{
-			generic: 'integer'
-			value:   none
-		}
-	}
-	if type_expr == 'float' || type_expr == 'float()' {
-		return TypeInfo{
-			generic: 'float'
-			value:   none
-		}
-	}
-	if type_expr == 'string' || type_expr == 'string()' {
-		return TypeInfo{
-			generic: 'string'
-			value:   none
-		}
-	}
-	if type_expr == 'boolean' || type_expr == 'boolean()' {
-		return TypeInfo{
-			generic: 'boolean'
-			value:   none
-		}
-	}
-	if type_expr == 'atom' || type_expr == 'atom()' {
-		return TypeInfo{
-			generic: 'atom'
-			value:   none
-		}
-	}
-	if type_expr == 'nil' {
-		return TypeInfo{
-			generic: 'nil'
-			value:   none
-		}
-	}
-	if type_expr == 'any' || type_expr == 'any()' {
-		return TypeInfo{
-			generic: 'any'
-			value:   none
-		}
-	}
-	if type_expr == 'pid' || type_expr == 'pid()' {
-		return TypeInfo{
-			generic: 'pid'
-			value:   none
-		}
-	}
-	if type_expr == 'port' || type_expr == 'port()' {
-		return TypeInfo{
-			generic: 'port'
-			value:   none
-		}
-	}
-	if type_expr == 'reference' || type_expr == 'reference()' {
-		return TypeInfo{
-			generic: 'reference'
-			value:   none
-		}
-	}
-	if type_expr == 'bitstring' || type_expr == 'bitstring()' {
-		return TypeInfo{
-			generic: 'bitstring'
-			value:   none
-		}
-	}
-	if type_expr == 'fun' || type_expr == 'fun()' {
-		return TypeInfo{
-			generic: 'fun'
-			value:   none
-		}
-	}
-	if type_expr == 'list' || type_expr == 'list()' {
-		return TypeInfo{
-			generic: 'list'
-			value:   none
-		}
-	}
-	if type_expr == 'map' || type_expr == 'map()' {
-		return TypeInfo{
-			generic: 'map'
-			value:   none
-		}
-	}
-	if type_expr == 'tuple' || type_expr == 'tuple()' {
-		return TypeInfo{
-			generic: 'tuple'
-			value:   none
-		}
-	}
-
-	// Detectar valores específicos dinamicamente
-	// Átomos específicos (começam com : ou são strings sem aspas)
-	if type_expr.starts_with(':') {
-		// Átomo específico (ex: :ok, :error)
-		atom_value := type_expr[1..]
-		return TypeInfo{
-			generic: 'atom'
-			value:   atom_value
-		}
-	}
-
-	// Booleanos específicos
-	if type_expr == 'true' || type_expr == 'false' {
-		return TypeInfo{
-			generic: 'boolean'
-			value:   type_expr
-		}
-	}
-
-	// Inteiros específicos (números sem ponto)
-	if is_integer_literal(type_expr) {
-		return TypeInfo{
-			generic: 'integer'
-			value:   type_expr
-		}
-	}
-
-	// Floats específicos (números com ponto)
-	if is_float_literal(type_expr) {
-		return TypeInfo{
-			generic: 'float'
-			value:   type_expr
-		}
-	}
-
-	// Records (começam com #)
-	if type_expr.starts_with('#') {
-		return TypeInfo{
-			generic: 'record'
-			value:   type_expr
-		}
-	}
-
-	// Tuplas (começam com {)
-	if type_expr.starts_with('{') {
-		return typeinfo_from_tuple(type_expr)
-	}
-
-	// Lists com tipo específico (ex: list(integer))
-	if type_expr.starts_with('list(') {
-		return TypeInfo{
-			generic: 'list'
-			value:   type_expr
-		}
-	}
-
-	// Maps com tipos específicos (ex: map(integer=>string))
-	if type_expr.starts_with('map(') {
-		return TypeInfo{
-			generic: 'map'
-			value:   type_expr
-		}
-	}
-
-	// Tuples com tipos específicos (ex: tuple(integer, float))
-	if type_expr.starts_with('tuple(') {
-		return TypeInfo{
-			generic: 'tuple'
-			value:   type_expr
-		}
-	}
-
-	// Union types (contêm |)
-	if type_expr.contains('|') {
-		return TypeInfo{
-			generic: 'union'
-			value:   type_expr
-		}
-	}
-
-	// User defined types (não são built-in) - começam com maiúscula
-	if type_expr.len > 0 && type_expr[0].is_capital() {
-		return TypeInfo{
-			generic: 'record'
-			value:   type_expr
-		}
-	}
-
-	// Átomos genéricos (lowercase identifiers que não são tipos built-in)
-	if type_expr.len > 0 && type_expr[0] >= `a` && type_expr[0] <= `z` {
-		return TypeInfo{
-			generic: 'atom'
-			value:   type_expr
-		}
-	}
-
-	// Default case - unknown type
+// Create TypeInfo for basic types
+pub fn typeinfo_integer() TypeInfo {
 	return TypeInfo{
-		generic: 'unknown'
+		generic: 'integer'
 		value:   none
+		values:  []
+	}
+}
+
+pub fn typeinfo_float() TypeInfo {
+	return TypeInfo{
+		generic: 'float'
+		value:   none
+		values:  []
+	}
+}
+
+pub fn typeinfo_string() TypeInfo {
+	return TypeInfo{
+		generic: 'string'
+		value:   none
+		values:  []
+	}
+}
+
+pub fn typeinfo_boolean() TypeInfo {
+	return TypeInfo{
+		generic: 'boolean'
+		value:   none
+		values:  []
+	}
+}
+
+pub fn typeinfo_atom() TypeInfo {
+	return TypeInfo{
+		generic: 'atom'
+		value:   none
+		values:  []
+	}
+}
+
+pub fn typeinfo_nil() TypeInfo {
+	return TypeInfo{
+		generic: 'nil'
+		value:   none
+		values:  []
+	}
+}
+
+pub fn typeinfo_any() TypeInfo {
+	return TypeInfo{
+		generic: 'any'
+		value:   none
+		values:  []
+	}
+}
+
+// Create TypeInfo for specific values
+pub fn typeinfo_integer_value(value int) TypeInfo {
+	return TypeInfo{
+		generic: 'integer'
+		value:   value.str()
+		values:  []
+	}
+}
+
+pub fn typeinfo_atom_value(value string) TypeInfo {
+	return TypeInfo{
+		generic: 'atom'
+		value:   value
+		values:  []
+	}
+}
+
+pub fn typeinfo_string_value(value string) TypeInfo {
+	return TypeInfo{
+		generic: 'string'
+		value:   value
+		values:  []
+	}
+}
+
+pub fn typeinfo_boolean_value(value bool) TypeInfo {
+	return TypeInfo{
+		generic: 'boolean'
+		value:   value.str()
+		values:  []
+	}
+}
+
+// Create TypeInfo for complex types
+pub fn typeinfo_union(types []TypeInfo) TypeInfo {
+	return TypeInfo{
+		generic: 'union'
+		value:   none
+		values:  types
+	}
+}
+
+pub fn typeinfo_list(element_type TypeInfo) TypeInfo {
+	return TypeInfo{
+		generic: 'list'
+		value:   none
+		values:  [element_type]
+	}
+}
+
+pub fn typeinfo_map(key_type TypeInfo, value_type TypeInfo) TypeInfo {
+	return TypeInfo{
+		generic: 'map'
+		value:   none
+		values:  [key_type, value_type]
+	}
+}
+
+pub fn typeinfo_tuple(element_types []TypeInfo) TypeInfo {
+	return TypeInfo{
+		generic: 'tuple'
+		value:   none
+		values:  element_types
+	}
+}
+
+pub fn typeinfo_record(name string) TypeInfo {
+	return TypeInfo{
+		generic: 'record'
+		value:   name
+		values:  []
 	}
 }
 
@@ -243,6 +202,7 @@ pub fn typeinfo_from_tuple(tuple_type string) TypeInfo {
 	return TypeInfo{
 		generic: 'tuple'
 		value:   tuple_type
+		values:  []
 	}
 }
 
@@ -339,10 +299,11 @@ pub fn list_types_are_compatible(list1 string, list2 string) bool {
 	elem_type1 := extract_list_element_type(list1)
 	elem_type2 := extract_list_element_type(list2)
 
-	type1 := typeinfo_from_str(elem_type1)
-	type2 := typeinfo_from_str(elem_type2)
+	// Create TypeInfo directly instead of using typeinfo_from_str
+	elem_type_info1 := typeinfo_from_list_string(elem_type1)
+	elem_type_info2 := typeinfo_from_list_string(elem_type2)
 
-	return types_are_compatible(type1, type2)
+	return types_are_compatible(elem_type_info1, elem_type_info2)
 }
 
 pub fn map_types_are_compatible(map1 string, map2 string) bool {
@@ -354,10 +315,11 @@ pub fn map_types_are_compatible(map1 string, map2 string) bool {
 		return false
 	}
 
-	key_type1 := typeinfo_from_str(key_val1[0])
-	key_type2 := typeinfo_from_str(key_val2[0])
-	val_type1 := typeinfo_from_str(key_val1[1])
-	val_type2 := typeinfo_from_str(key_val2[1])
+	// Create TypeInfo directly instead of using typeinfo_from_str
+	key_type1 := typeinfo_from_basic_string(key_val1[0])
+	key_type2 := typeinfo_from_basic_string(key_val2[0])
+	val_type1 := typeinfo_from_basic_string(key_val1[1])
+	val_type2 := typeinfo_from_basic_string(key_val2[1])
 
 	return types_are_compatible(key_type1, key_type2) && types_are_compatible(val_type1, val_type2)
 }
@@ -382,6 +344,25 @@ pub fn extract_map_key_value_types(map_type string) []string {
 	return ['any', 'any']
 }
 
+// Helper functions to create TypeInfo from basic strings (for legacy compatibility)
+pub fn typeinfo_from_basic_string(type_str string) TypeInfo {
+	match type_str {
+		'integer', 'integer()' { return typeinfo_integer() }
+		'float', 'float()' { return typeinfo_float() }
+		'string', 'string()' { return typeinfo_string() }
+		'boolean', 'boolean()' { return typeinfo_boolean() }
+		'atom', 'atom()' { return typeinfo_atom() }
+		'nil' { return typeinfo_nil() }
+		'any', 'any()' { return typeinfo_any() }
+		else { return typeinfo_any() }
+	}
+}
+
+fn typeinfo_from_list_string(element_type_str string) TypeInfo {
+	element_type := typeinfo_from_basic_string(element_type_str)
+	return typeinfo_list(element_type)
+}
+
 // Basic conversion functions (without external dependencies)
 pub fn typeinfo_to_string(ti TypeInfo) string {
 	return ti.str()
@@ -391,40 +372,26 @@ pub fn typeinfo_to_string(ti TypeInfo) string {
 pub fn typeinfo_from_literal(literal ast.Literal) TypeInfo {
 	match literal {
 		ast.IntegerLiteral {
-			return TypeInfo{
-				generic: 'integer'
-				value:   literal.value.str()
-			}
+			return typeinfo_integer_value(literal.value)
 		}
 		ast.FloatLiteral {
 			return TypeInfo{
 				generic: 'float'
 				value:   literal.value.str()
+				values:  []
 			}
 		}
 		ast.StringLiteral {
-			return TypeInfo{
-				generic: 'string'
-				value:   '"${literal.value}"'
-			}
+			return typeinfo_string_value(literal.value)
 		}
 		ast.BooleanLiteral {
-			return TypeInfo{
-				generic: 'boolean'
-				value:   literal.value.str()
-			}
+			return typeinfo_boolean_value(literal.value)
 		}
 		ast.AtomLiteral {
-			return TypeInfo{
-				generic: 'atom'
-				value:   literal.value
-			}
+			return typeinfo_atom_value(literal.value)
 		}
 		ast.NilLiteral {
-			return TypeInfo{
-				generic: 'nil'
-				value:   none
-			}
+			return typeinfo_nil()
 		}
 	}
 }

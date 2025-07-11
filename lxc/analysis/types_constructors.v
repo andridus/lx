@@ -1,4 +1,4 @@
-module analysis1
+module analysis
 
 pub const integer_type = TypeConstructor{
 	name:       'integer'

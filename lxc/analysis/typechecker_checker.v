@@ -1,4 +1,4 @@
-module analysis1
+module analysis
 
 import ast
 import errors
@@ -21,17 +21,30 @@ pub fn new_type_checker() TypeChecker {
 	}
 }
 
-pub fn (mut tc TypeChecker) check_module(module_stmt ast.ModuleStmt) TypeCheckResult {
-	mut ctx := new_type_context()
-	tc.context = &ctx
-	tc.errors = []
-	tc.warnings = []
+// Nova função: faz uma primeira passagem para coletar tipos de retorno de todas as funções
+pub fn (mut tc TypeChecker) precollect_function_return_types(functions []ast.FunctionStmt) {
+	for stmt in functions {
+		for clause in stmt.clauses {
+			arity := clause.parameters.len
+			ret_type := tc.expression_checker.infer_expression_type_info(clause.body)
+			tc.context.store_function_return_type(stmt.name, arity, ret_type)
+		}
+	}
+}
 
-	// Check all statements in the module
-	for stmt in module_stmt.statements {
+// Modificar check_module para chamar a precollect antes de checar funções
+pub fn (mut tc TypeChecker) check_module(mod_stmt ast.ModuleStmt) TypeCheckResult {
+	// Filtrar apenas FunctionStmt
+	mut functions := []ast.FunctionStmt{}
+	for stmt in mod_stmt.statements {
+		if stmt is ast.FunctionStmt {
+			functions << (stmt as ast.FunctionStmt)
+		}
+	}
+	tc.precollect_function_return_types(functions)
+	for stmt in mod_stmt.statements {
 		tc.check_statement(stmt)
 	}
-
 	return TypeCheckResult{
 		context:  tc.context
 		errors:   tc.errors
@@ -64,7 +77,11 @@ fn (mut tc TypeChecker) check_expression_statement(stmt ast.ExprStmt) {
 }
 
 fn (mut tc TypeChecker) check_function_statement(stmt ast.FunctionStmt) {
-	// Group clauses by arity for proper type handling
+	// First pass: infer and store return types for all functions
+	// Removed first pass to avoid interference with variable bindings
+
+	// Second pass: check function bodies with proper type context
+	// Group clauses by arity to share context
 	mut clauses_by_arity := map[int][]ast.FunctionClause{}
 	for clause in stmt.clauses {
 		arity := clause.parameters.len
@@ -74,106 +91,78 @@ fn (mut tc TypeChecker) check_function_statement(stmt ast.FunctionStmt) {
 		clauses_by_arity[arity] << clause
 	}
 
-	// Process each arity group
+	// Process each arity group with shared context
 	for arity, clauses in clauses_by_arity {
-		// Coletar todos os tipos dos parâmetros de todos os heads
-		mut all_param_types := [][]TypeInfo{}
-		mut return_types := []TypeInfo{}
+		// Create shared context for this arity
+		function_context := tc.context.enter_function('${stmt.name}_${arity}')
+		c := &function_context
+		tc.context = c
+
+		// First pass: bind all parameters for this arity
 		for clause in clauses {
-			// Enter function context
-			function_context := tc.context.enter_function(stmt.name)
-			tc.context = &function_context
-
-			// Bind parameters to context e coletar tipos
-			mut param_types := []TypeInfo{}
-			for param in clause.parameters {
-				param_type := tc.check_pattern_and_get_type(param)
-				param_types << param_type
-			}
-			all_param_types << param_types
-
-			// Check function body
-			tc.expression_checker.check_expression(clause.body)
-			tc.errors << tc.expression_checker.errors
-			tc.expression_checker.errors = []
-
-			// Exit function context
-			if mut parent := tc.context.exit_function() {
-				tc.context = parent
-			}
-
-			return_types << tc.expression_checker.infer_expression_type_info(clause.body)
+			tc.bind_parameters_only(clause, stmt.name, arity)
 		}
 
-		// Unificar tipos dos parâmetros por posição
-		mut param_unions := []TypeInfo{}
-		if all_param_types.len > 0 {
-			for i in 0 .. all_param_types[0].len {
-				mut types_at_pos := []TypeInfo{}
-				for pt in all_param_types {
-					if i < pt.len {
-						types_at_pos << pt[i]
-					}
-				}
-				// Unir tipos distintos
-				mut unique_types := []string{}
-				mut unique_typeinfos := []TypeInfo{}
-				for t in types_at_pos {
-					if t.str() !in unique_types {
-						unique_types << t.str()
-						unique_typeinfos << t
-					}
-				}
-				if unique_typeinfos.len == 1 {
-					param_unions << unique_typeinfos[0]
-				} else {
-					// Criar union
-					union_str := unique_typeinfos.map(fn (t TypeInfo) string {
-						if t.generic == 'string' { return 'binary()'
-						 } else { return t.generic + '()'
-						 }
-					}).join(' | ')
-					param_unions << TypeInfo{
-						generic: 'union'
-						value:   union_str
-					}
-				}
-			}
+		// Second pass: check function bodies and infer return types
+		for clause in clauses {
+			tc.check_function_body_only(clause, stmt.name, arity)
 		}
-		tc.context.function_param_types['${stmt.name}/${arity}/params'] = param_unions
 
-		// Unificar tipos de retorno (como antes)
-		mut base_types := []string{}
-		for t in return_types {
-			if t.generic !in base_types {
-				base_types << t.generic
+		// Exit function context and propagate to parent
+		if mut parent := tc.context.exit_function() {
+			// Propagar function_param_types do filho para o pai
+			for k, v in tc.context.function_param_types {
+				parent.function_param_types[k] = v
 			}
-		}
-		if base_types.len == 1 {
-			tc.context.store_function_return_type(stmt.name, arity, return_types[0])
-		} else {
-			mut union_parts := []string{}
-			for bt in base_types {
-				if bt == 'string' {
-					union_parts << 'binary()'
-				} else {
-					union_parts << bt + '()'
-				}
+			// Propagar function_return_types do filho para o pai
+			for k, v in tc.context.function_return_types {
+				parent.function_return_types[k] = v
 			}
-			union_str := union_parts.join(' | ')
-			tc.context.store_function_return_type(stmt.name, arity, TypeInfo{
-				generic: 'union'
-				value:   union_str
-			})
+			// Propagar bindings do filho para o pai
+			for k, v in tc.context.bindings {
+				parent.bindings[k] = v
+			}
+			tc.context = parent
 		}
 	}
 }
 
 fn (mut tc TypeChecker) check_function_clause_with_name(clause ast.FunctionClause, fn_name string, arity int) {
-	// Enter function context
-	function_context := tc.context.enter_function(fn_name)
-	tc.context = &function_context
+	// Bind parameters to context and collect their types FIRST
+	mut param_types := []TypeInfo{}
+	for param in clause.parameters {
+		param_type := tc.check_pattern_and_get_type(param)
+		param_types << param_type
+	}
 
+	// Store parameter types for union generation
+	tc.context.merge_function_param_types(fn_name, arity, param_types)
+
+	// Check function body
+	println('DEBUG: Checking function body for ${fn_name}/${arity}')
+	tc.expression_checker.check_expression(clause.body)
+	tc.errors << tc.expression_checker.errors
+	tc.expression_checker.errors = []
+
+	// Atualizar o tipo de retorno da função após checagem real do corpo
+	println('DEBUG: Inferring return type for ${fn_name}/${arity}')
+	return_type := tc.expression_checker.infer_expression_type_info(clause.body)
+	println('DEBUG: Inferred return type: ${return_type.str()}')
+	tc.context.merge_function_return_type(fn_name, arity, return_type)
+
+	// Validate return type if specified
+	if return_type_expr := clause.return_type {
+		expected_type := tc.type_expr_to_type_info(return_type_expr)
+		actual_type := tc.expression_checker.infer_expression_type_info(clause.body)
+
+		if !types_are_compatible(expected_type, actual_type) {
+			tc.report_error('Function return type mismatch: expected ${expected_type.str()}, got ${actual_type.str()}',
+				'Make sure the function body returns the declared type', clause.body.position)
+		}
+	}
+}
+
+fn (mut tc TypeChecker) bind_parameters_only(clause ast.FunctionClause, fn_name string, arity int) {
 	// Bind parameters to context and collect their types
 	mut param_types := []TypeInfo{}
 	for param in clause.parameters {
@@ -181,27 +170,26 @@ fn (mut tc TypeChecker) check_function_clause_with_name(clause ast.FunctionClaus
 		param_types << param_type
 	}
 
-	// Check function body
-	tc.expression_checker.check_expression(clause.body)
-	tc.errors << tc.expression_checker.errors
-	tc.expression_checker.errors = []
-
 	// Store parameter types for union generation
 	tc.context.merge_function_param_types(fn_name, arity, param_types)
+}
 
-	// Exit function context
-	if mut parent := tc.context.exit_function() {
-		// Propagar function_param_types do filho para o pai
-		for k, v in tc.context.function_param_types {
-			parent.function_param_types[k] = v
-		}
-		tc.context = parent
-	}
+fn (mut tc TypeChecker) check_function_body_only(clause ast.FunctionClause, fn_name string, arity int) {
+	// Check function body
+
+	// Create a new ExpressionChecker with the correct context
+	mut ec := analysis.new_expression_checker(tc.context)
+	ec.check_expression(clause.body)
+	tc.errors << ec.errors
+
+	// Atualizar o tipo de retorno da função após checagem real do corpo
+	return_type := ec.infer_expression_type_info(clause.body)
+	tc.context.merge_function_return_type(fn_name, arity, return_type)
 
 	// Validate return type if specified
 	if return_type_expr := clause.return_type {
 		expected_type := tc.type_expr_to_type_info(return_type_expr)
-		actual_type := tc.expression_checker.infer_expression_type_info(clause.body)
+		actual_type := ec.infer_expression_type_info(clause.body)
 
 		if !types_are_compatible(expected_type, actual_type) {
 			tc.report_error('Function return type mismatch: expected ${expected_type.str()}, got ${actual_type.str()}',
@@ -220,90 +208,58 @@ fn (mut tc TypeChecker) check_pattern_and_get_type(pattern ast.Pattern) TypeInfo
 				tc.context.bind(pattern.name, type_info, pattern.position)
 				return type_info
 			} else {
-				type_info := TypeInfo{
-					generic: 'any'
-					value:   none
-				}
+				type_info := typeinfo_any()
 				tc.context.bind(pattern.name, type_info, pattern.position)
 				return type_info
 			}
 		}
 		ast.AtomPattern {
-			return TypeInfo{
-				generic: 'atom'
-				value:   pattern.value
-			}
+			return typeinfo_atom_value(pattern.value)
 		}
 		ast.LiteralPattern {
 			return typeinfo_from_literal(pattern.value)
 		}
 		ast.TuplePattern {
-			mut element_types := []string{}
+			mut element_types := []TypeInfo{}
 			for element in pattern.elements {
 				element_type := tc.check_pattern_and_get_type(element)
-				element_types << element_type.str()
+				element_types << element_type
 			}
-			return TypeInfo{
-				generic: 'tuple'
-				value:   '{${element_types.join(', ')}}'
-			}
+			return typeinfo_tuple(element_types)
 		}
 		ast.ListLiteralPattern {
 			if pattern.elements.len == 0 {
-				return TypeInfo{
-					generic: 'list'
-					value:   'list(any)'
-				}
+				return typeinfo_list(typeinfo_any())
 			}
 			first_type := tc.check_pattern_and_get_type(pattern.elements[0])
-			return TypeInfo{
-				generic: 'list'
-				value:   'list(${first_type.str()})'
-			}
+			return typeinfo_list(first_type)
 		}
 		ast.ListConsPattern {
 			head_type := tc.check_pattern_and_get_type(pattern.head)
-			return TypeInfo{
-				generic: 'list'
-				value:   'list(${head_type.str()})'
-			}
+			return typeinfo_list(head_type)
 		}
 		ast.ListEmptyPattern {
-			return TypeInfo{
-				generic: 'list'
-				value:   'list(any)'
-			}
+			return typeinfo_list(typeinfo_any())
 		}
 		ast.MapPattern {
-			return TypeInfo{
-				generic: 'map'
-				value:   'map(any=>any)'
-			}
+			return typeinfo_map(typeinfo_any(), typeinfo_any())
 		}
 		ast.RecordPattern {
-			return TypeInfo{
-				generic: 'record'
-				value:   'record'
-			}
+			return typeinfo_record('record')
 		}
 		ast.BinaryPattern {
 			return TypeInfo{
 				generic: 'bitstring'
 				value:   none
+				values:  []
 			}
 		}
 		ast.WildcardPattern {
-			return TypeInfo{
-				generic: 'any'
-				value:   none
-			}
+			return typeinfo_any()
 		}
 	}
 	// Default return in case no match (should not happen)
-	return TypeInfo{
-		generic: 'any'
-		value:   none
-	}
+	return typeinfo_any()
 }
 
 // Mantém a função original para compatibilidade
@@ -434,40 +390,53 @@ pub fn (mut tc TypeChecker) types_are_compatible(type1 TypeExpr, type2 TypeExpr)
 fn (mut tc TypeChecker) type_expr_to_type_info(type_expr ast.TypeExpression) TypeInfo {
 	return match type_expr {
 		ast.SimpleTypeExpr {
-			// Use the existing typeinfo_from_str function for dynamic detection
-			typeinfo_from_str(type_expr.name)
+			match type_expr.name {
+				'integer' { typeinfo_integer() }
+				'float' { typeinfo_float() }
+				'string' { typeinfo_string() }
+				'boolean' { typeinfo_boolean() }
+				'atom' { typeinfo_atom() }
+				'nil' { typeinfo_nil() }
+				'any' { typeinfo_any() }
+				else {
+					if type_expr.name.len > 0 && type_expr.name[0].is_capital() {
+						typeinfo_record(type_expr.name)
+					} else {
+						typeinfo_atom_value(type_expr.name)
+					}
+				}
+			}
 		}
-		ast.TupleTypeExpr {
-			mut element_types := []string{}
-			for elem in type_expr.element_types {
-				elem_info := tc.type_expr_to_type_info(elem)
-				element_types << elem_info.str()
-			}
-			TypeInfo{
-				generic: 'tuple'
-				value:   '{${element_types.join(', ')}}'
-			}
+		ast.UnionTypeExpr {
+			types := type_expr.types.map(tc.type_expr_to_type_info(it))
+			typeinfo_union(types)
 		}
 		ast.ListTypeExpr {
-			elem_info := tc.type_expr_to_type_info(type_expr.element_type)
-			TypeInfo{
-				generic: 'list'
-				value:   'list(${elem_info.str()})'
-			}
+			element_type := tc.type_expr_to_type_info(type_expr.element_type)
+			typeinfo_list(element_type)
+		}
+		ast.TupleTypeExpr {
+			element_types := type_expr.element_types.map(tc.type_expr_to_type_info(it))
+			typeinfo_tuple(element_types)
 		}
 		ast.MapTypeExpr {
-			key_info := tc.type_expr_to_type_info(type_expr.key_type)
-			value_info := tc.type_expr_to_type_info(type_expr.value_type)
+			key_type := tc.type_expr_to_type_info(type_expr.key_type)
+			value_type := tc.type_expr_to_type_info(type_expr.value_type)
+			typeinfo_map(key_type, value_type)
+		}
+		ast.FunctionTypeExpr {
+			return_type := tc.type_expr_to_type_info(type_expr.return_type)
 			TypeInfo{
-				generic: 'map'
-				value:   'map(${key_info.str()}=>${value_info.str()})'
+				generic: 'union'
+				value:   none
+				values:  [return_type]
 			}
 		}
-		else {
-			TypeInfo{
-				generic: 'any'
-				value:   none
-			}
+		ast.VariableTypeExpr {
+			typeinfo_atom_value(type_expr.name)
+		}
+		ast.RecordTypeExpr {
+			typeinfo_record(type_expr.name)
 		}
 	}
 }

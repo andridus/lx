@@ -1,4 +1,4 @@
-module analysis1
+module analysis
 
 import ast
 

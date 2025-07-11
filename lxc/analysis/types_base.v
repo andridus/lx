@@ -1,4 +1,4 @@
-module analysis1
+module analysis
 
 import ast
 
@@ -115,12 +115,12 @@ pub fn (mut tc TypeContext) bind(name string, type_info TypeInfo, position ast.P
 
 // Legacy function for backwards compatibility - simplified without external dependencies
 pub fn (mut tc TypeContext) bind_string(name string, type_str string, position ast.Position) {
-	type_info := typeinfo_from_str(type_str)
+	type_info := typeinfo_from_basic_string(type_str)
 	tc.bind(name, type_info, position)
 }
 
 pub fn (tc &TypeContext) enter_function(name string) TypeContext {
-	new_context := TypeContext{
+	mut new_context := TypeContext{
 		bindings:              map[string]TypeBinding{}
 		type_aliases:          map[string]TypeExpr{}
 		record_types:          map[string]string{}
@@ -130,6 +130,17 @@ pub fn (tc &TypeContext) enter_function(name string) TypeContext {
 		function_return_types: map[string]TypeInfo{}
 		function_param_types:  map[string][]TypeInfo{}
 	}
+
+	// Copy function return types from parent context
+	for key, value in tc.function_return_types {
+		new_context.function_return_types[key] = value
+	}
+
+	// Copy function param types from parent context
+	for key, value in tc.function_param_types {
+		new_context.function_param_types[key] = value
+	}
+
 	return new_context
 }
 
@@ -184,10 +195,13 @@ pub fn (mut tc TypeContext) store_function_return_type(func_name string, arity i
 	tc.function_return_types[key] = return_type
 }
 
-// Get function return type
+// get_function_return_type gets the return type for a function
 pub fn (tc &TypeContext) get_function_return_type(func_name string, arity int) ?TypeInfo {
 	key := '${func_name}/${arity}'
-	return tc.function_return_types[key]
+	if type_info := tc.function_return_types[key] {
+		return type_info
+	}
+	return none
 }
 
 // Store function parameter types for union generation
@@ -228,16 +242,46 @@ pub fn (mut tc TypeContext) merge_function_param_types(func_name string, arity i
 	}
 }
 
+// Merge return types to create unions
+pub fn (mut tc TypeContext) merge_function_return_type(func_name string, arity int, new_return_type TypeInfo) {
+	key := '${func_name}/${arity}'
+	if existing := tc.function_return_types[key] {
+		// Special case: if existing is 'any', replace with new type
+		if existing.generic == 'any' {
+			tc.function_return_types[key] = new_return_type
+		} else {
+			// Create union of existing and new return type
+			union_type := create_union_type(existing, new_return_type)
+			tc.function_return_types[key] = union_type
+		}
+	} else {
+		// First time storing return type for this function/arity
+		tc.function_return_types[key] = new_return_type
+	}
+}
+
 // Create union type from two types
-fn create_union_type(type1 TypeInfo, type2 TypeInfo) TypeInfo {
+pub fn create_union_type(type1 TypeInfo, type2 TypeInfo) TypeInfo {
 	if types_are_compatible(type1, type2) {
 		return type1 // If compatible, return the first type
 	}
-	// Create union type
-	union_str := '${type1.str()} | ${type2.str()}'
+	// Cria union usando o campo values corretamente
+	mut types := []TypeInfo{}
+	// Se type1 já é union, concatena
+	if type1.generic == 'union' {
+		types << type1.values
+	} else {
+		types << type1
+	}
+	if type2.generic == 'union' {
+		types << type2.values
+	} else {
+		types << type2
+	}
 	return TypeInfo{
 		generic: 'union'
-		value:   union_str
+		value:   none
+		values:  types
 	}
 }
 

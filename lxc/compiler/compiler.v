@@ -5,7 +5,7 @@ import frontend.parser
 import os
 import ast
 import errors
-import analysis1
+import analysis
 import backend.codegen
 import backend.erlang
 
@@ -115,7 +115,7 @@ pub fn (mut comp Compiler) compile(source string, file_path string) codegen.Code
 	}
 
 	// Use the new refactored analysis module
-	mut analyzer := analysis1.new_analyzer()
+	mut analyzer := analysis.new_analyzer()
 	analysis_result := analyzer.analyze_module(module_stmt0)
 
 	if analysis_result.errors.len > 0 {

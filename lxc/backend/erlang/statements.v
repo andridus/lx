@@ -1,7 +1,7 @@
 module erlang
 
 import ast
-import analysis1
+import analysis
 
 // generate_statement generates code for a single statement
 pub fn (mut gen ErlangGenerator) generate_statement(stmt ast.Stmt) string {
@@ -174,22 +174,12 @@ fn (mut gen ErlangGenerator) generate_match_rescue_with_continuation(expr ast.Ma
 	return 'case ${value} of\n    ${pattern} ->\n${formatted_success_code};\n    ${rescue_var} ->\n        ${rescue_body}\nend'
 }
 
-// get_function_return_type gets the return type from the type context
-fn (gen ErlangGenerator) get_function_return_type(clause ast.FunctionClause, func_name string, arity int) string {
-	if clause.return_type != none {
-		return gen.generate_type_expression(clause.return_type)
-	}
-
-	// Try to get the inferred type from the type context
+// get_function_return_type gets the return type for a function from the context
+fn (gen ErlangGenerator) get_function_return_type(fn_name string, arity int) ?analysis.TypeInfo {
 	if type_ctx := gen.type_context {
-		if expr_type := type_ctx.get_function_return_type(func_name, arity) {
-			erlang_type := gen.typeinfo_to_erlang_type(expr_type)
-			return erlang_type
-		}
+		return type_ctx.get_function_return_type(fn_name, arity)
 	}
-
-	// Fallback to 'any()' if no explicit return type and no inferred type
-	return 'any()'
+	return none
 }
 
 // Get function parameter types with unions
@@ -210,52 +200,44 @@ fn (gen ErlangGenerator) get_function_param_types(func_name string, arity int) [
 }
 
 // get_expression_type gets the type from the type context
-fn (gen ErlangGenerator) get_expression_type(expr ast.Expr) string {
+fn (gen ErlangGenerator) get_expression_type(expr ast.Expr) analysis.TypeInfo {
 	// Get type from the type context
 	if type_ctx := gen.type_context {
 		if expr_type := type_ctx.get_expression_type(expr) {
-			// Convert TypeInfo to string representation
-			return expr_type.str()
+			return expr_type
 		}
 	}
 
-	// If no type information available, this is an error - type checker should have caught this
-	panic('No type found for expression')
+	// If no type information available, return any
+	return analysis.typeinfo_any()
 }
 
 // get_literal_type gets the type of a literal
-fn (gen ErlangGenerator) get_literal_type(literal ast.Literal) string {
-	return match literal {
-		ast.IntegerLiteral { 'integer()' }
-		ast.FloatLiteral { 'float()' }
-		ast.StringLiteral { 'string()' }
-		ast.BooleanLiteral { 'boolean()' }
-		ast.AtomLiteral { 'atom()' }
-		ast.NilLiteral { 'nil' }
-	}
+fn (gen ErlangGenerator) get_literal_type(literal ast.Literal) analysis.TypeInfo {
+	return analysis.typeinfo_from_literal(literal)
 }
 
 // get_binary_expression_type gets the type of a binary expression
-fn (gen ErlangGenerator) get_binary_expression_type(expr ast.BinaryExpr) string {
+fn (gen ErlangGenerator) get_binary_expression_type(expr ast.BinaryExpr) analysis.TypeInfo {
 	left_type := gen.get_expression_type(expr.left)
 	right_type := gen.get_expression_type(expr.right)
 
 	match expr.op {
 		.add, .subtract, .multiply, .divide, .modulo, .power {
 			// Arithmetic operations
-			if left_type == 'float()' || right_type == 'float()' {
-				return 'float()'
+			if left_type.generic == 'float' || right_type.generic == 'float' {
+				return analysis.typeinfo_float()
 			}
-			return 'integer()'
+			return analysis.typeinfo_integer()
 		}
 		.and, .or {
-			return 'boolean()'
+			return analysis.typeinfo_boolean()
 		}
 		.equal, .not_equal, .less_than, .less_equal, .greater_than, .greater_equal {
-			return 'boolean()'
+			return analysis.typeinfo_boolean()
 		}
 		else {
-			panic('Unknown binary operator')
+			return analysis.typeinfo_any()
 		}
 	}
 }
@@ -294,14 +276,20 @@ pub fn (mut gen ErlangGenerator) generate_function(func ast.FunctionStmt) string
 		// Get parameter types with unions
 		param_types := gen.get_function_param_types(func.name, arity)
 
-		// Use explicit return type if defined, otherwise use type do contexto
-		mut return_type := ''
+		// Gerar o tipo de retorno a partir do TypeInfo
+		mut return_type := analysis.typeinfo_any()
 		if first_clause.return_type != none {
-			return_type = gen.generate_type_expression(first_clause.return_type)
+			return_type = gen.type_expr_to_typeinfo(first_clause.return_type)
 		} else {
-			return_type = gen.get_function_return_type(first_clause, func.name, arity)
+			if type_info := gen.get_function_return_type(func.name, arity) {
+				return_type = type_info
+			}
 		}
-		spec_line := '-spec ${func.name}(${param_types.join(', ')}) -> ${gen.convert_type_to_erlang_spec(return_type)}.\n'
+		mut spec_type := gen.typeinfo_to_erlang_type(return_type)
+		if spec_type.len == 0 || spec_type == '.' {
+			spec_type = 'any()'
+		}
+		spec_line := '-spec ${func.name}(${param_types.join(', ')}) -> ${spec_type}.\n'
 		// --- END SPEC GENERATION ---
 
 		for clause in clauses {
@@ -347,6 +335,22 @@ pub fn (mut gen ErlangGenerator) generate_function(func ast.FunctionStmt) string
 	gen.current_function_id = original_function_id
 
 	return function_definitions.join('')
+}
+
+// generate_function_spec generates the -spec for a function
+fn (gen ErlangGenerator) generate_function_spec(clause ast.FunctionClause, func_name string, arity int) string {
+	if clause.return_type != none {
+		return gen.generate_type_expression(clause.return_type)
+	}
+
+	// Try to get the inferred type from the type context
+	if type_info := gen.get_function_return_type(func_name, arity) {
+		erlang_type := gen.typeinfo_to_erlang_type(type_info)
+		return erlang_type
+	}
+
+	// Fallback to 'any()' if no explicit return type and no inferred type
+	return 'any()'
 }
 
 // generate_record_definition generates code for record definitions
@@ -443,140 +447,163 @@ fn (gen ErlangGenerator) generate_type_expression(type_expr ast.TypeExpression) 
 }
 
 // get_if_expression_type gets the type from the type context
-fn (gen ErlangGenerator) get_if_expression_type(expr ast.IfExpr) string {
+fn (gen ErlangGenerator) get_if_expression_type(expr ast.IfExpr) analysis.TypeInfo {
 	// Get type from the type context
 	if type_ctx := gen.type_context {
 		if expr_type := type_ctx.get_expression_type(expr) {
-			return expr_type.str()
+			return expr_type
 		}
 	}
 
-	// If no type information available, this is an error - type checker should have caught this
-	panic('No type found for if expression')
+	// If no type information available, return any
+	return analysis.typeinfo_any()
 }
 
 // get_case_expression_type gets the type from the type context
-fn (gen ErlangGenerator) get_case_expression_type(expr ast.CaseExpr) string {
+fn (gen ErlangGenerator) get_case_expression_type(expr ast.CaseExpr) analysis.TypeInfo {
 	// Get type from the type context
 	if type_ctx := gen.type_context {
 		if expr_type := type_ctx.get_expression_type(expr) {
-			return gen.convert_type_to_erlang_spec(expr_type.str())
+			return expr_type
 		}
 	}
 
-	// If no type information available, this is an error - type checker should have caught this
-	panic('No type found for case expression')
+	// If no type information available, return any
+	return analysis.typeinfo_any()
+}
+
+// type_expr_to_typeinfo converts TypeExpression to TypeInfo
+fn (gen ErlangGenerator) type_expr_to_typeinfo(type_expr ast.TypeExpression) analysis.TypeInfo {
+	return match type_expr {
+		ast.SimpleTypeExpr {
+			match type_expr.name {
+				'integer' { analysis.typeinfo_integer() }
+				'float' { analysis.typeinfo_float() }
+				'string' { analysis.typeinfo_string() }
+				'boolean' { analysis.typeinfo_boolean() }
+				'atom' { analysis.typeinfo_atom() }
+				'nil' { analysis.typeinfo_nil() }
+				'any' { analysis.typeinfo_any() }
+				else {
+					if type_expr.name.len > 0 && type_expr.name[0].is_capital() {
+						analysis.typeinfo_record(type_expr.name)
+					} else {
+						analysis.typeinfo_atom_value(type_expr.name)
+					}
+				}
+			}
+		}
+		ast.UnionTypeExpr {
+			types := type_expr.types.map(gen.type_expr_to_typeinfo(it))
+			analysis.typeinfo_union(types)
+		}
+		ast.ListTypeExpr {
+			element_type := gen.type_expr_to_typeinfo(type_expr.element_type)
+			analysis.typeinfo_list(element_type)
+		}
+		ast.TupleTypeExpr {
+			element_types := type_expr.element_types.map(gen.type_expr_to_typeinfo(it))
+			analysis.typeinfo_tuple(element_types)
+		}
+		ast.MapTypeExpr {
+			key_type := gen.type_expr_to_typeinfo(type_expr.key_type)
+			value_type := gen.type_expr_to_typeinfo(type_expr.value_type)
+			analysis.typeinfo_map(key_type, value_type)
+		}
+		ast.FunctionTypeExpr {
+			// param_types := type_expr.param_types.map(gen.type_expr_to_typeinfo(it))
+			return_type := gen.type_expr_to_typeinfo(type_expr.return_type)
+			analysis.TypeInfo{
+				generic: 'function'
+				value:   none
+				values:  [return_type]
+			}
+		}
+		ast.VariableTypeExpr {
+			analysis.typeinfo_atom_value(type_expr.name)
+		}
+		ast.RecordTypeExpr {
+			analysis.typeinfo_record(type_expr.name)
+		}
+	}
 }
 
 // convert_type_to_erlang_spec converts type strings to proper Erlang spec format
+// This function is now deprecated e delega para typeinfo_to_erlang_type
 fn (gen ErlangGenerator) convert_type_to_erlang_spec(type_str string) string {
-	// Handle union types like "integer(20) | integer(1) | integer(0)"
-	if type_str.contains(' | ') {
-		parts := type_str.split(' | ')
-		converted_parts := parts.map(gen.convert_single_type_to_erlang_spec(it.trim_space()))
-
-		// Detect if all parts are literals of the same base type (e.g., integer)
-		mut base_types := []string{}
-		mut literal_count := 0
-		for p in parts {
-			if p.contains('(') && p.ends_with(')') {
-				open_paren := p.index('(') or { continue }
-				base_types << p[..open_paren]
-				literal_count++
-			}
-		}
-		if base_types.len == parts.len && base_types.all(it == base_types[0]) && parts.len >= 3 {
-			// All are literals of the same type and there are 3 or more: use the generic type
-			return base_types[0] + '()'
-		}
-
-		return converted_parts.join(' | ')
-	}
-	return gen.convert_single_type_to_erlang_spec(type_str)
-}
-
-// convert_single_type_to_erlang_spec converts a single type to Erlang spec format
-fn (gen ErlangGenerator) convert_single_type_to_erlang_spec(type_str string) string {
-	// Handle types with literal values like "integer(20)" -> "20", "atom(ok)" -> "ok", etc.
-	if type_str.contains('(') && type_str.ends_with(')') {
-		open_paren := type_str.index('(') or { return type_str }
-		close_paren := type_str.last_index(')') or { return type_str }
-		if open_paren < close_paren {
-			literal_value := type_str[open_paren + 1..close_paren]
-			return literal_value
-		}
-	}
-	return type_str
+	// For legacy compatibility, create a TypeInfo from the string and convert it
+	type_info := analysis.typeinfo_from_basic_string(type_str)
+	return gen.typeinfo_to_erlang_type(type_info)
 }
 
 // get_with_expression_type gets the type from the type context
-fn (gen ErlangGenerator) get_with_expression_type(expr ast.WithExpr) string {
+fn (gen ErlangGenerator) get_with_expression_type(expr ast.WithExpr) analysis.TypeInfo {
 	// Get type from the type context
 	if type_ctx := gen.type_context {
 		if expr_type := type_ctx.get_expression_type(expr) {
-			return expr_type.str()
+			return expr_type
 		}
 	}
 
-	// If no type information available, this is an error - type checker should have caught this
-	panic('No type found for with expression')
+	// If no type information available, return any
+	return analysis.typeinfo_any()
 }
 
 // get_block_type gets the type from the type context
-fn (gen ErlangGenerator) get_block_type(block ast.BlockExpr) string {
+fn (gen ErlangGenerator) get_block_type(block ast.BlockExpr) analysis.TypeInfo {
 	// Get type from the type context
 	if type_ctx := gen.type_context {
 		if block.body.len > 0 {
 			last_stmt := block.body[block.body.len - 1]
 			if last_stmt is ast.ExprStmt {
 				if expr_type := type_ctx.get_expression_type(last_stmt.expr) {
-					return expr_type.str()
+					return expr_type
 				}
 			}
 		}
 	}
 
-	// If no type information available, this is an error - type checker should have caught this
-	panic('No type found for block expression')
+	// If no type information available, return any
+	return analysis.typeinfo_any()
 }
 
 // get_map_literal_type gets the type from the type context
-fn (gen ErlangGenerator) get_map_literal_type(expr ast.MapLiteralExpr) string {
+fn (gen ErlangGenerator) get_map_literal_type(expr ast.MapLiteralExpr) analysis.TypeInfo {
 	// Get type from the type context
 	if type_ctx := gen.type_context {
 		if expr_type := type_ctx.get_expression_type(expr) {
-			return expr_type.str()
+			return expr_type
 		}
 	}
 
-	// If no type information available, this is an error - type checker should have caught this
-	panic('No type found for map literal expression')
+	// If no type information available, return any
+	return analysis.typeinfo_any()
 }
 
 // get_map_update_type gets the type from the type context
-fn (gen ErlangGenerator) get_map_update_type(expr ast.MapUpdateExpr) string {
+fn (gen ErlangGenerator) get_map_update_type(expr ast.MapUpdateExpr) analysis.TypeInfo {
 	// Get type from the type context
 	if type_ctx := gen.type_context {
 		if expr_type := type_ctx.get_expression_type(expr) {
-			return expr_type.str()
+			return expr_type
 		}
 	}
 
-	// If no type information available, this is an error - type checker should have caught this
-	panic('No type found for map update expression')
+	// If no type information available, return any
+	return analysis.typeinfo_any()
 }
 
 // get_assignment_type gets the type from the type context
-fn (gen ErlangGenerator) get_assignment_type(expr ast.AssignExpr) string {
+fn (gen ErlangGenerator) get_assignment_type(expr ast.AssignExpr) analysis.TypeInfo {
 	// Get type from the type context
 	if type_ctx := gen.type_context {
 		if expr_type := type_ctx.get_expression_type(expr) {
-			return expr_type.str()
+			return expr_type
 		}
 	}
 
-	// If no type information available, this is an error - type checker should have caught this
-	panic('No type found for assignment expression')
+	// If no type information available, return any
+	return analysis.typeinfo_any()
 }
 
 // find_common_type_for_keys finds the most appropriate common type for map keys
@@ -653,16 +680,16 @@ fn (gen ErlangGenerator) find_common_type_for_values(type1 string, type2 string)
 }
 
 // get_for_expression_type gets the type from the type context
-fn (gen ErlangGenerator) get_for_expression_type(expr ast.ForExpr) string {
+fn (gen ErlangGenerator) get_for_expression_type(expr ast.ForExpr) analysis.TypeInfo {
 	// Get type from the type context
 	if type_ctx := gen.type_context {
 		if expr_type := type_ctx.get_expression_type(expr) {
-			return expr_type.str()
+			return expr_type
 		}
 	}
 
-	// If no type information available, this is an error - type checker should have caught this
-	panic('No type found for for expression')
+	// If no type information available, return any
+	return analysis.typeinfo_any()
 }
 
 // create_typed_pattern creates a pattern with type information based on the element type
@@ -751,9 +778,9 @@ fn (gen ErlangGenerator) parse_tuple_element_types(types_str string) []string {
 }
 
 // convert_type_expr_to_spec_string converts a TypeExpr to a spec string
-fn (gen ErlangGenerator) convert_type_expr_to_spec_string(type_expr analysis1.TypeExpr) string {
+fn (gen ErlangGenerator) convert_type_expr_to_spec_string(type_expr analysis.TypeExpr) string {
 	match type_expr {
-		analysis1.TypeConstructor {
+		analysis.TypeConstructor {
 			if type_expr.parameters.len > 0 {
 				params := type_expr.parameters.map(gen.convert_type_expr_to_spec_string(it)).join(', ')
 				'${type_expr.name}(${params})'
@@ -761,7 +788,7 @@ fn (gen ErlangGenerator) convert_type_expr_to_spec_string(type_expr analysis1.Ty
 				type_expr.name
 			}
 		}
-		analysis1.FunctionType {
+		analysis.FunctionType {
 			if type_expr.parameters.len == 0 {
 				'fun(() -> ${gen.convert_type_expr_to_spec_string(type_expr.return_type)})'
 			} else {
@@ -769,10 +796,10 @@ fn (gen ErlangGenerator) convert_type_expr_to_spec_string(type_expr analysis1.Ty
 				'fun((${params}) -> ${gen.convert_type_expr_to_spec_string(type_expr.return_type)})'
 			}
 		}
-		analysis1.MapType {
+		analysis.MapType {
 			'#{${gen.convert_type_expr_to_spec_string(type_expr.key_type)} => ${gen.convert_type_expr_to_spec_string(type_expr.value_type)}}'
 		}
-		analysis1.TupleType {
+		analysis.TupleType {
 			if type_expr.elements.len == 0 {
 				'{}'
 			} else {
@@ -780,10 +807,10 @@ fn (gen ErlangGenerator) convert_type_expr_to_spec_string(type_expr analysis1.Ty
 				'{${elements}}'
 			}
 		}
-		analysis1.ListType {
+		analysis.ListType {
 			'[${gen.convert_type_expr_to_spec_string(type_expr.element_type)}]'
 		}
-		analysis1.UnionType {
+		analysis.UnionType {
 			types := type_expr.types.map(gen.convert_type_expr_to_spec_string(it)).join(' | ')
 			types
 		}
@@ -797,160 +824,157 @@ fn (gen ErlangGenerator) convert_type_expr_to_spec_string(type_expr analysis1.Ty
 // REMOVIDO: TypeInfo, parse_type_expression, parse_tuple_type, extract_tuple_elements, types_are_compatible, tuple_types_are_compatible e todos os usos relacionados.
 // O backend não deve conter nenhuma lógica de análise ou comparação de tipos.
 
-// typeinfo_to_erlang_type converts TypeInfo to Erlang type string
-fn (gen ErlangGenerator) typeinfo_to_erlang_type(type_info analysis1.TypeInfo) string {
-	match type_info.generic {
+// typeinfo_to_erlang_type converts TypeInfo directly to Erlang type string
+fn (gen ErlangGenerator) typeinfo_to_erlang_type(type_info analysis.TypeInfo) string {
+	return match type_info.generic {
 		'integer' {
-			return 'integer()'
+			if value := type_info.value {
+				value // Return literal value directly
+			} else {
+				'integer()'
+			}
 		}
 		'float' {
-			return 'float()'
+			if value := type_info.value {
+				value // Return literal value directly
+			} else {
+				'float()'
+			}
 		}
 		'string' {
-			return 'binary()' // Lx strings são binaries UTF-8
+			if value := type_info.value {
+				'"${value}"' // Return quoted string
+			} else {
+				'binary()' // Lx strings are UTF-8 binaries
+			}
 		}
 		'boolean' {
-			return 'boolean()'
+			if value := type_info.value {
+				value // Return true/false directly
+			} else {
+				'boolean()'
+			}
 		}
 		'atom' {
 			if value := type_info.value {
-				return value // Return the atom value directly (e.g., "ok", "error")
+				value // Return atom value directly
+			} else {
+				'atom()'
 			}
-			return 'atom()'
 		}
 		'nil' {
-			return 'nil'
+			'nil'
 		}
 		'any' {
-			return 'any()'
+			'any()'
 		}
 		'union' {
-			if value := type_info.value {
-				return value
+			if type_info.values.len > 0 {
+				erlang_types := type_info.values.map(gen.typeinfo_to_erlang_type(it))
+				erlang_types.join(' | ')
+			} else {
+				'any()'
 			}
-			return 'any()'
+		}
+		'list' {
+			if type_info.values.len > 0 {
+				element_type := gen.typeinfo_to_erlang_type(type_info.values[0])
+				'[${element_type}]'
+			} else {
+				'[any()]'
+			}
+		}
+		'map' {
+			if type_info.values.len >= 2 {
+				key_type := gen.typeinfo_to_erlang_type(type_info.values[0])
+				value_type := gen.typeinfo_to_erlang_type(type_info.values[1])
+				'#{${key_type} => ${value_type}}'
+			} else {
+				'#{any() => any()}'
+			}
 		}
 		'tuple' {
-			if value := type_info.value {
-				return gen.convert_tuple_type_to_erlang(value)
+			if type_info.values.len > 0 {
+				element_types := type_info.values.map(gen.typeinfo_to_erlang_type(it))
+				'{${element_types.join(', ')}}'
+			} else {
+				'{}'
 			}
-			return 'tuple()'
 		}
 		'record' {
 			if value := type_info.value {
-				return '#${value.to_lower()}{}'
+				if value.starts_with('#') {
+					value // Already in record format
+				} else {
+					'#${value.to_lower()}{}'
+				}
+			} else {
+				'#record{}'
 			}
-			return 'record()'
 		}
-		'list' {
-			if value := type_info.value {
-				return gen.convert_list_type_to_erlang(value)
+		'function' {
+			if type_info.values.len > 0 {
+				return_type := gen.typeinfo_to_erlang_type(type_info.values[0])
+				'fun(() -> ${return_type})'
+			} else {
+				'fun()'
 			}
-			return '[any()]'
 		}
-		'map' {
-			if value := type_info.value {
-				return gen.convert_map_type_to_erlang(value)
-			}
-			return '#{any() => any()}'
+		'pid' {
+			'pid()'
+		}
+		'port' {
+			'port()'
+		}
+		'reference' {
+			'reference()'
+		}
+		'bitstring' {
+			'bitstring()'
+		}
+		'fun' {
+			'fun()'
 		}
 		else {
-			return 'any()'
+			'any()'
 		}
 	}
 }
 
-// convert_union_type_to_erlang converts union type string to Erlang format
-fn (gen ErlangGenerator) convert_union_type_to_erlang(union_type string) string {
-	// Split union type by " | "
-	parts := union_type.split(' | ')
-	erlang_parts := parts.map(gen.convert_type_element_to_erlang(it))
-	return erlang_parts.join(' | ')
-}
 
-// convert_tuple_type_to_erlang converts tuple type string to Erlang format
-fn (gen ErlangGenerator) convert_tuple_type_to_erlang(tuple_type string) string {
-	// Extract elements from tuple type string
-	// Example: "{atom(ok), record(Usuario)}" -> ["atom(ok)", "record(Usuario)"]
-	elements := analysis1.extract_tuple_elements(tuple_type)
 
-	// Convert each element to Erlang format
-	erlang_elements := elements.map(gen.convert_type_element_to_erlang(it))
-
-	return '{${erlang_elements.join(', ')}}'
-}
-
-// convert_list_type_to_erlang converts list type string to Erlang format
-fn (gen ErlangGenerator) convert_list_type_to_erlang(list_type string) string {
-	// Extract element type from list type string
-	// Example: "list(integer)" -> "integer"
-	element_type := analysis1.extract_list_element_type(list_type)
-
-	// Convert element type to Erlang format
-	erlang_element := gen.convert_type_element_to_erlang(element_type)
-
-	return '[${erlang_element}]'
-}
-
-// convert_map_type_to_erlang converts map type string to Erlang format
-fn (gen ErlangGenerator) convert_map_type_to_erlang(map_type string) string {
-	// Extract key and value types from map type string
-	// Example: "map(integer=>string)" -> ["integer", "string"]
-	key_value_types := analysis1.extract_map_key_value_types(map_type)
-
-	if key_value_types.len == 2 {
-		key_type := gen.convert_type_element_to_erlang(key_value_types[0])
-		value_type := gen.convert_type_element_to_erlang(key_value_types[1])
-		return '#{${key_type} => ${value_type}}'
+// convert_single_type_to_erlang_spec converts a single type to Erlang spec format
+fn (gen ErlangGenerator) convert_single_type_to_erlang_spec(type_str string) string {
+	// Handle tuple types like "{integer(1), string("hello")}" -> "{1, binary()}"
+	if type_str.starts_with('{') && type_str.ends_with('}') {
+		inner_content := type_str[1..type_str.len - 1]
+		// Convert each element of the tuple
+		elements := inner_content.split(',')
+		converted_elements := elements.map(gen.convert_single_type_to_erlang_spec(it.trim_space()))
+		return '{${converted_elements.join(', ')}}'
 	}
 
-	return '#{any() => any()}'
-}
-
-// convert_type_element_to_erlang converts a type element to Erlang format
-fn (gen ErlangGenerator) convert_type_element_to_erlang(type_element string) string {
-	// Handle specific type patterns
-	if type_element.starts_with('atom(') && type_element.ends_with(')') {
-		// Extract atom value: "atom(ok)" -> "ok"
-		atom_value := type_element[5..type_element.len - 1]
-		return atom_value
+	// Handle string types like "string("hello")" -> "binary()"
+	if type_str.starts_with('string(') && type_str.ends_with(')') {
+		return 'binary()'
 	}
 
-	if type_element.starts_with('record(') && type_element.ends_with(')') {
-		// Extract record name: "record(Usuario)" -> "#usuario{}"
-		record_name := type_element[7..type_element.len - 1]
-		return '#${record_name.to_lower()}{}'
-	}
+	// Handle types with literal values like "integer(20)" -> "20", "atom(ok)" -> "ok", etc.
+	if type_str.contains('(') && type_str.ends_with(')') {
+		open_paren := type_str.index('(') or { return type_str }
+		close_paren := type_str.last_index(')') or { return type_str }
+		if open_paren < close_paren {
+			base_type := type_str[..open_paren]
+			literal_value := type_str[open_paren + 1..close_paren]
 
-	// Handle basic types
-	match type_element {
-		'integer' {
-			return 'integer()'
-		}
-		'float' {
-			return 'float()'
-		}
-		'string' {
-			return 'binary()'
-		} // Lx strings são binaries UTF-8
-		'boolean' {
-			return 'boolean()'
-		}
-		'atom' {
-			return 'atom()'
-		}
-		'nil' {
-			return 'nil'
-		}
-		'any' {
-			return 'any()'
-		}
-		else {
-			// If it's a user-defined type (starts with capital letter), treat as record
-			if type_element.len > 0 && type_element[0].is_capital() {
-				return '#${type_element.to_lower()}{}'
+			// For numeric types with literal values, return just the literal
+			if base_type == 'integer' || base_type == 'float' {
+				return literal_value
 			}
-			return 'any()'
+
+			// For other types, keep the original format
+			return type_str
 		}
 	}
+	return type_str
 }
