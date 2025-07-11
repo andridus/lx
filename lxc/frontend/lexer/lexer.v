@@ -435,26 +435,14 @@ fn (mut l Lexer) create_token_from_buffer() Token {
 					}
 				}
 			} else if is_operator(l.buffer) {
-				if otok := get_operator_token(l.buffer, l.start_pos) {
-					OperatorToken{
-						value:    otok.value
-						position: l.start_pos
-					}
-				} else {
-					ErrorToken{
-						message:  'Lexical error: Unknown operator'
-						position: l.start_pos
-					}
+				operator_token := get_operator_token(l.buffer, l.start_pos) or {
+					panic('Internal error: operator not found')
+				}
+				OperatorToken{
+					value:    operator_token.value
+					position: l.start_pos
 				}
 			} else {
-				// Only emit error for single colon if we're at the end of input
-				// or if the next character can't form a valid operator
-				if l.buffer == ':' && l.position >= l.input.len {
-					return ErrorToken{
-						message:  'Lexical error: Isolated colon is not allowed'
-						position: l.start_pos
-					}
-				}
 				ErrorToken{
 					message:  'Lexical error: Unknown operator'
 					position: l.start_pos

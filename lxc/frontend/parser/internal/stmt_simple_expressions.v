@@ -55,6 +55,10 @@ fn (mut sp StatementParser) parse_simple_expression() ?ast.Expr {
 				op = .subtract
 				should_continue = true
 			}
+			.concat {
+				op = .append
+				should_continue = true
+			}
 			.mult {
 				op = .multiply
 				should_continue = true

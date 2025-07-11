@@ -208,6 +208,7 @@ fn (mut ep ExpressionParser) parse_additive_expression() ?ast.Expr {
 		op := match op_token.value {
 			.plus { ast.BinaryOp.add }
 			.minus { ast.BinaryOp.subtract }
+			.concat { ast.BinaryOp.append }
 			else { break }
 		}
 

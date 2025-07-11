@@ -194,22 +194,14 @@ fn (gen ErlangGenerator) get_function_return_type(clause ast.FunctionClause, fun
 
 // Get function parameter types with unions
 fn (gen ErlangGenerator) get_function_param_types(func_name string, arity int) []string {
-	println('[DEBUG] Getting param types for ${func_name}/${arity}')
 	if type_ctx := gen.type_context {
 		if param_types := type_ctx.get_function_param_types(func_name, arity) {
-			println('[DEBUG] Found param types: ${param_types.map(it.str())}')
 			erlang_types := param_types.map(gen.typeinfo_to_erlang_type(it))
-			println('[DEBUG] Converted to Erlang: ${erlang_types}')
 			return erlang_types
-		} else {
-			println('[DEBUG] No param types found in context')
 		}
-	} else {
-		println('[DEBUG] No type context available')
 	}
 
 	// Fallback: return any() for each parameter
-	println('[DEBUG] Using fallback types: any() for ${arity} params')
 	mut fallback_types := []string{}
 	for _ in 0 .. arity {
 		fallback_types << 'any()'
@@ -394,7 +386,7 @@ fn (gen ErlangGenerator) generate_type_expression(type_expr ast.TypeExpression) 
 					'float()'
 				}
 				'string' {
-					'string()'
+					'binary()'  // Lx strings são binaries UTF-8
 				}
 				'boolean' {
 					'boolean()'
@@ -774,7 +766,7 @@ fn (gen ErlangGenerator) typeinfo_to_erlang_type(type_info analysis1.TypeInfo) s
 			return 'float()'
 		}
 		'string' {
-			return '[char()]'  // Erlang uses [char()] instead of string()
+			return 'binary()'  // Lx strings são binaries UTF-8
 		}
 		'boolean' {
 			return 'boolean()'
@@ -893,7 +885,7 @@ fn (gen ErlangGenerator) convert_type_element_to_erlang(type_element string) str
 	match type_element {
 		'integer' { return 'integer()' }
 		'float' { return 'float()' }
-		'string' { return '[char()]' }  // Erlang uses [char()] instead of string()
+		'string' { return 'binary()' }  // Lx strings são binaries UTF-8
 		'boolean' { return 'boolean()' }
 		'atom' { return 'atom()' }
 		'nil' { return 'nil' }

@@ -27,8 +27,6 @@ pub fn new_erlang_generator() ErlangGenerator {
 
 // generate_module generates a complete Erlang module (implements CodeGenerator interface)
 pub fn (mut gen ErlangGenerator) generate_module(module_stmt ast.ModuleStmt, type_ctx &analysis1.TypeContext) CodegenResult {
-	println('[BACKEND] expression_types keys: ' + type_ctx.expression_types.keys().str())
-	// Store the type context for use in expression generation
 	gen.type_context = unsafe { type_ctx }
 	// Collect all type definitions first
 	gen.collect_type_definitions(module_stmt.statements)

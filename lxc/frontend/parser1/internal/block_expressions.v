@@ -316,6 +316,9 @@ fn (mut p LXParser) parse_arithmetic_expression() ?ast.Expr {
 		} else if p.check(operator_token(.minus)) {
 			op = .subtract
 			matched = true
+		} else if p.check(operator_token(.concat)) {
+			op = .append
+			matched = true
 		}
 
 		if matched {
@@ -656,7 +659,11 @@ fn (mut p LXParser) parse_primary_expression() ?ast.Expr {
 				.modulo {
 					p.parse_map_expression()
 				}
+				.concat {
+					p.parse_binary_expression(ast.BinaryOp.append)
+				}
 				else {
+					println('[LOG] block_expressions: Unexpected operator in expression, op = ' + op.value.str() + ', pos = ' + p.get_current_position().str())
 					p.add_error('Unexpected operator in expression', 'Got ${p.current.str()}')
 					none
 				}
@@ -2003,4 +2010,19 @@ pub fn test_parse_postfix_expression(tokens []lexer.Token, context ParsingContex
 	mut parser := new_lx_parser(tokens)
 	parser.context = context
 	return parser.parse_postfix_expression()
+}
+
+// parse_binary_expression parses binary expressions with the given operator
+fn (mut p LXParser) parse_binary_expression(op ast.BinaryOp) ?ast.Expr {
+	position := p.get_current_position()
+	p.advance() // consume the operator
+
+	right := p.parse_expression()?
+
+	return ast.BinaryExpr{
+		left:     ast.Expr(ast.LiteralExpr{}) // placeholder, will be set by caller
+		op:       op
+		right:    right
+		position: position
+	}
 }

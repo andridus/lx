@@ -304,7 +304,7 @@ fn (gen ErlangGenerator) generate_literal(literal ast.Literal) string {
 		ast.StringLiteral {
 			// Escape quotes and special characters for Erlang
 			escaped := literal.value.replace('\\', '\\\\').replace('"', '\\"')
-			return '"${escaped}"'
+			return '<<"${escaped}"/utf8>>'
 		}
 		ast.BooleanLiteral {
 			return if literal.value { 'true' } else { 'false' }
@@ -343,6 +343,49 @@ fn (gen ErlangGenerator) capitalize_variable(name string) string {
 
 // generate_binary_expression generates code for binary expressions
 fn (mut gen ErlangGenerator) generate_binary_expression(expr ast.BinaryExpr) string {
+	if expr.op == .append {
+		left_code := gen.generate_expression(expr.left)
+		right_code := gen.generate_expression(expr.right)
+		is_left_empty := left_code == '<<""/utf8>>'
+		is_right_empty := right_code == '<<""/utf8>>'
+
+		if is_left_empty && is_right_empty {
+			return '<<>>'
+		} else if is_left_empty {
+			if right_code.starts_with('<<') && right_code.ends_with('/utf8>>') {
+				return right_code
+			}
+			return '<<${right_code}/binary>>'
+		} else if is_right_empty {
+			if left_code.starts_with('<<') && left_code.ends_with('/utf8>>') {
+				return left_code
+			}
+			return '<<${left_code}/binary>>'
+		}
+
+		final_left := if left_code.starts_with('<<') && left_code.ends_with('/utf8>>') {
+			left_code // mantém o literal completo, ex: <<"hello "/utf8>>
+		} else {
+			'${left_code}/binary'
+		}
+		final_right := if right_code.starts_with('<<') && right_code.ends_with('/utf8>>') {
+			right_code
+		} else {
+			'${right_code}/binary'
+		}
+		// Remove os "<<" e ">>" dos literais para montar corretamente
+		left_inner := if final_left.starts_with('<<') && final_left.ends_with('>>') {
+			final_left[2..final_left.len-2]
+		} else {
+			final_left
+		}
+		right_inner := if final_right.starts_with('<<') && final_right.ends_with('>>') {
+			final_right[2..final_right.len-2]
+		} else {
+			final_right
+		}
+		return '<<${left_inner}, ${right_inner}>>'
+	}
 	left := gen.generate_expression(expr.left)
 	right := gen.generate_expression(expr.right)
 	op := gen.translate_operator(expr.op, false)
