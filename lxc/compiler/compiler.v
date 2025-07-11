@@ -117,7 +117,6 @@ pub fn (mut comp Compiler) compile(source string, file_path string) codegen.Code
 	// Use the new refactored analysis module
 	mut analyzer := analysis1.new_analyzer()
 	analysis_result := analyzer.analyze_module(module_stmt0)
-	println('DEBUG: analysis_result.errors.len = ${analysis_result.errors.len}')
 
 	if analysis_result.errors.len > 0 {
 		source_lines := errors.load_source_lines(file_path)
@@ -129,9 +128,14 @@ pub fn (mut comp Compiler) compile(source string, file_path string) codegen.Code
 		exit(1)
 	}
 
-	// Generate Erlang code
+	mut final_module_stmt := module_stmt0
+	module_name := os.file_name(file_path).replace('.lx', '')
+	if final_module_stmt.name == 'main' {
+		final_module_stmt.name = module_name
+	}
+
 	mut erlang_gen := erlang.new_erlang_generator()
-	codegen_result := erlang_gen.generate_module(module_stmt0, analysis_result.type_context)
+	codegen_result := erlang_gen.generate_module(final_module_stmt, analysis_result.type_context)
 
 	if !codegen_result.success {
 		eprintln('Code generation failed')
