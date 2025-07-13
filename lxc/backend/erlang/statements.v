@@ -176,8 +176,17 @@ fn (mut gen ErlangGenerator) generate_match_rescue_with_continuation(expr ast.Ma
 
 // get_function_return_type gets the return type for a function from the context
 fn (gen ErlangGenerator) get_function_return_type(fn_name string, arity int) ?analysis.TypeInfo {
+	// Fallback to legacy system
 	if type_ctx := gen.type_context {
 		return type_ctx.get_function_return_type(fn_name, arity)
+	}
+	return none
+}
+
+// get_function_return_type_by_ast_id gets the return type for a function by AST ID from HM TypeTable
+fn (gen ErlangGenerator) get_function_return_type_by_ast_id(ast_id int) ?analysis.TypeInfo {
+	if type_table := gen.type_table {
+		return type_table.get_type(ast_id)
 	}
 	return none
 }
@@ -281,8 +290,16 @@ pub fn (mut gen ErlangGenerator) generate_function(func ast.FunctionStmt) string
 		if first_clause.return_type != none {
 			return_type = gen.type_expr_to_typeinfo(first_clause.return_type)
 		} else {
-			if type_info := gen.get_function_return_type(func.name, arity) {
-				return_type = type_info
+			// Try to get from HM TypeTable first using AST ID
+			if func.ast_id > 0 {
+				if type_info := gen.get_function_return_type_by_ast_id(func.ast_id) {
+					return_type = type_info
+				}
+			} else {
+				// Fallback to legacy system
+				if type_info := gen.get_function_return_type(func.name, arity) {
+					return_type = type_info
+				}
 			}
 		}
 		mut spec_type := gen.typeinfo_to_erlang_type(return_type)
@@ -477,13 +494,27 @@ fn (gen ErlangGenerator) type_expr_to_typeinfo(type_expr ast.TypeExpression) ana
 	return match type_expr {
 		ast.SimpleTypeExpr {
 			match type_expr.name {
-				'integer' { analysis.typeinfo_integer() }
-				'float' { analysis.typeinfo_float() }
-				'string' { analysis.typeinfo_string() }
-				'boolean' { analysis.typeinfo_boolean() }
-				'atom' { analysis.typeinfo_atom() }
-				'nil' { analysis.typeinfo_nil() }
-				'any' { analysis.typeinfo_any() }
+				'integer' {
+					analysis.typeinfo_integer()
+				}
+				'float' {
+					analysis.typeinfo_float()
+				}
+				'string' {
+					analysis.typeinfo_string()
+				}
+				'boolean' {
+					analysis.typeinfo_boolean()
+				}
+				'atom' {
+					analysis.typeinfo_atom()
+				}
+				'nil' {
+					analysis.typeinfo_nil()
+				}
+				'any' {
+					analysis.typeinfo_any()
+				}
 				else {
 					if type_expr.name.len > 0 && type_expr.name[0].is_capital() {
 						analysis.typeinfo_record(type_expr.name)
@@ -935,13 +966,23 @@ fn (gen ErlangGenerator) typeinfo_to_erlang_type(type_info analysis.TypeInfo) st
 		'fun' {
 			'fun()'
 		}
+		'named' {
+			if value := type_info.value {
+				// For named types like User, convert to record format
+				if value.len > 0 && value[0].is_capital() {
+					'#${value.to_lower()}{}'
+				} else {
+					value // Return as is for other named types
+				}
+			} else {
+				'any()'
+			}
+		}
 		else {
 			'any()'
 		}
 	}
 }
-
-
 
 // convert_single_type_to_erlang_spec converts a single type to Erlang spec format
 fn (gen ErlangGenerator) convert_single_type_to_erlang_spec(type_str string) string {

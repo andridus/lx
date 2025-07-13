@@ -5,16 +5,17 @@ import ast
 // TypeInfo representa um tipo com base genérica e valor específico (quando possível)
 pub struct TypeInfo {
 pub mut:
-	generic string  // 'atom', 'integer', 'string', 'union', 'list', 'map', 'tuple', etc.
-	value   ?string // ':ok', '1', etc. ou none
+	generic string     // 'atom', 'integer', 'string', 'union', 'list', 'map', 'tuple', etc.
+	value   ?string    // ':ok', '1', etc. ou none
 	values  []TypeInfo // Para union types, list element types, map key/value types, tuple element types
 }
 
 // Convert TypeInfo to string representation
 pub fn (ti TypeInfo) str() string {
 	if ti.generic == 'union' && ti.values.len > 0 {
-		// Union types: join all values with |
-		return ti.values.map(it.str()).join(' | ')
+		// Union types: join all values with | (remove duplicates)
+		unique_types := remove_duplicate_types(ti.values)
+		return unique_types.map(it.str()).join(' | ')
 	}
 
 	if ti.generic == 'list' && ti.values.len > 0 {
@@ -35,6 +36,14 @@ pub fn (ti TypeInfo) str() string {
 	if value := ti.value {
 		// Special handling for tuples - return just the value without tuple() prefix
 		if ti.generic == 'tuple' {
+			return value
+		}
+		// Special handling for atoms - return just the atom value
+		if ti.generic == 'atom' {
+			return value
+		}
+		// Special handling for named types - return just the name for better readability
+		if ti.generic == 'named' {
 			return value
 		}
 		return '${ti.generic}(${value})'
@@ -132,12 +141,34 @@ pub fn typeinfo_boolean_value(value bool) TypeInfo {
 	}
 }
 
+// Remove duplicate types from a list of TypeInfo
+fn remove_duplicate_types(types []TypeInfo) []TypeInfo {
+	if types.len <= 1 {
+		return types
+	}
+
+	mut unique_types := []TypeInfo{}
+	mut seen_strings := map[string]bool{}
+
+	for type_info in types {
+		type_str := type_info.str()
+		if !seen_strings[type_str] {
+			seen_strings[type_str] = true
+			unique_types << type_info
+		}
+	}
+
+	return unique_types
+}
+
 // Create TypeInfo for complex types
 pub fn typeinfo_union(types []TypeInfo) TypeInfo {
+	// Remove duplicates when creating union types
+	unique_types := remove_duplicate_types(types)
 	return TypeInfo{
 		generic: 'union'
 		value:   none
-		values:  types
+		values:  unique_types
 	}
 }
 

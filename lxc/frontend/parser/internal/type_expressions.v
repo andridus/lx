@@ -350,11 +350,22 @@ fn (mut p LXParser) parse_tuple_type() ?ast.TypeExpression {
 fn (mut p LXParser) parse_literal_type() ?ast.TypeExpression {
 	position := p.get_current_position()
 	value := p.current.get_value()
+
+	// Check if it's an atom token and preserve the colon
+	final_value := match p.current {
+		lexer.AtomToken {
+			':${value}'
+		}
+		else {
+			value
+		}
+	}
+
 	p.advance()
 
 	// For now, treat literals as simple types with their value as name
 	return ast.SimpleTypeExpr{
-		name:     value
+		name:     final_value
 		position: position
 	}
 }

@@ -168,6 +168,7 @@ fn (mut p LXParser) parse_assignment_expression() ?ast.Expr {
 					name:     name
 					value:    value
 					position: position
+					ast_id:   p.generate_ast_id()
 				}
 			}
 		}
@@ -195,6 +196,7 @@ fn (mut p LXParser) parse_or_expression() ?ast.Expr {
 			op:       .or
 			right:    right
 			position: p.get_current_position()
+			ast_id:   p.generate_ast_id()
 		}
 	}
 
@@ -212,6 +214,7 @@ fn (mut p LXParser) parse_and_expression() ?ast.Expr {
 			op:       .and
 			right:    right
 			position: p.get_current_position()
+			ast_id:   p.generate_ast_id()
 		}
 	}
 
@@ -235,6 +238,7 @@ fn (mut p LXParser) parse_equality_expression() ?ast.Expr {
 				op:       .equal
 				right:    right
 				position: p.get_current_position()
+				ast_id:   p.generate_ast_id()
 			}
 		} else if p.check(operator_token(.neq)) {
 			p.advance() // consume '!='
@@ -244,6 +248,7 @@ fn (mut p LXParser) parse_equality_expression() ?ast.Expr {
 				op:       .not_equal
 				right:    right
 				position: p.get_current_position()
+				ast_id:   p.generate_ast_id()
 			}
 		} else {
 			break
@@ -288,6 +293,7 @@ fn (mut p LXParser) parse_comparison_expression() ?ast.Expr {
 				op:       op
 				right:    right
 				position: p.get_current_position()
+				ast_id:   p.generate_ast_id()
 			}
 		} else {
 			break
@@ -329,6 +335,7 @@ fn (mut p LXParser) parse_arithmetic_expression() ?ast.Expr {
 				op:       op
 				right:    right
 				position: p.get_current_position()
+				ast_id:   p.generate_ast_id()
 			}
 		} else {
 			break
@@ -362,6 +369,7 @@ fn (mut p LXParser) parse_term() ?ast.Expr {
 				op:       op
 				right:    right
 				position: p.get_current_position()
+				ast_id:   p.generate_ast_id()
 			}
 		} else {
 			break
@@ -728,6 +736,7 @@ fn (mut p LXParser) parse_identifier_expression() ?ast.Expr {
 	return ast.VariableExpr{
 		name:     name
 		position: position
+		ast_id:   p.generate_ast_id()
 	}
 }
 
@@ -742,6 +751,7 @@ fn (mut p LXParser) parse_integer_literal() ?ast.Expr {
 			value: int(value)
 		}
 		position: position
+		ast_id:   p.generate_ast_id()
 	}
 }
 
@@ -756,6 +766,7 @@ fn (mut p LXParser) parse_float_literal() ?ast.Expr {
 			value: value
 		}
 		position: position
+		ast_id:   p.generate_ast_id()
 	}
 }
 
@@ -770,6 +781,7 @@ fn (mut p LXParser) parse_string_literal() ?ast.Expr {
 			value: value
 		}
 		position: position
+		ast_id:   p.generate_ast_id()
 	}
 }
 
@@ -784,6 +796,7 @@ fn (mut p LXParser) parse_boolean_literal() ?ast.Expr {
 			value: value
 		}
 		position: position
+		ast_id:   p.generate_ast_id()
 	}
 }
 
@@ -798,6 +811,7 @@ fn (mut p LXParser) parse_atom_literal() ?ast.Expr {
 			value: value
 		}
 		position: position
+		ast_id:   p.generate_ast_id()
 	}
 }
 
@@ -809,6 +823,7 @@ fn (mut p LXParser) parse_nil_literal() ?ast.Expr {
 	return ast.LiteralExpr{
 		value:    ast.NilLiteral{}
 		position: position
+		ast_id:   p.generate_ast_id()
 	}
 }
 
@@ -846,6 +861,7 @@ fn (mut p LXParser) parse_tuple_expression() ?ast.Expr {
 	return ast.TupleExpr{
 		elements: elements
 		position: position
+		ast_id:   p.generate_ast_id()
 	}
 }
 
@@ -860,6 +876,7 @@ fn (mut p LXParser) parse_list_expression() ?ast.Expr {
 		return ast.ListLiteralExpr{
 			elements: []
 			position: position
+			ast_id:   p.generate_ast_id()
 		}
 	}
 
@@ -900,6 +917,7 @@ fn (mut p LXParser) parse_list_expression() ?ast.Expr {
 	return ast.ListLiteralExpr{
 		elements: elements
 		position: position
+		ast_id:   p.generate_ast_id()
 	}
 }
 

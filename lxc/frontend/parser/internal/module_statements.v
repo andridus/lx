@@ -136,6 +136,7 @@ fn (mut p LXParser) parse_function_definition() ?ast.Stmt {
 		is_private: false
 		directives: []
 		position:   p.get_current_position()
+		ast_id:     p.generate_ast_id()
 	}
 }
 
@@ -162,6 +163,7 @@ fn (mut p LXParser) parse_private_function_definition() ?ast.Stmt {
 		is_private: true
 		directives: []
 		position:   p.get_current_position()
+		ast_id:     p.generate_ast_id()
 	}
 }
 

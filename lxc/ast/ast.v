@@ -5,6 +5,7 @@ pub struct VariableExpr {
 pub:
 	name     string
 	position Position
+	ast_id   int = -1 // -1 indicates uninitialized
 }
 
 // LiteralExpr represents a literal expression
@@ -12,6 +13,7 @@ pub struct LiteralExpr {
 pub:
 	value    Literal
 	position Position
+	ast_id   int = -1 // -1 indicates uninitialized
 }
 
 // AssignExpr represents an assignment expression
@@ -21,6 +23,7 @@ pub:
 	value           Expr
 	type_annotation ?TypeExpression
 	position        Position
+	ast_id          int = -1 // -1 indicates uninitialized
 }
 
 // BinaryExpr represents a binary operation
@@ -30,6 +33,7 @@ pub:
 	op       BinaryOp
 	right    Expr
 	position Position
+	ast_id   int = -1 // -1 indicates uninitialized
 }
 
 // CallExpr represents a function call
@@ -41,6 +45,7 @@ pub:
 	function_name string // function name if external
 	arguments     []Expr
 	position      Position
+	ast_id        int = -1 // -1 indicates uninitialized
 }
 
 // MatchExpr represents pattern matching
@@ -49,6 +54,7 @@ pub:
 	value    Expr
 	cases    []MatchCase
 	position Position
+	ast_id   int = -1 // -1 indicates uninitialized
 }
 
 // ListConsExpr represents list cons operation
@@ -57,11 +63,13 @@ pub:
 	head     Expr
 	tail     Expr
 	position Position
+	ast_id   int = -1 // -1 indicates uninitialized
 }
 
 // ListEmptyExpr represents an empty list
 pub struct ListEmptyExpr {
 	position Position
+	ast_id   int = -1 // -1 indicates uninitialized
 }
 
 // ListLiteralExpr represents a list literal
@@ -69,6 +77,7 @@ pub struct ListLiteralExpr {
 pub:
 	elements []Expr
 	position Position
+	ast_id   int = -1 // -1 indicates uninitialized
 }
 
 // TupleExpr represents a tuple
@@ -76,6 +85,7 @@ pub struct TupleExpr {
 pub:
 	elements []Expr
 	position Position
+	ast_id   int = -1 // -1 indicates uninitialized
 }
 
 // MapLiteralExpr represents a map literal
@@ -83,6 +93,7 @@ pub struct MapLiteralExpr {
 pub:
 	entries  []MapEntry
 	position Position
+	ast_id   int = -1 // -1 indicates uninitialized
 }
 
 // MapAccessExpr represents map access expression
@@ -91,6 +102,7 @@ pub:
 	map_expr Expr
 	key      Expr
 	position Position
+	ast_id   int = -1 // -1 indicates uninitialized
 }
 
 // MapUpdateExpr represents map update operations
@@ -99,6 +111,7 @@ pub:
 	base_map Expr
 	entries  []MapEntry
 	position Position
+	ast_id   int = -1 // -1 indicates uninitialized
 }
 
 // RecordLiteralExpr represents a record literal
@@ -107,6 +120,7 @@ pub:
 	name     string
 	fields   []RecordField
 	position Position
+	ast_id   int = -1 // -1 indicates uninitialized
 }
 
 // RecordAccessExpr represents record field access
@@ -115,6 +129,7 @@ pub:
 	record   Expr
 	field    string
 	position Position
+	ast_id   int = -1 // -1 indicates uninitialized
 }
 
 // RecordUpdateExpr represents record update operations
@@ -124,6 +139,7 @@ pub:
 	base_record Expr
 	fields      []RecordField
 	position    Position
+	ast_id      int = -1 // -1 indicates uninitialized
 }
 
 // FunExpr represents a function definition
@@ -132,6 +148,7 @@ pub:
 	parameters []Pattern
 	body       BlockExpr
 	position   Position
+	ast_id     int = -1 // -1 indicates uninitialized
 }
 
 // SendExpr represents message sending
@@ -140,6 +157,7 @@ pub:
 	pid      Expr
 	message  Expr
 	position Position
+	ast_id   int = -1 // -1 indicates uninitialized
 }
 
 // ReceiveExpr represents message receiving
@@ -148,6 +166,7 @@ pub:
 	cases    []ReceiveCase
 	timeout  ?TimeoutClause
 	position Position
+	ast_id   int = -1 // -1 indicates uninitialized
 }
 
 // TimeoutClause represents a timeout clause in receive expressions
@@ -156,6 +175,7 @@ pub:
 	timeout  Expr      // Timeout value in milliseconds
 	body     BlockExpr // Code to execute on timeout
 	position Position
+	ast_id   int = -1 // -1 indicates uninitialized
 }
 
 // GuardExpr represents a guard expression
@@ -163,6 +183,7 @@ pub struct GuardExpr {
 pub:
 	condition Expr
 	position  Position
+	ast_id    int = -1 // -1 indicates uninitialized
 }
 
 // UnaryExpr represents a unary operation
@@ -171,6 +192,7 @@ pub:
 	op       UnaryOp
 	operand  Expr
 	position Position
+	ast_id   int = -1 // -1 indicates uninitialized
 }
 
 // IfExpr represents an if expression
@@ -180,6 +202,7 @@ pub:
 	then_body BlockExpr
 	else_body BlockExpr
 	position  Position
+	ast_id    int = -1 // -1 indicates uninitialized
 }
 
 // CaseExpr represents a case expression
@@ -188,6 +211,7 @@ pub:
 	value    Expr
 	cases    []MatchCase
 	position Position
+	ast_id   int = -1 // -1 indicates uninitialized
 }
 
 // WithExpr represents a with expression
@@ -197,6 +221,7 @@ pub:
 	body      BlockExpr
 	else_body BlockExpr
 	position  Position
+	ast_id    int = -1 // -1 indicates uninitialized
 }
 
 // ForExpr represents a for expression (list comprehension)
@@ -207,6 +232,7 @@ pub:
 	guard      Expr
 	body       BlockExpr
 	position   Position
+	ast_id     int = -1 // -1 indicates uninitialized
 }
 
 // SimpleMatchExpr represents a simple match expression (without rescue)
@@ -216,6 +242,7 @@ pub:
 	value    Expr
 	guard    Expr
 	position Position
+	ast_id   int = -1 // -1 indicates uninitialized
 }
 
 // MatchRescueExpr represents a match rescue expression
@@ -226,6 +253,7 @@ pub:
 	rescue_var  string
 	rescue_body BlockExpr
 	position    Position
+	ast_id      int = -1 // -1 indicates uninitialized
 }
 
 // BlockExpr represents a block expression (do...end)
@@ -233,6 +261,7 @@ pub struct BlockExpr {
 pub:
 	body     []Stmt
 	position Position
+	ast_id   int = -1 // -1 indicates uninitialized
 }
 
 // Expr represents expressions in LX using sum types
@@ -472,6 +501,7 @@ pub:
 	is_private bool
 	directives []string
 	position   Position
+	ast_id     int = -1 // -1 indicates uninitialized
 }
 
 // RecordDefStmt represents a record definition
@@ -900,4 +930,39 @@ pub fn (rc ReceiveCase) str() string {
 // str returns a string representation of TimeoutClause
 pub fn (tc TimeoutClause) str() string {
 	return 'TimeoutClause(${tc.timeout.str()} -> ${tc.body.str()})'
+}
+
+// get_expr_ast_id returns the ast_id of any expression
+// This is a helper function for the type table system
+pub fn get_expr_ast_id(expr Expr) int {
+	return match expr {
+		VariableExpr { expr.ast_id }
+		LiteralExpr { expr.ast_id }
+		BinaryExpr { expr.ast_id }
+		CallExpr { expr.ast_id }
+		AssignExpr { expr.ast_id }
+		MatchExpr { expr.ast_id }
+		ListConsExpr { expr.ast_id }
+		ListEmptyExpr { expr.ast_id }
+		ListLiteralExpr { expr.ast_id }
+		TupleExpr { expr.ast_id }
+		MapLiteralExpr { expr.ast_id }
+		MapAccessExpr { expr.ast_id }
+		MapUpdateExpr { expr.ast_id }
+		RecordLiteralExpr { expr.ast_id }
+		RecordAccessExpr { expr.ast_id }
+		RecordUpdateExpr { expr.ast_id }
+		FunExpr { expr.ast_id }
+		SendExpr { expr.ast_id }
+		ReceiveExpr { expr.ast_id }
+		GuardExpr { expr.ast_id }
+		UnaryExpr { expr.ast_id }
+		IfExpr { expr.ast_id }
+		CaseExpr { expr.ast_id }
+		WithExpr { expr.ast_id }
+		ForExpr { expr.ast_id }
+		SimpleMatchExpr { expr.ast_id }
+		MatchRescueExpr { expr.ast_id }
+		BlockExpr { expr.ast_id }
+	}
 }

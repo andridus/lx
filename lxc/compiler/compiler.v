@@ -26,6 +26,7 @@ pub mut:
 	file_path    string
 	module_name  string
 	debug_tokens bool
+	debug_types  bool // Flag to enable type debugging
 }
 
 // new_compiler creates a new compiler instance
@@ -34,7 +35,18 @@ pub fn new_compiler() Compiler {
 		module_name:  ''
 		file_path:    ''
 		debug_tokens: false
+		debug_types:  false
 	}
+}
+
+// enable_debug_tokens enables token debugging
+pub fn (mut comp Compiler) enable_debug_tokens() {
+	comp.debug_tokens = true
+}
+
+// enable_debug_types enables type debugging
+pub fn (mut comp Compiler) enable_debug_types() {
+	comp.debug_types = true
 }
 
 // compile_file compiles a single file
@@ -114,9 +126,23 @@ pub fn (mut comp Compiler) compile(source string, file_path string) codegen.Code
 		exit(1)
 	}
 
-	// Use the new refactored analysis module
-	mut analyzer := analysis.new_analyzer()
+	// Use the HM type system (now the only option)
+	mut analyzer := if comp.debug_types {
+		println('Using Hindley-Milner type inference with debug')
+		analysis.new_analyzer_with_debug()
+	} else {
+		println('Using Hindley-Milner type inference')
+		analysis.new_analyzer()
+	}
+
 	analysis_result := analyzer.analyze_module(module_stmt0)
+
+	// Print debug information if requested
+	if comp.debug_types {
+		println('\n=== TYPE ANALYSIS DEBUG ===')
+		analyzer.print_debug()
+		println('============================\n')
+	}
 
 	if analysis_result.errors.len > 0 {
 		source_lines := errors.load_source_lines(file_path)
@@ -135,6 +161,10 @@ pub fn (mut comp Compiler) compile(source string, file_path string) codegen.Code
 	}
 
 	mut erlang_gen := erlang.new_erlang_generator()
+	// Set the type table in the backend (HM is now the only system)
+	type_table := analyzer.get_type_table()
+	erlang_gen.set_type_table(type_table)
+
 	codegen_result := erlang_gen.generate_module(final_module_stmt, analysis_result.type_context)
 
 	if !codegen_result.success {

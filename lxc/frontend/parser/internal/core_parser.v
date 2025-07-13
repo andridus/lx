@@ -23,11 +23,12 @@ pub enum ParsingContext {
 @[heap]
 pub struct LXParser {
 mut:
-	tokens   []lexer.Token
-	position int
-	current  lexer.Token
-	context  ParsingContext
-	errors   []errors.CompilationError
+	tokens      []lexer.Token
+	position    int
+	current     lexer.Token
+	context     ParsingContext
+	errors      []errors.CompilationError
+	next_ast_id int = 1 // Next available AST ID
 }
 
 // new_lx_parser creates a new internal parser instance
@@ -190,6 +191,13 @@ fn (mut p LXParser) skip_newlines() {
 	for p.current is lexer.NewlineToken {
 		p.advance()
 	}
+}
+
+// generate_ast_id generates a new unique AST ID
+fn (mut p LXParser) generate_ast_id() int {
+	id := p.next_ast_id
+	p.next_ast_id++
+	return id
 }
 
 // Helper functions for creating tokens
