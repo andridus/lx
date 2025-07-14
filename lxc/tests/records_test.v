@@ -10,13 +10,13 @@ record Person {
 def create_person() do
   Person{name: "Alice", age: 30}
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([create_person/0]).
 
 -record(person, {name, age}).
 -spec create_person() -> #person{}.
 create_person() ->
-#person{name = "Alice", age = 30}.
+#person{name = <<"Alice"/utf8>>, age = 30}.
 
 '
 	assert generates_erlang(lx_code) == expected
@@ -33,14 +33,14 @@ def get_name() do
   person = Person{name: "Bob", age: 25}
   person.name
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([get_name/0]).
 
 -record(person, {name, age}).
--spec get_name() -> string().
+-spec get_name() -> any().
 get_name() ->
-Person_aaaa = #person{name = "Bob", age = 25},
-Person_aaaa#person.name.
+Person_aaaa = #person{name = <<"Bob"/utf8>>, age = 25},
+Person_aaaa#record.name.
 
 '
 	assert generates_erlang(lx_code) == expected
@@ -57,13 +57,13 @@ def update_age() do
   person = Person{name: "Charlie", age: 35}
   Person{person | age: 36}
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([update_age/0]).
 
 -record(person, {name, age}).
--spec update_age() -> #person{}.
+-spec update_age() -> any().
 update_age() ->
-Person_aaaa = #person{name = "Charlie", age = 35},
+Person_aaaa = #person{name = <<"Charlie"/utf8>>, age = 35},
 Person_aaaa#{age => 36}.
 
 '
@@ -82,14 +82,14 @@ def update_person() do
   person = Person{name: "David", age: 40, email: "david@old.com"}
   Person{person | age: 41, email: "david@new.com"}
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([update_person/0]).
 
 -record(person, {name, age, email}).
--spec update_person() -> #person{}.
+-spec update_person() -> any().
 update_person() ->
-Person_aaaa = #person{name = "David", age = 40, email = "david@old.com"},
-Person_aaaa#{age => 41, email => "david@new.com"}.
+Person_aaaa = #person{name = <<"David"/utf8>>, age = 40, email = <<"david@old.com"/utf8>>},
+Person_aaaa#{age => 41, email => <<"david@new.com"/utf8>>}.
 
 '
 	assert generates_erlang(lx_code) == expected
@@ -108,11 +108,11 @@ def get_user_id(user) do
     _ -> -1
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([get_user_id/1]).
 
 -record(user, {id, email}).
--spec get_user_id(any()) -> any().
+-spec get_user_id(any()) -> integer().
 get_user_id(User) ->
 case User of
     #user{id = User_id} -> User_id;
@@ -138,15 +138,15 @@ def process_person() do
     _ -> 0
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([process_person/0]).
 
 -record(person, {name, age}).
 -spec process_person() -> integer().
 process_person() ->
-Person_aaaa = #person{name = "Eve", age = 28},
+Person_aaaa = #person{name = <<"Eve"/utf8>>, age = 28},
 case Person_aaaa of
-    #person{name = "Eve", age = Age} -> Age;
+    #person{name = <<"Eve"/utf8>>, age = Age} -> Age;
     #person{age = Age} when Age >= 18 -> Age;
     _ -> 0
 end.
@@ -170,16 +170,16 @@ def validate_contact(contact) do
     _ -> {"unknown", "unknown"}
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([validate_contact/1]).
 
 -record(contact, {name, email, phone}).
--spec validate_contact(any()) -> {any(), any()}.
+-spec validate_contact(any()) -> {binary(), binary()}.
 validate_contact(Contact) ->
 case Contact of
-    #contact{name = Name, email = Email} when Name =/= "" -> {Name, Email};
-    #contact{phone = Phone} when Phone =/= "" -> {"unknown", Phone};
-    _ -> {"unknown", "unknown"}
+    #contact{name = Name, email = Email} when Name =/= <<""/utf8>> -> {Name, Email};
+    #contact{phone = Phone} when Phone =/= <<""/utf8>> -> {<<"unknown"/utf8>>, Phone};
+    _ -> {<<"unknown"/utf8>>, <<"unknown"/utf8>>}
 end.
 
 '

@@ -12,7 +12,7 @@ def simple_receive() do
     _ -> 999
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([simple_receive/0]).
 
 -spec simple_receive() -> any().
@@ -45,7 +45,7 @@ def receive_with_timeout() do
     {msg, code}
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([receive_with_timeout/0]).
 
 -spec receive_with_timeout() -> any().
@@ -57,7 +57,7 @@ receive
     2 -> ok;
     _ -> unknown
 after 1000 ->
-    Msg_caaa = "timeout",
+    Msg_caaa = <<"timeout"/utf8>>,
     Code_daaa = 999,
     {Msg_caaa, Code_daaa}
 end.

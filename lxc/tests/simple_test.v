@@ -5,11 +5,13 @@ fn test_simple_function_string() {
 def f() do
 1
 end'
-	expected := '-module(main).
--export([f/0]).\n
+	expected := '-module(test).
+-export([f/0]).
+
 -spec f() -> integer().
 f() ->
-1.\n
+1.
+
 '
 	assert generates_erlang(lx_code) == expected
 }
@@ -20,11 +22,11 @@ type number :: integer
 def f() do
    1
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([f/0]).
 
 -type number() :: integer().
--spec f() -> number().
+-spec f() -> integer().
 f() ->
 1.
 
@@ -37,11 +39,11 @@ fn test_type_alias_opaque() {
 def f() do
 1
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([f/0]).
 
 -opaque user_id() :: integer().
--spec f() -> user_id().
+-spec f() -> integer().
 f() ->
 1.
 
@@ -54,11 +56,11 @@ fn test_type_alias_nominal() {
 def f() do
 1.0
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([f/0]).
 
 -nominal celsius() :: float().
--spec f() -> celsius().
+-spec f() -> float().
 f() ->
 1.0.
 
@@ -71,12 +73,13 @@ fn test_type_alias_union_does_not_return() {
 def f() do
 "test"
 end'
-	expected := '-module(main).
--export([f/0]).\n
--type id() :: string() | integer().
--spec f() -> string().
+	expected := '-module(test).
+-export([f/0]).
+
+-type id() :: binary() | integer().
+-spec f() -> binary().
 f() ->
-"test".
+<<"test"/utf8>>.
 
 '
 	assert generates_erlang(lx_code) == expected
@@ -87,12 +90,12 @@ fn test_type_alias_with_function_params() {
 def add(a :: number, b :: number) do
 {a, b}
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([add/2]).
 
 -type number() :: integer().
--spec add(number(), number()) -> {number(), number()}.
-add(A, B) ->
+-spec add(number(), number()) -> {number, number}.
+add(A, B) when is_number(A) andalso is_number(B) ->
 {A, B}.
 
 '
@@ -145,12 +148,12 @@ fn test_type_alias_with_tuple() {
 def create_pair(x :: integer, y :: string) do
 {x, y}
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([create_pair/2]).
 
--nominal pair() :: {integer(), string()}.
--spec create_pair(integer(), string()) -> pair().
-create_pair(X, Y) ->
+-nominal pair() :: {integer(), binary()}.
+-spec create_pair(integer(), binary()) -> {integer(), binary()}.
+create_pair(X, Y) when is_integer(X) andalso is_binary(Y) ->
 {X, Y}.
 
 '
@@ -245,7 +248,7 @@ def simple_if() do
     0
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([simple_if/0]).
 
 -spec simple_if() -> integer().
@@ -271,17 +274,17 @@ def if_with_var() do
     "lesser"
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([if_with_var/0]).
 
--spec if_with_var() -> string().
+-spec if_with_var() -> binary().
 if_with_var() ->
 X_aaaa = 10,
 case X_aaaa > 5 of
     true ->
-        "greater";
+        <<"greater"/utf8>>;
     false ->
-        "lesser"
+        <<"lesser"/utf8>>
 end.
 
 '
@@ -295,14 +298,14 @@ def if_no_else() do
     "never"
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([if_no_else/0]).
 
--spec if_no_else() -> string().
+-spec if_no_else() -> binary() | nil.
 if_no_else() ->
 case false of
     true ->
-        "never";
+        <<"never"/utf8>>;
     false ->
         nil
 end.
@@ -325,22 +328,22 @@ def nested_if() do
     "small"
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([nested_if/0]).
 
--spec nested_if() -> string().
+-spec nested_if() -> binary().
 nested_if() ->
 X_aaaa = 15,
 case X_aaaa > 10 of
     true ->
         case X_aaaa > 20 of
     true ->
-        "very large";
+        <<"very large"/utf8>>;
     false ->
-        "medium"
+        <<"medium"/utf8>>
 end;
     false ->
-        "small"
+        <<"small"/utf8>>
 end.
 
 '
@@ -358,18 +361,18 @@ def complex_if() do
     "sum is lesser"
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([complex_if/0]).
 
--spec complex_if() -> string().
+-spec complex_if() -> binary().
 complex_if() ->
 X_aaaa = 5,
 Y_baaa = 10,
 case X_aaaa + Y_baaa > 12 of
     true ->
-        "sum is greater";
+        <<"sum is greater"/utf8>>;
     false ->
-        "sum is lesser"
+        <<"sum is lesser"/utf8>>
 end.
 
 '

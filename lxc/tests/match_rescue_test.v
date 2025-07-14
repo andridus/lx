@@ -8,7 +8,7 @@ def test_simple() do
   end
   value
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([test_simple/0]).
 
 -spec test_simple() -> any().
@@ -32,12 +32,12 @@ def test_failure() do
   end
   :completed
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([test_failure/0]).
 
--spec test_failure() -> atom().
+-spec test_failure() -> {atom(), {atom(), binary()}} | atom().
 test_failure() ->
-case {error, "not_found"} of
+case {error, <<"not_found"/utf8>>} of
     {ok, Value} ->
         completed;
     Error ->
@@ -56,16 +56,16 @@ def test_complex() do
   end
   {name, age}
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([test_complex/0]).
 
--spec test_complex() -> {any(), any()}.
+-spec test_complex() -> any().
 test_complex() ->
-case {ok, "alice", 25} of
+case {ok, <<"alice"/utf8>>, 25} of
     {ok, Name, Age} ->
         {Name, Age};
     Error ->
-        {error, "failed", Error}
+        {error, <<"failed"/utf8>>, Error}
 end.
 
 '
@@ -83,14 +83,14 @@ def test_sequential() do
   end
   {user, perms}
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([test_sequential/0]).
 
--spec test_sequential() -> {any(), any()}.
+-spec test_sequential() -> any().
 test_sequential() ->
-case {ok, "alice"} of
+case {ok, <<"alice"/utf8>>} of
     {ok, User} ->
-        case {ok, "admin"} of
+        case {ok, <<"admin"/utf8>>} of
             {ok, Perms} ->
                 {User, Perms};
             Result ->
@@ -116,12 +116,12 @@ def test_with_call() do
   end
   data
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([get_data/0, test_with_call/0]).
 
--spec get_data() -> {atom(), string()}.
+-spec get_data() -> {atom(), binary()}.
 get_data() ->
-{ok, "data"}.
+{ok, <<"data"/utf8>>}.
 
 -spec test_with_call() -> any().
 test_with_call() ->
@@ -129,7 +129,7 @@ case get_data() of
     {ok, Data} ->
         Data;
     Error ->
-        {error, "Failed", Error}
+        {error, <<"Failed"/utf8>>, Error}
 end.
 
 '
@@ -144,7 +144,7 @@ def test_list() do
   end
   x
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([test_list/0]).
 
 -spec test_list() -> any().
@@ -168,10 +168,10 @@ def test_cons() do
   end
   {h, t}
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([test_cons/0]).
 
--spec test_cons() -> {any(), any()}.
+-spec test_cons() -> any().
 test_cons() ->
 case [1, 2, 3] of
     [H | T] ->

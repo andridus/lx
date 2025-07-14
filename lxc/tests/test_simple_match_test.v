@@ -6,10 +6,10 @@ match {:ok, data} <- {:ok, 123}
 data
 end'
 
-	expected_erlang := '-module(main).
+	expected_erlang := '-module(test).
 -export([test_basic/0]).
 
--spec test_basic() -> any().
+-spec test_basic() -> {atom(), integer()} | integer().
 test_basic() ->
 case {ok, 123} of
     {ok, Data} ->
@@ -29,10 +29,10 @@ match [h | t] <- [1, 2, 3]
 {h, t}
 end'
 
-	expected_erlang := '-module(main).
+	expected_erlang := '-module(test).
 -export([test_cons/0]).
 
--spec test_cons() -> {any(), any()}.
+-spec test_cons() -> [integer()] | {integer(), [integer()]}.
 test_cons() ->
 case [1, 2, 3] of
     [H | T] ->
@@ -53,10 +53,10 @@ match {:ok, perms} <- get_permissions(user)
 {user, perms}
 end'
 
-	expected_erlang := '-module(main).
+	expected_erlang := '-module(test).
 -export([test_sequential/0]).
 
--spec test_sequential() -> {any(), any()}.
+-spec test_sequential() -> any().
 test_sequential() ->
 case get_user() of
     {ok, User} ->
@@ -83,10 +83,10 @@ match [h | t] <- [1, 2, 3]
 {h, t}
 end'
 
-	expected_erlang := '-module(main).
+	expected_erlang := '-module(test).
 -export([test_cons/0]).
 
--spec test_cons() -> {any(), any()}.
+-spec test_cons() -> [integer()] | {integer(), [integer()]}.
 test_cons() ->
 case [1, 2, 3] of
     [H | T] ->
@@ -137,10 +137,10 @@ match {x, y, z} <- get_coordinates()
 {x, y, z}
 end'
 
-	expected_erlang := '-module(main).
+	expected_erlang := '-module(test).
 -export([test_tuple/0]).
 
--spec test_tuple() -> {any(), any(), any()}.
+-spec test_tuple() -> any().
 test_tuple() ->
 case get_coordinates() of
     {X, Y, Z} ->
@@ -160,14 +160,14 @@ match :ok <- process_data()
 "success"
 end'
 
-	expected_erlang := '-module(main).
+	expected_erlang := '-module(test).
 -export([test_atom/0]).
 
--spec test_atom() -> string().
+-spec test_atom() -> any().
 test_atom() ->
 case process_data() of
     ok ->
-        "success";
+        <<"success"/utf8>>;
     Other ->
         Other
 end.
@@ -183,10 +183,10 @@ match {:ok, value} <- compute_value(10, 20)
 value
 end'
 
-	expected_erlang := '-module(main).
+	expected_erlang := '-module(test).
 -export([test_computation/0]).
 
--spec test_computation() -> any().
+-spec test_computation() -> integer().
 test_computation() ->
 case compute_value(10, 20) of
     {ok, Value} ->
@@ -206,14 +206,14 @@ match [] <- get_list()
 "empty list"
 end'
 
-	expected_erlang := '-module(main).
+	expected_erlang := '-module(test).
 -export([test_empty/0]).
 
--spec test_empty() -> string().
+-spec test_empty() -> any().
 test_empty() ->
 case get_list() of
     [] ->
-        "empty list";
+        <<"empty list"/utf8>>;
     Other ->
         Other
 end.
@@ -232,7 +232,7 @@ end
 data
 end'
 
-	expected_erlang := '-module(main).
+	expected_erlang := '-module(test).
 -export([test_mixed/0]).
 
 -spec test_mixed() -> any().

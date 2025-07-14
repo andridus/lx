@@ -48,6 +48,7 @@ pub fn (ti TypeInfo) str() string {
 		}
 		return '${ti.generic}(${value})'
 	}
+
 	return ti.generic
 }
 
@@ -150,7 +151,7 @@ fn remove_duplicate_types(types []TypeInfo) []TypeInfo {
 	mut unique_types := []TypeInfo{}
 	mut seen_strings := map[string]bool{}
 
-	for type_info in types {
+	for _, type_info in types {
 		type_str := type_info.str()
 		if !seen_strings[type_str] {
 			seen_strings[type_str] = true
@@ -163,13 +164,23 @@ fn remove_duplicate_types(types []TypeInfo) []TypeInfo {
 
 // Create TypeInfo for complex types
 pub fn typeinfo_union(types []TypeInfo) TypeInfo {
+	// Flatten nested unions
+	mut flat_types := []TypeInfo{}
+	for t in types {
+		if t.generic == 'union' {
+			flat_types << t.values
+		} else {
+			flat_types << t
+		}
+	}
 	// Remove duplicates when creating union types
-	unique_types := remove_duplicate_types(types)
-	return TypeInfo{
+	unique_types := remove_duplicate_types(flat_types)
+	result := TypeInfo{
 		generic: 'union'
 		value:   none
 		values:  unique_types
 	}
+	return result
 }
 
 pub fn typeinfo_list(element_type TypeInfo) TypeInfo {

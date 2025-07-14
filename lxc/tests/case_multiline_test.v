@@ -158,18 +158,18 @@ def list_case(lst) do
       unknown
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([list_case/1]).
 
--spec list_case(any()) -> {any(), any()}.
+-spec list_case(any()) -> binary() | {any(), integer()}.
 list_case(Lst) ->
 case Lst of
-    [] -> Empty_msg_aaaa = "Empty list",
+    [] -> Empty_msg_aaaa = <<"Empty list"/utf8>>,
     Empty_msg_aaaa;
     [Head | Tail] -> First_baaa = Head,
     Rest_count_caaa = 42,
     {First_baaa, Rest_count_caaa};
-    _ -> Unknown_daaa = "Unknown",
+    _ -> Unknown_daaa = <<"Unknown"/utf8>>,
     Unknown_daaa
 end.
 

@@ -179,15 +179,30 @@ fn (mut a Analyzer) check_module_with_hm(module_stmt ast.ModuleStmt) TypeCheckRe
 			ast.FunctionStmt {
 				// Process the entire function (all clauses)
 				a.process_function_hm(stmt) or {
-					println('HM function processing error: ${err}')
-					// Continue with other functions
+					// Collect errors from HM inferencer
+					hm_errors := a.hm_inferencer.get_errors()
+					error_list << hm_errors
+					a.hm_inferencer.clear_errors()
+					// Don't continue if there are type errors
+					if hm_errors.len > 0 {
+						break
+					}
 				}
+			}
+			ast.RecordDefStmt {
+				// Process record definitions to register them in the type environment
+				a.process_record_definition_hm(stmt)
 			}
 			else {
 				// For other statements, we can extend HM support later
 			}
 		}
 	}
+
+    // Also collect any remaining errors from HM inferencer
+    remaining_errors := a.hm_inferencer.get_errors()
+    error_list << remaining_errors
+    a.hm_inferencer.clear_errors()
 
 	// Create a minimal type context for compatibility
 	type_context := new_type_context()
@@ -203,70 +218,97 @@ fn (mut a Analyzer) check_module_with_hm(module_stmt ast.ModuleStmt) TypeCheckRe
 fn (mut a Analyzer) process_function_hm(func_stmt ast.FunctionStmt) ! {
 	mut hm_inferencer := &a.hm_inferencer
 
+	// Reset HM inferencer state for this function
+	hm_inferencer.reset_for_function()
+
 	if hm_inferencer.type_table.debug_mode {
 		println('[HM_INFERENCER] Processing function "${func_stmt.name}" with ${func_stmt.clauses.len} clauses')
 	}
 
-	// Process each clause and collect return types
-	mut clause_return_types := []TypeInfo{}
-
-	for i, clause in func_stmt.clauses {
-		if hm_inferencer.type_table.debug_mode {
-			println('[HM_INFERENCER] Processing clause ${i + 1}/${func_stmt.clauses.len}')
+	// Group clauses by arity for separate type processing
+	mut clauses_by_arity := map[int][]ast.FunctionClause{}
+	for clause in func_stmt.clauses {
+		arity := clause.parameters.len
+		if arity !in clauses_by_arity {
+			clauses_by_arity[arity] = []ast.FunctionClause{}
 		}
+		clauses_by_arity[arity] << clause
+	}
 
-		// Create a new environment scope for this clause
-		clause_env := hm_inferencer.type_env.extend()
-		original_env := hm_inferencer.type_env
-		hm_inferencer.type_env = clause_env
-
-		// Process parameters first to bind their types
-		a.process_function_parameters_hm(clause)!
-
-		// Infer types for expressions in the function body
-		body_type := hm_inferencer.infer_expression(clause.body)!
+	// Process each arity group separately
+	for arity, clauses in clauses_by_arity {
+		mut clause_return_types := []TypeInfo{}
 
 		if hm_inferencer.type_table.debug_mode {
-			println('[HM_INFERENCER] Clause ${i + 1} body type: ${body_type}')
+			println('[HM_INFERENCER] Processing arity ${arity} with ${clauses.len} clauses')
 		}
 
-		// Check if clause has return type annotation
-		if return_type_expr := clause.return_type {
-			expected_return_type := a.convert_type_expr_to_type_info(return_type_expr)
-
+		// Process each clause in this arity group
+		for i, clause in clauses {
 			if hm_inferencer.type_table.debug_mode {
-				println('[HM_INFERENCER] Clause ${i + 1} expected return type: ${expected_return_type}')
+				println('[HM_INFERENCER] Processing clause ${i + 1}/${clauses.len} for arity ${arity}')
 			}
 
-			// Add constraint that body type must match expected return type
-			hm_inferencer.add_constraint(body_type, expected_return_type)
-			clause_return_types << expected_return_type
-		} else {
-			// No annotation - use inferred body type
-			clause_return_types << body_type
+			// Create a new environment scope for this clause
+			clause_env := hm_inferencer.type_env.extend()
+			original_env := hm_inferencer.type_env
+			hm_inferencer.type_env = clause_env
+
+			// Process parameters first to bind their types
+			a.process_function_parameters_hm(clause)!
+
+			// Infer types for expressions in the function body
+			body_type := hm_inferencer.infer_expression(clause.body)!
+
+			if hm_inferencer.type_table.debug_mode {
+				println('[HM_INFERENCER] Clause ${i + 1} body type: ${body_type}')
+			}
+
+			// Check if clause has return type annotation
+			if return_type_expr := clause.return_type {
+				expected_return_type := a.convert_type_expr_to_type_info(return_type_expr)
+
+				if hm_inferencer.type_table.debug_mode {
+					println('[HM_INFERENCER] Clause ${i + 1} expected return type: ${expected_return_type}')
+				}
+
+				// Add constraint that body type must match expected return type
+				hm_inferencer.add_constraint(body_type, expected_return_type)
+				clause_return_types << expected_return_type
+			} else {
+				// No annotation - use inferred body type
+				clause_return_types << body_type
+			}
+
+			// Restore original environment
+			hm_inferencer.type_env = original_env
 		}
 
-		// Restore original environment
-		hm_inferencer.type_env = original_env
-	}
+		// Determine the return type for this arity
+		arity_return_type := if clause_return_types.len == 1 {
+			clause_return_types[0]
+		} else {
+			// Multiple clauses for this arity - create union type
+			typeinfo_union(clause_return_types)
+		}
 
-	// Determine the function's overall return type
-	function_return_type := if clause_return_types.len == 1 {
-		clause_return_types[0]
-	} else {
-		// Multiple clauses - create union type
-		typeinfo_union(clause_return_types)
-	}
+		if hm_inferencer.type_table.debug_mode {
+			println('[HM_INFERENCER] Function "${func_stmt.name}/${arity}" return type: ${arity_return_type}')
+		}
 
-	if hm_inferencer.type_table.debug_mode {
-		println('[HM_INFERENCER] Function "${func_stmt.name}" return type: ${function_return_type}')
-	}
+		// Store the return type for this specific arity using a unique AST ID
+		// We'll create a synthetic AST ID for each arity by combining function AST ID with arity
+		arity_ast_id := func_stmt.ast_id * 1000 + arity
+		pos := '${func_stmt.position.line}:${func_stmt.position.column}'
+		func_text := 'def ${func_stmt.name}/${arity}(...)'
+		hm_inferencer.type_table.assign_type_with_pos(arity_ast_id, arity_return_type, pos, func_text)
 
-	// Create function type
-	// For now, we'll use the parameters from the first clause
-	// In a full implementation, we'd handle multiple arities
-	if func_stmt.clauses.len > 0 {
-		first_clause := func_stmt.clauses[0]
+		if hm_inferencer.type_table.debug_mode {
+			println('[HM_INFERENCER] Stored function "${func_stmt.name}/${arity}" return type in TypeTable with AST ID: ${arity_ast_id}')
+		}
+
+		// Create function type for this arity
+		first_clause := clauses[0]
 		mut param_types := []TypeInfo{}
 
 		for param in first_clause.parameters {
@@ -287,7 +329,7 @@ fn (mut a Analyzer) process_function_hm(func_stmt ast.FunctionStmt) ! {
 
 		// Create function type
 		mut all_types := param_types.clone()
-		all_types << function_return_type
+		all_types << arity_return_type
 
 		function_type := TypeInfo{
 			generic: 'function'
@@ -298,26 +340,85 @@ fn (mut a Analyzer) process_function_hm(func_stmt ast.FunctionStmt) ! {
 		// Bind function to environment so it can be called
 		hm_inferencer.type_env.bind(func_stmt.name, monotype(function_type))
 
-		// CRITICAL: Also store function RETURN TYPE in TypeTable for logging
-		if func_stmt.ast_id > 0 {
-			pos := '${func_stmt.position.line}:${func_stmt.position.column}'
-			func_text := 'def ${func_stmt.name}(...)'
-			hm_inferencer.type_table.assign_type_with_pos(func_stmt.ast_id, function_return_type,
-				pos, func_text)
-
-			if hm_inferencer.type_table.debug_mode {
-				println('[HM_INFERENCER] Stored function "${func_stmt.name}" return type in TypeTable with AST ID: ${func_stmt.ast_id}')
-			}
-		} else {
-			if hm_inferencer.type_table.debug_mode {
-				println('[HM_INFERENCER] WARNING: Function "${func_stmt.name}" has invalid AST ID: ${func_stmt.ast_id}')
-			}
-		}
-
 		if hm_inferencer.type_table.debug_mode {
-			println('[HM_INFERENCER] Bound function "${func_stmt.name}" to type: ${function_type}')
+			println('[HM_INFERENCER] Bound function "${func_stmt.name}/${arity}" to type: ${function_type}')
 		}
 	}
+
+	// Also store the overall function return type (union of all arities) for compatibility
+	// Process each clause and collect return types
+	mut all_clause_return_types := []TypeInfo{}
+	for clause in func_stmt.clauses {
+		// Create a new environment scope for this clause
+		clause_env := hm_inferencer.type_env.extend()
+		original_env := hm_inferencer.type_env
+		hm_inferencer.type_env = clause_env
+
+		// Process parameters first to bind their types
+		a.process_function_parameters_hm(clause)!
+
+		// Infer types for expressions in the function body
+		body_type := hm_inferencer.infer_expression(clause.body)!
+
+		// Check if clause has return type annotation
+		if return_type_expr := clause.return_type {
+			expected_return_type := a.convert_type_expr_to_type_info(return_type_expr)
+			hm_inferencer.add_constraint(body_type, expected_return_type)
+			all_clause_return_types << expected_return_type
+		} else {
+			// No annotation - use inferred body type
+			all_clause_return_types << body_type
+		}
+
+		// Restore original environment
+		hm_inferencer.type_env = original_env
+	}
+
+	// Determine the function's overall return type
+	function_return_type := if all_clause_return_types.len == 1 {
+		all_clause_return_types[0]
+	} else {
+		// Multiple clauses - create union type
+		typeinfo_union(all_clause_return_types)
+	}
+
+	// CRITICAL: Also store function RETURN TYPE in TypeTable for logging
+	if func_stmt.ast_id > 0 {
+		pos := '${func_stmt.position.line}:${func_stmt.position.column}'
+		func_text := 'def ${func_stmt.name}(...)'
+		hm_inferencer.type_table.assign_type_with_pos(func_stmt.ast_id, function_return_type,
+			pos, func_text)
+
+		if hm_inferencer.type_table.debug_mode {
+			println('[HM_INFERENCER] Stored function "${func_stmt.name}" return type in TypeTable with AST ID: ${func_stmt.ast_id}')
+		}
+	} else {
+		if hm_inferencer.type_table.debug_mode {
+			println('[HM_INFERENCER] WARNING: Function "${func_stmt.name}" has invalid AST ID: ${func_stmt.ast_id}')
+		}
+	}
+
+	// Resolve constraints and apply substitutions
+	if hm_inferencer.constraints.len > 0 {
+		if hm_inferencer.type_table.debug_mode {
+			println('[HM_INFERENCER] DEBUG: Function "${func_stmt.name}" constraints after processing:')
+			for i, constraint in hm_inferencer.constraints {
+				println('[HM_INFERENCER] DEBUG: Constraint ${i + 1}: ${constraint.left} = ${constraint.right}')
+			}
+		}
+
+		// Resolve all constraints
+		substitution := hm_inferencer.resolve_constraints()!
+
+		if hm_inferencer.type_table.debug_mode {
+			println('[HM_INFERENCER] DEBUG: Applied substitution: ${substitution.str()}')
+		}
+	}
+
+    // Check if there are any type errors and prevent compilation
+    if hm_inferencer.has_errors() {
+        return error('Type errors detected in function "${func_stmt.name}"')
+    }
 }
 
 // process_function_parameters_hm processes function parameters and binds their types to HM environment
@@ -456,5 +557,38 @@ fn (a Analyzer) convert_type_expr_to_type_info(type_expr ast.TypeExpression) Typ
 				values:  []
 			}
 		}
+	}
+}
+
+// process_record_definition_hm processes record definitions and registers them in the HM environment
+fn (mut a Analyzer) process_record_definition_hm(record_stmt ast.RecordDefStmt) {
+	mut hm_inferencer := &a.hm_inferencer
+
+	if hm_inferencer.type_table.debug_mode {
+		println('[HM_INFERENCER] Processing record definition: ${record_stmt.name}')
+	}
+
+	// Create a record type with field information
+	for field in record_stmt.fields {
+		field_type := a.convert_type_expr_to_type_info(field.field_type)
+		key := '${record_stmt.name}.${field.name}'
+		hm_inferencer.record_field_types[key] = field_type
+		if hm_inferencer.type_table.debug_mode {
+			println('[HM_INFERENCER] Record field ${key}: ${field_type}')
+		}
+	}
+
+	// Create the record type
+	record_type := TypeInfo{
+		generic: 'record'
+		value:   record_stmt.name
+		values:  []TypeInfo{} // We'll store field types in a different way
+	}
+
+	// Bind the record name to its type in the environment
+	hm_inferencer.type_env.bind(record_stmt.name, monotype(record_type))
+
+	if hm_inferencer.type_table.debug_mode {
+		println('[HM_INFERENCER] Registered record "${record_stmt.name}" with type: ${record_type}')
 	}
 }

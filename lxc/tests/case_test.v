@@ -12,7 +12,7 @@ def simple_case() do
     _ -> -1
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([simple_case/0]).
 
 -spec simple_case() -> integer().
@@ -39,16 +39,16 @@ def case_with_var(x) do
     _ -> "qualquer"
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([case_with_var/1]).
 
--spec case_with_var(any()) -> string().
+-spec case_with_var(any()) -> binary().
 case_with_var(X) ->
 case X of
-    1 -> "um";
-    2 -> "dois";
-    3 -> "três";
-    _ -> "qualquer"
+    1 -> <<"um"/utf8>>;
+    2 -> <<"dois"/utf8>>;
+    3 -> <<"três"/utf8>>;
+    _ -> <<"qualquer"/utf8>>
 end.
 
 '
@@ -65,16 +65,16 @@ def case_with_guards(x) do
     _ -> "qualquer"
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([case_with_guards/1]).
 
--spec case_with_guards(any()) -> string().
+-spec case_with_guards(any()) -> binary().
 case_with_guards(X) ->
 case X of
-    X when X > 3 -> "maior que 3";
-    2 -> "dois";
-    3 -> "três";
-    _ -> "qualquer"
+    X when X > 3 -> <<"maior que 3"/utf8>>;
+    2 -> <<"dois"/utf8>>;
+    3 -> <<"três"/utf8>>;
+    _ -> <<"qualquer"/utf8>>
 end.
 
 '
@@ -99,19 +99,19 @@ def atom_case() do
       {unknown_msg, unknown_code}
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([atom_case/0]).
 
--spec atom_case() -> {any(), any()}.
+-spec atom_case() -> {binary(), integer()}.
 atom_case() ->
 case ok of
-    ok -> Success_msg_aaaa = "Operation successful",
+    ok -> Success_msg_aaaa = <<"Operation successful"/utf8>>,
     Count_baaa = 1,
     {Success_msg_aaaa, Count_baaa};
-    error -> Error_msg_caaa = "Operation failed",
+    error -> Error_msg_caaa = <<"Operation failed"/utf8>>,
     Error_code_daaa = -1,
     {Error_msg_caaa, Error_code_daaa};
-    _ -> Unknown_msg_eaaa = "Unknown status",
+    _ -> Unknown_msg_eaaa = <<"Unknown status"/utf8>>,
     Unknown_code_faaa = 0,
     {Unknown_msg_eaaa, Unknown_code_faaa}
 end.
@@ -129,7 +129,7 @@ def single_statement_case() do
     _ -> :unknown
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([single_statement_case/0]).
 
 -spec single_statement_case() -> atom().

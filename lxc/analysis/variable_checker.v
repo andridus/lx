@@ -106,8 +106,8 @@ fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 		ast.GuardExpr { vc.check_guard_expression(expr) }
 		ast.UnaryExpr { vc.check_unary_expression(expr) }
 		ast.ListEmptyExpr {}
-		ast.SimpleMatchExpr {}
-		ast.MatchRescueExpr {}
+		ast.SimpleMatchExpr { vc.check_simple_match_expression(expr) }
+		ast.MatchRescueExpr { vc.check_match_rescue_expression(expr) }
 	}
 }
 
@@ -224,6 +224,33 @@ fn (mut vc VariableChecker) check_for_expression(expr ast.ForExpr) {
 fn (mut vc VariableChecker) check_send_expression(expr ast.SendExpr) {
 	vc.check_expression(expr.pid)
 	vc.check_expression(expr.message)
+}
+
+fn (mut vc VariableChecker) check_simple_match_expression(expr ast.SimpleMatchExpr) {
+	// Check the value being matched
+	vc.check_expression(expr.value)
+
+	// Check the pattern and bind variables from it
+	vc.check_pattern(expr.pattern)
+
+	// Check the guard if present
+	if expr.guard != ast.Expr{} {
+		vc.check_expression(expr.guard)
+	}
+}
+
+fn (mut vc VariableChecker) check_match_rescue_expression(expr ast.MatchRescueExpr) {
+	// Check the value being matched
+	vc.check_expression(expr.value)
+
+	// Check the pattern and bind variables from it
+	vc.check_pattern(expr.pattern)
+
+	// Bind the rescue variable
+	vc.scope_manager.bind_variable(expr.rescue_var, expr.position)
+
+	// Check the rescue body
+	vc.check_expression(expr.rescue_body)
 }
 
 fn (mut vc VariableChecker) check_pattern(pattern ast.Pattern) {

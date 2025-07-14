@@ -282,18 +282,25 @@ pub fn (mut gen ErlangGenerator) generate_function(func ast.FunctionStmt) string
 		first_clause := clauses[0]
 		arity := first_clause.parameters.len
 
-		// Get parameter types with unions
-		param_types := gen.get_function_param_types(func.name, arity)
+		// Get parameter types by analyzing all clauses with this arity
+		param_types := gen.get_param_types_from_clauses(clauses)
 
 		// Gerar o tipo de retorno a partir do TypeInfo
 		mut return_type := analysis.typeinfo_any()
 		if first_clause.return_type != none {
 			return_type = gen.type_expr_to_typeinfo(first_clause.return_type)
 		} else {
-			// Try to get from HM TypeTable first using AST ID
+			// Try to get from HM TypeTable using arity-specific AST ID
 			if func.ast_id > 0 {
-				if type_info := gen.get_function_return_type_by_ast_id(func.ast_id) {
+				// Create synthetic AST ID for this arity (same formula as in analyzer)
+				arity_ast_id := func.ast_id * 1000 + arity
+				if type_info := gen.get_function_return_type_by_ast_id(arity_ast_id) {
 					return_type = type_info
+				} else {
+					// Fallback to function-wide type
+					if type_info := gen.get_function_return_type_by_ast_id(func.ast_id) {
+						return_type = type_info
+					}
 				}
 			} else {
 				// Fallback to legacy system
@@ -321,20 +328,40 @@ pub fn (mut gen ErlangGenerator) generate_function(func ast.FunctionStmt) string
 				}
 			}
 			parameters := clause.parameters.map(gen.generate_pattern(it))
-			mut guard := ''
+
+			// Generate automatic type guards using processed parameter names
+			mut guard_parts := []string{}
+			automatic_guards := gen.generate_automatic_type_guards_with_names(clause, parameters)
+			if automatic_guards.len > 0 {
+				guard_parts << automatic_guards
+			}
+
+			// Add existing manual guards if present
+			mut manual_guard := ''
 			if clause.guard is ast.LiteralExpr {
 				literal := clause.guard as ast.LiteralExpr
 				if literal.value is ast.BooleanLiteral {
 					boolean := literal.value as ast.BooleanLiteral
 					if !boolean.value {
-						guard = ' when ' + gen.generate_expression_in_guard(clause.guard)
+						manual_guard = gen.generate_expression_in_guard(clause.guard)
 					}
 				} else {
-					guard = ' when ' + gen.generate_expression_in_guard(clause.guard)
+					manual_guard = gen.generate_expression_in_guard(clause.guard)
 				}
 			} else {
-				guard = ' when ' + gen.generate_expression_in_guard(clause.guard)
+				manual_guard = gen.generate_expression_in_guard(clause.guard)
 			}
+
+			if manual_guard.len > 0 {
+				guard_parts << manual_guard
+			}
+
+			// Combine all guards
+			mut guard := ''
+			if guard_parts.len > 0 {
+				guard = ' when ' + guard_parts.join(' andalso ')
+			}
+
 			// Use the new function body generator that handles match rescue and block assignments
 			body_code := gen.generate_function_body(clause.body.body)
 			gen.exit_scope()
@@ -902,7 +929,12 @@ fn (gen ErlangGenerator) typeinfo_to_erlang_type(type_info analysis.TypeInfo) st
 		'union' {
 			if type_info.values.len > 0 {
 				erlang_types := type_info.values.map(gen.typeinfo_to_erlang_type(it))
-				erlang_types.join(' | ')
+				// If any of the types is 'any()', then the union is just 'any()'
+				if erlang_types.contains('any()') {
+					'any()'
+				} else {
+					erlang_types.join(' | ')
+				}
 			} else {
 				'any()'
 			}
@@ -1018,4 +1050,203 @@ fn (gen ErlangGenerator) convert_single_type_to_erlang_spec(type_str string) str
 		}
 	}
 	return type_str
+}
+
+// generate_automatic_type_guards generates guards based on parameter types
+fn (gen ErlangGenerator) generate_automatic_type_guards(clause ast.FunctionClause) string {
+	mut type_guards := []string{}
+
+	for param in clause.parameters {
+		match param {
+			ast.VarPattern {
+				if type_ann := param.type_annotation {
+					guard_expr := gen.type_annotation_to_guard(param.name, type_ann)
+					if guard_expr.len > 0 {
+						type_guards << guard_expr
+					}
+				}
+			}
+			else {}
+		}
+	}
+
+	if type_guards.len > 0 {
+		return type_guards.join(' andalso ')
+	}
+	return ''
+}
+
+// generate_automatic_type_guards_with_names generates guards based on parameter types using processed parameter names
+fn (gen ErlangGenerator) generate_automatic_type_guards_with_names(clause ast.FunctionClause, parameters []string) string {
+	mut type_guards := []string{}
+
+	for i, param in clause.parameters {
+		match param {
+			ast.VarPattern {
+				if type_ann := param.type_annotation {
+					// Use the processed parameter name from the parameters array
+					param_name := parameters[i]
+					guard_expr := gen.type_annotation_to_guard(param_name, type_ann)
+					if guard_expr.len > 0 {
+						type_guards << guard_expr
+					}
+				}
+			}
+			else {}
+		}
+	}
+
+	if type_guards.len > 0 {
+		return type_guards.join(' andalso ')
+	}
+	return ''
+}
+
+// type_annotation_to_guard converts a type annotation to an Erlang guard expression
+fn (gen ErlangGenerator) type_annotation_to_guard(param_name string, type_expr ast.TypeExpression) string {
+	match type_expr {
+		ast.SimpleTypeExpr {
+			return match type_expr.name {
+				'integer' { 'is_integer(${param_name})' }
+				'float' { 'is_float(${param_name})' }
+				'atom' { 'is_atom(${param_name})' }
+				'string', 'binary' { 'is_binary(${param_name})' }
+				'boolean' { 'is_boolean(${param_name})' }
+				'list' { 'is_list(${param_name})' }
+				'map' { 'is_map(${param_name})' }
+				'tuple' { 'is_tuple(${param_name})' }
+				'number' { 'is_number(${param_name})' }
+				'pid' { 'is_pid(${param_name})' }
+				'port' { 'is_port(${param_name})' }
+				'reference' { 'is_reference(${param_name})' }
+				'bitstring' { 'is_bitstring(${param_name})' }
+				'function' { 'is_function(${param_name})' }
+				else { '' }
+			}
+		}
+		ast.FunctionTypeExpr {
+			if type_expr.param_types.len > 0 {
+				return 'is_function(${param_name}, ${type_expr.param_types.len})'
+			}
+			return 'is_function(${param_name})'
+		}
+		ast.ListTypeExpr {
+			return 'is_list(${param_name})'
+		}
+		ast.TupleTypeExpr {
+			return 'is_tuple(${param_name})'
+		}
+		ast.MapTypeExpr {
+			return 'is_map(${param_name})'
+		}
+		else {
+			return ''
+		}
+	}
+}
+
+// get_param_types_from_clauses extracts parameter types from function clauses
+fn (gen ErlangGenerator) get_param_types_from_clauses(clauses []ast.FunctionClause) []string {
+	if clauses.len == 0 {
+		return []string{}
+	}
+
+	arity := clauses[0].parameters.len
+	mut param_types := [][]string{len: arity}
+
+	// Initialize each parameter position with empty array
+	for i in 0 .. arity {
+		param_types[i] = []string{}
+	}
+
+	// Collect types from all clauses
+	for clause in clauses {
+		if clause.parameters.len != arity {
+			continue // Skip clauses with different arity (shouldn't happen)
+		}
+
+		for i, param in clause.parameters {
+			match param {
+				ast.VarPattern {
+					if type_ann := param.type_annotation {
+						param_type := gen.type_expression_to_erlang_type(type_ann)
+						if param_type.len > 0 && param_type !in param_types[i] {
+							param_types[i] << param_type
+						}
+					}
+				}
+				else {
+					// For other pattern types, use any() if not already present
+					if 'any()' !in param_types[i] {
+						param_types[i] << 'any()'
+					}
+				}
+			}
+		}
+	}
+
+	// Convert to union types for each parameter position
+	mut result := []string{}
+	for i in 0 .. arity {
+		if param_types[i].len == 0 {
+			result << 'any()'
+		} else if param_types[i].len == 1 {
+			result << param_types[i][0]
+		} else {
+			// Create union type
+			result << param_types[i].join(' | ')
+		}
+	}
+
+	return result
+}
+
+// type_expression_to_erlang_type converts a TypeExpression to Erlang type string
+fn (gen ErlangGenerator) type_expression_to_erlang_type(type_expr ast.TypeExpression) string {
+	match type_expr {
+		ast.SimpleTypeExpr {
+			return match type_expr.name {
+				'integer' { 'integer()' }
+				'float' { 'float()' }
+				'atom' { 'atom()' }
+				'string', 'binary' { 'binary()' }
+				'boolean' { 'boolean()' }
+				'list' { 'list()' }
+				'map' { 'map()' }
+				'tuple' { 'tuple()' }
+				'number' { 'number()' }
+				'pid' { 'pid()' }
+				'port' { 'port()' }
+				'reference' { 'reference()' }
+				'bitstring' { 'bitstring()' }
+				'function' { 'function()' }
+				else { 'any()' }
+			}
+		}
+		ast.ListTypeExpr {
+			element_type := gen.type_expression_to_erlang_type(type_expr.element_type)
+			return '[${element_type}]'
+		}
+		ast.TupleTypeExpr {
+			element_types := type_expr.element_types.map(gen.type_expression_to_erlang_type(it))
+			return '{${element_types.join(', ')}}'
+		}
+		ast.MapTypeExpr {
+			key_type := gen.type_expression_to_erlang_type(type_expr.key_type)
+			value_type := gen.type_expression_to_erlang_type(type_expr.value_type)
+			return '#{${key_type} => ${value_type}}'
+		}
+		ast.FunctionTypeExpr {
+			param_types := type_expr.param_types.map(gen.type_expression_to_erlang_type(it))
+			return_type := gen.type_expression_to_erlang_type(type_expr.return_type)
+			return 'fun((${param_types.join(', ')}) -> ${return_type})'
+		}
+		ast.UnionTypeExpr {
+			union_types := type_expr.types.map(gen.type_expression_to_erlang_type(it))
+			return union_types.join(' | ')
+		}
+		else {
+			return 'any()'
+		}
+	}
 }

@@ -5,12 +5,12 @@ fn test_map_literal_basic() {
 def test_map() do
   %{name: "John", age: 30}
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([test_map/0]).
 
--spec test_map() -> #{atom() => string()}.
+-spec test_map() -> #{atom() => any()}.
 test_map() ->
-#{name => "John", age => 30}.
+#{name => <<"John"/utf8>>, age => 30}.
 
 '
 	erl1 := generates_erlang_result(lx_code)
@@ -23,12 +23,12 @@ fn test_map_literal_with_fat_arrow() {
 def test_map() do
   %{"name" => "John", "age" => 30}
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([test_map/0]).
 
--spec test_map() -> #{string() => string()}.
+-spec test_map() -> #{binary() => any()}.
 test_map() ->
-#{"name" => "John", "age" => 30}.
+#{<<"name"/utf8>> => <<"John"/utf8>>, <<"age"/utf8>> => 30}.
 
 '
 	erl1 := generates_erlang_result(lx_code)
@@ -41,7 +41,7 @@ fn test_map_access() {
 def get_name(user) do
   user[:name]
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([get_name/1]).
 
 -spec get_name(any()) -> any().
@@ -59,7 +59,7 @@ fn test_map_update() {
 def update_age(user) do
   %{user | age: 31}
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([update_age/1]).
 
 -spec update_age(any()) -> any().
@@ -77,12 +77,12 @@ fn test_map_update_with_fat_arrow() {
 def update_user(user) do
   %{user | "status" => "active"}
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([update_user/1]).
 
 -spec update_user(any()) -> any().
 update_user(User) ->
-User#{"status" => "active"}.
+User#{<<"status"/utf8>> => <<"active"/utf8>>}.
 
 '
 	erl1 := generates_erlang_result(lx_code)
@@ -98,14 +98,14 @@ def extract_name(user) do
     _ -> "unknown"
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([extract_name/1]).
 
--spec extract_name(any()) -> string().
+-spec extract_name(any()) -> any().
 extract_name(User) ->
 case User of
     #{name => Name} -> Name;
-    _ -> "unknown"
+    _ -> <<"unknown"/utf8>>
 end.
 
 '
@@ -122,13 +122,13 @@ def extract_data(data) do
     _ -> nil
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([extract_data/1]).
 
 -spec extract_data(any()) -> any().
 extract_data(Data) ->
 case Data of
-    #{"key" => Value} -> Value;
+    #{<<"key"/utf8>> => Value} -> Value;
     _ -> nil
 end.
 
@@ -143,7 +143,7 @@ fn test_nested_map_access() {
 def get_db_host(config) do
   config[:database][:host]
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([get_db_host/1]).
 
 -spec get_db_host(any()) -> any().
@@ -194,10 +194,10 @@ fn test_empty_map() {
 def empty_map() do
   %{}
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([empty_map/0]).
 
--spec empty_map() -> #{}.
+-spec empty_map() -> #{any() => any()}.
 empty_map() ->
 #{}.
 
@@ -212,7 +212,7 @@ fn test_map_with_variables() {
 def create_user(name, age) do
   %{name: name, age: age, active: true}
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([create_user/2]).
 
 -spec create_user(any(), any()) -> #{atom() => any()}.

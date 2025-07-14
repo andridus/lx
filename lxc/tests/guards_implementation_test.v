@@ -14,17 +14,17 @@ def check_user_status(user) do
 		"inactive_user"
 	end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([check_user_status/1]).
 
 -record(user, {id, active}).
--spec check_user_status(any()) -> string().
+-spec check_user_status(any()) -> binary().
 check_user_status(User) ->
 case User of
     #user{id = Id, active = true} when Id > 0 ->
-        "active_user";
+        <<"active_user"/utf8>>;
     Other ->
-        "inactive_user"
+        <<"inactive_user"/utf8>>
 end.
 
 '

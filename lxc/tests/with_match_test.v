@@ -1,7 +1,7 @@
 module tests
 
 import frontend.lexer
-import frontend.parser1
+import frontend.parser
 import ast
 
 fn tokenize_code(code string) []lexer.Token {
@@ -34,7 +34,7 @@ end
 
 	tokens := tokenize_code(code)
 
-	mut p := parser1.new_parser(tokens)
+	mut p := parser.new_parser(tokens)
 	result := p.parse_program() or {
 		println('Parse errors:')
 		for error in p.get_errors() {
@@ -82,7 +82,7 @@ end
 
 	tokens := tokenize_code(code)
 
-	mut p := parser1.new_parser(tokens)
+	mut p := parser.new_parser(tokens)
 	result := p.parse_program() or {
 		println('Parse errors:')
 		for error in p.get_errors() {
@@ -135,7 +135,7 @@ end
 
 	tokens := tokenize_code(code)
 
-	mut p := parser1.new_parser(tokens)
+	mut p := parser.new_parser(tokens)
 	result := p.parse_program() or {
 		println('Parse errors:')
 		for error in p.get_errors() {

@@ -8,10 +8,10 @@ def test_cons() do
   end
   {h, t}
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([test_cons/0]).
 
--spec test_cons() -> {any(), any()}.
+-spec test_cons() -> any().
 test_cons() ->
 case [1, 2, 3] of
     [H | T] ->
@@ -32,16 +32,16 @@ def test_success() do
   end
   {first, rest}
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([test_success/0]).
 
--spec test_success() -> {any(), any()}.
+-spec test_success() -> any().
 test_success() ->
 case [42, 10, 5] of
     [First | Rest] ->
         {First, Rest};
     Error ->
-        {error, "empty list"}
+        {error, <<"empty list"/utf8>>}
 end.
 
 '

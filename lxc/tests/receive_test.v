@@ -12,7 +12,7 @@ def simple_receive() do
     _ -> -1
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([simple_receive/0]).
 
 -spec simple_receive() -> any().
@@ -45,7 +45,7 @@ def receive_with_timeout() do
     {timeout_msg, error_code}
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([receive_with_timeout/0]).
 
 -spec receive_with_timeout() -> any().
@@ -57,7 +57,7 @@ receive
     2 -> ok;
     _ -> unknown
 after 1000 ->
-    Timeout_msg_caaa = "Timeout occurred",
+    Timeout_msg_caaa = <<"Timeout occurred"/utf8>>,
     Error_code_daaa = -1,
     {Timeout_msg_caaa, Error_code_daaa}
 end.
@@ -84,19 +84,19 @@ def tuple_receive() do
       default_response
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([tuple_receive/0]).
 
 -spec tuple_receive() -> any().
 tuple_receive() ->
 receive
-    {Start, Pid} -> Msg_aaaa = "Process started",
+    {Start, Pid} -> Msg_aaaa = <<"Process started"/utf8>>,
     Response_baaa = {Msg_aaaa, Pid},
     Response_baaa;
-    {Stop, Reason} -> Cleanup_msg_caaa = "Cleaning up",
+    {Stop, Reason} -> Cleanup_msg_caaa = <<"Cleaning up"/utf8>>,
     Final_msg_daaa = {Cleanup_msg_caaa, Reason},
     Final_msg_daaa;
-    _ -> Unknown_msg_eaaa = "Unknown message",
+    _ -> Unknown_msg_eaaa = <<"Unknown message"/utf8>>,
     Default_response_faaa = {Unknown_msg_eaaa, error},
     Default_response_faaa
 end.
@@ -131,26 +131,26 @@ def atom_receive() do
     {timeout_status, timeout_code}
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([atom_receive/0]).
 
 -spec atom_receive() -> any().
 atom_receive() ->
 receive
-    start -> Status_aaaa = "started",
+    start -> Status_aaaa = <<"started"/utf8>>,
     Code_baaa = 1,
     {Status_aaaa, Code_baaa};
-    stop -> Status_caaa = "stopped",
+    stop -> Status_caaa = <<"stopped"/utf8>>,
     Code_daaa = 0,
     {Status_caaa, Code_daaa};
-    error -> Status_eaaa = "error",
+    error -> Status_eaaa = <<"error"/utf8>>,
     Code_faaa = -1,
     {Status_eaaa, Code_faaa};
-    _ -> Status_gaaa = "unknown",
+    _ -> Status_gaaa = <<"unknown"/utf8>>,
     Code_haaa = 999,
     {Status_gaaa, Code_haaa}
 after 2000 ->
-    Timeout_status_iaaa = "timeout",
+    Timeout_status_iaaa = <<"timeout"/utf8>>,
     Timeout_code_jaaa = -2,
     {Timeout_status_iaaa, Timeout_code_jaaa}
 end.
@@ -179,7 +179,7 @@ def nested_receive() do
     _ -> 0
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([nested_receive/0]).
 
 -spec nested_receive() -> any().
@@ -214,7 +214,7 @@ def single_statement_receive() do
     :timeout
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([single_statement_receive/0]).
 
 -spec single_statement_receive() -> any().

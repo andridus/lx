@@ -16,7 +16,7 @@ def simple() do
     1
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([func_a/0, func_b/0, simple/0]).
 
 -spec func_a() -> {integer(), integer()}.
@@ -63,7 +63,7 @@ def simple_2() do
     0
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([func_a/0, func_b/0, simple_2/0]).
 
 -spec func_a() -> {integer(), integer()}.
@@ -105,20 +105,20 @@ def single_with() do
     "failed"
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([get_value/0, single_with/0]).
 
--spec get_value() -> {integer(), string()}.
+-spec get_value() -> {integer(), binary()}.
 get_value() ->
-{1, "hello"}.
+{1, <<"hello"/utf8>>}.
 
--spec single_with() -> string().
+-spec single_with() -> binary().
 single_with() ->
 case get_value() of
     {1, Value} ->
         Value;
     Other ->
-        "failed"
+        <<"failed"/utf8>>
 end.
 
 '
@@ -132,12 +132,12 @@ def no_bindings() do
     "success"
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([no_bindings/0]).
 
--spec no_bindings() -> string().
+-spec no_bindings() -> binary().
 no_bindings() ->
-"success".
+<<"success"/utf8>>.
 
 '
 	assert generates_erlang(lx_code) == expected
@@ -157,17 +157,17 @@ def check_user_status(user) do
 		"inactive_user"
 	end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([check_user_status/1]).
 
 -record(user, {id, active}).
--spec check_user_status(any()) -> string().
+-spec check_user_status(any()) -> binary().
 check_user_status(User) ->
 case User of
     #user{id = Id, active = true} when Id > 0 ->
-        "active_user";
+        <<"active_user"/utf8>>;
     Other ->
-        "inactive_user"
+        <<"inactive_user"/utf8>>
 end.
 
 '

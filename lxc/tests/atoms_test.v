@@ -5,7 +5,7 @@ fn test_simple_atom() {
 def simple() do
   :ok
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([simple/0]).
 
 -spec simple() -> atom().
@@ -29,7 +29,7 @@ end
 def get_pending() do
   :pending
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([get_status/0, get_error/0, get_pending/0]).
 
 -spec get_status() -> atom().
@@ -57,16 +57,16 @@ end
 def result_error() do
   {:error, "failed"}
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([result_ok/0, result_error/0]).
 
--spec result_ok() -> {atom(), string()}.
+-spec result_ok() -> {atom(), binary()}.
 result_ok() ->
-{ok, "success"}.
+{ok, <<"success"/utf8>>}.
 
--spec result_error() -> {atom(), string()}.
+-spec result_error() -> {atom(), binary()}.
 result_error() ->
-{error, "failed"}.
+{error, <<"failed"/utf8>>}.
 
 '
 	assert generates_erlang(lx_code) == expected
@@ -81,12 +81,12 @@ end
 def simple_response() do
   {:response, :success}
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([complex_result/0, simple_response/0]).
 
--spec complex_result() -> {atom(), atom(), integer(), string()}.
+-spec complex_result() -> {atom(), atom(), integer(), binary()}.
 complex_result() ->
-{ok, data, 42, "message"}.
+{ok, data, 42, <<"message"/utf8>>}.
 
 -spec simple_response() -> {atom(), atom()}.
 simple_response() ->
@@ -105,16 +105,16 @@ end
 def print_with_args() do
   :io.format("Hello ~s", ["World"])
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([print_hello/0, print_with_args/0]).
 
 -spec print_hello() -> any().
 print_hello() ->
-io:format("Hello").
+io:format(<<"Hello"/utf8>>).
 
 -spec print_with_args() -> any().
 print_with_args() ->
-io:format("Hello ~s", ["World"]).
+io:format(<<"Hello ~s"/utf8>>, [<<"World"/utf8>>]).
 
 '
 	assert generates_erlang(lx_code) == expected
@@ -129,7 +129,7 @@ end
 def get_node() do
   :erlang.node()
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([debug_info/0, get_node/0]).
 
 -spec debug_info() -> any().
@@ -154,16 +154,16 @@ def handle_status(status) do
     _ -> "Unknown"
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([handle_status/1]).
 
--spec handle_status(any()) -> string().
+-spec handle_status(any()) -> binary().
 handle_status(Status) ->
 case Status of
-    ok -> "Success";
-    error -> "Failed";
-    pending -> "Waiting";
-    _ -> "Unknown"
+    ok -> <<"Success"/utf8>>;
+    error -> <<"Failed"/utf8>>;
+    pending -> <<"Waiting"/utf8>>;
+    _ -> <<"Unknown"/utf8>>
 end.
 
 '
@@ -186,7 +186,7 @@ def check_simple_response(response) do
     _ -> "Unknown response"
   end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([extract_ok_value/1, check_simple_response/1]).
 
 -spec extract_ok_value(any()) -> any().
@@ -196,12 +196,12 @@ case Result of
     {error, _} -> nil
 end.
 
--spec check_simple_response(any()) -> string().
+-spec check_simple_response(any()) -> any().
 check_simple_response(Response) ->
 case Response of
     {success, Data} -> Data;
-    {failure, _} -> "Failed";
-    _ -> "Unknown response"
+    {failure, _} -> <<"Failed"/utf8>>;
+    _ -> <<"Unknown response"/utf8>>
 end.
 
 '

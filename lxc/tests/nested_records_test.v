@@ -17,18 +17,18 @@ def check_adult_user(user) do
 		"minor_user"
 	end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([check_adult_user/1]).
 
 -record(profile, {age}).
 -record(user, {profile}).
--spec check_adult_user(any()) -> string().
+-spec check_adult_user(any()) -> binary().
 check_adult_user(User) ->
 case User of
     #user{profile = #profile{age = Age}} when Age >= 18 ->
-        "adult_user";
+        <<"adult_user"/utf8>>;
     Other ->
-        "minor_user"
+        <<"minor_user"/utf8>>
 end.
 
 '
@@ -59,19 +59,19 @@ def get_user_city(user) do
 		"unknown"
 	end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([get_user_city/1]).
 
 -record(address, {street, city}).
 -record(profile, {age, address}).
 -record(user, {name, profile}).
--spec get_user_city(any()) -> string().
+-spec get_user_city(any()) -> binary().
 get_user_city(User) ->
 case User of
     #user{profile = #profile{address = #address{city = City}}} ->
         City;
     Other ->
-        "unknown"
+        <<"unknown"/utf8>>
 end.
 
 '
@@ -96,18 +96,18 @@ def check_user_eligibility(user) do
 		"not_eligible"
 	end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([check_user_eligibility/1]).
 
 -record(profile, {age}).
 -record(user, {name, profile}).
--spec check_user_eligibility(any()) -> string().
+-spec check_user_eligibility(any()) -> binary().
 check_user_eligibility(User) ->
 case User of
     #user{name = Name, profile = #profile{age = Age}} when Age >= 21 ->
         Name;
     Other ->
-        "not_eligible"
+        <<"not_eligible"/utf8>>
 end.
 
 '
@@ -129,14 +129,14 @@ record Company {
 def create_company() do
 	Company{name: "Tech Corp", employees: []}
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([create_company/0]).
 
 -record(person, {name, age}).
 -record(company, {name, employees}).
 -spec create_company() -> #company{}.
 create_company() ->
-#company{name = "Tech Corp", employees = []}.
+#company{name = <<"Tech Corp"/utf8>>, employees = []}.
 
 '
 	assert generates_erlang(lx_code) == expected
@@ -170,20 +170,20 @@ def get_person_country(person) do
 		"unknown"
 	end
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([get_person_country/1]).
 
 -record(country, {name}).
 -record(city, {name, country}).
 -record(address, {street, city}).
 -record(person, {name, address}).
--spec get_person_country(any()) -> string().
+-spec get_person_country(any()) -> binary().
 get_person_country(Person) ->
 case Person of
     #person{address = #address{city = #city{country = #country{name = Country}}}} ->
         Country;
     Other ->
-        "unknown"
+        <<"unknown"/utf8>>
 end.
 
 '
@@ -204,14 +204,14 @@ record User {
 def create_user() do
 	User{name: "John", profile: Profile{age: 25}}
 end'
-	expected := '-module(main).
+	expected := '-module(test).
 -export([create_user/0]).
 
 -record(profile, {age}).
 -record(user, {name, profile}).
 -spec create_user() -> #user{}.
 create_user() ->
-#user{name = "John", profile = #profile{age = 25}}.
+#user{name = <<"John"/utf8>>, profile = #profile{age = 25}}.
 
 '
 	assert generates_erlang(lx_code) == expected

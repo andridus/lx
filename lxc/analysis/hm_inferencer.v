@@ -1,6 +1,7 @@
 module analysis
 
 import ast
+import errors
 
 // HMInferencer implements basic HM type inference
 pub struct HMInferencer {
@@ -9,6 +10,9 @@ pub mut:
 	type_env      TypeEnv
 	next_type_var int = 1
 	constraints   []Constraint
+    last_map_field_types map[string]TypeInfo
+    record_field_types   map[string]TypeInfo
+    error_reporter ErrorReporter
 }
 
 // Constraint represents a type constraint in the HM system
@@ -25,6 +29,8 @@ pub fn new_hm_inferencer() HMInferencer {
 		type_env:      new_type_env()
 		next_type_var: 1
 		constraints:   []
+        record_field_types: map[string]TypeInfo{},
+        error_reporter: new_error_reporter()
 	}
 }
 
@@ -35,6 +41,8 @@ pub fn new_hm_inferencer_with_debug() HMInferencer {
 		type_env:      new_type_env()
 		next_type_var: 1
 		constraints:   []
+        record_field_types: map[string]TypeInfo{},
+        error_reporter: new_error_reporter()
 	}
 }
 
@@ -93,19 +101,34 @@ pub fn (mut hmi HMInferencer) add_constraint(left TypeInfo, right TypeInfo) {
 	}
 }
 
+// reset_for_function resets the HM inferencer state for a new function
+pub fn (mut hmi HMInferencer) reset_for_function() {
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] Resetting state for new function')
+	}
+
+	// Clear constraints from previous function
+	hmi.constraints.clear()
+
+	// Reset type variable counter to avoid conflicts
+	hmi.next_type_var = 0
+}
+
 // infer_expression infers the type of an expression using HM
 pub fn (mut hmi HMInferencer) infer_expression(expr ast.Expr) !TypeInfo {
 	ast_id := ast.get_expr_ast_id(expr)
 
+	expr_type := match expr {
+		ast.VariableExpr { 'VariableExpr(${expr.name})' }
+		ast.LiteralExpr { 'LiteralExpr' }
+		ast.BinaryExpr { 'BinaryExpr' }
+		ast.AssignExpr { 'AssignExpr(${expr.name})' }
+		ast.BlockExpr { 'BlockExpr' }
+		ast.CaseExpr { 'CaseExpr' }
+		ast.RecordLiteralExpr { 'RecordLiteralExpr' }
+		else { 'Other' }
+	}
 	if hmi.type_table.debug_mode {
-		expr_type := match expr {
-			ast.VariableExpr { 'VariableExpr(${expr.name})' }
-			ast.LiteralExpr { 'LiteralExpr' }
-			ast.BinaryExpr { 'BinaryExpr' }
-			ast.AssignExpr { 'AssignExpr(${expr.name})' }
-			ast.BlockExpr { 'BlockExpr' }
-			else { 'Other' }
-		}
 		println('[HM_INFERENCER] >>> Inferring ${expr_type} with AST ID: ${ast_id}')
 	}
 
@@ -184,6 +207,60 @@ pub fn (mut hmi HMInferencer) infer_expression(expr ast.Expr) !TypeInfo {
 				println('[HM_INFERENCER] Matched RecordLiteralExpr')
 			}
 			hmi.infer_record_literal(expr)!
+		}
+		ast.CaseExpr {
+			if hmi.type_table.debug_mode {
+				println('[HM_INFERENCER] Matched CaseExpr')
+			}
+			hmi.infer_case(expr)!
+		}
+		ast.WithExpr {
+			if hmi.type_table.debug_mode {
+				println('[HM_INFERENCER] Matched WithExpr')
+			}
+			hmi.infer_with(expr)!
+		}
+		ast.SimpleMatchExpr {
+			if hmi.type_table.debug_mode {
+				println('[HM_INFERENCER] Matched SimpleMatchExpr')
+			}
+			hmi.infer_simple_match(expr)!
+		}
+		ast.IfExpr {
+			if hmi.type_table.debug_mode {
+				println('[HM_INFERENCER] Matched IfExpr')
+			}
+			hmi.infer_if(expr)!
+		}
+		ast.MatchRescueExpr {
+			if hmi.type_table.debug_mode {
+				println('[HM_INFERENCER] Matched MatchRescueExpr')
+			}
+			hmi.infer_match_rescue(expr)!
+		}
+		ast.ForExpr {
+			if hmi.type_table.debug_mode {
+				println('[HM_INFERENCER] Matched ForExpr')
+			}
+			hmi.infer_for(expr)!
+		}
+		ast.ListLiteralExpr {
+			if hmi.type_table.debug_mode {
+				println('[HM_INFERENCER] Matched ListLiteralExpr')
+			}
+			hmi.infer_list_literal(expr)!
+		}
+		ast.MapLiteralExpr {
+			if hmi.type_table.debug_mode {
+				println('[HM_INFERENCER] Matched MapLiteralExpr')
+			}
+			hmi.infer_map_literal(expr)!
+		}
+		ast.UnaryExpr {
+			if hmi.type_table.debug_mode {
+				println('[HM_INFERENCER] Matched UnaryExpr')
+			}
+			hmi.infer_unary(expr)!
 		}
 		else {
 			if hmi.type_table.debug_mode {
@@ -355,13 +432,141 @@ pub fn (mut hmi HMInferencer) infer_assign(expr ast.AssignExpr) !TypeInfo {
 	return value_type
 }
 
+// resolve_constraints resolves all collected constraints and applies substitutions
+pub fn (mut hmi HMInferencer) resolve_constraints() !Substitution {
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] Resolving ${hmi.constraints.len} constraints')
+	}
+
+	if hmi.constraints.len == 0 {
+		return Substitution{subst: map[int]TypeInfo{}}
+	}
+
+	// Group constraints by type variable
+	mut var_constraints := map[int][]TypeInfo{}
+
+	for constraint in hmi.constraints {
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] Processing constraint: ${constraint.left} = ${constraint.right}')
+		}
+
+		// If left is a type variable, collect all constraints for it
+		if constraint.left.generic == 'typevar' {
+			if value := constraint.left.value {
+				var_id := value.int()
+				if var_id !in var_constraints {
+					var_constraints[var_id] = []
+				}
+				var_constraints[var_id] << constraint.right
+			}
+		}
+	}
+
+	// Create substitution based on collected constraints
+	mut substitution := Substitution{subst: map[int]TypeInfo{}}
+
+	for var_id, types in var_constraints {
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] Variable ${var_id} has ${types.len} constraints: ${types}')
+		}
+
+		if types.len == 1 {
+			// Single constraint - direct substitution
+			substitution.subst[var_id] = types[0]
+			if hmi.type_table.debug_mode {
+				println('[HM_INFERENCER] Single constraint: typevar(T${var_id}) -> ${types[0]}')
+			}
+		} else {
+			// Multiple constraints - create union type
+			union_type := typeinfo_union(types)
+			substitution.subst[var_id] = union_type
+			if hmi.type_table.debug_mode {
+				println('[HM_INFERENCER] Multiple constraints: typevar(T${var_id}) -> ${union_type}')
+			}
+		}
+	}
+
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] Generated substitution: ${substitution.str()}')
+	}
+
+	// Apply substitution to all types in the type table
+	hmi.apply_substitution_to_type_table(substitution)
+
+	// Apply substitution to all bindings in the type environment
+	hmi.apply_substitution_to_type_env(substitution)
+
+	return substitution
+}
+
+// apply_substitution_to_type_table applies a substitution to all types in the type table
+fn (mut hmi HMInferencer) apply_substitution_to_type_table(substitution Substitution) {
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] Applying substitution to type table')
+	}
+
+	// Get all types from the type table
+	all_types := hmi.type_table.get_all_types()
+
+	for ast_id, type_info in all_types {
+		substituted_type := substitution.apply_to_type(type_info)
+
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] AST ID ${ast_id}: ${type_info} -> ${substituted_type}')
+		}
+
+		// Update the type in the table
+		hmi.type_table.assign_type(ast_id, substituted_type)
+	}
+
+	// Log final type table after substitution
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] FINAL TYPE TABLE:')
+		for ast_id, type_info in hmi.type_table.get_all_types() {
+			println('  AST ID ${ast_id}: ${type_info}')
+		}
+	}
+}
+
+// apply_substitution_to_type_env applies a substitution to all bindings in the type environment
+fn (mut hmi HMInferencer) apply_substitution_to_type_env(substitution Substitution) {
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] Applying substitution to type environment')
+	}
+
+	// Apply substitution to all bindings in the current environment
+	for name, scheme in hmi.type_env.bindings {
+		substituted_type := substitution.apply_to_type(scheme.type_info)
+
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] Environment binding "${name}": ${scheme.type_info} -> ${substituted_type}')
+		}
+
+		// Update the binding with the substituted type
+		hmi.type_env.bindings[name] = TypeScheme{
+			vars:      scheme.vars
+			type_info: substituted_type
+		}
+	}
+
+	// Log final environment after substitution
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] FINAL TYPE ENVIRONMENT:')
+		for name, scheme in hmi.type_env.bindings {
+			println('  ${name}: ${scheme.type_info}')
+		}
+	}
+}
+
 // infer_block infers the type of a block expression
 pub fn (mut hmi HMInferencer) infer_block(expr ast.BlockExpr) !TypeInfo {
 	if hmi.type_table.debug_mode {
-		println('[HM_INFERENCER] infer_block: ${expr.body.len} statements')
+		println('[HM_INFERENCER] >>> Entrando em infer_block')
 	}
 
 	mut last_type := typeinfo_nil()
+	mut return_types := []TypeInfo{}
+	mut last_stmt_expr := ast.Expr{}
 
 	for i, stmt in expr.body {
 		if hmi.type_table.debug_mode {
@@ -373,10 +578,27 @@ pub fn (mut hmi HMInferencer) infer_block(expr ast.BlockExpr) !TypeInfo {
 				if hmi.type_table.debug_mode {
 					println('[HM_INFERENCER] Found ExprStmt, inferring expression')
 				}
-				last_type = hmi.infer_expression(stmt.expr)!
+				stmt_type := hmi.infer_expression(stmt.expr)!
 				if hmi.type_table.debug_mode {
-					println('[HM_INFERENCER] ExprStmt inferred as: ${last_type}')
+					println('[HM_INFERENCER] ExprStmt inferred as: ${stmt_type}')
 				}
+
+				// Check if this expression can return a value (like MatchRescueExpr or SimpleMatchExpr)
+				if stmt.expr is ast.MatchRescueExpr {
+					if hmi.type_table.debug_mode {
+						println('[HM_INFERENCER] Found MatchRescueExpr, adding to return types')
+					}
+					return_types << stmt_type
+				}
+				if stmt.expr is ast.SimpleMatchExpr {
+					if hmi.type_table.debug_mode {
+						println('[HM_INFERENCER] Found SimpleMatchExpr, adding to return types')
+					}
+					return_types << stmt_type
+				}
+
+				last_type = stmt_type
+				last_stmt_expr = stmt.expr
 			}
 			else {
 				if hmi.type_table.debug_mode {
@@ -386,11 +608,80 @@ pub fn (mut hmi HMInferencer) infer_block(expr ast.BlockExpr) !TypeInfo {
 		}
 	}
 
-	if hmi.type_table.debug_mode {
-		println('[HM_INFERENCER] Block final type: ${last_type}')
+	// Apply current substitution to resolve any remaining typevars
+	mut final_last_type := last_type
+	if hmi.constraints.len > 0 {
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] Resolving constraints before final type calculation')
+		}
+		substitution := hmi.resolve_constraints() or { Substitution{subst: map[int]TypeInfo{}} }
+		final_last_type = substitution.apply_to_type(last_type)
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] Applied substitution to last_type: ${last_type} -> ${final_last_type}')
+		}
 	}
 
-	return last_type
+	// Check if the last statement is a variable expression (extracted from pattern)
+	mut additional_types := []TypeInfo{}
+	if last_stmt_expr is ast.VariableExpr {
+		ve := last_stmt_expr as ast.VariableExpr
+		var_name := ve.name
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] Last statement is VariableExpr: ${var_name}')
+		}
+		// Look up the variable in the type environment
+		if scheme := hmi.type_env.lookup(var_name) {
+			if hmi.type_table.debug_mode {
+				println('[HM_INFERENCER] Found variable ${var_name} in environment with type: ${scheme.type_info}')
+			}
+			additional_types << scheme.type_info
+		} else {
+			if hmi.type_table.debug_mode {
+				println('[HM_INFERENCER] Variable ${var_name} not found in environment')
+			}
+		}
+	}
+
+	// Sempre inclua o tipo do último statement na união, mesmo que já esteja em return_types
+	if return_types.len > 0 {
+		mut all_types := return_types.clone()
+		all_types << final_last_type // força inclusão, mesmo que já exista
+		all_types << additional_types // adiciona tipos de variáveis extraídas
+		mut result_type := typeinfo_union(all_types)
+
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] Final union types: ${all_types}')
+			println('[HM_INFERENCER] Final result type: ${result_type}')
+		}
+
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] <<< Saindo de infer_block com tipo união: ${result_type}')
+		}
+		return result_type
+	}
+
+	// If no return_types, but we have additional_types, create union
+	if additional_types.len > 0 {
+		mut all_types := [final_last_type]
+		all_types << additional_types
+		mut result_type := typeinfo_union(all_types)
+
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] Final union types (no return_types): ${all_types}')
+			println('[HM_INFERENCER] Final result type: ${result_type}')
+		}
+
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] <<< Saindo de infer_block com tipo união: ${result_type}')
+		}
+		return result_type
+	}
+
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] <<< Saindo de infer_block com tipo: ${final_last_type}')
+	}
+
+	return final_last_type
 }
 
 // infer_call infers the type of a function call
@@ -430,6 +721,15 @@ pub fn (mut hmi HMInferencer) infer_call(expr ast.CallExpr) !TypeInfo {
 					}
 					return return_type
 				}
+			}
+
+			// If we can't resolve from environment, try to get from type table
+			// Look for function return type in the type table
+			if func_return_type := hmi.get_function_return_type(func_name, arg_types.len) {
+				if hmi.type_table.debug_mode {
+					println('[HM_INFERENCER] Found function "${func_name}" return type in type table: ${func_return_type}')
+				}
+				return func_return_type
 			}
 		}
 	}
@@ -475,6 +775,658 @@ pub fn (mut hmi HMInferencer) infer_record_literal(expr ast.RecordLiteralExpr) !
 	}
 
 	return record_type
+}
+
+// infer_case infers the type of a case expression
+pub fn (mut hmi HMInferencer) infer_case(expr ast.CaseExpr) !TypeInfo {
+
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] infer_case: processing case expression')
+	}
+
+	// Infer type of the value being matched
+	value_type := hmi.infer_expression(expr.value)!
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] Case value type: ${value_type}')
+	}
+
+	// Collect all case body types
+	mut case_body_types := []TypeInfo{}
+
+	// Process each case branch
+	for i, case_branch in expr.cases {
+
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] Processing case branch ${i + 1}')
+		}
+
+		// Extract variables from the pattern and bind them to the type environment
+		hmi.extract_pattern_variables(case_branch.pattern, value_type)
+
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] Extracted pattern variables for case branch ${i + 1}')
+		}
+
+		// Infer the type of the case body
+		case_body_type := hmi.infer_expression(case_branch.body)!
+		case_body_types << case_body_type
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] Case branch ${i + 1} body type: ${case_body_type}')
+		}
+	}
+
+	// Create union type from all case body types
+	mut result_type := if case_body_types.len > 0 {
+		typeinfo_union(case_body_types)
+	} else {
+		hmi.fresh_type_var()
+	}
+
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] Case expression result type: ${result_type}')
+	}
+
+	return result_type
+}
+
+// infer_if infers the type of an if expression
+pub fn (mut hmi HMInferencer) infer_if(expr ast.IfExpr) !TypeInfo {
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] infer_if: processing if expression')
+	}
+
+	// Infer type of the condition (should be boolean)
+	condition_type := hmi.infer_expression(expr.condition)!
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] If condition type: ${condition_type}')
+	}
+
+	// Create a fresh type variable for the result type
+	result_type := hmi.fresh_type_var()
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] If result type variable: ${result_type}')
+	}
+
+	// Infer type of the then body
+	then_type := hmi.infer_expression(expr.then_body)!
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] If then body type: ${then_type}')
+	}
+
+	// Add constraint that result type must match then body type
+	hmi.add_constraint(result_type, then_type)
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] Added constraint: ${result_type} = ${then_type}')
+	}
+
+	// Infer type of the else body if present
+	if expr.else_body.body.len > 0 {
+		else_type := hmi.infer_expression(expr.else_body)!
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] If else body type: ${else_type}')
+		}
+
+		// Add constraint that both bodies must have the same type
+		hmi.add_constraint(result_type, else_type)
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] Added constraint: ${result_type} = ${else_type}')
+		}
+	} else {
+		// No else body - if without else returns nil
+		nil_result_type := typeinfo_nil()
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] If without else returns: ${nil_result_type}')
+		}
+
+		// Add constraint that result type must match nil
+		hmi.add_constraint(result_type, nil_result_type)
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] Added constraint: ${result_type} = ${nil_result_type}')
+		}
+	}
+
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] If expression result type: ${result_type}')
+	}
+
+	return result_type
+}
+
+// infer_with infers the type of a with expression
+pub fn (mut hmi HMInferencer) infer_with(expr ast.WithExpr) !TypeInfo {
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] infer_with: processing with expression')
+	}
+
+	// Process bindings first
+	for i, binding in expr.bindings {
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] Processing with binding ${i + 1}/${expr.bindings.len}')
+		}
+
+		// Infer type of the value being matched
+		value_type := hmi.infer_expression(binding.value)!
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] With binding value type: ${value_type}')
+		}
+
+		// Extract variables from the pattern and bind them to the type environment
+		hmi.extract_pattern_variables(binding.pattern, value_type)
+	}
+
+	// Infer type of the main body
+	body_type := hmi.infer_expression(expr.body)!
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] With body type: ${body_type}')
+	}
+
+	// Infer type of the else body if present
+	if expr.else_body.body.len > 0 {
+		else_type := hmi.infer_expression(expr.else_body)!
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] With else body type: ${else_type}')
+		}
+
+		// Add constraint that both bodies must have the same type
+		hmi.add_constraint(body_type, else_type)
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] Added constraint: ${body_type} = ${else_type}')
+		}
+	}
+
+			// Check each statement in the body for match expressions
+	mut match_return_types := []TypeInfo{}
+
+	// Check each statement in the body for match expressions
+	for stmt in expr.body.body {
+		if stmt is ast.ExprStmt {
+			expr_stmt := stmt as ast.ExprStmt
+			if expr_stmt.expr is ast.SimpleMatchExpr {
+				// Simple match - include the value type in union (circuit breaker)
+				simple_match := expr_stmt.expr as ast.SimpleMatchExpr
+				value_type := hmi.infer_expression(simple_match.value)!
+				match_return_types << value_type
+				if hmi.type_table.debug_mode {
+					println('[HM_INFERENCER] Added simple match return type: ${value_type}')
+				}
+			}
+			if expr_stmt.expr is ast.MatchRescueExpr {
+				// Match rescue - include the rescue body type in union (circuit breaker)
+				match_rescue := expr_stmt.expr as ast.MatchRescueExpr
+				rescue_body_type := hmi.infer_expression(match_rescue.rescue_body)!
+				match_return_types << rescue_body_type
+				if hmi.type_table.debug_mode {
+					println('[HM_INFERENCER] Added match rescue return type: ${rescue_body_type}')
+				}
+			}
+		}
+	}
+
+		// If there are match expressions, create a union type
+	mut result_type := body_type
+	if match_return_types.len > 0 {
+		// Create union of body type and all match return types
+		mut union_values := [body_type]
+		union_values << match_return_types
+
+		result_type = TypeInfo{
+			generic: 'union'
+			values:  union_values
+		}
+
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] Created union type for with: ${result_type}')
+		}
+	}
+
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] With expression result type: ${result_type}')
+	}
+
+	return result_type
+}
+
+// infer_simple_match infers the type of a simple match expression
+pub fn (mut hmi HMInferencer) infer_simple_match(expr ast.SimpleMatchExpr) !TypeInfo {
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] infer_simple_match: processing simple match')
+	}
+
+	// Infer type of the value being matched
+	value_type := hmi.infer_expression(expr.value)!
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] Simple match value type: ${value_type}')
+	}
+
+	// Extract variables from the pattern and bind them to the type environment
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] Pattern type: ${typeof(expr.pattern).name}')
+		println('[HM_INFERENCER] Pattern: ${expr.pattern}')
+	}
+	hmi.extract_pattern_variables(expr.pattern, value_type)
+
+	// For simple match, we return the type of the value
+	// The pattern matching is handled by the backend
+	return value_type
+}
+
+// infer_match_rescue infers the type of a match_rescue expression
+pub fn (mut hmi HMInferencer) infer_match_rescue(expr ast.MatchRescueExpr) !TypeInfo {
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] infer_match_rescue: processing match_rescue expression')
+	}
+
+	// Infer type of the value being matched
+	value_type := hmi.infer_expression(expr.value)!
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] MatchRescue value type: ${value_type}')
+	}
+
+	// Add the rescue variable to the type environment
+	// The rescue variable has the same type as the value being matched
+	hmi.type_env.bind(expr.rescue_var, monotype(value_type))
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] Bound rescue variable "${expr.rescue_var}" to type: ${value_type}')
+	}
+
+	// For match rescue, we need to infer the type of the rescue body
+	// The rescue body is a BlockExpr that handles the error case
+	rescue_body_type := hmi.infer_expression(expr.rescue_body)!
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] MatchRescue rescue body type: ${rescue_body_type}')
+	}
+
+	// For match rescue, we return the type of the rescue body
+	// The continuation type will be handled by the block expression that contains this match rescue
+	result_type := rescue_body_type
+
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] MatchRescue expression result type: ${result_type}')
+	}
+
+	return result_type
+}
+
+// infer_for infers the type of a for expression (list comprehension)
+pub fn (mut hmi HMInferencer) infer_for(expr ast.ForExpr) !TypeInfo {
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] infer_for: processing for expression')
+	}
+	// Inferir o tipo da coleção
+	collection_type := hmi.infer_expression(expr.collection)!
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] Collection type: ${collection_type}')
+	}
+
+	// O tipo da coleção deve ser uma lista
+	mut element_type := hmi.fresh_type_var()
+	if collection_type.generic == 'list' && collection_type.values.len > 0 {
+		element_type = collection_type.values[0]
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] Extracted element type from list: ${element_type}')
+		}
+	} else if collection_type.generic == 'typevar' {
+		// Adiciona constraint que collection_type deve ser list(element_type)
+		hmi.add_constraint(collection_type, typeinfo_list(element_type))
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] Added constraint: ${collection_type} = list(${element_type})')
+		}
+	}
+
+	// Bind o padrão ao tipo do elemento
+	hmi.extract_pattern_variables(expr.pattern, element_type)
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] Extracted pattern variables')
+	}
+
+	// Processar o guard se presente
+	if expr.guard !is ast.LiteralExpr {
+		guard_type := hmi.infer_expression(expr.guard)!
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] Guard type: ${guard_type}')
+		}
+		// O guard deve ser boolean
+		hmi.add_constraint(guard_type, typeinfo_boolean())
+	}
+
+	// Inferir o tipo do corpo do for
+	body_type := hmi.infer_expression(expr.body)!
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] Body type: ${body_type}')
+	}
+
+	// O tipo do for é list(body_type)
+	result_type := typeinfo_list(body_type)
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] For result type: ${result_type}')
+	}
+	return result_type
+}
+
+// infer_list_literal infers the type of a list literal expression
+pub fn (mut hmi HMInferencer) infer_list_literal(expr ast.ListLiteralExpr) !TypeInfo {
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] infer_list_literal: processing list literal')
+	}
+	if expr.elements.len == 0 {
+		// Lista vazia: list(any())
+		return typeinfo_list(typeinfo_any())
+	}
+	// Inferir o tipo de todos os elementos
+	mut element_types := []TypeInfo{}
+    // Se todos os elementos são mapas literais, coletar tipos dos campos
+    mut all_maps := true
+    mut field_types := map[string]TypeInfo{}
+	for el in expr.elements {
+		element_types << hmi.infer_expression(el)!
+		if el is ast.MapLiteralExpr {
+			for entry in el.entries {
+				if entry.key is ast.LiteralExpr && entry.key.value is ast.AtomLiteral {
+					atom_key := entry.key.value as ast.AtomLiteral
+					field_value_type := hmi.infer_expression(entry.value) or { typeinfo_any() }
+					// Verificar se o campo já existe com tipo diferente
+					if existing_type := field_types[atom_key.value] {
+						if !types_are_compatible(existing_type, field_value_type) {
+                            hmi.error_reporter.report_error(.type_error,
+                                'Type mismatch for map field "${atom_key.value}": ${existing_type} vs ${field_value_type}',
+                                el.position,
+                                'Ensure all map fields have consistent types')
+                            return error('Type mismatch detected')
+						}
+					}
+					field_types[atom_key.value] = field_value_type
+				}
+			}
+		} else {
+			all_maps = false
+		}
+	}
+    if all_maps && field_types.len > 0 {
+        hmi.last_map_field_types = field_types.clone()
+    } else {
+        hmi.last_map_field_types = map[string]TypeInfo{}
+    }
+	// Unificar todos os tipos dos elementos
+	mut unified_type := element_types[0]
+	for t in element_types[1..] {
+		if !types_are_compatible(unified_type, t) {
+			unified_type = typeinfo_any()
+			break
+		}
+	}
+	return typeinfo_list(unified_type)
+}
+
+// infer_map_literal infers the type of a map literal expression
+pub fn (mut hmi HMInferencer) infer_map_literal(expr ast.MapLiteralExpr) !TypeInfo {
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] infer_map_literal: processing map literal')
+	}
+	if expr.entries.len == 0 {
+		// Mapa vazio: map(any(), any())
+		return typeinfo_map(typeinfo_any(), typeinfo_any())
+	}
+	// Inferir o tipo de todas as chaves e valores
+	mut key_types := []TypeInfo{}
+	mut value_types := []TypeInfo{}
+	for entry in expr.entries {
+		key_type := hmi.infer_expression(entry.key)!
+		value_type := hmi.infer_expression(entry.value)!
+		key_types << key_type
+		value_types << value_type
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] Map entry: key=${key_type}, value=${value_type}')
+		}
+	}
+	// Unificar todos os tipos das chaves
+	mut unified_key_type := key_types[0]
+	for t in key_types[1..] {
+		if !types_are_compatible(unified_key_type, t) {
+			unified_key_type = typeinfo_any()
+			break
+		}
+	}
+	// Unificar todos os tipos dos valores
+	mut unified_value_type := value_types[0]
+	for t in value_types[1..] {
+		if !types_are_compatible(unified_value_type, t) {
+			unified_value_type = typeinfo_any()
+			break
+		}
+	}
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] Unified map type: map(${unified_key_type}, ${unified_value_type})')
+	}
+	return typeinfo_map(unified_key_type, unified_value_type)
+}
+
+pub fn (mut hmi HMInferencer) infer_unary(expr ast.UnaryExpr) !TypeInfo {
+	operand_type := hmi.infer_expression(expr.operand)!
+	result_type := match expr.op {
+		.minus {
+			if operand_type.generic == 'integer' {
+				typeinfo_integer()
+			} else if operand_type.generic == 'float' {
+				typeinfo_float()
+			} else {
+				typeinfo_integer()
+			}
+		}
+		.not {
+			typeinfo_boolean()
+		}
+	}
+	return result_type
+}
+
+// extract_pattern_variables extracts variables from a pattern and binds them to the type environment
+fn (mut hmi HMInferencer) extract_pattern_variables(pattern ast.Pattern, value_type TypeInfo) {
+
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] extract_pattern_variables: pattern=${typeof(pattern).name}, value_type=${value_type}')
+	}
+
+	// Descompacta union de um único valor
+	mut substituted_type := value_type
+	if substituted_type.generic == 'union' && substituted_type.values.len == 1 {
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] [UNION] Descompactando union de um único valor: ${substituted_type.values[0]}')
+		}
+		substituted_type = substituted_type.values[0]
+	}
+
+	if hmi.constraints.len > 0 {
+		if hmi.constraints.len > 10 {
+			return
+		}
+
+		substitution := hmi.resolve_constraints() or { Substitution{subst: map[int]TypeInfo{}} }
+		substituted_type = substitution.apply_to_type(substituted_type)
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] Applied substitution: ${value_type} -> ${substituted_type}')
+		}
+	}
+
+	match pattern {
+		ast.VarPattern {
+			mut bind_type := substituted_type
+			if bind_type.generic == 'any' && pattern.name.contains('.') {
+				if pattern.name in hmi.record_field_types {
+					bind_type = hmi.record_field_types[pattern.name]
+				}
+			}
+			hmi.type_env.bind(pattern.name, monotype(bind_type))
+			if hmi.type_table.debug_mode {
+				println('[HM_INFERENCER] Bound pattern variable "${pattern.name}" to type: ${bind_type}')
+			}
+		}
+		ast.TuplePattern {
+			// For tuple patterns, we need to extract the types of each element
+			if hmi.type_table.debug_mode {
+				println('[HM_INFERENCER] [TUPLE] Pattern: ${pattern}, Type: ${substituted_type}')
+				println('[HM_INFERENCER] [TUPLE] substituted_type.generic: ${substituted_type.generic}')
+				println('[HM_INFERENCER] [TUPLE] substituted_type.values.len: ${substituted_type.values.len}')
+				println('[HM_INFERENCER] [TUPLE] pattern.elements.len: ${pattern.elements.len}')
+			}
+			if substituted_type.generic == 'tuple' && substituted_type.values.len == pattern.elements.len {
+				for i, element_pattern in pattern.elements {
+					if i < substituted_type.values.len {
+						element_type := substituted_type.values[i]
+						if hmi.type_table.debug_mode {
+							println('[HM_INFERENCER] [TUPLE] Element ${i}: pattern=${typeof(element_pattern).name}, type=${element_type}')
+						}
+						match element_pattern {
+							ast.VarPattern {
+								if hmi.type_table.debug_mode {
+									println('[HM_INFERENCER] [TUPLE] Binding variable "${element_pattern.name}" to type: ${element_type}')
+								}
+								hmi.type_env.bind(element_pattern.name, monotype(element_type))
+							}
+							else {
+								hmi.extract_pattern_variables(element_pattern, element_type)
+							}
+						}
+					}
+				}
+			} else {
+				if hmi.type_table.debug_mode {
+					println('[HM_INFERENCER] [TUPLE] Cannot determine exact tuple types, using fallback')
+				}
+				for element_pattern in pattern.elements {
+					hmi.extract_pattern_variables(element_pattern, substituted_type)
+				}
+			}
+		}
+		ast.ListConsPattern {
+			// For list cons patterns, head gets the element type, tail gets the list type
+			if substituted_type.generic == 'list' && substituted_type.values.len > 0 {
+				element_type := substituted_type.values[0]
+				hmi.extract_pattern_variables(pattern.head, element_type)
+				hmi.extract_pattern_variables(pattern.tail, substituted_type)
+			} else {
+				// Create a fresh type variable for the element type
+				element_type := hmi.fresh_type_var()
+				// Create a list type with the element type
+				list_type := typeinfo_list(element_type)
+				if hmi.type_table.debug_mode {
+					println('[HM_INFERENCER] Created list type: ${list_type} for ListConsPattern')
+				}
+				// Extract variables with the created types
+				hmi.extract_pattern_variables(pattern.head, element_type)
+				hmi.extract_pattern_variables(pattern.tail, list_type)
+			}
+		}
+		ast.ListLiteralPattern {
+			// For list literal patterns, each element gets the corresponding type
+			if substituted_type.generic == 'list' && substituted_type.values.len > 0 {
+				element_type := substituted_type.values[0]
+				for element_pattern in pattern.elements {
+					hmi.extract_pattern_variables(element_pattern, element_type)
+				}
+			} else {
+				// Fallback: bind all to the value type
+				for element_pattern in pattern.elements {
+					hmi.extract_pattern_variables(element_pattern, substituted_type)
+				}
+			}
+		}
+		ast.MapPattern {
+			// For map patterns, we need to handle key-value pairs
+			if substituted_type.generic == 'map' && substituted_type.values.len >= 2 {
+				map_key_type := substituted_type.values[0]
+				map_value_type := substituted_type.values[1]
+				if hmi.type_table.debug_mode {
+					println('[HM_INFERENCER] [MAP] Key type: ${map_key_type}, Value type: ${map_value_type}')
+				}
+				for entry in pattern.entries {
+					match entry.key {
+						ast.AtomPattern {
+							key_name := entry.key.value
+							if hmi.type_table.debug_mode {
+								println('[HM_INFERENCER] [MAP] Processing key: ${key_name}')
+							}
+                            // Se temos tipos deduzidos dos campos, usar
+                            field_type := if key_name in hmi.last_map_field_types { hmi.last_map_field_types[key_name] } else { map_value_type }
+                            hmi.extract_pattern_variables(entry.value, field_type)
+                            // Limpar após uso para não vazar contexto
+                            hmi.last_map_field_types.delete(key_name)
+						}
+						else {
+							hmi.extract_pattern_variables(entry.key, map_key_type)
+							hmi.extract_pattern_variables(entry.value, map_value_type)
+						}
+					}
+				}
+			} else {
+				if hmi.type_table.debug_mode {
+					println('[HM_INFERENCER] [MAP] Cannot determine map types, using fallback')
+				}
+				for entry in pattern.entries {
+					hmi.extract_pattern_variables(entry.key, substituted_type)
+					hmi.extract_pattern_variables(entry.value, substituted_type)
+				}
+			}
+		}
+		ast.RecordPattern {
+			mut record_type := substituted_type
+			if record_type.generic != 'record' && pattern.name != '' {
+				record_type = typeinfo_record(pattern.name)
+			}
+			hmi.add_constraint(substituted_type, record_type)
+			if record_type.generic == 'record' {
+				record_name := record_type.value or { 'unknown' }
+				for field in pattern.fields {
+					key := '${record_name}.${field.name}'
+					if key in hmi.record_field_types {
+						field_type := hmi.record_field_types[key]
+						if hmi.type_table.debug_mode {
+							println('[HM_INFERENCER] [RECORD] Field ${key}: ${field_type}')
+						}
+						hmi.extract_pattern_variables(field.pattern, field_type)
+					} else {
+						if hmi.type_table.debug_mode {
+							println('[HM_INFERENCER] [RECORD] Unknown field ${key}, using any type')
+						}
+						hmi.extract_pattern_variables(field.pattern, typeinfo_any())
+					}
+				}
+			} else {
+				// Fallback: use any type for all fields
+				if hmi.type_table.debug_mode {
+					println('[HM_INFERENCER] [RECORD] Cannot determine record type, using any for all fields')
+				}
+				for field in pattern.fields {
+					hmi.extract_pattern_variables(field.pattern, typeinfo_any())
+				}
+			}
+		}
+		else {
+			// For other patterns (wildcard, literal, atom), no variables to bind
+			if hmi.type_table.debug_mode {
+				println('[HM_INFERENCER] No variables to extract from pattern type: ${pattern}')
+			}
+		}
+	}
+}
+
+// get_function_return_type gets the return type of a function from the type table
+fn (hmi HMInferencer) get_function_return_type(func_name string, arity int) ?TypeInfo {
+	mut best_candidate := TypeInfo{}
+
+	for _, type_info in hmi.type_table.get_all_types() {
+		if type_info.generic == 'typevar' || type_info.generic == 'function' {
+			continue
+		}
+		if type_info.generic == 'union' || type_info.generic == 'tuple' ||
+		   type_info.generic == 'string' || type_info.generic == 'atom' ||
+		   type_info.generic == 'boolean' || type_info.generic == 'integer' {
+			best_candidate = type_info
+		}
+	}
+	if best_candidate.generic != '' {
+		return best_candidate
+	}
+	return none
 }
 
 // Helper methods
@@ -534,4 +1486,19 @@ fn (hmi HMInferencer) get_expression_position(expr ast.Expr) ast.Position {
 		ast.RecordLiteralExpr { expr.position }
 		else { ast.Position{} }
 	}
+}
+
+// get_errors returns the compilation errors from the error reporter
+pub fn (hmi HMInferencer) get_errors() []errors.CompilationError {
+	return hmi.error_reporter.get_compilation_errors()
+}
+
+// has_errors returns true if there are any errors
+pub fn (hmi HMInferencer) has_errors() bool {
+	return hmi.error_reporter.errors.len > 0
+}
+
+// clear_errors limpa os erros do error_reporter
+pub fn (mut hmi HMInferencer) clear_errors() {
+	hmi.error_reporter.errors.clear()
 }
