@@ -1,7 +1,7 @@
 module main
 
 import os
-import lx_cli
+import cli
 
 fn main() {
 	args := os.args
@@ -18,16 +18,16 @@ fn main() {
 	command := args[1]
 	match command {
 		'compile' {
-			lx_cli.handle_compile_command(args[2..])
+			cli.handle_compile_command(args[2..])
 		}
 		'new' {
-			lx_cli.handle_new_command(args[2..])
+			cli.handle_new_command(args[2..])
 		}
 		'shell' {
-			lx_cli.handle_shell_command(args[2..])
+			cli.handle_shell_command(args[2..])
 		}
 		'symlink' {
-			lx_cli.handle_symlink_command()
+			cli.handle_symlink_command()
 		}
 		else {
 			eprintln('Unknown command: ${command}')

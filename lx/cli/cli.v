@@ -1,4 +1,4 @@
-module lx_cli
+module cli
 
 import os
 import compiler
@@ -40,13 +40,21 @@ pub fn handle_new_command(args []string) {
 }
 
 pub fn handle_compile_command(args []string) {
-	if args.len < 1 {
-		eprintln('Usage: lx compile <input_file_or_project> [--debug-tokens] [--debug-types] [--no-rebar-compile]')
-		exit(1)
-	}
-
-	input_path := args[0]
+	mut input_path := ''
 	mut config := CLIConfig{}
+
+	if args.len < 1 {
+		// Se nenhum argumento, tente usar o diretório atual se for um projeto válido
+		current_dir := os.getwd()
+		if is_valid_project_directory(current_dir) {
+			input_path = current_dir
+		} else {
+			eprintln('Usage: lx compile <input_file_or_project> [--debug-tokens] [--debug-types] [--no-rebar-compile]')
+			exit(1)
+		}
+	} else {
+		input_path = args[0]
+	}
 
 	// Parse command line flags
 	for i in 1 .. args.len {
@@ -61,14 +69,14 @@ pub fn handle_compile_command(args []string) {
 				config.no_rebar_compile = true
 			}
 			else {
-				eprintln('Unknown flag: ${args[i]}')
+				eprintln('Unknown flag: \\${args[i]}')
 				exit(1)
 			}
 		}
 	}
 
 	if !os.exists(input_path) {
-		eprintln('Input file or project not found: ${input_path}')
+		eprintln('Input file or project not found: \\${input_path}')
 		exit(1)
 	}
 
