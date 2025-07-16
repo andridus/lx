@@ -94,9 +94,47 @@ fn (mut p LXParser) parse_primary_type() ?ast.TypeExpression {
 
 // parse_named_type parses named types (simple, parameterized, record types)
 fn (mut p LXParser) parse_named_type() ?ast.TypeExpression {
-	name := p.current.get_value()
+	mut name := p.current.get_value()
 	position := p.get_current_position()
 	p.advance()
+
+	// Check for qualified type: module.Type or module.record
+	if p.check(operator_token(.dot)) {
+		p.advance() // consume '.'
+		if p.current.is_identifier() {
+			type_name := p.current.get_value()
+			name = '${name}.${type_name}'
+			p.advance()
+		} else {
+			p.add_error('Expected type name after .', 'Got ${p.current.str()}')
+			return none
+		}
+	}
+
+	// Detect qualified type usage: module.type or module.Record
+	if name.contains('.') {
+		parts := name.split('.')
+		if parts.len == 2 {
+			mod := parts[0]
+			typ := parts[1]
+			// Register usage in the global registry
+			if typ.len > 0 && typ[0].is_capital() {
+				// Record usage
+				if mod != p.module_name {
+					if typ !in p.global_registry.record_usages['${mod}.${typ}'] {
+						p.global_registry.record_usages['${mod}.${typ}'] << p.module_name
+					}
+				}
+			} else {
+				// Type alias usage
+				if mod != p.module_name {
+					if typ !in p.global_registry.type_usages['${mod}.${typ}'] {
+						p.global_registry.type_usages['${mod}.${typ}'] << p.module_name
+					}
+				}
+			}
+		}
+	}
 
 	// Check for record type: RecordName{field: type, ...}
 	if p.check(punctuation_token(.lbrace)) {

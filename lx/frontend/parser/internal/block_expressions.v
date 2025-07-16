@@ -2024,13 +2024,6 @@ fn (p &LXParser) is_next_receive_pattern() bool {
 	return p.is_pattern_followed_by_arrow(p.position)
 }
 
-// Função auxiliar para testes: permite testar parse_postfix_expression diretamente
-pub fn test_parse_postfix_expression(tokens []lexer.Token, context ParsingContext) ?ast.Expr {
-	mut parser := new_lx_parser(tokens)
-	parser.context = context
-	return parser.parse_postfix_expression()
-}
-
 // parse_binary_expression parses binary expressions with the given operator
 fn (mut p LXParser) parse_binary_expression(op ast.BinaryOp) ?ast.Expr {
 	position := p.get_current_position()

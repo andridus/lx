@@ -5,6 +5,30 @@ import lexer
 import errors
 
 // ========================================
+// GLOBAL REGISTRY FOR SHARED TYPES/RECORDS
+// ========================================
+
+// GlobalRegistry holds all records, type aliases and their cross-module usage
+@[heap]
+pub struct GlobalRegistry {
+pub mut:
+	records       map[string]ast.RecordDefStmt // 'module.Record' -> definition
+	types         map[string]ast.TypeAliasStmt // 'module.type'   -> definition
+	record_usages map[string][]string          // 'module.Record' -> [consumer modules]
+	type_usages   map[string][]string          // 'module.type'   -> [consumer modules]
+}
+
+// new_global_registry creates a new global registry instance
+pub fn new_global_registry() &GlobalRegistry {
+	return &GlobalRegistry{
+		records:       {}
+		types:         {}
+		record_usages: {}
+		type_usages:   {}
+	}
+}
+
+// ========================================
 // PARSING CONTEXT MANAGEMENT
 // ========================================
 
@@ -23,21 +47,27 @@ pub enum ParsingContext {
 @[heap]
 pub struct LXParser {
 mut:
-	tokens      []lexer.Token
-	position    int
-	current     lexer.Token
-	context     ParsingContext
-	errors      []errors.CompilationError
-	next_ast_id int = 1 // Next available AST ID
+	tokens []lexer.Token
+
+	position        int
+	current         lexer.Token
+	context         ParsingContext
+	errors          []errors.CompilationError
+	next_ast_id     int = 1 // Next available AST ID
+	global_registry &GlobalRegistry // Reference to global registry for cross-module types
+pub:
+	module_name string // Name of the current module being parsed
 }
 
 // new_lx_parser creates a new internal parser instance
-pub fn new_lx_parser(tokens []lexer.Token) &LXParser {
+pub fn new_lx_parser(tokens []lexer.Token, module_name string, global_registry &GlobalRegistry) &LXParser {
 	mut parser := &LXParser{
-		tokens:   tokens
-		position: 0
-		context:  .mod // Start in mod context
-		errors:   []
+		tokens:          tokens
+		position:        0
+		context:         .mod // Start in mod context
+		errors:          []
+		module_name:     module_name
+		global_registry: global_registry
 	}
 
 	// Initialize current token

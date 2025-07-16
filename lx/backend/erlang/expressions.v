@@ -618,8 +618,44 @@ fn (mut gen ErlangGenerator) generate_record_literal(expr ast.RecordLiteralExpr)
 fn (mut gen ErlangGenerator) generate_record_access(expr ast.RecordAccessExpr) string {
 	record := gen.generate_expression(expr.record)
 
-	// For now, use a generic record name - this could be improved with type inference
-	record_name := 'record'
+	// Try to get the record type from the type table
+	mut record_name := 'record' // fallback
+
+	if type_table := gen.type_table {
+		// Try to get type information for the record expression
+		record_ast_id := ast.get_expr_ast_id(expr.record)
+
+		if record_ast_id != -1 {
+			if record_type := type_table.get_type(record_ast_id) {
+				// Check if it's a record type with value
+				if record_type.generic == 'record' {
+					if type_str := record_type.value {
+						record_name = type_str.to_lower()
+					}
+				}
+				// Handle qualified types like example.User (generic: named)
+				else if record_type.generic == 'named' {
+					if type_str := record_type.value {
+						if type_str.contains('.') {
+							parts := type_str.split('.')
+							if parts.len == 2 {
+								record_name = parts[1].to_lower()
+							}
+						} else {
+							record_name = type_str.to_lower()
+						}
+					}
+				}
+				// Handle qualified types like example.User in generic field
+				else if record_type.generic.contains('.') {
+					parts := record_type.generic.split('.')
+					if parts.len == 2 {
+						record_name = parts[1].to_lower()
+					}
+				}
+			}
+		}
+	}
 
 	// In Erlang, record access uses: Record#record_name.field
 	return '${record}#${record_name}.${expr.field}'

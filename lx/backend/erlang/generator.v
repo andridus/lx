@@ -3,16 +3,18 @@ module erlang
 import ast
 import analysis
 import codegen { CodegenResult }
+import frontend.parser.internal
 
 // ErlangGenerator generates Erlang code from LX AST
 pub struct ErlangGenerator {
 mut:
 	defined_types       map[string]ast.TypeAliasStmt // Map of type name to type definition
 	var_scopes          []map[string]string          // Stack of variable scopes: original name -> hashed name
-	next_hash           int                    // Counter for unique hashes
-	type_context        ?&analysis.TypeContext // Type context for record type information
-	type_table          ?&analysis.TypeTable   // Type table from HM system
-	current_function_id string                 // Current function ID for type lookups
+	next_hash           int                       // Counter for unique hashes
+	type_context        ?&analysis.TypeContext    // Type context for record type information
+	type_table          ?&analysis.TypeTable      // Type table from HM system
+	current_function_id string                    // Current function ID for type lookups
+	global_registry     ?&internal.GlobalRegistry // Global registry for cross-module types
 }
 
 // new_erlang_generator creates a new Erlang code generator
@@ -24,7 +26,13 @@ pub fn new_erlang_generator() ErlangGenerator {
 		type_context:        none
 		type_table:          none
 		current_function_id: ''
+		global_registry:     none
 	}
+}
+
+// set_global_registry sets the global registry for cross-module types
+pub fn (mut gen ErlangGenerator) set_global_registry(registry &internal.GlobalRegistry) {
+	gen.global_registry = unsafe { registry }
 }
 
 // set_type_table sets the type table for the generator
@@ -41,6 +49,12 @@ pub fn (mut gen ErlangGenerator) generate_module(module_stmt ast.ModuleStmt, typ
 	// Generate module header
 	mut code := gen.get_module_header(module_stmt.name)
 
+	// Generate includes for cross-module types
+	includes := gen.generate_includes(module_stmt.name)
+	if includes.len > 0 {
+		code += includes.join('\n') + '\n\n'
+	}
+
 	// Generate exports
 	exports := gen.generate_exports(module_stmt.statements)
 	if exports.len > 0 {
@@ -48,19 +62,23 @@ pub fn (mut gen ErlangGenerator) generate_module(module_stmt ast.ModuleStmt, typ
 	}
 	code += '\n'
 
-	// Generate statements
+	// Generate statements (excluding shared records/types that go to .hrl)
 	for stmt in module_stmt.statements {
-		stmt_code := gen.generate_statement(stmt)
+		stmt_code := gen.generate_statement_filtered(stmt)
 		code += stmt_code + '\n'
 	}
 
 	// Add module footer
 	code += gen.get_module_footer()
 
+	// Generate .hrl content for all records/types in this module
+	hrl_content := gen.generate_hrl_content(module_stmt.name, module_stmt.statements)
+
 	return CodegenResult{
-		success: true
-		errors:  []
-		code:    code
+		success:     true
+		errors:      []
+		code:        code
+		hrl_content: hrl_content
 	}
 }
 
@@ -106,6 +124,113 @@ fn (gen ErlangGenerator) generate_exports(statements []ast.Stmt) []string {
 	}
 
 	return exports
+}
+
+// generate_includes generates include statements for cross-module types
+fn (gen ErlangGenerator) generate_includes(module_name string) []string {
+	mut includes := []string{}
+
+	if registry := gen.global_registry {
+		// Check which external modules this module depends on
+		mut external_modules := map[string]bool{}
+
+		// Check record usages
+		for record_key, consumers in registry.record_usages {
+			if module_name in consumers {
+				parts := record_key.split('.')
+				if parts.len == 2 {
+					external_modules[parts[0]] = true
+				}
+			}
+		}
+
+		// Check type usages
+		for type_key, consumers in registry.type_usages {
+			if module_name in consumers {
+				parts := type_key.split('.')
+				if parts.len == 2 {
+					external_modules[parts[0]] = true
+				}
+			}
+		}
+
+		// Check if this module has its own records (needs self-include)
+		for record_key, _ in registry.records {
+			parts := record_key.split('.')
+			if parts.len == 2 && parts[0] == module_name {
+				// This module defines records, so it needs to include its own .hrl
+				external_modules[module_name] = true
+				break
+			}
+		}
+
+		// Generate include statements
+		for ext_module, _ in external_modules {
+			includes << '-include("${ext_module}.hrl").'
+		}
+	}
+
+	return includes
+}
+
+// generate_statement_filtered generates code for statements, filtering out shared records/types
+fn (mut gen ErlangGenerator) generate_statement_filtered(stmt ast.Stmt) string {
+	match stmt {
+		ast.RecordDefStmt {
+			// Always skip records - they go to .hrl
+			return ''
+		}
+		ast.TypeAliasStmt {
+			// Always skip type aliases - they go to .hrl
+			return ''
+		}
+		else {
+			// Generate other statements normally
+			return gen.generate_statement(stmt)
+		}
+	}
+}
+
+// generate_hrl_content generates .hrl content for all records and types in the module
+fn (mut gen ErlangGenerator) generate_hrl_content(module_name string, statements []ast.Stmt) string {
+	mut all_records := []ast.RecordDefStmt{}
+	mut all_types := []ast.TypeAliasStmt{}
+
+	// Collect all records and types
+	for stmt in statements {
+		match stmt {
+			ast.RecordDefStmt {
+				all_records << stmt
+			}
+			ast.TypeAliasStmt {
+				all_types << stmt
+			}
+			else {}
+		}
+	}
+
+	// Generate .hrl content if there are any records or types
+	if all_records.len > 0 || all_types.len > 0 {
+		mut hrl_content := ''
+
+		// Add header comment
+		hrl_content += '%% Generated header file for ${module_name} module\n'
+		hrl_content += '%% Contains records and type definitions\n\n'
+
+		// Generate record definitions
+		for record in all_records {
+			hrl_content += gen.generate_record_definition(record) + '\n'
+		}
+
+		// Generate type definitions
+		for type_alias in all_types {
+			hrl_content += gen.generate_type_alias(type_alias) + '\n'
+		}
+
+		return hrl_content
+	}
+
+	return ''
 }
 
 // Interface implementations

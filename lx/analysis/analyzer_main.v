@@ -199,10 +199,10 @@ fn (mut a Analyzer) check_module_with_hm(module_stmt ast.ModuleStmt) TypeCheckRe
 		}
 	}
 
-    // Also collect any remaining errors from HM inferencer
-    remaining_errors := a.hm_inferencer.get_errors()
-    error_list << remaining_errors
-    a.hm_inferencer.clear_errors()
+	// Also collect any remaining errors from HM inferencer
+	remaining_errors := a.hm_inferencer.get_errors()
+	error_list << remaining_errors
+	a.hm_inferencer.clear_errors()
 
 	// Create a minimal type context for compatibility
 	type_context := new_type_context()
@@ -301,7 +301,8 @@ fn (mut a Analyzer) process_function_hm(func_stmt ast.FunctionStmt) ! {
 		arity_ast_id := func_stmt.ast_id * 1000 + arity
 		pos := '${func_stmt.position.line}:${func_stmt.position.column}'
 		func_text := 'def ${func_stmt.name}/${arity}(...)'
-		hm_inferencer.type_table.assign_type_with_pos(arity_ast_id, arity_return_type, pos, func_text)
+		hm_inferencer.type_table.assign_type_with_pos(arity_ast_id, arity_return_type,
+			pos, func_text)
 
 		if hm_inferencer.type_table.debug_mode {
 			println('[HM_INFERENCER] Stored function "${func_stmt.name}/${arity}" return type in TypeTable with AST ID: ${arity_ast_id}')
@@ -415,10 +416,10 @@ fn (mut a Analyzer) process_function_hm(func_stmt ast.FunctionStmt) ! {
 		}
 	}
 
-    // Check if there are any type errors and prevent compilation
-    if hm_inferencer.has_errors() {
-        return error('Type errors detected in function "${func_stmt.name}"')
-    }
+	// Check if there are any type errors and prevent compilation
+	if hm_inferencer.has_errors() {
+		return error('Type errors detected in function "${func_stmt.name}"')
+	}
 }
 
 // process_function_parameters_hm processes function parameters and binds their types to HM environment

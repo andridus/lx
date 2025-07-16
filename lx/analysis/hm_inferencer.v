@@ -6,13 +6,13 @@ import errors
 // HMInferencer implements basic HM type inference
 pub struct HMInferencer {
 pub mut:
-	type_table    TypeTable
-	type_env      TypeEnv
-	next_type_var int = 1
-	constraints   []Constraint
-    last_map_field_types map[string]TypeInfo
-    record_field_types   map[string]TypeInfo
-    error_reporter ErrorReporter
+	type_table           TypeTable
+	type_env             TypeEnv
+	next_type_var        int = 1
+	constraints          []Constraint
+	last_map_field_types map[string]TypeInfo
+	record_field_types   map[string]TypeInfo
+	error_reporter       ErrorReporter
 }
 
 // Constraint represents a type constraint in the HM system
@@ -25,24 +25,24 @@ pub:
 // new_hm_inferencer creates a new HM inferencer
 pub fn new_hm_inferencer() HMInferencer {
 	return HMInferencer{
-		type_table:    new_type_table()
-		type_env:      new_type_env()
-		next_type_var: 1
-		constraints:   []
-        record_field_types: map[string]TypeInfo{},
-        error_reporter: new_error_reporter()
+		type_table:         new_type_table()
+		type_env:           new_type_env()
+		next_type_var:      1
+		constraints:        []
+		record_field_types: map[string]TypeInfo{}
+		error_reporter:     new_error_reporter()
 	}
 }
 
 // new_hm_inferencer_with_debug creates a new HM inferencer with debug mode
 pub fn new_hm_inferencer_with_debug() HMInferencer {
 	return HMInferencer{
-		type_table:    new_type_table_with_debug()
-		type_env:      new_type_env()
-		next_type_var: 1
-		constraints:   []
-        record_field_types: map[string]TypeInfo{},
-        error_reporter: new_error_reporter()
+		type_table:         new_type_table_with_debug()
+		type_env:           new_type_env()
+		next_type_var:      1
+		constraints:        []
+		record_field_types: map[string]TypeInfo{}
+		error_reporter:     new_error_reporter()
 	}
 }
 
@@ -207,6 +207,12 @@ pub fn (mut hmi HMInferencer) infer_expression(expr ast.Expr) !TypeInfo {
 				println('[HM_INFERENCER] Matched RecordLiteralExpr')
 			}
 			hmi.infer_record_literal(expr)!
+		}
+		ast.RecordAccessExpr {
+			if hmi.type_table.debug_mode {
+				println('[HM_INFERENCER] Matched RecordAccessExpr')
+			}
+			hmi.infer_record_access(expr)!
 		}
 		ast.CaseExpr {
 			if hmi.type_table.debug_mode {
@@ -439,7 +445,9 @@ pub fn (mut hmi HMInferencer) resolve_constraints() !Substitution {
 	}
 
 	if hmi.constraints.len == 0 {
-		return Substitution{subst: map[int]TypeInfo{}}
+		return Substitution{
+			subst: map[int]TypeInfo{}
+		}
 	}
 
 	// Group constraints by type variable
@@ -463,7 +471,9 @@ pub fn (mut hmi HMInferencer) resolve_constraints() !Substitution {
 	}
 
 	// Create substitution based on collected constraints
-	mut substitution := Substitution{subst: map[int]TypeInfo{}}
+	mut substitution := Substitution{
+		subst: map[int]TypeInfo{}
+	}
 
 	for var_id, types in var_constraints {
 		if hmi.type_table.debug_mode {
@@ -614,7 +624,11 @@ pub fn (mut hmi HMInferencer) infer_block(expr ast.BlockExpr) !TypeInfo {
 		if hmi.type_table.debug_mode {
 			println('[HM_INFERENCER] Resolving constraints before final type calculation')
 		}
-		substitution := hmi.resolve_constraints() or { Substitution{subst: map[int]TypeInfo{}} }
+		substitution := hmi.resolve_constraints() or {
+			Substitution{
+				subst: map[int]TypeInfo{}
+			}
+		}
 		final_last_type = substitution.apply_to_type(last_type)
 		if hmi.type_table.debug_mode {
 			println('[HM_INFERENCER] Applied substitution to last_type: ${last_type} -> ${final_last_type}')
@@ -777,9 +791,30 @@ pub fn (mut hmi HMInferencer) infer_record_literal(expr ast.RecordLiteralExpr) !
 	return record_type
 }
 
+// infer_record_access infers the type of a record field access
+pub fn (mut hmi HMInferencer) infer_record_access(expr ast.RecordAccessExpr) !TypeInfo {
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] infer_record_access: accessing field ${expr.field}')
+	}
+
+	// Infer the type of the record being accessed
+	record_type := hmi.infer_expression(expr.record)!
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] Record type: ${record_type}')
+	}
+
+	// For now, return string type for record field access
+	// TODO: Implement proper record field type lookup
+	field_type := typeinfo_string()
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] Field ${expr.field} type: ${field_type}')
+	}
+
+	return field_type
+}
+
 // infer_case infers the type of a case expression
 pub fn (mut hmi HMInferencer) infer_case(expr ast.CaseExpr) !TypeInfo {
-
 	if hmi.type_table.debug_mode {
 		println('[HM_INFERENCER] infer_case: processing case expression')
 	}
@@ -795,7 +830,6 @@ pub fn (mut hmi HMInferencer) infer_case(expr ast.CaseExpr) !TypeInfo {
 
 	// Process each case branch
 	for i, case_branch in expr.cases {
-
 		if hmi.type_table.debug_mode {
 			println('[HM_INFERENCER] Processing case branch ${i + 1}')
 		}
@@ -934,7 +968,7 @@ pub fn (mut hmi HMInferencer) infer_with(expr ast.WithExpr) !TypeInfo {
 		}
 	}
 
-			// Check each statement in the body for match expressions
+	// Check each statement in the body for match expressions
 	mut match_return_types := []TypeInfo{}
 
 	// Check each statement in the body for match expressions
@@ -962,7 +996,7 @@ pub fn (mut hmi HMInferencer) infer_with(expr ast.WithExpr) !TypeInfo {
 		}
 	}
 
-		// If there are match expressions, create a union type
+	// If there are match expressions, create a union type
 	mut result_type := body_type
 	if match_return_types.len > 0 {
 		// Create union of body type and all match return types
@@ -1114,9 +1148,9 @@ pub fn (mut hmi HMInferencer) infer_list_literal(expr ast.ListLiteralExpr) !Type
 	}
 	// Inferir o tipo de todos os elementos
 	mut element_types := []TypeInfo{}
-    // Se todos os elementos são mapas literais, coletar tipos dos campos
-    mut all_maps := true
-    mut field_types := map[string]TypeInfo{}
+	// Se todos os elementos são mapas literais, coletar tipos dos campos
+	mut all_maps := true
+	mut field_types := map[string]TypeInfo{}
 	for el in expr.elements {
 		element_types << hmi.infer_expression(el)!
 		if el is ast.MapLiteralExpr {
@@ -1127,11 +1161,9 @@ pub fn (mut hmi HMInferencer) infer_list_literal(expr ast.ListLiteralExpr) !Type
 					// Verificar se o campo já existe com tipo diferente
 					if existing_type := field_types[atom_key.value] {
 						if !types_are_compatible(existing_type, field_value_type) {
-                            hmi.error_reporter.report_error(.type_error,
-                                'Type mismatch for map field "${atom_key.value}": ${existing_type} vs ${field_value_type}',
-                                el.position,
-                                'Ensure all map fields have consistent types')
-                            return error('Type mismatch detected')
+							hmi.error_reporter.report_error(.type_error, 'Type mismatch for map field "${atom_key.value}": ${existing_type} vs ${field_value_type}',
+								el.position, 'Ensure all map fields have consistent types')
+							return error('Type mismatch detected')
 						}
 					}
 					field_types[atom_key.value] = field_value_type
@@ -1141,11 +1173,11 @@ pub fn (mut hmi HMInferencer) infer_list_literal(expr ast.ListLiteralExpr) !Type
 			all_maps = false
 		}
 	}
-    if all_maps && field_types.len > 0 {
-        hmi.last_map_field_types = field_types.clone()
-    } else {
-        hmi.last_map_field_types = map[string]TypeInfo{}
-    }
+	if all_maps && field_types.len > 0 {
+		hmi.last_map_field_types = field_types.clone()
+	} else {
+		hmi.last_map_field_types = map[string]TypeInfo{}
+	}
 	// Unificar todos os tipos dos elementos
 	mut unified_type := element_types[0]
 	for t in element_types[1..] {
@@ -1221,7 +1253,6 @@ pub fn (mut hmi HMInferencer) infer_unary(expr ast.UnaryExpr) !TypeInfo {
 
 // extract_pattern_variables extracts variables from a pattern and binds them to the type environment
 fn (mut hmi HMInferencer) extract_pattern_variables(pattern ast.Pattern, value_type TypeInfo) {
-
 	if hmi.type_table.debug_mode {
 		println('[HM_INFERENCER] extract_pattern_variables: pattern=${typeof(pattern).name}, value_type=${value_type}')
 	}
@@ -1240,7 +1271,11 @@ fn (mut hmi HMInferencer) extract_pattern_variables(pattern ast.Pattern, value_t
 			return
 		}
 
-		substitution := hmi.resolve_constraints() or { Substitution{subst: map[int]TypeInfo{}} }
+		substitution := hmi.resolve_constraints() or {
+			Substitution{
+				subst: map[int]TypeInfo{}
+			}
+		}
 		substituted_type = substitution.apply_to_type(substituted_type)
 		if hmi.type_table.debug_mode {
 			println('[HM_INFERENCER] Applied substitution: ${value_type} -> ${substituted_type}')
@@ -1268,7 +1303,8 @@ fn (mut hmi HMInferencer) extract_pattern_variables(pattern ast.Pattern, value_t
 				println('[HM_INFERENCER] [TUPLE] substituted_type.values.len: ${substituted_type.values.len}')
 				println('[HM_INFERENCER] [TUPLE] pattern.elements.len: ${pattern.elements.len}')
 			}
-			if substituted_type.generic == 'tuple' && substituted_type.values.len == pattern.elements.len {
+			if substituted_type.generic == 'tuple'
+				&& substituted_type.values.len == pattern.elements.len {
 				for i, element_pattern in pattern.elements {
 					if i < substituted_type.values.len {
 						element_type := substituted_type.values[i]
@@ -1345,11 +1381,15 @@ fn (mut hmi HMInferencer) extract_pattern_variables(pattern ast.Pattern, value_t
 							if hmi.type_table.debug_mode {
 								println('[HM_INFERENCER] [MAP] Processing key: ${key_name}')
 							}
-                            // Se temos tipos deduzidos dos campos, usar
-                            field_type := if key_name in hmi.last_map_field_types { hmi.last_map_field_types[key_name] } else { map_value_type }
-                            hmi.extract_pattern_variables(entry.value, field_type)
-                            // Limpar após uso para não vazar contexto
-                            hmi.last_map_field_types.delete(key_name)
+							// Se temos tipos deduzidos dos campos, usar
+							field_type := if key_name in hmi.last_map_field_types {
+								hmi.last_map_field_types[key_name]
+							} else {
+								map_value_type
+							}
+							hmi.extract_pattern_variables(entry.value, field_type)
+							// Limpar após uso para não vazar contexto
+							hmi.last_map_field_types.delete(key_name)
 						}
 						else {
 							hmi.extract_pattern_variables(entry.key, map_key_type)
@@ -1417,9 +1457,9 @@ fn (hmi HMInferencer) get_function_return_type(func_name string, arity int) ?Typ
 		if type_info.generic == 'typevar' || type_info.generic == 'function' {
 			continue
 		}
-		if type_info.generic == 'union' || type_info.generic == 'tuple' ||
-		   type_info.generic == 'string' || type_info.generic == 'atom' ||
-		   type_info.generic == 'boolean' || type_info.generic == 'integer' {
+		if type_info.generic == 'union' || type_info.generic == 'tuple'
+			|| type_info.generic == 'string' || type_info.generic == 'atom'
+			|| type_info.generic == 'boolean' || type_info.generic == 'integer' {
 			best_candidate = type_info
 		}
 	}

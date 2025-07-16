@@ -2,6 +2,7 @@ module compiler
 
 import frontend.lexer
 import frontend.parser
+import frontend.parser.internal
 import os
 import ast
 import errors
@@ -58,7 +59,7 @@ pub fn (mut comp Compiler) compile_file(file_path string) {
 		println('Failed to read file: ${file_path}: ${err}')
 		exit(1)
 	}
-	result := comp.compile(source, file_path)
+	result := comp.compile(source, file_path, '')
 
 	// Create output directory if it doesn't exist
 	os.mkdir_all(os.dir(file_path)) or {
@@ -76,8 +77,11 @@ pub fn (mut comp Compiler) compile_file(file_path string) {
 	}
 }
 
-pub fn (mut comp Compiler) compile(source string, file_path string) codegen.CodegenResult {
+pub fn (mut comp Compiler) compile(source string, file_path string, output_dir string) codegen.CodegenResult {
 	mut error_formatter := errors.new_error_formatter()
+	// Create global registry for cross-module types
+	global_registry := internal.new_global_registry()
+
 	// Create lexer and tokenize
 	mut lexer_instance := lexer.new_lexer(source, file_path)
 	mut tokens := []lexer.Token{}
@@ -112,7 +116,8 @@ pub fn (mut comp Compiler) compile(source string, file_path string) codegen.Code
 	}
 
 	// Create parser and parse the tokens into AST
-	mut parser1_instance := parser.new_parser(tokens)
+	module_name := os.file_name(file_path).replace('.lx', '')
+	mut parser1_instance := parser.new_parser(tokens, module_name, global_registry)
 	program_stmt := parser1_instance.parse_program() or { ast.ModuleStmt{} }
 
 	if parser1_instance.has_errors() {
@@ -134,7 +139,7 @@ pub fn (mut comp Compiler) compile(source string, file_path string) codegen.Code
 		}
 		ast.ModuleStmt {
 			// Handle module compilation (existing behavior)
-			return comp.compile_module(program_stmt, file_path)
+			return comp.compile_module(program_stmt, file_path, output_dir, global_registry)
 		}
 		else {
 			println('Error: Unsupported program type')
@@ -144,7 +149,7 @@ pub fn (mut comp Compiler) compile(source string, file_path string) codegen.Code
 }
 
 // compile_module compiles a single module
-fn (mut comp Compiler) compile_module(module_stmt ast.ModuleStmt, file_path string) codegen.CodegenResult {
+fn (mut comp Compiler) compile_module(module_stmt ast.ModuleStmt, file_path string, output_dir string, global_registry &internal.GlobalRegistry) codegen.CodegenResult {
 	// Use the HM type system (now the only option)
 	mut analyzer := if comp.debug_types {
 		println('Using Hindley-Milner type inference with debug')
@@ -184,6 +189,8 @@ fn (mut comp Compiler) compile_module(module_stmt ast.ModuleStmt, file_path stri
 	// Set the type table in the backend (HM is now the only system)
 	type_table := analyzer.get_type_table()
 	erlang_gen.set_type_table(type_table)
+	// Set the global registry for cross-module types
+	erlang_gen.set_global_registry(global_registry)
 
 	codegen_result := erlang_gen.generate_module(final_module_stmt, analysis_result.type_context)
 
@@ -194,6 +201,18 @@ fn (mut comp Compiler) compile_module(module_stmt ast.ModuleStmt, file_path stri
 		}
 		exit(1)
 	}
+
+	// Generate .hrl file if there's content for it
+	if codegen_result.hrl_content.len > 0 {
+		hrl_dir := if output_dir.len > 0 { output_dir } else { os.dir(file_path) }
+		hrl_file := '${hrl_dir}/${final_module_stmt.name}.hrl'
+		os.write_file(hrl_file, codegen_result.hrl_content) or {
+			eprintln('Failed to write ${hrl_file}: ${err}')
+			exit(1)
+		}
+		println('Generated ${hrl_file}')
+	}
+
 	println('Compiled ${file_path} successfully')
 	return codegen_result
 }
@@ -244,11 +263,11 @@ fn (mut comp Compiler) compile_application(app_stmt ast.ApplicationStmt, file_pa
 
 	// Return success result
 	return codegen.CodegenResult{
-		success: true
-		code: ''
-		file_path: '${output_dir}/src/${app_name}.erl'
-		errors: []
-		warnings: []
+		success:     true
+		code:        ''
+		file_path:   '${output_dir}/src/${app_name}.erl'
+		errors:      []
+		warnings:    []
 		module_name: app_name
 	}
 }

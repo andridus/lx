@@ -17,13 +17,17 @@ pub fn (gen ApplicationGenerator) generate_app_src(app_stmt ast.ApplicationStmt,
 	version := gen.get_string_field(app_stmt.fields, 'vsn') or { '1.0.0' }
 
 	// Extract applications list
-	applications := gen.get_atom_list_field(app_stmt.fields, 'applications') or { ['kernel', 'stdlib'] }
+	applications := gen.get_atom_list_field(app_stmt.fields, 'applications') or {
+		['kernel', 'stdlib']
+	}
 
 	// Extract registered list
 	registered := gen.get_atom_list_field(app_stmt.fields, 'registered') or { [] }
 
 	// Extract env map
-	env_map := gen.get_env_map_field(app_stmt.fields, 'env') or { map[string]string{} }
+	env_map := gen.get_env_map_field(app_stmt.fields, 'env') or {
+		map[string]string{}
+	}
 
 	mut app_src := '{application, ${app_name}, [\n'
 	app_src += '    {description, "${description}"},\n'
@@ -172,7 +176,11 @@ pub fn (gen ApplicationGenerator) get_env_map_field(fields map[string]ast.Expr, 
 								env_map[key_str] = value_expr.value.value
 							}
 							ast.BooleanLiteral {
-								env_map[key_str] = if value_expr.value.value { 'true' } else { 'false' }
+								env_map[key_str] = if value_expr.value.value {
+									'true'
+								} else {
+									'false'
+								}
 							}
 							ast.IntegerLiteral {
 								env_map[key_str] = value_expr.value.value.str()
@@ -198,24 +206,26 @@ pub fn (gen ApplicationGenerator) extract_dependencies(expr ast.Expr) []ast.Depe
 				if element.value is ast.AtomLiteral {
 					// Simple dependency like :cowboy
 					deps << ast.Dependency{
-						name: element.value.value
-						version: none
-						source: none
+						name:     element.value.value
+						version:  none
+						source:   none
 						position: element.position
 					}
 				}
 			} else if element is ast.TupleExpr {
 				// Complex dependency like {:mongodb, "~> 4.0.0"}
 				if element.elements.len == 2 {
-					if element.elements[0] is ast.LiteralExpr && element.elements[1] is ast.LiteralExpr {
+					if element.elements[0] is ast.LiteralExpr
+						&& element.elements[1] is ast.LiteralExpr {
 						name_expr := element.elements[0] as ast.LiteralExpr
 						version_expr := element.elements[1] as ast.LiteralExpr
 
-						if name_expr.value is ast.AtomLiteral && version_expr.value is ast.StringLiteral {
+						if name_expr.value is ast.AtomLiteral
+							&& version_expr.value is ast.StringLiteral {
 							deps << ast.Dependency{
-								name: name_expr.value.value
-								version: version_expr.value.value
-								source: none
+								name:     name_expr.value.value
+								version:  version_expr.value.value
+								source:   none
 								position: element.position
 							}
 						}

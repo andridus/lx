@@ -30,10 +30,14 @@ pub fn (mut p LXParser) parse_program_statements() ?ast.Stmt {
 	}
 
 	// Parse module header if present
+	mut module_name := 'main'
 	if p.check(keyword_token(.module)) {
 		module_info := p.parse_module_header()?
 		exports = module_info.exports.clone()
 		imports = module_info.imports.clone()
+		if exports.len > 0 {
+			module_name = exports[0]
+		}
 	}
 
 	// Parse all module statements
@@ -45,11 +49,12 @@ pub fn (mut p LXParser) parse_program_statements() ?ast.Stmt {
 		}
 
 		stmt := p.parse_module_statement() or { return none }
+
 		statements << stmt
 	}
 
 	return ast.ModuleStmt{
-		name:       if exports.len > 0 { exports[0] } else { 'main' }
+		name:       module_name
 		exports:    exports
 		imports:    imports
 		statements: statements
@@ -213,11 +218,16 @@ fn (mut p LXParser) parse_record_definition() ?ast.Stmt {
 
 	p.consume(punctuation_token(.rbrace), 'Expected } after record fields')?
 
-	return ast.RecordDefStmt{
+	record_stmt := ast.RecordDefStmt{
 		name:     name
 		fields:   fields
 		position: p.get_current_position()
 	}
+
+	// Register record in global registry with key 'module.Record'
+	p.global_registry.records['${p.module_name}.${name}'] = record_stmt
+
+	return record_stmt
 }
 
 // ========================================
@@ -253,12 +263,17 @@ fn (mut p LXParser) parse_type_definition() ?ast.Stmt {
 
 	type_expr := p.parse_type_expression()?
 
-	return ast.TypeAliasStmt{
+	type_alias_stmt := ast.TypeAliasStmt{
 		name:       name
 		type_expr:  type_expr
 		alias_type: alias_type
 		position:   p.get_current_position()
 	}
+
+	// Register type alias in global registry with key 'module.type'
+	p.global_registry.types['${p.module_name}.${name}'] = type_alias_stmt
+
+	return type_alias_stmt
 }
 
 // ========================================
@@ -576,7 +591,7 @@ fn (mut p LXParser) parse_application_definition() ?ast.Stmt {
 	p.consume(punctuation_token(.rbrace), 'Expected closing brace after application fields')?
 
 	return ast.ApplicationStmt{
-		fields: fields
+		fields:   fields
 		position: p.get_current_position()
 	}
 }

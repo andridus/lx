@@ -27,6 +27,7 @@ pub mut:
 	warnings    []string
 	module_name string
 	file_path   string
+	hrl_content string // Content for .hrl file (empty if no records/types)
 }
 
 // new_result creates a new code generation result

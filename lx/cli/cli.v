@@ -6,8 +6,8 @@ import compiler
 // CLI configuration
 pub struct CLIConfig {
 pub mut:
-	debug_tokens bool
-	debug_types  bool
+	debug_tokens     bool
+	debug_types      bool
 	no_rebar_compile bool
 }
 
@@ -244,7 +244,7 @@ fn compile_project(project_path string, config CLIConfig) {
 		}
 
 		// Compile to Erlang
-		result := comp.compile(source, lx_file)
+		result := comp.compile(source, lx_file, build_src_dir)
 
 		// Generate output filename
 		base_name := os.file_name(lx_file).replace('.lx', '')
@@ -334,9 +334,7 @@ fn run_rebar_compile(project_dir string) {
 	result := os.execute('${rebar_path} compile')
 
 	// Change back to original directory
-	os.chdir(original_dir) or {
-		eprintln('Failed to change back to original directory: ${err}')
-	}
+	os.chdir(original_dir) or { eprintln('Failed to change back to original directory: ${err}') }
 
 	if result.exit_code != 0 {
 		eprintln('Rebar compilation failed:')
@@ -408,8 +406,8 @@ fn start_project_shell(project_path string) {
 
 	// First compile the project to ensure it's up to date
 	config := CLIConfig{
-		debug_tokens: false
-		debug_types: false
+		debug_tokens:     false
+		debug_types:      false
 		no_rebar_compile: false
 	}
 
@@ -429,7 +427,7 @@ fn start_project_shell(project_path string) {
 		exit(1)
 	}
 
-		println('Starting Erlang shell...')
+	println('Starting Erlang shell...')
 	println('Project: ${project_name}')
 	println('Build directory: ${project_build_dir}')
 	println('Type "q()." to quit the shell')
@@ -439,9 +437,7 @@ fn start_project_shell(project_path string) {
 	exit_code := os.system('${rebar_path} shell')
 
 	// Change back to original directory
-	os.chdir(original_dir) or {
-		eprintln('Failed to change back to original directory: ${err}')
-	}
+	os.chdir(original_dir) or { eprintln('Failed to change back to original directory: ${err}') }
 
 	if exit_code != 0 {
 		eprintln('Shell exited with code: ${exit_code}')

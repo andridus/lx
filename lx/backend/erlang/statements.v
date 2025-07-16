@@ -334,7 +334,8 @@ pub fn (mut gen ErlangGenerator) generate_function(func ast.FunctionStmt) string
 
 			// Generate automatic type guards using processed parameter names
 			mut guard_parts := []string{}
-			automatic_guards := gen.generate_automatic_type_guards_with_names(clause, parameters)
+			automatic_guards := gen.generate_automatic_type_guards_with_names(clause,
+				parameters)
 			if automatic_guards.len > 0 {
 				guard_parts << automatic_guards
 			}
