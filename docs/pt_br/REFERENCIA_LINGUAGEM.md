@@ -4,6 +4,52 @@
 
 LX é uma linguagem de programação funcional que compila para Erlang, combinando a sintaxe limpa do Elixir com recursos modernos de programação funcional e um sistema de tipos robusto.
 
+## Criação de Projetos
+
+Para criar um novo projeto LX, utilize o comando:
+
+```bash
+lx new nome_do_projeto
+```
+
+Isso irá gerar a seguinte estrutura:
+
+```
+nome_do_projeto/
+├── application.lx         # Configuração principal do projeto
+├── src/                  # Código-fonte LX
+│   └── nome_do_projeto.lx # Módulo principal
+```
+
+Exemplo de `application.lx`:
+```lx
+application {
+  description: "example - A Lx Application",
+  vsn: "1.0.0",
+  applications: [:kernel, :stdlib],
+  registered: [],
+  env: %{
+    debug: true,
+    timeout: 5000,
+    port: "8080"
+  },
+  deps: []
+}
+```
+
+Exemplo de arquivo principal em `src/`:
+```lx
+# Main application module
+record User{
+    name :: string,
+    age :: integer
+}
+
+def new_user(name :: string) do
+    User{name: name, age: 10}
+end
+```
+
 ## Sintaxe Fundamental
 
 ### Comentários
@@ -423,30 +469,60 @@ end
 
 ### Definições de Tipo
 
+A linguagem LX possui um sistema de tipos robusto, incluindo tipos nominais, opacos, genéricos e recursivos.
+
+#### Tipo união
 ```lx
-# Tipo união
 type status :: :ok | :error | :pending
-
-# Tipo genérico
-type result :: {:some, T} | :none
-
-# Tipo recursivo
-type list :: [] | {T, list}
-
 ```
 
-### Aliases de Tipo
-
+#### Tipo genérico
 ```lx
-# Alias simples
+type result(T) :: {:some, T} | :none
+```
+
+#### Tipo recursivo
+```lx
+type list(T) :: [] | {T, list(T)}
+```
+
+#### Alias simples
+```lx
 type nome :: string
 type idade :: integer
+```
 
-# Alias opaco
+#### Alias opaco
+```lx
 type opaque user_id :: integer
+```
 
-# Alias nominal
+#### Alias nominal
+```lx
 type nominal email :: string
+```
+
+#### Uso de tipos em funções
+```lx
+def soma(a :: integer, b :: integer) :: integer do
+  a + b
+end
+
+def processa_resultado(res :: result(integer)) :: integer do
+  case res do
+    {:some, v} -> v
+    :none -> 0
+  end
+end
+```
+
+#### Tipos em records
+```lx
+record Pessoa {
+  nome :: string,
+  idade :: integer,
+  email :: email
+}
 ```
 
 ## Módulos
@@ -677,32 +753,45 @@ end
 ### Compilação
 
 ```bash
-# Compilar arquivo
-lxc arquivo.lx
+# Compilar arquivo único
+lx compile arquivo.lx
 
-# Compilar com debug
-lxc arquivo.lx --debug-tokens
+# Compilar projeto (diretório)
+lx compile caminho/do/projeto
+
+# Compilar com debug dos tokens
+gx compile arquivo.lx --debug-tokens
+
+# Compilar com debug do sistema de tipos
+lx compile arquivo.lx --debug-types
+
+# Compilar sem rodar o rebar3 (apenas gera código Erlang)
+lx compile caminho/do/projeto --no-rebar-compile
 ```
 
-### Testes
+### Shell interativo do projeto
 
 ```bash
-# Executar testes
-lxc test
-
-# Executar testes específicos
-lxc test --only "nome do teste"
+# Iniciar shell Erlang no contexto do projeto (compila antes de abrir o shell)
+lx shell caminho/do/projeto
 ```
 
-### Formatação
+### Criação de link simbólico global
 
 ```bash
-# Formatar código
-lxc fmt arquivo.lx
-
-# Verificar formatação
-lxc fmt --check arquivo.lx
+# Cria um symlink /usr/local/bin/lx para o binário atual
+sudo lx symlink
 ```
+
+## Opções do Compilador LX
+
+- `lx new <nome>`: Cria um novo projeto LX
+- `lx compile <arquivo.lx|diretorio> [flags]`: Compila um arquivo ou projeto LX
+  - `--debug-tokens`: Mostra tokens gerados pelo lexer
+  - `--debug-types`: Mostra inferência e checagem de tipos
+  - `--no-rebar-compile`: Não executa o rebar3 após gerar o código Erlang
+- `lx shell [diretorio]`: Compila e abre shell Erlang no contexto do projeto
+- `lx symlink`: Cria um link simbólico global para o comando `lx`
 
 Esta referência cobre os principais aspectos da linguagem LX. Para exemplos mais detalhados e casos de uso específicos, consulte a documentação completa e os exemplos no diretório `ex/`.
 `
