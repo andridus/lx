@@ -9,7 +9,8 @@ import lexer
 // ========================================
 
 // parse_program_statements parses the entire program as a sequence of module statements
-pub fn (mut p LXParser) parse_program_statements() ?ast.ModuleStmt {
+// Returns either a ModuleStmt or ApplicationStmt depending on content
+pub fn (mut p LXParser) parse_program_statements() ?ast.Stmt {
 	mut statements := []ast.Stmt{}
 	mut imports := []ast.Import{}
 	mut exports := []string{}
@@ -21,6 +22,12 @@ pub fn (mut p LXParser) parse_program_statements() ?ast.ModuleStmt {
 	}
 
 	p.skip_newlines()
+
+	// Check if this is an application definition
+	if p.check(keyword_token(.application)) {
+		// Parse application definition
+		return p.parse_application_definition()
+	}
 
 	// Parse module header if present
 	if p.check(keyword_token(.module)) {
@@ -95,8 +102,11 @@ fn (mut p LXParser) parse_module_statement() ?ast.Stmt {
 				.describe {
 					p.parse_describe_block()
 				}
+				.application {
+					p.parse_application_definition()
+				}
 				else {
-					p.add_error('Invalid module statement', 'Expected def, record, type, spec, test, worker, supervisor, or describe')
+					p.add_error('Invalid module statement', 'Expected def, record, type, spec, test, worker, supervisor, describe, or application')
 					none
 				}
 			}
@@ -506,3 +516,69 @@ fn (mut p LXParser) parse_import_statement() ?ast.Import {
 		position: p.get_current_position()
 	}
 }
+
+// ========================================
+// APPLICATION DEFINITION
+// Grammar: application_definition ::= 'application' '{' application_fields '}'
+// ========================================
+
+// parse_application_definition parses application definitions
+fn (mut p LXParser) parse_application_definition() ?ast.Stmt {
+	p.advance() // consume 'application'
+
+	p.consume(punctuation_token(.lbrace), 'Expected opening brace after application')?
+
+	mut fields := map[string]ast.Expr{}
+
+	// Parse application fields using record-like syntax
+	if !p.check(punctuation_token(.rbrace)) {
+		for {
+			p.skip_newlines()
+
+			if p.check(punctuation_token(.rbrace)) {
+				break
+			}
+
+			// Parse field name (same as record field parsing)
+			field_name := if p.current.is_key() {
+				// Handle key tokens like description:
+				key_value := p.current.get_key_value()
+				p.advance()
+				key_value
+			} else {
+				// Handle identifier followed by colon
+				name := p.current.get_value()
+				if !p.current.is_identifier() {
+					p.add_error('Expected field name', 'Got ${p.current.str()}')
+					return none
+				}
+				p.advance()
+				p.consume(punctuation_token(.colon), 'Expected colon after field name')?
+				name
+			}
+
+			// Parse field value as expression
+			old_context := p.context
+			p.context = .expression
+			field_value := p.parse_expression()?
+			p.context = old_context
+			fields[field_name] = field_value
+
+			// Optional comma
+			if !p.match(punctuation_token(.comma)) {
+				break
+			}
+
+			p.skip_newlines()
+		}
+	}
+
+	p.consume(punctuation_token(.rbrace), 'Expected closing brace after application fields')?
+
+	return ast.ApplicationStmt{
+		fields: fields
+		position: p.get_current_position()
+	}
+}
+
+// parse_string_field parses a string literal for application fields

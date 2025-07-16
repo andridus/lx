@@ -539,6 +539,7 @@ pub enum TypeAliasType {
 // Stmt represents statements in LX using sum types
 pub type Stmt = ExprStmt
 	| ModuleStmt
+	| ApplicationStmt
 	| FunctionStmt
 	| RecordDefStmt
 	| TypeDefStmt
@@ -965,4 +966,40 @@ pub fn get_expr_ast_id(expr Expr) int {
 		MatchRescueExpr { expr.ast_id }
 		BlockExpr { expr.ast_id }
 	}
+}
+
+// Dependency represents an application dependency
+pub struct Dependency {
+pub:
+	name     string
+	version  ?string // Optional, for versioned dependencies
+	source   ?string // Optional, for specific sources (github, hex, etc.)
+	position Position
+}
+
+// ApplicationStmt represents a complete OTP application
+pub struct ApplicationStmt {
+pub:
+	// All application fields stored as a map with atom keys
+	fields map[string]Expr // key is atom name, value is the expression
+
+	// Internal
+	position Position
+	ast_id   int = -1 // -1 indicates uninitialized
+}
+
+// ModuleCallback represents the mod field {module, args}
+pub struct ModuleCallback {
+pub:
+	module   string
+	args     string // Simplified as string for now
+	position Position
+}
+
+// StartPhase represents a start phase {phase, args}
+pub struct StartPhase {
+pub:
+	phase    string
+	args     string // Simplified as string for now
+	position Position
 }

@@ -29,8 +29,8 @@ pub fn new_parser(tokens []lexer.Token) Parser {
 
 // parse_program is the SINGLE ENTRY POINT for parsing
 // It parses the entire program according to the grammar:
-// program ::= { module_statement }
-pub fn (mut p Parser) parse_program() ?ast.ModuleStmt {
+// program ::= { module_statement } | application_definition
+pub fn (mut p Parser) parse_program() ?ast.Stmt {
 	// Create internal parser with proper context
 	mut internal_parser := internal.new_lx_parser(p.lexer_tokens)
 	// Parse the complete program

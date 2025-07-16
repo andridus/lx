@@ -27,6 +27,9 @@ pub fn (mut gen ErlangGenerator) generate_statement(stmt ast.Stmt) string {
 		ast.TypeAliasStmt {
 			return gen.generate_type_alias(stmt)
 		}
+		ast.ApplicationStmt {
+			return gen.generate_application_statement(stmt)
+		}
 	}
 }
 
@@ -1249,4 +1252,11 @@ fn (gen ErlangGenerator) type_expression_to_erlang_type(type_expr ast.TypeExpres
 			return 'any()'
 		}
 	}
+}
+
+// generate_application_statement generates code for application statements
+pub fn (mut gen ErlangGenerator) generate_application_statement(stmt ast.ApplicationStmt) string {
+	// Application statements are handled by the compiler, not the backend
+	// They generate project structure and configuration files
+	return '%% Application definition - handled by compiler'
 }

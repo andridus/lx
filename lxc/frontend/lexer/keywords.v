@@ -38,6 +38,7 @@ pub const keyword_map = {
 	'assert':       KeywordValue.assert
 	'match':        KeywordValue.match_
 	'rescue':       KeywordValue.rescue
+	'application':  KeywordValue.application
 }
 
 // is_keyword checks if a string is a keyword

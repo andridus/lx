@@ -143,6 +143,7 @@ pub enum KeywordValue {
 	in
 	match_
 	rescue
+	application
 }
 
 // KeywordToken represents a keyword token
@@ -296,6 +297,7 @@ pub fn (k KeywordValue) str() string {
 		.in { 'in' }
 		.match_ { 'match' }
 		.rescue { 'rescue' }
+		.application { 'application' }
 	}
 }
 

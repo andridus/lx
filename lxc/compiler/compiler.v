@@ -113,7 +113,7 @@ pub fn (mut comp Compiler) compile(source string, file_path string) codegen.Code
 
 	// Create parser and parse the tokens into AST
 	mut parser1_instance := parser.new_parser(tokens)
-	module_stmt0 := parser1_instance.parse_program() or { ast.ModuleStmt{} }
+	program_stmt := parser1_instance.parse_program() or { ast.ModuleStmt{} }
 
 	if parser1_instance.has_errors() {
 		// Format parser errors properly
@@ -126,6 +126,25 @@ pub fn (mut comp Compiler) compile(source string, file_path string) codegen.Code
 		exit(1)
 	}
 
+	// Check if this is an application or module
+	match program_stmt {
+		ast.ApplicationStmt {
+			// Handle application compilation
+			return comp.compile_application(program_stmt, file_path)
+		}
+		ast.ModuleStmt {
+			// Handle module compilation (existing behavior)
+			return comp.compile_module(program_stmt, file_path)
+		}
+		else {
+			println('Error: Unsupported program type')
+			exit(1)
+		}
+	}
+}
+
+// compile_module compiles a single module
+fn (mut comp Compiler) compile_module(module_stmt ast.ModuleStmt, file_path string) codegen.CodegenResult {
 	// Use the HM type system (now the only option)
 	mut analyzer := if comp.debug_types {
 		println('Using Hindley-Milner type inference with debug')
@@ -135,7 +154,7 @@ pub fn (mut comp Compiler) compile(source string, file_path string) codegen.Code
 		analysis.new_analyzer()
 	}
 
-	analysis_result := analyzer.analyze_module(module_stmt0)
+	analysis_result := analyzer.analyze_module(module_stmt)
 
 	// Print debug information if requested
 	if comp.debug_types {
@@ -146,6 +165,7 @@ pub fn (mut comp Compiler) compile(source string, file_path string) codegen.Code
 
 	if analysis_result.errors.len > 0 {
 		source_lines := errors.load_source_lines(file_path)
+		mut error_formatter := errors.new_error_formatter()
 		mut formatted_errors := []string{}
 		for err in analysis_result.errors {
 			formatted_errors << error_formatter.format_error(err, source_lines)
@@ -154,7 +174,7 @@ pub fn (mut comp Compiler) compile(source string, file_path string) codegen.Code
 		exit(1)
 	}
 
-	mut final_module_stmt := module_stmt0
+	mut final_module_stmt := module_stmt
 	module_name := os.file_name(file_path).replace('.lx', '')
 	if final_module_stmt.name == 'main' {
 		final_module_stmt.name = module_name
@@ -176,4 +196,59 @@ pub fn (mut comp Compiler) compile(source string, file_path string) codegen.Code
 	}
 	println('Compiled ${file_path} successfully')
 	return codegen_result
+}
+
+// compile_application compiles an application with multiple modules
+fn (mut comp Compiler) compile_application(app_stmt ast.ApplicationStmt, file_path string) codegen.CodegenResult {
+	// Use the ApplicationGenerator from backend/erlang
+	mut app_gen := erlang.new_application_generator()
+
+	// Extract values from the fields map
+	description := app_gen.get_string_field(app_stmt.fields, 'description') or { 'Lx Application' }
+
+	println('Compiling application: ${description}')
+
+	// Create output directory
+	app_name := os.file_name(file_path).replace('.lx', '')
+	output_dir := '${app_name}'
+
+	// Create directory structure
+	os.mkdir_all('${output_dir}/src') or {
+		println('Error creating src directory: ${err}')
+		exit(1)
+	}
+
+	// Generate rebar.config
+	rebar_config := app_gen.generate_rebar_config(app_stmt)
+	os.write_file('${output_dir}/rebar.config', rebar_config) or {
+		println('Error writing rebar.config: ${err}')
+		exit(1)
+	}
+
+	// Generate .app.src file
+	app_src := app_gen.generate_app_src(app_stmt, app_name)
+	os.write_file('${output_dir}/src/${app_name}.app.src', app_src) or {
+		println('Error writing .app.src: ${err}')
+		exit(1)
+	}
+
+	// Generate <app_name>.erl with basic structure
+	main_erl := app_gen.generate_main_erl(app_stmt, app_name)
+	os.write_file('${output_dir}/src/${app_name}.erl', main_erl) or {
+		println('Error writing ${app_name}.erl: ${err}')
+		exit(1)
+	}
+
+	println('Application structure generated in: ${output_dir}')
+	println('Run "cd ${output_dir} && rebar3 compile" to build the application')
+
+	// Return success result
+	return codegen.CodegenResult{
+		success: true
+		code: ''
+		file_path: '${output_dir}/src/${app_name}.erl'
+		errors: []
+		warnings: []
+		module_name: app_name
+	}
 }

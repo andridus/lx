@@ -35,6 +35,7 @@ fn (mut vc VariableChecker) check_statement(stmt ast.Stmt) {
 		ast.TypeDefStmt {}
 		ast.TypeAliasStmt {}
 		ast.ModuleStmt {}
+		ast.ApplicationStmt { vc.check_application_statement(stmt) }
 	}
 }
 
@@ -377,4 +378,11 @@ fn (mut vc VariableChecker) report_error(message string, suggestion string, posi
 		suggestion: suggestion
 	}, position, message)
 	vc.errors << error
+}
+
+fn (mut vc VariableChecker) check_application_statement(stmt ast.ApplicationStmt) {
+	// Check all field expressions in the application
+	for _, field_expr in stmt.fields {
+		vc.check_expression(field_expr)
+	}
 }
