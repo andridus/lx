@@ -13,7 +13,9 @@ print_hello() ->
 io:format(<<"Hello"/utf8>>).
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_external_function_call_with_multiple_arguments() {
@@ -29,7 +31,9 @@ print_formatted() ->
 io:format(<<"~p"/utf8>>, [1, 2, 3]).
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_multiple_external_function_calls() {
@@ -61,7 +65,9 @@ get_pid() ->
 erlang:self().
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_external_call_with_variables() {
@@ -85,7 +91,9 @@ print_number(Num) ->
 io:format(<<"Number: ~p"/utf8>>, [Num]).
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_external_call_with_complex_arguments() {
@@ -109,7 +117,9 @@ print_map() ->
 io:format(<<"Map: ~p"/utf8>>, [#{name => <<"John"/utf8>>, age => 30}]).
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_external_call_in_case_expression() {
@@ -135,7 +145,9 @@ case Command of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_external_call_with_nested_expressions() {
@@ -159,7 +171,9 @@ debug_with_info() ->
 io:format(<<"Debug: ~p"/utf8>>, [erlang:process_info(erlang:self())]).
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 // fn test_record_access_vs_external_call() {
@@ -183,5 +197,7 @@ io:format(<<"Debug: ~p"/utf8>>, [erlang:process_info(erlang:self())]).
 // io:format(<<"Name: ~s, Age: ~p"/utf8>>, [Person#record.name, Person#record.age]).
 
 // '
-// 	assert generates_erlang(lx_code) == expected
+// code, hrl_content := generates_erlang(lx_code)
+// assert code == expected
+// assert hrl_content == ''
 // }

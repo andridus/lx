@@ -21,7 +21,9 @@ case [1, 2, 3] of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_list_cons_success() {
@@ -45,5 +47,7 @@ case [42, 10, 5] of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }

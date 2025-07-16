@@ -20,7 +20,9 @@ end.
 
 '
 
-	assert generates_erlang(lx_code) == expected_erlang
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected_erlang
+	assert hrl_content == ''
 }
 
 fn test_simple_match_list_cons() {
@@ -43,7 +45,9 @@ end.
 
 '
 
-	assert generates_erlang(lx_code) == expected_erlang
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected_erlang
+	assert hrl_content == ''
 }
 
 fn test_simple_match_multiple_sequential() {
@@ -72,7 +76,9 @@ end.
 
 '
 
-	assert generates_erlang(lx_code) == expected_erlang
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected_erlang
+	assert hrl_content == ''
 }
 
 fn test_simple_match_three_sequential() {
@@ -106,7 +112,9 @@ case [1, 2, 3] of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected_erlang
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected_erlang
+	assert hrl_content == ''
 }
 
 // TODO: Fix map pattern matching - lexer issue with colon in maps
@@ -151,7 +159,9 @@ end.
 
 '
 
-	assert generates_erlang(lx_code) == expected_erlang
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected_erlang
+	assert hrl_content == ''
 }
 
 fn test_simple_match_atom_pattern() {
@@ -174,7 +184,9 @@ end.
 
 '
 
-	assert generates_erlang(lx_code) == expected_erlang
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected_erlang
+	assert hrl_content == ''
 }
 
 fn test_simple_match_with_computation() {
@@ -197,7 +209,9 @@ end.
 
 '
 
-	assert generates_erlang(lx_code) == expected_erlang
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected_erlang
+	assert hrl_content == ''
 }
 
 fn test_simple_match_empty_list() {
@@ -220,7 +234,9 @@ end.
 
 '
 
-	assert generates_erlang(lx_code) == expected_erlang
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected_erlang
+	assert hrl_content == ''
 }
 
 fn test_simple_match_mixed_with_rescue() {
@@ -251,5 +267,7 @@ end.
 
 '
 
-	assert generates_erlang(lx_code) == expected_erlang
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected_erlang
+	assert hrl_content == ''
 }

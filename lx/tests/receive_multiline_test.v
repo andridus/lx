@@ -26,7 +26,9 @@ receive
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_receive_multiline_with_timeout() {
@@ -63,5 +65,7 @@ after 1000 ->
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }

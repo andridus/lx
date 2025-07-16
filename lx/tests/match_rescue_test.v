@@ -21,7 +21,9 @@ case {ok, 42} of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_match_rescue_simple_failure() {
@@ -45,7 +47,9 @@ case {error, <<"not_found"/utf8>>} of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_match_rescue_complex_pattern() {
@@ -69,7 +73,9 @@ case {ok, <<"alice"/utf8>>, 25} of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_match_rescue_sequential() {
@@ -101,7 +107,9 @@ case {ok, <<"alice"/utf8>>} of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_match_rescue_with_function_call() {
@@ -133,7 +141,9 @@ case get_data() of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_match_rescue_simple_list() {
@@ -157,7 +167,9 @@ case [42] of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_match_rescue_list_cons() {
@@ -181,5 +193,7 @@ case [1, 2, 3] of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }

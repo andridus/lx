@@ -15,9 +15,11 @@ def check_user_status(user) do
 	end
 end'
 	expected := '-module(test).
+-include("test.hrl").
+
 -export([check_user_status/1]).
 
--record(user, {id, active}).
+
 -spec check_user_status(any()) -> binary().
 check_user_status(User) ->
 case User of
@@ -28,7 +30,13 @@ case User of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-record(user, {id, active}).
+'
 }
 
 // fn test_with_expression_multiple_guards() {

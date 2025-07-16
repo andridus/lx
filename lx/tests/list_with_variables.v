@@ -17,7 +17,9 @@ Y_baaa = 20,
 [X_aaaa, Y_baaa].
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_list_with_variables_mixed_types() {
@@ -39,7 +41,9 @@ Z_caaa = atom,
 [X_aaaa, Y_baaa, Z_caaa].
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_list_with_variables_and_literals() {
@@ -59,7 +63,9 @@ Y_baaa = 15,
 [1, X_aaaa, 10, Y_baaa, 20].
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_list_with_variables_nested() {
@@ -81,7 +87,9 @@ Z_caaa = 3,
 [[X_aaaa, Y_baaa], [Z_caaa, 4], [5, 6]].
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_list_with_variables_and_expressions() {
@@ -101,7 +109,9 @@ Y_baaa = 5,
 [X_aaaa + Y_baaa, X_aaaa - Y_baaa, X_aaaa * Y_baaa].
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_list_with_variables_and_function_calls() {
@@ -121,7 +131,9 @@ Y_baaa = [4, 5],
 [length(X_aaaa), length(Y_baaa), length([6, 7, 8, 9])].
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_list_with_variables_in_function_params() {
@@ -137,7 +149,9 @@ list_with_params(X, Y) ->
 [X, Y, X + Y].
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_list_with_variables_and_guards() {
@@ -153,7 +167,9 @@ list_with_guards(X, Y) when X > 0 andalso Y > 0 ->
 [X, Y, X * Y].
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_list_with_variables_and_case() {
@@ -180,7 +196,9 @@ case X of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_list_with_variables_and_if() {
@@ -205,5 +223,7 @@ case X > 0 of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }

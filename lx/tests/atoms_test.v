@@ -13,7 +13,9 @@ simple() ->
 ok.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_multiple_atoms() {
@@ -45,7 +47,9 @@ get_pending() ->
 pending.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_tuple_with_atoms() {
@@ -69,7 +73,9 @@ result_error() ->
 {error, <<"failed"/utf8>>}.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_complex_tuple_with_atoms() {
@@ -93,7 +99,9 @@ simple_response() ->
 {response, success}.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_external_function_call() {
@@ -117,7 +125,9 @@ print_with_args() ->
 io:format(<<"Hello ~s"/utf8>>, [<<"World"/utf8>>]).
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_multiple_external_calls() {
@@ -141,7 +151,9 @@ get_node() ->
 erlang:node().
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_atoms_with_case_expression() {
@@ -167,7 +179,9 @@ case Status of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_tuple_destructuring_with_atoms() {
@@ -205,5 +219,7 @@ case Response of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }

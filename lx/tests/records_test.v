@@ -11,15 +11,23 @@ def create_person() do
   Person{name: "Alice", age: 30}
 end'
 	expected := '-module(test).
+-include("test.hrl").
+
 -export([create_person/0]).
 
--record(person, {name, age}).
+
 -spec create_person() -> #person{}.
 create_person() ->
 #person{name = <<"Alice"/utf8>>, age = 30}.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-record(person, {name, age}).
+'
 }
 
 fn test_record_field_access() {
@@ -34,16 +42,24 @@ def get_name() do
   person.name
 end'
 	expected := '-module(test).
+-include("test.hrl").
+
 -export([get_name/0]).
 
--record(person, {name, age}).
--spec get_name() -> any().
+
+-spec get_name() -> binary().
 get_name() ->
 Person_aaaa = #person{name = <<"Bob"/utf8>>, age = 25},
-Person_aaaa#record.name.
+Person_aaaa#person.name.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-record(person, {name, age}).
+'
 }
 
 fn test_record_update_single_field() {
@@ -58,16 +74,24 @@ def update_age() do
   Person{person | age: 36}
 end'
 	expected := '-module(test).
+-include("test.hrl").
+
 -export([update_age/0]).
 
--record(person, {name, age}).
+
 -spec update_age() -> any().
 update_age() ->
 Person_aaaa = #person{name = <<"Charlie"/utf8>>, age = 35},
 Person_aaaa#{age => 36}.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-record(person, {name, age}).
+'
 }
 
 fn test_record_update_multiple_fields() {
@@ -83,16 +107,24 @@ def update_person() do
   Person{person | age: 41, email: "david@new.com"}
 end'
 	expected := '-module(test).
+-include("test.hrl").
+
 -export([update_person/0]).
 
--record(person, {name, age, email}).
+
 -spec update_person() -> any().
 update_person() ->
 Person_aaaa = #person{name = <<"David"/utf8>>, age = 40, email = <<"david@old.com"/utf8>>},
 Person_aaaa#{age => 41, email => <<"david@new.com"/utf8>>}.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-record(person, {name, age, email}).
+'
 }
 
 fn test_record_patterns_simple() {
@@ -109,9 +141,11 @@ def get_user_id(user) do
   end
 end'
 	expected := '-module(test).
+-include("test.hrl").
+
 -export([get_user_id/1]).
 
--record(user, {id, email}).
+
 -spec get_user_id(any()) -> integer().
 get_user_id(User) ->
 case User of
@@ -120,7 +154,13 @@ case User of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-record(user, {id, email}).
+'
 }
 
 fn test_record_patterns_with_case_and_guards() {
@@ -139,9 +179,11 @@ def process_person() do
   end
 end'
 	expected := '-module(test).
+-include("test.hrl").
+
 -export([process_person/0]).
 
--record(person, {name, age}).
+
 -spec process_person() -> integer().
 process_person() ->
 Person_aaaa = #person{name = <<"Eve"/utf8>>, age = 28},
@@ -152,7 +194,13 @@ case Person_aaaa of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-record(person, {name, age}).
+'
 }
 
 fn test_record_patterns_multiple_fields() {
@@ -171,9 +219,11 @@ def validate_contact(contact) do
   end
 end'
 	expected := '-module(test).
+-include("test.hrl").
+
 -export([validate_contact/1]).
 
--record(contact, {name, email, phone}).
+
 -spec validate_contact(any()) -> {binary(), binary()}.
 validate_contact(Contact) ->
 case Contact of
@@ -183,7 +233,13 @@ case Contact of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-record(contact, {name, email, phone}).
+'
 }
 
 // fn test_record_patterns_with() {

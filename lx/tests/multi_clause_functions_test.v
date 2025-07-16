@@ -16,7 +16,9 @@ f(Y) ->
 2.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_multi_clause_function_with_different_arities() {
@@ -40,7 +42,9 @@ process(X, Y) ->
 {ok, X, Y}.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_multi_clause_function_with_blocks() {
@@ -64,7 +68,9 @@ Result_aaaa = X + Y,
 Result_aaaa * 2.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_multi_clause_function_with_tuples() {
@@ -84,7 +90,9 @@ f(X) ->
 {ok, X}.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_multi_clause_function_with_atoms() {
@@ -109,7 +117,9 @@ handle_status(_) ->
 <<"Unknown"/utf8>>.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_multi_clause_function_with_pattern_matching() {
@@ -131,7 +141,9 @@ extract_value(_) ->
 <<"Unknown"/utf8>>.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_multi_clause_function_with_guards() {
@@ -153,7 +165,9 @@ process_number(0) ->
 <<"Zero"/utf8>>.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_multi_clause_function_with_external_calls() {
@@ -178,7 +192,9 @@ debug_info(_) ->
 io:format(<<"Unknown debug type"/utf8>>).
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_multi_clause_function_with_complex_patterns() {
@@ -203,5 +219,7 @@ handle_message(_) ->
 io:format(<<"Unknown message type"/utf8>>).
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }

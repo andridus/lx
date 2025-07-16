@@ -13,7 +13,9 @@ test_map() ->
 #{name => <<"John"/utf8>>, age => 30}.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_map_literal_with_fat_arrow() {
@@ -30,7 +32,9 @@ test_map() ->
 #{<<"name"/utf8>> => <<"John"/utf8>>, <<"age"/utf8>> => 30}.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_map_access() {
@@ -47,7 +51,9 @@ get_name(User) ->
 maps:get(name, User).
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_map_update() {
@@ -64,7 +70,9 @@ update_age(User) ->
 User#{age => 31}.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_map_update_with_fat_arrow() {
@@ -81,7 +89,9 @@ update_user(User) ->
 User#{<<"status"/utf8>> => <<"active"/utf8>>}.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_empty_map() {
@@ -98,7 +108,9 @@ empty_map() ->
 #{}.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_map_with_variables() {
@@ -115,7 +127,9 @@ create_user(Name) ->
 #{name => Name}.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_nested_map_access() {
@@ -132,7 +146,9 @@ get_db_host(Config) ->
 maps:get(host, maps:get(database, Config)).
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_map_type_inference() {
@@ -149,5 +165,7 @@ create_person() ->
 #{name => <<"John"/utf8>>, age => 30}.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }

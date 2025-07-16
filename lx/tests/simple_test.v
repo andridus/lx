@@ -13,7 +13,9 @@ f() ->
 1.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_type_alias_basic() {
@@ -25,13 +27,19 @@ end'
 	expected := '-module(test).
 -export([f/0]).
 
--type number() :: integer().
+
 -spec f() -> integer().
 f() ->
 1.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-type number() :: integer().
+'
 }
 
 fn test_type_alias_opaque() {
@@ -42,13 +50,19 @@ end'
 	expected := '-module(test).
 -export([f/0]).
 
--opaque user_id() :: integer().
+
 -spec f() -> integer().
 f() ->
 1.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-opaque user_id() :: integer().
+'
 }
 
 fn test_type_alias_nominal() {
@@ -59,13 +73,19 @@ end'
 	expected := '-module(test).
 -export([f/0]).
 
--nominal celsius() :: float().
+
 -spec f() -> float().
 f() ->
 1.0.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-nominal celsius() :: float().
+'
 }
 
 fn test_type_alias_union_does_not_return() {
@@ -76,13 +96,19 @@ end'
 	expected := '-module(test).
 -export([f/0]).
 
--type id() :: binary() | integer().
+
 -spec f() -> binary().
 f() ->
 <<"test"/utf8>>.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-type id() :: binary() | integer().
+'
 }
 
 fn test_type_alias_with_function_params() {
@@ -93,13 +119,19 @@ end'
 	expected := '-module(test).
 -export([add/2]).
 
--type number() :: integer().
+
 -spec add(number(), number()) -> {number, number}.
 add(A, B) when is_number(A) andalso is_number(B) ->
 {A, B}.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-type number() :: integer().
+'
 }
 
 // fn test_type_alias_opaque_with_function() {
@@ -151,13 +183,19 @@ end'
 	expected := '-module(test).
 -export([create_pair/2]).
 
--nominal pair() :: {integer(), binary()}.
+
 -spec create_pair(integer(), binary()) -> {integer(), binary()}.
 create_pair(X, Y) when is_integer(X) andalso is_binary(Y) ->
 {X, Y}.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-nominal pair() :: {integer(), binary()}.
+'
 }
 
 // fn test_type_alias_with_list() {
@@ -261,7 +299,9 @@ case true of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_if_expression_with_variable() {
@@ -288,7 +328,9 @@ case X_aaaa > 5 of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_if_expression_without_else() {
@@ -311,7 +353,9 @@ case false of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_if_expression_nested() {
@@ -347,7 +391,9 @@ end;
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_if_expression_complex_condition() {
@@ -376,5 +422,7 @@ case X_aaaa + Y_baaa > 12 of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }

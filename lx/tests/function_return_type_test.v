@@ -23,16 +23,24 @@ def criar_usuario(nome :: string, email :: string) :: {atom, Usuario} do
 end'
 
 	expected := '-module(test).
+-include("test.hrl").
+
 -export([criar_usuario/2]).
 
--record(usuario, {id, nome, email, ativo}).
+
 -spec criar_usuario(binary(), binary()) -> {atom(), #usuario{}}.
 criar_usuario(Nome, Email) when is_binary(Nome) andalso is_binary(Email) ->
 {ok, #usuario{id = 1, nome = Nome, email = Email, ativo = true}}.
 
 '
 
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-record(usuario, {id, nome, email, ativo}).
+'
 }
 
 fn test_function_with_return_type_mismatch() {
@@ -50,7 +58,9 @@ add(A, B) when is_integer(A) andalso is_integer(B) ->
 
 '
 
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_function_with_simple_return_type() {
@@ -84,7 +94,9 @@ true.
 
 '
 
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_function_with_tuple_return_type() {
@@ -110,7 +122,9 @@ create_triple(A, B, C) when is_integer(A) andalso is_binary(B) andalso is_boolea
 
 '
 
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_function_with_list_return_type() {
@@ -136,7 +150,9 @@ create_strings() ->
 
 '
 
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_function_with_map_return_type() {
@@ -154,7 +170,9 @@ create_user_map(Name, Age) when is_binary(Name) andalso is_integer(Age) ->
 
 '
 
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_function_with_record_return_type() {
@@ -174,16 +192,24 @@ def create_person(name :: string, age :: integer, email :: string) :: Person do
 end'
 
 	expected := '-module(test).
+-include("test.hrl").
+
 -export([create_person/3]).
 
--record(person, {name, age, email}).
+
 -spec create_person(binary(), integer(), binary()) -> #person{}.
 create_person(Name, Age, Email) when is_binary(Name) andalso is_integer(Age) andalso is_binary(Email) ->
 #person{name = Name, age = Age, email = Email}.
 
 '
 
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-record(person, {name, age, email}).
+'
 }
 
 fn test_function_with_union_return_type() {
@@ -209,7 +235,9 @@ case Input =/= <<""/utf8>> of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 // fn test_function_with_function_return_type() {
@@ -270,9 +298,11 @@ def process_user_data(data :: string) :: {atom, User} | {atom, string} do
 end'
 
 	expected := '-module(test).
+-include("test.hrl").
+
 -export([process_user_data/1]).
 
--record(user, {id, name, email}).
+
 -spec process_user_data(binary()) -> {atom(), #user{}} | {atom(), binary()}.
 process_user_data(Data) when is_binary(Data) ->
 case Data =:= <<""/utf8>> of
@@ -289,7 +319,13 @@ end.
 
 '
 
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-record(user, {id, name, email}).
+'
 }
 
 fn test_function_with_nested_return_type() {
@@ -313,7 +349,9 @@ Result_caaa = {ok, <<"success"/utf8>>},
 
 '
 
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }
 
 fn test_function_with_return_type_validation_error() {
@@ -340,5 +378,7 @@ end.
 
 '
 
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == ''
 }

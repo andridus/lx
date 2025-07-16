@@ -18,10 +18,12 @@ def check_adult_user(user) do
 	end
 end'
 	expected := '-module(test).
+-include("test.hrl").
+
 -export([check_adult_user/1]).
 
--record(profile, {age}).
--record(user, {profile}).
+
+
 -spec check_adult_user(any()) -> binary().
 check_adult_user(User) ->
 case User of
@@ -32,7 +34,14 @@ case User of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-record(profile, {age}).
+-record(user, {profile}).
+'
 }
 
 fn test_multiple_nested_records() {
@@ -60,11 +69,13 @@ def get_user_city(user) do
 	end
 end'
 	expected := '-module(test).
+-include("test.hrl").
+
 -export([get_user_city/1]).
 
--record(address, {street, city}).
--record(profile, {age, address}).
--record(user, {name, profile}).
+
+
+
 -spec get_user_city(any()) -> binary().
 get_user_city(User) ->
 case User of
@@ -75,7 +86,15 @@ case User of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-record(address, {street, city}).
+-record(profile, {age, address}).
+-record(user, {name, profile}).
+'
 }
 
 fn test_nested_records_with_guards() {
@@ -97,10 +116,12 @@ def check_user_eligibility(user) do
 	end
 end'
 	expected := '-module(test).
+-include("test.hrl").
+
 -export([check_user_eligibility/1]).
 
--record(profile, {age}).
--record(user, {name, profile}).
+
+
 -spec check_user_eligibility(any()) -> binary().
 check_user_eligibility(User) ->
 case User of
@@ -111,7 +132,14 @@ case User of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-record(profile, {age}).
+-record(user, {name, profile}).
+'
 }
 
 fn test_record_with_list_of_custom_types() {
@@ -130,16 +158,25 @@ def create_company() do
 	Company{name: "Tech Corp", employees: []}
 end'
 	expected := '-module(test).
+-include("test.hrl").
+
 -export([create_company/0]).
 
--record(person, {name, age}).
--record(company, {name, employees}).
+
+
 -spec create_company() -> #company{}.
 create_company() ->
 #company{name = <<"Tech Corp"/utf8>>, employees = []}.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-record(person, {name, age}).
+-record(company, {name, employees}).
+'
 }
 
 fn test_deeply_nested_records() {
@@ -171,12 +208,14 @@ def get_person_country(person) do
 	end
 end'
 	expected := '-module(test).
+-include("test.hrl").
+
 -export([get_person_country/1]).
 
--record(country, {name}).
--record(city, {name, country}).
--record(address, {street, city}).
--record(person, {name, address}).
+
+
+
+
 -spec get_person_country(any()) -> binary().
 get_person_country(Person) ->
 case Person of
@@ -187,7 +226,16 @@ case Person of
 end.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-record(country, {name}).
+-record(city, {name, country}).
+-record(address, {street, city}).
+-record(person, {name, address}).
+'
 }
 
 fn test_nested_records_creation() {
@@ -205,14 +253,23 @@ def create_user() do
 	User{name: "John", profile: Profile{age: 25}}
 end'
 	expected := '-module(test).
+-include("test.hrl").
+
 -export([create_user/0]).
 
--record(profile, {age}).
--record(user, {name, profile}).
+
+
 -spec create_user() -> #user{}.
 create_user() ->
 #user{name = <<"John"/utf8>>, profile = #profile{age = 25}}.
 
 '
-	assert generates_erlang(lx_code) == expected
+	code, hrl_content := generates_erlang(lx_code)
+	assert code == expected
+	assert hrl_content == '%% Generated header file for test module
+%% Contains records and type definitions
+
+-record(profile, {age}).
+-record(user, {name, profile}).
+'
 }

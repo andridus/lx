@@ -12,7 +12,7 @@ def check_user_status(user) do
 	end
 end'
 
-	erlang_code := generates_erlang(lx_code)
+	erlang_code, hrl_content := generates_erlang(lx_code)
 
 	// Verify the generated code contains the correct pattern assignment
 	assert erlang_code.contains('#user{id = Id, active = true} = User1'), 'With expression should generate pattern assignment'
@@ -35,7 +35,7 @@ def check_user_status(user) do
 	end
 end'
 
-	erlang_code := generates_erlang(lx_code)
+	erlang_code, hrl_content := generates_erlang(lx_code)
 
 	// Verify the generated code does not contain pattern assignment
 	assert erlang_code.contains('#user{id = Id, active = true}'), 'With expression should generate pattern without assignment'
@@ -60,7 +60,7 @@ def check_user_status(user) do
 	end
 end'
 
-	erlang_code := generates_erlang(lx_code)
+	erlang_code, hrl_content := generates_erlang(lx_code)
 
 	// Verify the generated code contains the correct pattern assignment
 	assert erlang_code.contains('#user{id = Id, active = true} = User1'), 'Case expression should generate pattern assignment'
@@ -84,7 +84,7 @@ def check_user_status(user) do
 	end
 end'
 
-	erlang_code := generates_erlang(lx_code)
+	erlang_code, hrl_content := generates_erlang(lx_code)
 
 	// Verify the generated code does not contain pattern assignment
 	assert erlang_code.contains('#user{id = Id, active = true}'), 'Case expression should generate pattern without assignment'
@@ -105,7 +105,7 @@ def check_user_status(user) do
 	"active_user"
 end'
 
-	erlang_code := generates_erlang(lx_code)
+	erlang_code, hrl_content := generates_erlang(lx_code)
 
 	// Verify the generated code contains the correct pattern assignment
 	assert erlang_code.contains('#user{id = Id, active = true} = User1'), 'Match expression should generate pattern assignment'
@@ -124,7 +124,7 @@ def check_user_status(user) do
 	"active_user"
 end'
 
-	erlang_code := generates_erlang(lx_code)
+	erlang_code, hrl_content := generates_erlang(lx_code)
 
 	// Verify the generated code does not contain pattern assignment
 	assert erlang_code.contains('#user{id = Id, active = true}'), 'Match expression should generate pattern without assignment'
