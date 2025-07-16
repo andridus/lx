@@ -7,12 +7,14 @@ pub struct VariableChecker {
 pub mut:
 	scope_manager ScopeManager
 	errors        []errors.CompilationError
+	module_names  map[string]ast.Position // Track module names to prevent duplicates
 }
 
 pub fn new_variable_checker() VariableChecker {
 	return VariableChecker{
 		scope_manager: new_scope_manager()
 		errors:        []
+		module_names:  {}
 	}
 }
 
@@ -36,6 +38,8 @@ fn (mut vc VariableChecker) check_statement(stmt ast.Stmt) {
 		ast.TypeAliasStmt {}
 		ast.ModuleStmt {}
 		ast.ApplicationStmt { vc.check_application_statement(stmt) }
+		ast.WorkerStmt { vc.check_worker_statement(stmt) }
+		ast.SupervisorStmt { vc.check_supervisor_statement(stmt) }
 	}
 }
 
@@ -296,11 +300,21 @@ fn (mut vc VariableChecker) check_map_pattern(pattern ast.MapPattern) {
 		vc.check_pattern(entry.key)
 		vc.check_pattern(entry.value)
 	}
+
+	// Handle assign_variable if present
+	if assign_var := pattern.assign_variable {
+		vc.scope_manager.bind_variable(assign_var, ast.Position{})
+	}
 }
 
 fn (mut vc VariableChecker) check_record_pattern(pattern ast.RecordPattern) {
 	for field in pattern.fields {
 		vc.check_pattern(field.pattern)
+	}
+
+	// Handle assign_variable if present
+	if assign_var := pattern.assign_variable {
+		vc.scope_manager.bind_variable(assign_var, ast.Position{})
 	}
 }
 
@@ -384,5 +398,113 @@ fn (mut vc VariableChecker) check_application_statement(stmt ast.ApplicationStmt
 	// Check all field expressions in the application
 	for _, field_expr in stmt.fields {
 		vc.check_expression(field_expr)
+	}
+}
+
+fn (mut vc VariableChecker) check_worker_statement(stmt ast.WorkerStmt) {
+	// Check for duplicate module names
+	if stmt.name in vc.module_names {
+		existing_pos := vc.module_names[stmt.name]
+		vc.report_error("Duplicate module name '${stmt.name}'",
+			'Module name already defined at ${existing_pos.str()}.', stmt.position)
+	} else {
+		vc.module_names[stmt.name] = stmt.position
+	}
+
+	// Check that worker has required functions
+	mut has_init := false
+	mut has_handle_function := false
+
+	// Check all statements in the worker
+	for worker_stmt in stmt.statements {
+		if worker_stmt is ast.FunctionStmt {
+			func_stmt := worker_stmt as ast.FunctionStmt
+			match func_stmt.name {
+				'init' { has_init = true }
+				'handle_call', 'handle_cast', 'handle_continue', 'handle_info' {
+					has_handle_function = true
+				}
+				else {}
+			}
+		}
+		// Check the statement recursively
+		vc.check_statement(worker_stmt)
+	}
+
+	// Validate required functions
+	if !has_init {
+		vc.report_error("Worker '${stmt.name}' must implement 'init' function",
+			'Workers require an init/1 function for OTP compliance.', stmt.position)
+	}
+
+	if !has_handle_function {
+		vc.report_error("Worker '${stmt.name}' must implement at least one handle function",
+			'Workers require at least one of: handle_call, handle_cast, handle_continue, handle_info.',
+			stmt.position)
+	}
+}
+
+fn (mut vc VariableChecker) check_supervisor_statement(stmt ast.SupervisorStmt) {
+	// Check for duplicate module names (only if supervisor has a name)
+	if stmt.name != '' {
+		if stmt.name in vc.module_names {
+			existing_pos := vc.module_names[stmt.name]
+			vc.report_error("Duplicate module name '${stmt.name}'",
+				'Module name already defined at ${existing_pos.str()}.', stmt.position)
+		} else {
+			vc.module_names[stmt.name] = stmt.position
+		}
+	}
+
+	// Validate children specification
+	match stmt.children {
+		ast.ListChildren {
+			// Check that all children names are valid identifiers
+			for child in stmt.children.children {
+				if child.trim_space() == '' {
+					vc.report_error("Empty child name in supervisor '${stmt.name}'",
+						'Child names cannot be empty.', stmt.children.position)
+				}
+			}
+		}
+		ast.MapChildren {
+			// Check workers and supervisors lists
+			for worker in stmt.children.workers {
+				if worker.trim_space() == '' {
+					vc.report_error("Empty worker name in supervisor '${stmt.name}'",
+						'Worker names cannot be empty.', stmt.children.position)
+				}
+			}
+			for supervisor in stmt.children.supervisors {
+				if supervisor.trim_space() == '' {
+					vc.report_error("Empty supervisor name in supervisor '${stmt.name}'",
+						'Supervisor names cannot be empty.', stmt.children.position)
+				}
+			}
+		}
+		ast.TupleChildren {
+			// Check tuple children specification
+			for child in stmt.children.children {
+				if child.name.trim_space() == '' {
+					vc.report_error("Empty child name in supervisor '${stmt.name}'",
+						'Child names cannot be empty.', child.position)
+				}
+				// Validate restart type
+				if child.restart !in ['permanent', 'temporary', 'transient'] {
+					vc.report_error("Invalid restart type '${child.restart}' in supervisor '${stmt.name}'",
+						'Restart type must be :permanent, :temporary, or :transient.', child.position)
+				}
+				// Validate child type
+				if child.type_ !in ['worker', 'supervisor'] {
+					vc.report_error("Invalid child type '${child.type_}' in supervisor '${stmt.name}'",
+						'Child type must be :worker or :supervisor.', child.position)
+				}
+			}
+		}
+	}
+
+	// Check all statements in the supervisor
+	for supervisor_stmt in stmt.statements {
+		vc.check_statement(supervisor_stmt)
 	}
 }

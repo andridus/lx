@@ -369,11 +369,11 @@ pub fn get_transitions() []Transition {
 		// Atom state transitions
 		Transition{
 			from_state: .atom
-			to_state:   .error
+			to_state:   .atom
 			condition:  CharacterClassCondition{
 				class: .digit
 			}
-			action:     .emit_error
+			action:     .consume_character
 		},
 		Transition{
 			from_state: .atom

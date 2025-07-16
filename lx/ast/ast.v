@@ -403,7 +403,8 @@ pub:
 // MapPattern represents a map pattern
 pub struct MapPattern {
 pub:
-	entries []MapPatternEntry
+	entries         []MapPatternEntry
+	assign_variable ?string // Optional variable for pattern assignment (pattern = variable)
 }
 
 // RecordPattern represents a record pattern
@@ -536,6 +537,68 @@ pub enum TypeAliasType {
 	nominal // nominal type alias
 }
 
+// WorkerStmt represents a worker definition
+pub struct WorkerStmt {
+pub:
+	name       string          // worker name (identifier)
+	statements []Stmt          // functions, records, types inside worker
+	position   Position
+	ast_id     int = -1        // -1 indicates uninitialized
+}
+
+// SupervisorStmt represents a supervisor definition
+pub struct SupervisorStmt {
+pub:
+	name       string          // supervisor name (identifier), empty for root supervisor
+	children   ChildrenSpec    // children specification
+	strategy   SupervisorStrategy // supervision strategy
+	statements []Stmt          // functions, records, types inside supervisor
+	position   Position
+	ast_id     int = -1        // -1 indicates uninitialized
+}
+
+// ChildrenSpec represents the children specification for supervisors
+pub type ChildrenSpec = ListChildren | MapChildren | TupleChildren
+
+// ListChildren represents simple list of children [worker1, worker2]
+pub struct ListChildren {
+pub:
+	children []string // list of worker/supervisor names
+	position Position
+}
+
+// MapChildren represents map-based children specification
+pub struct MapChildren {
+pub:
+	workers     []string // list of worker names
+	supervisors []string // list of supervisor names
+	position    Position
+}
+
+// TupleChildren represents tuple-based children specification
+pub struct TupleChildren {
+pub:
+	children []ChildTuple // list of detailed child specifications
+	position Position
+}
+
+// ChildTuple represents a detailed child specification tuple
+pub struct ChildTuple {
+pub:
+	name     string // child name
+	restart  string // restart type: permanent, temporary, transient
+	shutdown string // shutdown time: integer or infinity
+	type_    string // child type: worker, supervisor
+	position Position
+}
+
+// SupervisorStrategy represents supervision strategies
+pub enum SupervisorStrategy {
+	one_for_one
+	one_for_all
+	rest_for_one
+}
+
 // Stmt represents statements in LX using sum types
 pub type Stmt = ExprStmt
 	| ModuleStmt
@@ -544,6 +607,8 @@ pub type Stmt = ExprStmt
 	| RecordDefStmt
 	| TypeDefStmt
 	| TypeAliasStmt
+	| WorkerStmt
+	| SupervisorStmt
 
 // str returns a string representation of Expr
 pub fn (e Expr) str() string {

@@ -361,16 +361,35 @@ fn (mut p LXParser) parse_worker_definition() ?ast.Stmt {
 	name := p.current.get_value()
 	p.advance()
 
-	// Parse worker body as block_top_level (mod context)
-	body := p.parse_block_top_level()?
+	// Consume 'do'
+	p.consume(keyword_token(.do_), 'Expected "do" after worker name')?
 
-	// For now, return as ModuleStmt since WorkerStmt doesn't exist yet
-	return ast.ModuleStmt{
-		name:       'worker_' + name
-		exports:    []
-		imports:    []
-		statements: body
+	// Parse worker body (statements)
+	mut statements := []ast.Stmt{}
+
+	p.skip_newlines()
+
+	for !p.check(keyword_token(.end_)) && !p.is_at_end() {
+		p.skip_newlines()
+
+		if p.check(keyword_token(.end_)) {
+			break
+		}
+
+		stmt := p.parse_module_statement()?
+		statements << stmt
+
+		p.skip_newlines()
+	}
+
+	// Consume 'end'
+	p.consume(keyword_token(.end_), 'Expected "end" after worker body')?
+
+	return ast.WorkerStmt{
+		name:       name
+		statements: statements
 		position:   p.get_current_position()
+		ast_id:     p.generate_ast_id()
 	}
 }
 
@@ -378,25 +397,53 @@ fn (mut p LXParser) parse_worker_definition() ?ast.Stmt {
 fn (mut p LXParser) parse_supervisor_definition() ?ast.Stmt {
 	p.advance() // consume 'supervisor'
 
-	// Parse supervisor name
-	if !p.current.is_identifier() {
-		p.add_error('Expected supervisor name', 'Got ${p.current.str()}')
-		return none
+	// Parse optional supervisor name
+	mut name := ''
+	if p.current.is_identifier() {
+		name = p.current.get_value()
+		p.advance()
 	}
 
-	name := p.current.get_value()
-	p.advance()
+	// Consume 'do'
+	p.consume(keyword_token(.do_), 'Expected "do" after supervisor declaration')?
 
-	// Parse supervisor body as block_top_level (mod context)
-	body := p.parse_block_top_level()?
+	// Parse supervisor body
+	mut children := ast.ChildrenSpec(ast.ListChildren{children: [], position: p.get_current_position()})
+	mut strategy := ast.SupervisorStrategy.one_for_one
+	mut statements := []ast.Stmt{}
 
-	// For now, return as ModuleStmt since SupervisorStmt doesn't exist yet
-	return ast.ModuleStmt{
-		name:       'supervisor_' + name
-		exports:    []
-		imports:    []
-		statements: body
+	p.skip_newlines()
+
+	for !p.check(keyword_token(.end_)) && !p.is_at_end() {
+		p.skip_newlines()
+
+		if p.check(keyword_token(.end_)) {
+			break
+		}
+
+		if p.check(keyword_token(.children)) {
+			children = p.parse_children_spec()?
+		} else if p.check(keyword_token(.strategy)) {
+			strategy = p.parse_strategy_spec()?
+		} else {
+			// Regular module statement
+			stmt := p.parse_module_statement()?
+			statements << stmt
+		}
+
+		p.skip_newlines()
+	}
+
+	// Consume 'end'
+	p.consume(keyword_token(.end_), 'Expected "end" after supervisor body')?
+
+	return ast.SupervisorStmt{
+		name:       name
+		children:   children
+		strategy:   strategy
+		statements: statements
 		position:   p.get_current_position()
+		ast_id:     p.generate_ast_id()
 	}
 }
 
@@ -594,6 +641,199 @@ fn (mut p LXParser) parse_application_definition() ?ast.Stmt {
 		fields:   fields
 		position: p.get_current_position()
 	}
+}
+
+
+
+// parse_children_spec parses children specification
+fn (mut p LXParser) parse_children_spec() ?ast.ChildrenSpec {
+	p.advance() // consume 'children'
+
+	old_context := p.context
+	p.context = .expression
+
+	// Parse children expression
+	expr := p.parse_expression()?
+
+	p.context = old_context
+
+			// Convert expression to ChildrenSpec
+	return match expr {
+		ast.ListLiteralExpr {
+			p.parse_list_children_spec(expr)
+		}
+		ast.MapLiteralExpr {
+			mut workers := []string{}
+			mut supervisors := []string{}
+
+			for entry in expr.entries {
+				if entry.key is ast.LiteralExpr {
+					literal_expr := entry.key as ast.LiteralExpr
+					if literal_expr.value is ast.AtomLiteral {
+						atom_literal := literal_expr.value as ast.AtomLiteral
+						if atom_literal.value == 'worker' {
+							if entry.value is ast.ListLiteralExpr {
+								list_expr := entry.value as ast.ListLiteralExpr
+								for element in list_expr.elements {
+									if element is ast.VariableExpr {
+										workers << element.name
+									}
+								}
+							}
+						} else if atom_literal.value == 'supervisor' {
+							if entry.value is ast.ListLiteralExpr {
+								list_expr := entry.value as ast.ListLiteralExpr
+								for element in list_expr.elements {
+									if element is ast.VariableExpr {
+										supervisors << element.name
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+			ast.MapChildren{
+				workers: workers
+				supervisors: supervisors
+				position: expr.position
+			}
+		}
+		else {
+			p.add_error('Children must be a list or map', 'Got ${expr.str()}')
+			return none
+		}
+	}
+}
+
+// parse_strategy_spec parses supervision strategy
+fn (mut p LXParser) parse_strategy_spec() ?ast.SupervisorStrategy {
+	p.advance() // consume 'strategy'
+
+	// Check if current token is an atom
+	if p.current !is lexer.AtomToken {
+		p.add_error('Expected strategy atom', 'Got ${p.current.str()}')
+		return ast.SupervisorStrategy.one_for_one
+	}
+
+	strategy_name := p.current.get_value()
+	p.advance()
+
+	return match strategy_name {
+		'one_for_one' { ast.SupervisorStrategy.one_for_one }
+		'one_for_all' { ast.SupervisorStrategy.one_for_all }
+		'rest_for_one' { ast.SupervisorStrategy.rest_for_one }
+		else {
+			p.add_error('Invalid supervision strategy', 'Expected :one_for_one, :one_for_all, or :rest_for_one')
+			ast.SupervisorStrategy.one_for_one
+		}
+	}
+}
+
+// parse_list_children_spec parses list-based children specification
+fn (mut p LXParser) parse_list_children_spec(expr ast.ListLiteralExpr) ast.ChildrenSpec {
+	// Check if it's a list of tuples or simple identifiers
+	if expr.elements.len > 0 {
+		first_element := expr.elements[0]
+		if first_element is ast.TupleExpr {
+			// List of tuples - detailed specification
+			mut children := []ast.ChildTuple{}
+			for element in expr.elements {
+				if element is ast.TupleExpr {
+					tuple_expr := element as ast.TupleExpr
+					if tuple_expr.elements.len >= 4 {
+						// Extract tuple elements: {name, restart, shutdown, type}
+						name := p.extract_atom_from_expr(tuple_expr.elements[0]) or {
+							p.add_error('Failed to extract name from tuple', 'Got ${tuple_expr.elements[0].str()}')
+							continue
+						}
+						restart := p.extract_atom_from_expr(tuple_expr.elements[1]) or {
+							p.add_error('Failed to extract restart from tuple', 'Got ${tuple_expr.elements[1].str()}')
+							continue
+						}
+						shutdown := p.extract_shutdown_from_expr(tuple_expr.elements[2]) or {
+							p.add_error('Failed to extract shutdown from tuple', 'Got ${tuple_expr.elements[2].str()}')
+							continue
+						}
+						type_ := p.extract_atom_from_expr(tuple_expr.elements[3]) or {
+							p.add_error('Failed to extract type from tuple', 'Got ${tuple_expr.elements[3].str()}')
+							continue
+						}
+
+						children << ast.ChildTuple{
+							name: name
+							restart: restart
+							shutdown: shutdown
+							type_: type_
+							position: tuple_expr.position
+						}
+					} else {
+						p.add_error('Child tuple must have at least 4 elements: {name, restart, shutdown, type}', 'Got ${tuple_expr.elements.len} elements')
+					}
+				} else {
+					p.add_error('Mixed tuple and non-tuple elements in children list', 'Got ${element.str()}')
+				}
+			}
+			return ast.TupleChildren{
+				children: children
+				position: expr.position
+			}
+		} else {
+			// Simple list of identifiers
+			mut children := []string{}
+			for element in expr.elements {
+				if element is ast.VariableExpr {
+					children << element.name
+				} else {
+					p.add_error('Children list must contain identifiers', 'Got ${element.str()}')
+				}
+			}
+			return ast.ListChildren{
+				children: children
+				position: expr.position
+			}
+		}
+	} else {
+		// Empty list
+		return ast.ListChildren{
+			children: []
+			position: expr.position
+		}
+	}
+}
+
+// extract_atom_from_expr extracts atom value from expression
+fn (mut p LXParser) extract_atom_from_expr(expr ast.Expr) ?string {
+	if expr is ast.LiteralExpr {
+		literal_expr := expr as ast.LiteralExpr
+		if literal_expr.value is ast.AtomLiteral {
+			atom_literal := literal_expr.value as ast.AtomLiteral
+			return atom_literal.value
+		}
+	}
+	p.add_error('Expected atom', 'Got ${expr.str()}')
+	return none
+}
+
+// extract_shutdown_from_expr extracts shutdown value from expression (integer or infinity)
+fn (mut p LXParser) extract_shutdown_from_expr(expr ast.Expr) ?string {
+	if expr is ast.LiteralExpr {
+		literal_expr := expr as ast.LiteralExpr
+		match literal_expr.value {
+			ast.IntegerLiteral {
+				return literal_expr.value.value.str()
+			}
+			ast.AtomLiteral {
+				if literal_expr.value.value == 'infinity' {
+					return 'infinity'
+				}
+			}
+			else {}
+		}
+	}
+	p.add_error('Expected integer or :infinity for shutdown', 'Got ${expr.str()}')
+	return none
 }
 
 // parse_string_field parses a string literal for application fields

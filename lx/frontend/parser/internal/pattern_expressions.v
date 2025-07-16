@@ -373,6 +373,7 @@ fn (mut p LXParser) parse_map_pattern() ?ast.Pattern {
 	p.consume(punctuation_token(.rbrace), 'Expected } after map pattern')?
 
 	return ast.MapPattern{
-		entries: entries
+		entries:         entries
+		assign_variable: none
 	}
 }

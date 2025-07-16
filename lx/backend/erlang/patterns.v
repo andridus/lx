@@ -40,6 +40,13 @@ pub fn (gen ErlangGenerator) generate_pattern(pattern ast.Pattern) string {
 				value := gen.generate_pattern(entry.value)
 				entries << '${key} => ${value}'
 			}
+
+			assign_var := pattern.assign_variable or { '' }
+			if assign_var != '' {
+				capitalized_var := gen.capitalize_variable(assign_var)
+				return '#{${entries.join(', ')}} = ${capitalized_var}'
+			}
+
 			return '#{${entries.join(', ')}}'
 		}
 		ast.RecordPattern {

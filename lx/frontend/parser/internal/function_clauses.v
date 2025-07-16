@@ -43,7 +43,36 @@ fn (mut p LXParser) parse_single_function_clause() ?ast.FunctionClause {
 
 	if !p.check(punctuation_token(.rparen)) {
 		for {
-			param := p.parse_pattern()?
+			mut param := p.parse_pattern()?
+
+			// Check for optional assignment to variable (pattern = variable)
+			if p.match(operator_token(.assign)) {
+				if p.current.is_identifier() {
+					assign_variable := p.current.get_value()
+					p.advance() // consume the identifier
+
+					// Update the pattern to include the assign_variable
+					if param is ast.RecordPattern {
+						record_pattern := param as ast.RecordPattern
+						param = ast.RecordPattern{
+							name:            record_pattern.name
+							fields:          record_pattern.fields
+							assign_variable: assign_variable
+						}
+					} else if param is ast.MapPattern {
+						map_pattern := param as ast.MapPattern
+						param = ast.MapPattern{
+							entries:         map_pattern.entries
+							assign_variable: assign_variable
+						}
+					}
+					// Add support for other pattern types as needed
+				} else {
+					p.add_error('Expected variable name after = in function parameter', 'Invalid syntax')
+					return none
+				}
+			}
+
 			parameters << param
 
 			if !p.match(punctuation_token(.comma)) {
