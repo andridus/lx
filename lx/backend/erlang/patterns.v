@@ -3,7 +3,7 @@ module erlang
 import ast
 
 // generate_pattern generates code for patterns
-pub fn (gen ErlangGenerator) generate_pattern(pattern ast.Pattern) string {
+pub fn (mut gen ErlangGenerator) generate_pattern(pattern ast.Pattern) string {
 	match pattern {
 		ast.WildcardPattern {
 			return '_'
@@ -67,7 +67,20 @@ pub fn (gen ErlangGenerator) generate_pattern(pattern ast.Pattern) string {
 		ast.BinaryPattern {
 			mut segments := []string{}
 			for segment in pattern.segments {
-				segments << '${segment.size}:${segment.unit}'
+				mut seg_code := ''
+				if segment.value is ast.VariableExpr {
+					var_name := (segment.value as ast.VariableExpr).name
+					seg_code += gen.capitalize_variable(var_name)
+				} else {
+					seg_code += gen.generate_expression(segment.value)
+				}
+				if segment.size != none {
+					seg_code += ':' + gen.generate_expression(segment.size)
+				}
+				if segment.options.len > 0 {
+					seg_code += '/' + segment.options.join("-")
+				}
+				segments << seg_code
 			}
 			return '<<${segments.join(', ')}>>'
 		}
@@ -132,7 +145,23 @@ pub fn (mut gen ErlangGenerator) generate_pattern_with_binding(pattern ast.Patte
 		ast.BinaryPattern {
 			mut segments := []string{}
 			for segment in pattern.segments {
-				segments << '${segment.size}:${segment.unit}'
+				mut seg_code := ''
+				if segment.value is ast.VariableExpr {
+					var_name := (segment.value as ast.VariableExpr).name
+					seg_code += gen.capitalize_variable(var_name)
+					if segment.size != none {
+						seg_code += ':' + gen.generate_expression(segment.size)
+					}
+				} else {
+					seg_code += gen.generate_expression(segment.value)
+				if segment.size != none {
+					seg_code += ':' + gen.generate_expression(segment.size)
+					}
+				}
+				if segment.options.len > 0 {
+					seg_code += '/' + segment.options.join("-")
+				}
+				segments << seg_code
 			}
 			return '<<${segments.join(', ')}>>'
 		}

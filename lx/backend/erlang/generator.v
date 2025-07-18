@@ -82,6 +82,30 @@ pub fn (mut gen ErlangGenerator) generate_module(module_stmt ast.ModuleStmt, typ
 	}
 }
 
+// generate_functions_only generates only function code without module header/exports
+pub fn (mut gen ErlangGenerator) generate_functions_only(statements []ast.Stmt, type_ctx &analysis.TypeContext) string {
+	gen.type_context = unsafe { type_ctx }
+	// Collect all type definitions first
+	gen.collect_type_definitions(statements)
+
+	mut code := ''
+
+	// Generate only function statements (they already include specs)
+	for stmt in statements {
+		match stmt {
+			ast.FunctionStmt {
+				stmt_code := gen.generate_function(stmt)
+				code += stmt_code
+			}
+			else {
+				// Skip non-function statements for worker generation
+			}
+		}
+	}
+
+	return code
+}
+
 // collect_type_definitions collects all type alias definitions from module statements
 fn (mut gen ErlangGenerator) collect_type_definitions(statements []ast.Stmt) {
 	for stmt in statements {

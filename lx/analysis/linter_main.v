@@ -378,6 +378,9 @@ fn (uvr UnusedVariableRule) is_variable_used(name string, expr ast.Expr) bool {
 		ast.MatchRescueExpr {
 			return false
 		}
+		ast.BinaryPatternExpr {
+			return false
+		}
 	}
 }
 

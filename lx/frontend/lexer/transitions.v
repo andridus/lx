@@ -163,7 +163,6 @@ pub fn (c CharacterClass) matches(ch u8) bool {
 // get_transitions returns all possible transitions for the lexer
 pub fn get_transitions() []Transition {
 	return [
-		// Initial state transitions
 		Transition{
 			from_state: .initial
 			to_state:   .identifier
@@ -236,7 +235,14 @@ pub fn get_transitions() []Transition {
 			}
 			action:     .consume_character
 		},
-		// Whitespace state transitions
+		Transition{
+			from_state: .initial
+			to_state:   .binary
+			condition:  CharacterCondition{
+				value: `<`
+			}
+			action:     .consume_character
+		},
 		Transition{
 			from_state: .whitespace
 			to_state:   .whitespace
@@ -251,7 +257,6 @@ pub fn get_transitions() []Transition {
 			condition:  AlwaysCondition{}
 			action:     .backtrack
 		},
-		// Identifier state transitions
 		Transition{
 			from_state: .identifier
 			to_state:   .identifier
@@ -274,14 +279,13 @@ pub fn get_transitions() []Transition {
 			condition:  AlwaysCondition{}
 			action:     .emit_token
 		},
-		// Key state transitions
 		Transition{
 			from_state: .key
 			to_state:   .initial
 			condition:  AlwaysCondition{}
 			action:     .emit_token
 		},
-		// Number state transitions
+
 		Transition{
 			from_state: .number
 			to_state:   .number
@@ -312,7 +316,6 @@ pub fn get_transitions() []Transition {
 			condition:  AlwaysCondition{}
 			action:     .emit_token
 		},
-		// Float state transitions
 		Transition{
 			from_state: .float
 			to_state:   .float
@@ -335,7 +338,6 @@ pub fn get_transitions() []Transition {
 			condition:  AlwaysCondition{}
 			action:     .emit_token
 		},
-		// String state transitions
 		Transition{
 			from_state: .string
 			to_state:   .string
@@ -366,7 +368,6 @@ pub fn get_transitions() []Transition {
 			condition:  AlwaysCondition{}
 			action:     .consume_character
 		},
-		// Atom state transitions
 		Transition{
 			from_state: .atom
 			to_state:   .atom
@@ -389,7 +390,6 @@ pub fn get_transitions() []Transition {
 			condition:  AlwaysCondition{}
 			action:     .emit_token
 		},
-		// Atom start state transitions
 		Transition{
 			from_state: .atom_start
 			to_state:   .operator
@@ -412,7 +412,6 @@ pub fn get_transitions() []Transition {
 			condition:  AlwaysCondition{}
 			action:     .emit_token
 		},
-		// Comment state transitions
 		Transition{
 			from_state: .comment
 			to_state:   .initial
@@ -427,7 +426,6 @@ pub fn get_transitions() []Transition {
 			condition:  AlwaysCondition{}
 			action:     .consume_character
 		},
-		// Directive state transitions - reordenadas para evitar conflitos
 		Transition{
 			from_state: .directive
 			to_state:   .initial
@@ -468,7 +466,6 @@ pub fn get_transitions() []Transition {
 			}
 			action:     .emit_error
 		},
-		// Diretiva válida - deve ter pelo menos um identificador após @
 		Transition{
 			from_state: .directive
 			to_state:   .directive
@@ -491,7 +488,6 @@ pub fn get_transitions() []Transition {
 			condition:  AlwaysCondition{}
 			action:     .emit_token
 		},
-		// Operator state transitions
 		Transition{
 			from_state: .operator
 			to_state:   .operator
@@ -506,19 +502,155 @@ pub fn get_transitions() []Transition {
 			condition:  AlwaysCondition{}
 			action:     .emit_token
 		},
-		// Punctuation state transitions
 		Transition{
 			from_state: .punctuation
 			to_state:   .initial
 			condition:  AlwaysCondition{}
 			action:     .emit_token
 		},
-		// Error state transitions
 		Transition{
 			from_state: .error
 			to_state:   .initial
 			condition:  AlwaysCondition{}
 			action:     .emit_error
+		},
+		Transition{
+			from_state: .binary
+			to_state:   .binary
+			condition:  CharacterCondition{
+				value: `<`
+			}
+			action:     .consume_character
+		},
+		Transition{
+			from_state: .binary
+			to_state:   .binary
+			condition:  CharacterCondition{
+				value: `>`
+			}
+			action:     .consume_character
+		},
+		Transition{
+			from_state: .binary
+			to_state:   .binary
+			condition:  CharacterCondition{
+				value: `:`
+			}
+			action:     .consume_character
+		},
+		Transition{
+			from_state: .binary
+			to_state:   .binary
+			condition:  CharacterClassCondition{
+				class: .digit
+			}
+			action:     .consume_character
+		},
+		Transition{
+			from_state: .binary
+			to_state:   .binary
+			condition:  CharacterClassCondition{
+				class: .identifier_start
+			}
+			action:     .consume_character
+		},
+		Transition{
+			from_state: .binary
+			to_state:   .binary
+			condition:  CharacterClassCondition{
+				class: .identifier_part
+			}
+			action:     .consume_character
+		},
+		Transition{
+			from_state: .binary
+			to_state:   .binary
+			condition:  CharacterCondition{
+				value: `,`
+			}
+			action:     .consume_character
+		},
+		Transition{
+			from_state: .binary
+			to_state:   .binary
+			condition:  CharacterClassCondition{
+				class: .whitespace
+			}
+			action:     .consume_character
+		},
+		Transition{
+			from_state: .binary
+			to_state:   .initial
+			condition:  AlwaysCondition{}
+			action:     .emit_token
+		},
+		Transition{
+			from_state: .number
+			to_state:   .hex_number
+			condition:  CharacterCondition{
+				value: `x`
+			}
+			action:     .consume_character
+		},
+		Transition{
+			from_state: .hex_number
+			to_state:   .hex_number
+			condition:  CharacterClassCondition{
+				class: .digit
+			}
+			action:     .consume_character
+		},
+		Transition{
+			from_state: .hex_number
+			to_state:   .hex_number
+			condition:  CharacterClassCondition{
+				class: .letter
+			}
+			action:     .consume_character
+		},
+		Transition{
+			from_state: .hex_number
+			to_state:   .initial
+			condition:  AlwaysCondition{}
+			action:     .emit_token
+		},
+		Transition{
+			from_state: .initial
+			to_state:   .hex_number
+			condition:  CharacterCondition{
+				value: `0`
+			}
+			action:     .consume_character
+		},
+		Transition{
+			from_state: .hex_number
+			to_state:   .hex_number
+			condition:  CharacterCondition{
+				value: `x`
+			}
+			action:     .consume_character
+		},
+		Transition{
+			from_state: .hex_number
+			to_state:   .hex_number
+			condition:  CharacterClassCondition{
+				class: .digit
+			}
+			action:     .consume_character
+		},
+		Transition{
+			from_state: .hex_number
+			to_state:   .hex_number
+			condition:  CharacterClassCondition{
+				class: .letter
+			}
+			action:     .consume_character
+		},
+		Transition{
+			from_state: .hex_number
+			to_state:   .initial
+			condition:  AlwaysCondition{}
+			action:     .emit_token
 		},
 	]
 }

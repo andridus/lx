@@ -276,10 +276,20 @@ fn (mut p LXParser) parse_clause_body_expressions() ?ast.Expr {
 			break
 		}
 
-		// Parse expression
-		expr := p.parse_expression()?
-		statements << ast.ExprStmt{
-			expr: expr
+		// Aqui: aceitar pattern matching e assignment como statements
+		if p.is_pattern_matching_statement() {
+			statements << ast.ExprStmt{
+				expr: p.parse_pattern_matching_statement()?
+			}
+		} else if p.is_simple_assignment() {
+			statements << ast.ExprStmt{
+				expr: p.parse_simple_assignment()?
+			}
+		} else {
+			expr := p.parse_expression()?
+			statements << ast.ExprStmt{
+				expr: expr
+			}
 		}
 
 		p.skip_newlines()

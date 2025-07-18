@@ -25,6 +25,12 @@ pub const operator_map = {
 	'and': OperatorValue.and_
 	'or':  OperatorValue.or_
 	'not': OperatorValue.not_
+	'&&&': OperatorValue.bitwise_and
+	'|||': OperatorValue.bitwise_or
+	'^^^': OperatorValue.bitwise_xor
+	'~~~': OperatorValue.bitwise_not
+	'<<':  OperatorValue.lshift
+	'>>':  OperatorValue.rshift
 }
 
 // PunctuationMap maps punctuation strings to their corresponding values
@@ -85,7 +91,7 @@ pub fn get_all_punctuation() []string {
 // is_single_char_operator checks if a character can be the start of an operator
 pub fn is_single_char_operator(c u8) bool {
 	return c == `=` || c == `<` || c == `>` || c == `!` || c == `:` || c == `+` || c == `-`
-		|| c == `*` || c == `/` || c == `|` || c == `.` || c == `&` || c == `%`
+		|| c == `*` || c == `/` || c == `|` || c == `.` || c == `&` || c == `%` || c == `^` || c == `~`
 }
 
 // is_operator_start checks if a character can be the start of an operator
@@ -100,10 +106,10 @@ pub fn get_operator_precedence(t OperatorValue) int {
 		.type_cons { 2 }
 		.concat { 3 }
 		.plus, .minus { 4 }
-		.mult, .div, .modulo { 5 }
+		.mult, .div, .modulo, .bitwise_and, .bitwise_xor, .lshift, .rshift { 5 }
 		.eq, .neq, .lt, .gt, .leq, .geq { 6 }
 		.and_, .or_ { 7 }
-		.not_ { 8 }
+		.not_, .bitwise_not { 8 }
 		.assign, .pattern_match { 9 }
 		.arrow, .fat_arrow { 10 }
 		else { 11 }
@@ -113,7 +119,7 @@ pub fn get_operator_precedence(t OperatorValue) int {
 // is_left_associative checks if an operator is left associative
 pub fn is_left_associative(t OperatorValue) bool {
 	return match t {
-		.plus, .minus, .mult, .div, .modulo, .concat, .and_, .or_ { true }
+		.plus, .minus, .mult, .div, .modulo, .concat, .and_, .or_, .bitwise_and, .bitwise_or, .bitwise_xor, .lshift, .rshift { true }
 		else { false }
 	}
 }

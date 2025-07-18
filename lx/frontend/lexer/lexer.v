@@ -35,15 +35,13 @@ pub fn new_lexer(input string, filename string) Lexer {
 	}
 }
 
-// next_token returns the next token from the input
 pub fn (mut l Lexer) next_token() Token {
-	// Se houve erro fatal, só retorna EOF
 	if l.had_error {
 		return EOFToken{
 			position: l.get_current_position()
 		}
 	}
-	// If there are errors, always return ErrorToken first
+
 	if l.has_errors() {
 		l.had_error = true
 		msg := l.errors[0].message
@@ -57,6 +55,29 @@ pub fn (mut l Lexer) next_token() Token {
 
 	for l.position < l.input.len {
 		ch := l.input[l.position]
+
+		if l.state == .initial && ch == `0` && l.position + 1 < l.input.len && (l.input[l.position + 1] == `x`) {
+			l.state = .hex_number
+			l.start_pos = l.get_current_position()
+			l.buffer = '0x'
+			l.position += 2
+			l.column += 2
+			continue
+		}
+
+		if l.state == .hex_number {
+			if ch.is_digit() || (ch >= `a` && ch <= `f`) || (ch >= `A` && ch <= `F`) {
+				l.buffer += ch.ascii_str()
+				l.position++
+				l.column++
+				continue
+			} else {
+				token := l.create_token_from_buffer()
+				l.buffer = ''
+				l.state = .initial
+				return token
+			}
+		}
 
 		// Find transition for current state and character
 		transition := find_transition(l.state, ch, l.buffer) or {
@@ -72,7 +93,6 @@ pub fn (mut l Lexer) next_token() Token {
 				l.state = .initial
 				return token
 			} else {
-				// Após erro, não consumir o caractere inválido e parar
 				l.add_error('Lexical error: Unexpected character', l.get_current_position())
 				l.state = .initial
 				l.buffer = ''
@@ -86,6 +106,7 @@ pub fn (mut l Lexer) next_token() Token {
 				}
 			}
 		}
+
 
 		match transition.action or { TransitionAction.consume_character } {
 			.consume_character {
@@ -349,7 +370,13 @@ fn (mut l Lexer) create_token_from_buffer() Token {
 			}
 		}
 		.number {
-			value := l.buffer.int()
+			mut value := 0
+			if l.buffer.starts_with('0x') {
+				hex_str := l.buffer[2..]
+				value = parse_hex_int(hex_str) or { 0 }
+			} else {
+				value = l.buffer.int()
+			}
 			IntToken{
 				value:    value
 				position: l.start_pos
@@ -383,9 +410,11 @@ fn (mut l Lexer) create_token_from_buffer() Token {
 		}
 		.atom {
 			if l.buffer.len == 1 {
-				return ErrorToken{
-					message:  'Lexical error: Isolated colon is not allowed'
-					position: l.start_pos
+				if l.state != .binary {
+					return ErrorToken{
+						message:  'Lexical error: Isolated colon is not allowed'
+						position: l.start_pos
+					}
 				}
 			}
 			value := l.buffer[1..]
@@ -443,9 +472,28 @@ fn (mut l Lexer) create_token_from_buffer() Token {
 					position: l.start_pos
 				}
 			} else {
-				ErrorToken{
-					message:  'Lexical error: Unknown operator'
-					position: l.start_pos
+				// Special case: if buffer ends with ::, it might be a key followed by ::
+				if l.buffer.ends_with('::') {
+					// Extract the key part (remove the ::)
+					key_part := l.buffer[..l.buffer.len - 2]
+					if key_part.len > 0 {
+						// This is a key followed by ::, but we can't return two tokens
+						// So we'll return an error for now
+						ErrorToken{
+							message:  'Lexical error: Unexpected :: after key'
+							position: l.start_pos
+						}
+					} else {
+						ErrorToken{
+							message:  'Lexical error: Unknown operator'
+							position: l.start_pos
+						}
+					}
+				} else {
+					ErrorToken{
+						message:  'Lexical error: Unknown operator'
+						position: l.start_pos
+					}
 				}
 			}
 		}
@@ -469,6 +517,19 @@ fn (mut l Lexer) create_token_from_buffer() Token {
 				}
 			}
 		}
+
+		.hex_number {
+			mut value := 0
+			if l.buffer.starts_with('0x') {
+				hex_str := l.buffer[2..]
+				value = parse_hex_int(hex_str) or { 0 }
+			}
+			IntToken{
+				value:    value
+				position: l.start_pos
+			}
+		}
+
 		else {
 			ErrorToken{
 				message:  'Lexical error: Unexpected state'
@@ -630,4 +691,23 @@ pub fn (l Lexer) get_position_index() int {
 // get_buffer returns the current buffer
 pub fn (l Lexer) get_buffer() string {
 	return l.buffer
+}
+
+// parse_hex_int converts a hexadecimal string to an integer
+fn parse_hex_int(hex_str string) ?int {
+	if hex_str.len == 0 {
+		return none
+	}
+
+	mut result := 0
+	for ch in hex_str {
+		digit := match ch {
+			`0`...`9` { int(ch - `0`) }
+			`a`...`f` { int(ch - `a` + 10) }
+			`A`...`F` { int(ch - `A` + 10) }
+			else { return none }
+		}
+		result = result * 16 + digit
+	}
+	return result
 }

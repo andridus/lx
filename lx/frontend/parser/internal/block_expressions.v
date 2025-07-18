@@ -34,10 +34,19 @@ pub fn (mut p LXParser) parse_block_expression() ?ast.Expr {
 			break
 		}
 
-		// Parse expression and wrap in statement
-		expr := p.parse_expression()?
-		statements << ast.ExprStmt{
-			expr: expr
+		if p.is_pattern_matching_statement() {
+			statements << ast.ExprStmt{
+				expr: p.parse_pattern_matching_statement()?
+			}
+		} else if p.is_simple_assignment() {
+			statements << ast.ExprStmt{
+				expr: p.parse_simple_assignment()?
+			}
+		} else {
+			expr := p.parse_expression()?
+			statements << ast.ExprStmt{
+				expr: expr
+			}
 		}
 
 		p.skip_newlines()
@@ -71,10 +80,21 @@ pub fn (mut p LXParser) parse_block_expression_with_delimiter(delimiters []lexer
 			break
 		}
 
-		// Parse expression and wrap in statement
-		expr := p.parse_expression()?
-		statements << ast.ExprStmt{
-			expr: expr
+		if p.is_pattern_matching_statement() {
+			pattern_match := p.parse_pattern_matching_statement()?
+			statements << ast.ExprStmt{
+				expr: pattern_match
+			}
+		} else if p.is_simple_assignment() {
+			assignment := p.parse_simple_assignment()?
+			statements << ast.ExprStmt{
+				expr: assignment
+			}
+		} else {
+			expr := p.parse_expression()?
+			statements << ast.ExprStmt{
+				expr: expr
+			}
 		}
 	}
 	return ast.BlockExpr{
@@ -127,256 +147,88 @@ pub fn (mut p LXParser) parse_block_top_level() ?[]ast.Stmt {
 	return statements
 }
 
-// ========================================
-// EXPRESSION PARSING
-// This handles all expression types in expression context
-// ========================================
+// =====================
+// OPERATOR PRECEDENCE TABLE
+// =====================
 
-// parse_expression parses expressions in expression context
-pub fn (mut p LXParser) parse_expression() ?ast.Expr {
-	// Must be in expression context
-	if p.context != .expression {
-		p.add_error('Expressions only allowed in expression context', 'Invalid context')
-		return none
+// Precedência dos operadores
+fn operator_precedence(op lexer.OperatorValue) int {
+	return match op {
+		.send { 1 }
+		.type_cons { 2 }
+		.concat { 3 }
+		.plus, .minus { 4 }
+		.mult, .div, .modulo, .bitwise_and, .bitwise_or, .bitwise_xor, .lshift, .rshift { 5 }
+		.eq, .neq, .lt, .gt, .leq, .geq { 6 }
+		.and_ { 7 }
+		.or_ { 8 }
+		.fat_arrow, .arrow, .pattern_match, .pipe { -1 }
+		else { 11 }
 	}
-
-	return p.parse_assignment_expression()
 }
 
-// ========================================
-// ASSIGNMENT EXPRESSIONS
-// Grammar: assignment_expression ::= identifier '=' expression | or_expression
-// ========================================
-
-// parse_assignment_expression parses assignment expressions
-fn (mut p LXParser) parse_assignment_expression() ?ast.Expr {
-	// Check for assignment pattern: identifier = expression
-	if p.current.is_identifier() {
-		next_token := p.peek()
-		if next_token is lexer.OperatorToken {
-			op := next_token as lexer.OperatorToken
-			if op.value == .assign {
-				// This is an assignment
-				name := p.current.get_value()
-				position := p.get_current_position()
-				p.advance() // consume identifier
-				p.advance() // consume '='
-
-				value := p.parse_assignment_expression()?
-
-				return ast.AssignExpr{
-					name:     name
-					value:    value
-					position: position
-					ast_id:   p.generate_ast_id()
-				}
-			}
-		}
+// Associatividade dos operadores
+fn operator_associativity(op lexer.OperatorValue) string {
+	return match op {
+		.send { 'right' }
+		else { 'left' }
 	}
-
-	// Not an assignment, parse as or expression
-	return p.parse_or_expression()
 }
 
-// ========================================
-// LOGICAL EXPRESSIONS
-// Grammar: or_expression ::= and_expression { 'or' and_expression }
-// Grammar: and_expression ::= equality_expression { 'and' equality_expression }
-// ========================================
+// =====================
+// CENTRALIZED BINARY EXPRESSION PARSER
+// =====================
 
-// parse_or_expression parses logical OR expressions
-fn (mut p LXParser) parse_or_expression() ?ast.Expr {
-	mut left := p.parse_and_expression()?
-
-	for p.check(operator_token(.or_)) {
-		p.advance() // consume 'or'
-		right := p.parse_and_expression()?
-		left = ast.BinaryExpr{
-			left:     left
-			op:       .or
-			right:    right
-			position: p.get_current_position()
-			ast_id:   p.generate_ast_id()
-		}
-	}
-
-	return left
+fn (mut p LXParser) parse_expression() ?ast.Expr {
+	return p.parse_binary_expression(0)
 }
 
-// parse_and_expression parses logical AND expressions
-fn (mut p LXParser) parse_and_expression() ?ast.Expr {
-	mut left := p.parse_equality_expression()?
-	for p.check(operator_token(.and_)) {
-		p.advance() // consume 'and'
-		right := p.parse_equality_expression()?
-		left = ast.BinaryExpr{
-			left:     left
-			op:       .and
-			right:    right
-			position: p.get_current_position()
-			ast_id:   p.generate_ast_id()
-		}
-	}
-
-	return left
-}
-
-// ========================================
-// EQUALITY EXPRESSIONS
-// Grammar: equality_expression ::= comparison_expression { ('==' | '!=') comparison_expression }
-// ========================================
-
-// parse_equality_expression parses equality expressions
-fn (mut p LXParser) parse_equality_expression() ?ast.Expr {
-	mut left := p.parse_comparison_expression()?
-	for {
-		if p.check(operator_token(.eq)) {
-			p.advance() // consume '=='
-			right := p.parse_comparison_expression()?
-			left = ast.BinaryExpr{
-				left:     left
-				op:       .equal
-				right:    right
-				position: p.get_current_position()
-				ast_id:   p.generate_ast_id()
-			}
-		} else if p.check(operator_token(.neq)) {
-			p.advance() // consume '!='
-			right := p.parse_comparison_expression()?
-			left = ast.BinaryExpr{
-				left:     left
-				op:       .not_equal
-				right:    right
-				position: p.get_current_position()
-				ast_id:   p.generate_ast_id()
-			}
-		} else {
-			break
-		}
-	}
-
-	return left
-}
-
-// ========================================
-// COMPARISON EXPRESSIONS
-// Grammar: comparison_expression ::= arithmetic_expression { ('<' | '>' | '<=' | '>=') arithmetic_expression }
-// ========================================
-
-// parse_comparison_expression parses comparison expressions
-fn (mut p LXParser) parse_comparison_expression() ?ast.Expr {
-	mut left := p.parse_arithmetic_expression()?
-
-	for {
-		mut op := ast.BinaryOp.add
-		mut matched := false
-
-		if p.check(operator_token(.lt)) {
-			op = .less_than
-			matched = true
-		} else if p.check(operator_token(.gt)) {
-			op = .greater_than
-			matched = true
-		} else if p.check(operator_token(.leq)) {
-			op = .less_equal
-			matched = true
-		} else if p.check(operator_token(.geq)) {
-			op = .greater_equal
-			matched = true
-		}
-
-		if matched {
-			p.advance() // consume operator
-			right := p.parse_arithmetic_expression()?
-			left = ast.BinaryExpr{
-				left:     left
-				op:       op
-				right:    right
-				position: p.get_current_position()
-				ast_id:   p.generate_ast_id()
-			}
-		} else {
-			break
-		}
-	}
-
-	return left
-}
-
-// ========================================
-// ARITHMETIC EXPRESSIONS
-// Grammar: arithmetic_expression ::= term { ('+' | '-') term }
-// Grammar: term ::= factor { ('*' | '/') factor }
-// ========================================
-
-// parse_arithmetic_expression parses addition and subtraction
-fn (mut p LXParser) parse_arithmetic_expression() ?ast.Expr {
-	mut left := p.parse_term()?
-	for {
-		mut op := ast.BinaryOp.add
-		mut matched := false
-
-		if p.check(operator_token(.plus)) {
-			op = .add
-			matched = true
-		} else if p.check(operator_token(.minus)) {
-			op = .subtract
-			matched = true
-		} else if p.check(operator_token(.concat)) {
-			op = .append
-			matched = true
-		}
-
-		if matched {
-			p.advance() // consume operator
-			right := p.parse_term()?
-			left = ast.BinaryExpr{
-				left:     left
-				op:       op
-				right:    right
-				position: p.get_current_position()
-				ast_id:   p.generate_ast_id()
-			}
-		} else {
-			break
-		}
-	}
-
-	return left
-}
-
-// parse_term parses multiplication and division
-fn (mut p LXParser) parse_term() ?ast.Expr {
+fn (mut p LXParser) parse_binary_expression(min_prec int) ?ast.Expr {
 	mut left := p.parse_unary_expression()?
-
-	for {
-		mut op := ast.BinaryOp.add
-		mut matched := false
-
-		if p.check(operator_token(.mult)) {
-			op = .multiply
-			matched = true
-		} else if p.check(operator_token(.div)) {
-			op = .divide
-			matched = true
-		}
-
-		if matched {
-			p.advance() // consume operator
-			right := p.parse_unary_expression()?
-			left = ast.BinaryExpr{
-				left:     left
-				op:       op
-				right:    right
-				position: p.get_current_position()
-				ast_id:   p.generate_ast_id()
-			}
-		} else {
+	for p.current is lexer.OperatorToken {
+		op_token := p.current as lexer.OperatorToken
+		prec := operator_precedence(op_token.value)
+		assoc := operator_associativity(op_token.value)
+		if prec < min_prec {
 			break
 		}
+		p.advance() // consume operator
+		right_prec := if assoc == 'left' { prec + 1 } else { prec }
+		right := p.parse_binary_expression(right_prec)?
+		left = ast.BinaryExpr{
+			left:     left
+			op:       operator_value_to_ast_binary_op(op_token.value)
+			right:    right
+			position: p.get_current_position()
+			ast_id:   p.generate_ast_id()
+		}
 	}
-
 	return left
+}
+
+fn operator_value_to_ast_binary_op(op lexer.OperatorValue) ast.BinaryOp {
+	return match op {
+		.concat { .append }
+		.plus { .add }
+		.minus { .subtract }
+		.mult { .multiply }
+		.div { .divide }
+		.modulo { .modulo }
+		.eq { .equal }
+		.neq { .not_equal }
+		.lt { .less_than }
+		.gt { .greater_than }
+		.leq { .less_equal }
+		.geq { .greater_equal }
+		.and_ { .and }
+		.or_ { .or }
+		.bitwise_and { .bitwise_and }
+		.bitwise_or { .bitwise_or }
+		.bitwise_xor { .bitwise_xor }
+		.lshift { .lshift }
+		.rshift { .rshift }
+		else { .add }
+	}
 }
 
 // ========================================
@@ -668,11 +520,9 @@ fn (mut p LXParser) parse_primary_expression() ?ast.Expr {
 					p.parse_map_expression()
 				}
 				.concat {
-					p.parse_binary_expression(ast.BinaryOp.append)
+					p.parse_binary_expression(0)
 				}
 				else {
-					println('[LOG] block_expressions: Unexpected operator in expression, op = ' +
-						op.value.str() + ', pos = ' + p.get_current_position().str())
 					p.add_error('Unexpected operator in expression', 'Got ${p.current.str()}')
 					none
 				}
@@ -682,6 +532,91 @@ fn (mut p LXParser) parse_primary_expression() ?ast.Expr {
 			p.add_error('Unexpected token in expression', 'Got ${p.current.str()}')
 			none
 		}
+	}
+}
+
+fn (mut p LXParser) parse_binary_pattern_expression() ?ast.Pattern {
+	p.advance()
+	mut segments := []ast.BinarySegment{}
+	for !p.check(operator_token(.rshift)) && !p.is_at_end() {
+		if p.check(punctuation_token(.comma)) {
+			p.advance()
+			continue
+		}
+		segments << p.parse_binary_segment()?
+	}
+	p.consume(operator_token(.rshift), 'Expected >> to close binary pattern')?
+	return ast.BinaryPattern{
+		segments: segments
+	}
+}
+
+pub fn (mut p LXParser) parse_binary_segment() ?ast.BinarySegment {
+	start_pos := p.get_current_position()
+	mut value := ast.Expr{}
+	if p.current is lexer.KeyToken {
+		key_token := p.current as lexer.KeyToken
+		key_value := key_token.value
+		if key_value.ends_with(':') {
+			var_name := key_value.trim_string_right(':')
+			value = ast.VariableExpr{
+				name:     var_name
+				position: start_pos
+				ast_id:   p.generate_ast_id()
+			}
+			p.advance()
+		} else {
+			value = ast.VariableExpr{
+				name:     key_value
+				position: start_pos
+				ast_id:   p.generate_ast_id()
+			}
+			p.advance()
+		}
+	} else {
+		value = match p.current {
+			lexer.StringToken {
+				p.parse_string_literal()?
+			}
+			lexer.IntToken {
+				p.parse_integer_literal()?
+			}
+			lexer.FloatToken {
+				p.parse_float_literal()?
+			}
+		else {
+			p.add_error('Invalid binary segment', 'Got ${p.current.str()}')
+			return none
+			}
+		}
+	}
+	mut size := ?ast.Expr(none)
+	mut options := []string{}
+
+	if p.check(punctuation_token(.colon)) {
+		p.advance()
+	}
+
+	if p.check(operator_token(.type_cons)) {
+		p.advance()
+		size = p.parse_expression()?
+	}
+
+	if p.check(operator_token(.div)) {
+		p.advance()
+		for {
+			if !p.current.is_identifier() { break }
+			options << p.current.get_value()
+			p.advance()
+			if !p.check(operator_token(.minus)) { break }
+			p.advance()
+		}
+	}
+	return ast.BinarySegment{
+		value: value
+		size: size
+		options: options
+		position: start_pos
 	}
 }
 
@@ -729,7 +664,12 @@ fn (mut p LXParser) parse_external_atom() ?ast.Expr {
 
 // parse_identifier_expression parses identifier expressions
 fn (mut p LXParser) parse_identifier_expression() ?ast.Expr {
-	name := p.current.get_value()
+// 	mut name := ''
+// 	if p.current is lexer.KeyToken {
+// 		name = p.current.get_key_value()
+// 	} else {
+		name := p.current.get_value()
+	// }
 	position := p.get_current_position()
 	p.advance()
 
@@ -1045,10 +985,21 @@ fn (mut p LXParser) parse_case_expression() ?ast.Expr {
 				break
 			}
 
-			// Parse expression and wrap in statement
-			expr := p.parse_expression()?
-			statements << ast.ExprStmt{
-				expr: expr
+			if p.is_pattern_matching_statement() {
+				pattern_match := p.parse_pattern_matching_statement()?
+				statements << ast.ExprStmt{
+					expr: pattern_match
+				}
+			} else if p.is_simple_assignment() {
+				assignment := p.parse_simple_assignment()?
+				statements << ast.ExprStmt{
+					expr: assignment
+				}
+			} else {
+				expr := p.parse_expression()?
+				statements << ast.ExprStmt{
+					expr: expr
+				}
 			}
 
 			p.skip_newlines()
@@ -1951,10 +1902,21 @@ fn (mut p LXParser) parse_receive_expression() ?ast.Expr {
 				break
 			}
 
-			// Parse expression and wrap in statement
-			expr := p.parse_expression()?
-			statements << ast.ExprStmt{
-				expr: expr
+			if p.is_pattern_matching_statement() {
+				pattern_match := p.parse_pattern_matching_statement()?
+				statements << ast.ExprStmt{
+					expr: pattern_match
+				}
+			} else if p.is_simple_assignment() {
+				assignment := p.parse_simple_assignment()?
+				statements << ast.ExprStmt{
+					expr: assignment
+				}
+			} else {
+				expr := p.parse_expression()?
+				statements << ast.ExprStmt{
+					expr: expr
+				}
 			}
 
 			p.skip_newlines()
@@ -1988,10 +1950,21 @@ fn (mut p LXParser) parse_receive_expression() ?ast.Expr {
 				break
 			}
 
-			// Parse expression and wrap in statement
-			expr := p.parse_expression()?
-			timeout_statements << ast.ExprStmt{
-				expr: expr
+			if p.is_pattern_matching_statement() {
+				pattern_match := p.parse_pattern_matching_statement()?
+				timeout_statements << ast.ExprStmt{
+					expr: pattern_match
+				}
+			} else if p.is_simple_assignment() {
+				assignment := p.parse_simple_assignment()?
+				timeout_statements << ast.ExprStmt{
+					expr: assignment
+				}
+			} else {
+				expr := p.parse_expression()?
+				timeout_statements << ast.ExprStmt{
+					expr: expr
+				}
 			}
 
 			p.skip_newlines()
@@ -2024,17 +1997,96 @@ fn (p &LXParser) is_next_receive_pattern() bool {
 	return p.is_pattern_followed_by_arrow(p.position)
 }
 
-// parse_binary_expression parses binary expressions with the given operator
-fn (mut p LXParser) parse_binary_expression(op ast.BinaryOp) ?ast.Expr {
+// ========================================
+// PATTERN MATCHING STATEMENT DETECTION
+// ========================================
+
+// is_pattern_matching_statement checks if the current tokens represent a pattern matching statement
+// Pattern matching statements have the form: pattern = expression
+fn (p &LXParser) is_pattern_matching_statement() bool {
+	match p.current {
+		lexer.BinaryPatternToken {
+			return true
+		}
+		lexer.IdentToken {
+			return false
+		}
+		lexer.UpperIdentToken {
+			return false
+		}
+		lexer.PunctuationToken {
+			punct := p.current as lexer.PunctuationToken
+			match punct.value {
+				.lbrace, .lbracket, .lparen {
+					next_token := p.peek()
+					return next_token is lexer.OperatorToken && (next_token as lexer.OperatorToken).value == .assign
+				}
+				else {
+					return false
+				}
+			}
+		}
+		lexer.OperatorToken {
+			op := p.current as lexer.OperatorToken
+			if op.value == .modulo {
+				// Só é pattern matching se o próximo token for '='
+				next_token := p.peek()
+				return next_token is lexer.OperatorToken && (next_token as lexer.OperatorToken).value == .assign
+			}
+			if op.value == .lshift {
+				// Só é pattern matching se o próximo token for '='
+				next_token := p.peek()
+				return next_token is lexer.OperatorToken && (next_token as lexer.OperatorToken).value == .assign
+			}
+			return false
+		}
+		else {
+			return false
+		}
+	}
+	return false
+}
+
+fn (mut p LXParser) parse_pattern_matching_statement() ?ast.Expr {
 	position := p.get_current_position()
-	p.advance() // consume the operator
+	pattern := p.parse_pattern()?
+	p.consume(operator_token(.assign), 'Expected = in pattern matching statement')?
+	value := p.parse_expression()?
+	return ast.SimpleMatchExpr{
+		pattern:  pattern
+		value:    value
+		guard:    ast.LiteralExpr{
+			value: ast.BooleanLiteral{
+				value: true
+			}
+		}
+		position: position
+	}
+}
 
-	right := p.parse_expression()?
+// is_simple_assignment checks if the current tokens represent a simple assignment statement
+// Simple assignment statements have the form: variable = expression
+fn (p &LXParser) is_simple_assignment() bool {
+	if p.current is lexer.IdentToken {
+		next_token := p.peek()
+		return next_token is lexer.OperatorToken && (next_token as lexer.OperatorToken).value == .assign
+	}
+	return false
+}
 
-	return ast.BinaryExpr{
-		left:     ast.Expr(ast.LiteralExpr{}) // placeholder, will be set by caller
-		op:       op
-		right:    right
+// parse_simple_assignment parses a simple assignment statement: variable = expression
+fn (mut p LXParser) parse_simple_assignment() ?ast.Expr {
+	position := p.get_current_position()
+	if !p.current.is_identifier() {
+		return none
+	}
+	var_name := p.current.get_value()
+	p.advance() // consume variable name
+	p.consume(operator_token(.assign), 'Expected = in assignment')?
+	value := p.parse_expression()?
+	return ast.AssignExpr{
+		name:     var_name
+		value:    value
 		position: position
 	}
 }

@@ -268,6 +268,22 @@ pub fn (mut hmi HMInferencer) infer_expression(expr ast.Expr) !TypeInfo {
 			}
 			hmi.infer_unary(expr)!
 		}
+		ast.BinaryPatternExpr {
+			if hmi.type_table.debug_mode {
+				println('[HM_INFERENCER] Matched BinaryPatternExpr')
+			}
+			// Para padrões binários, fazer bind das variáveis dos segmentos
+			for segment in expr.segments {
+				if segment.value is ast.VariableExpr {
+					var_expr := segment.value as ast.VariableExpr
+					if hmi.type_table.debug_mode {
+						println('[HM_INFERENCER] Bind variável binária: ' + var_expr.name)
+					}
+					hmi.type_env.bind(var_expr.name, monotype(typeinfo_integer()))
+				}
+			}
+			return typeinfo_binary()
+		}
 		else {
 			if hmi.type_table.debug_mode {
 				println('[HM_INFERENCER] Unsupported expression type: ${expr}')
@@ -1246,6 +1262,9 @@ pub fn (mut hmi HMInferencer) infer_unary(expr ast.UnaryExpr) !TypeInfo {
 		}
 		.not {
 			typeinfo_boolean()
+		}
+		.bitwise_not {
+			typeinfo_integer()
 		}
 	}
 	return result_type

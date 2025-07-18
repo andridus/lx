@@ -16,6 +16,8 @@ pub enum LexerState {
 	whitespace
 	error
 	punctuation
+	binary
+	hex_number
 }
 
 // str returns a string representation of LexerState
@@ -35,13 +37,15 @@ pub fn (s LexerState) str() string {
 		.whitespace { 'whitespace' }
 		.error { 'error' }
 		.punctuation { 'punctuation' }
+		.binary { 'binary' }
+		.hex_number { 'hex_number' }
 	}
 }
 
 // is_final_state checks if a state is a final state (can emit a token)
 pub fn (s LexerState) is_final_state() bool {
 	return match s {
-		.identifier, .key, .number, .float, .string, .atom, .directive, .error, .punctuation { true }
+		.identifier, .key, .number, .float, .string, .atom, .directive, .error, .punctuation, .binary, .hex_number { true }
 		else { false }
 	}
 }
@@ -51,7 +55,7 @@ pub fn (current LexerState) can_transition_to(target LexerState) bool {
 	return match current {
 		.initial {
 			match target {
-				.identifier, .number, .string, .atom, .comment, .directive, .operator, .whitespace {
+				.identifier, .number, .string, .atom, .comment, .directive, .operator, .whitespace, .binary, .hex_number {
 					true
 				}
 				else {
@@ -145,6 +149,18 @@ pub fn (current LexerState) can_transition_to(target LexerState) bool {
 				else { false }
 			}
 		}
+		.binary {
+			match target {
+				.initial { true }
+				else { false }
+			}
+		}
+		.hex_number {
+			match target {
+				.initial { true }
+				else { false }
+			}
+		}
 	}
 }
 
@@ -165,6 +181,8 @@ pub fn (s LexerState) get_default_transition() LexerState {
 		.whitespace { .initial }
 		.error { .initial }
 		.punctuation { .initial }
+		.binary { .initial }
+		.hex_number { .initial }
 	}
 }
 
@@ -172,7 +190,7 @@ pub fn (s LexerState) get_default_transition() LexerState {
 pub fn (s LexerState) is_accepting_state() bool {
 	return match s {
 		.identifier, .key, .number, .float, .string, .atom, .operator, .comment, .directive,
-		.atom_start {
+		.atom_start, .binary, .hex_number {
 			true
 		}
 		else {
@@ -231,10 +249,17 @@ pub fn (s LexerState) can_transition_from(from LexerState) bool {
 		.whitespace {
 			from == .initial || from == .identifier || from == .number || from == .float
 				|| from == .string || from == .atom || from == .operator || from == .comment
-				|| from == .directive || from == .punctuation || from == .atom_start
+				|| from == .directive || from == .punctuation || from == .atom_start || from == .binary
+				|| from == .hex_number
 		}
 		.error {
 			true
+		}
+		.binary {
+			from == .initial || from == .whitespace
+		}
+		.hex_number {
+			from == .initial || from == .whitespace
 		}
 	}
 }

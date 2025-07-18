@@ -151,6 +151,13 @@ pub:
 	ast_id     int = -1 // -1 indicates uninitialized
 }
 
+pub struct BinaryPatternExpr {
+pub:
+	segments []BinarySegment
+	position Position
+	ast_id     int = -1 // -1 indicates uninitialized
+}
+
 // SendExpr represents message sending
 pub struct SendExpr {
 pub:
@@ -282,6 +289,7 @@ pub type Expr = VariableExpr
 	| RecordAccessExpr
 	| RecordUpdateExpr
 	| FunExpr
+	| BinaryPatternExpr
 	| SendExpr
 	| ReceiveExpr
 	| GuardExpr
@@ -312,6 +320,12 @@ pub enum BinaryOp {
 	or
 	cons
 	append
+	bitwise_and
+	bitwise_or
+	bitwise_xor
+	bitwise_not
+	lshift
+	rshift
 }
 
 // str returns a string representation of BinaryOp
@@ -333,6 +347,12 @@ pub fn (op BinaryOp) str() string {
 		.or { 'or' }
 		.cons { '::' }
 		.append { '++' }
+		.bitwise_and { '&&&' }
+		.bitwise_or { '|||' }
+		.bitwise_xor { '^^^' }
+		.bitwise_not { '~~~' }
+		.lshift { '<<' }
+		.rshift { '>>' }
 	}
 }
 
@@ -340,6 +360,7 @@ pub fn (op BinaryOp) str() string {
 pub enum UnaryOp {
 	not
 	minus
+	bitwise_not
 }
 
 // str returns a string representation of UnaryOp
@@ -347,6 +368,7 @@ pub fn (op UnaryOp) str() string {
 	return match op {
 		.not { 'not' }
 		.minus { '-' }
+		.bitwise_not { '~~~' }
 	}
 }
 
@@ -710,6 +732,9 @@ pub fn (e Expr) str() string {
 		BlockExpr {
 			'Block([${e.body.map(it.str()).join(', ')}])'
 		}
+		BinaryPatternExpr {
+			'BinaryPattern([${e.segments.map(it.str()).join(', ')}])'
+		}
 	}
 }
 
@@ -797,8 +822,9 @@ pub:
 // BinarySegment represents a binary segment
 pub struct BinarySegment {
 pub:
-	size     int
-	unit     string
+	value Expr
+	size ?Expr
+	options []string
 	position Position
 }
 
@@ -1019,6 +1045,7 @@ pub fn get_expr_ast_id(expr Expr) int {
 		RecordAccessExpr { expr.ast_id }
 		RecordUpdateExpr { expr.ast_id }
 		FunExpr { expr.ast_id }
+		BinaryPatternExpr { expr.ast_id }
 		SendExpr { expr.ast_id }
 		ReceiveExpr { expr.ast_id }
 		GuardExpr { expr.ast_id }

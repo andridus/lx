@@ -5,50 +5,76 @@ import analysis
 
 // generate_statement generates code for a single statement
 pub fn (mut gen ErlangGenerator) generate_statement(stmt ast.Stmt) string {
-	match stmt {
+	return match stmt {
 		ast.ExprStmt {
 			if stmt.expr is ast.CaseExpr || stmt.expr is ast.IfExpr {
-				return gen.generate_expression(stmt.expr)
+				gen.generate_expression(stmt.expr)
 			}
-			return gen.generate_expression(stmt.expr)
+			gen.generate_expression(stmt.expr)
 		}
 		ast.FunctionStmt {
-			return gen.generate_function(stmt)
+			gen.generate_function(stmt)
 		}
 		ast.ModuleStmt {
-			return '%% Module statement'
+			'%% Module statement'
 		}
 		ast.RecordDefStmt {
-			return gen.generate_record_definition(stmt)
+			gen.generate_record_definition(stmt)
 		}
 		ast.TypeDefStmt {
-			return gen.generate_type_definition(stmt)
+			gen.generate_type_definition(stmt)
 		}
 		ast.TypeAliasStmt {
-			return gen.generate_type_alias(stmt)
+			gen.generate_type_alias(stmt)
 		}
 		ast.ApplicationStmt {
-			return gen.generate_application_statement(stmt)
+			gen.generate_application_statement(stmt)
 		}
 		ast.WorkerStmt {
-			return gen.generate_worker_module(stmt)
+			gen.generate_worker_module(stmt)
 		}
 		ast.SupervisorStmt {
-			return gen.generate_supervisor_module(stmt)
+			gen.generate_supervisor_module(stmt)
 		}
 	}
 }
 
 // generate_function_body generates code for function body with special handling for match rescue and block expressions
 pub fn (mut gen ErlangGenerator) generate_function_body(statements []ast.Stmt) string {
+	println('[LOG] generate_function_body: statements.len = ${statements.len}')
 	if statements.len == 0 {
+		println('[LOG] generate_function_body: vazio, retorna ok')
 		return 'ok'
 	}
+	if statements.len == 1 {
+		if statements[0] is ast.ExprStmt {
+			expr_stmt := statements[0] as ast.ExprStmt
+			if expr_stmt.expr is ast.SimpleMatchExpr {
+				simple_match := expr_stmt.expr as ast.SimpleMatchExpr
+				is_default_guard := if simple_match.guard is ast.LiteralExpr {
+					lit_expr := simple_match.guard as ast.LiteralExpr
+					if lit_expr.value is ast.BooleanLiteral {
+						bool_lit := lit_expr.value as ast.BooleanLiteral
+						bool_lit.value
+					} else {
+						false
+					}
+				} else {
+					false
+				}
+				if is_default_guard {
+					pattern := gen.generate_pattern_with_binding(simple_match.pattern)
+					value := gen.generate_expression(simple_match.value)
+					result := '${pattern} = ${value}'
+					println('[LOG] generate_function_body: simple match, result = ${result}')
+					return result
+				}
+			}
+		}
+	}
 
-	// Enter a new scope for the function body
 	gen.enter_scope()
 
-	// Check for match rescue patterns and block expressions
 	mut result := []string{}
 	mut i := 0
 
@@ -57,41 +83,36 @@ pub fn (mut gen ErlangGenerator) generate_function_body(statements []ast.Stmt) s
 		if stmt is ast.ExprStmt {
 			expr_stmt := stmt as ast.ExprStmt
 			if expr_stmt.expr is ast.SimpleMatchExpr {
-				// Found a simple match - collect subsequent expressions
 				simple_match := expr_stmt.expr as ast.SimpleMatchExpr
-
-				// Find all subsequent expressions to include in the success branch
+				if simple_match.guard == ast.Expr(ast.GuardExpr{}) && i == statements.len - 1 {
+					pattern := gen.generate_pattern_with_binding(simple_match.pattern)
+					value := gen.generate_expression(simple_match.value)
+					result << '${pattern} = ${value}'
+					i++
+					continue
+				}
 				mut subsequent_exprs := []ast.Stmt{}
 				mut j := i + 1
 				for j < statements.len {
 					subsequent_exprs << statements[j]
 					j++
 				}
-
-				// Generate the simple match with subsequent expressions
+				println('[LOG] generate_function_body: simple_match com subsequentes: ${subsequent_exprs.len}')
 				result << gen.generate_simple_match_with_continuation(simple_match, subsequent_exprs)
-
-				// Skip all processed statements
 				i = statements.len
 				continue
 			} else if expr_stmt.expr is ast.MatchRescueExpr {
-				// Found a match rescue - collect subsequent expressions
 				match_rescue := expr_stmt.expr as ast.MatchRescueExpr
-
-				// Find all subsequent expressions to include in the success branch
 				mut subsequent_exprs := []ast.Stmt{}
 				mut j := i + 1
 				for j < statements.len {
 					subsequent_exprs << statements[j]
 					j++
 				}
-
-				// Generate the match rescue with subsequent expressions
+				println('[LOG] generate_function_body: match_rescue com subsequentes: ${subsequent_exprs.len}')
 				result << gen.generate_match_rescue_with_continuation(match_rescue, subsequent_exprs)
-
-				// Skip all processed statements
 				i = statements.len
-				continue
+				break
 			} else if expr_stmt.expr is ast.AssignExpr {
 				// Check if this is an assignment with a block expression
 				assign_expr := expr_stmt.expr as ast.AssignExpr
@@ -115,6 +136,7 @@ pub fn (mut gen ErlangGenerator) generate_function_body(statements []ast.Stmt) s
 	// Exit the function body scope
 	gen.exit_scope()
 
+	println('[LOG] generate_function_body: result = ${result.join(',\n')}')
 	return result.join(',\n')
 }
 
@@ -145,23 +167,40 @@ fn (mut gen ErlangGenerator) generate_simple_match_with_continuation(expr ast.Si
 
 	value := gen.generate_expression(expr.value)
 
-	// Generate success body with subsequent expressions
-	// Use the new function body generator to handle nested match expressions correctly
-	success_code := if subsequent_exprs.len > 0 {
-		gen.generate_function_body(subsequent_exprs)
+	// Se há guarda, usa case. Senão, gera sequência simples
+	if guard_clause.len > 0 {
+		// Generate success body with subsequent expressions
+		success_code := if subsequent_exprs.len > 0 {
+			gen.generate_function_body(subsequent_exprs)
+		} else {
+			'ok'
+		}
+
+		// Format the success code with proper indentation
+		formatted_success_code := success_code.split('\n').map('        ${it}').join('\n')
+
+		// Simple match returns the original value if pattern doesn't match
+		return 'case ${value} of\n    ${pattern}${guard_clause} ->\n${formatted_success_code};\n    Other ->\n        Other\nend'
 	} else {
-		'ok'
+		// Sem guarda: gera sequência simples de statements
+		mut statements := []string{}
+
+		// Primeiro statement: pattern matching
+		statements << '${pattern} = ${value}'
+
+		// Statements subsequentes
+		for stmt in subsequent_exprs {
+			stmt_code := gen.generate_statement(stmt)
+			statements << stmt_code
+		}
+
+		return statements.join(',\n')
 	}
-
-	// Format the success code with proper indentation
-	formatted_success_code := success_code.split('\n').map('        ${it}').join('\n')
-
-	// Simple match returns the original value if pattern doesn't match
-	return 'case ${value} of\n    ${pattern}${guard_clause} ->\n${formatted_success_code};\n    Other ->\n        Other\nend'
 }
 
 // generate_match_rescue_with_continuation generates match rescue with subsequent expressions in success branch
 fn (mut gen ErlangGenerator) generate_match_rescue_with_continuation(expr ast.MatchRescueExpr, subsequent_exprs []ast.Stmt) string {
+	println('[LOG] generate_match_rescue_with_continuation: subsequentes = ${subsequent_exprs.len}')
 	pattern := gen.generate_pattern(expr.pattern)
 	value := gen.generate_expression(expr.value)
 	rescue_var := gen.capitalize_variable(expr.rescue_var)
@@ -169,17 +208,43 @@ fn (mut gen ErlangGenerator) generate_match_rescue_with_continuation(expr ast.Ma
 	// Generate rescue body
 	rescue_body := gen.generate_block_expression(expr.rescue_body)
 
-	// Generate success body with subsequent expressions
-	// Use the new function body generator to handle nested match rescue correctly
-	success_code := if subsequent_exprs.len > 0 {
-		gen.generate_function_body(subsequent_exprs)
+	// Novo: gerar statements do branch de sucesso corretamente
+	mut success_code := ''
+	if subsequent_exprs.len > 0 {
+		mut stmts := []string{}
+		for i, stmt in subsequent_exprs {
+			if i == subsequent_exprs.len - 1 {
+				// Último statement: valor de retorno
+				if stmt is ast.ExprStmt {
+					expr_stmt := stmt as ast.ExprStmt
+					if expr_stmt.expr is ast.VariableExpr {
+						var_expr := expr_stmt.expr as ast.VariableExpr
+						stmts << gen.capitalize_variable(var_expr.name)
+						println('[LOG] generate_match_rescue_with_continuation: último statement é variável: ${gen.capitalize_variable(var_expr.name)}')
+					} else {
+						stmts << gen.generate_statement(stmt)
+						println('[LOG] generate_match_rescue_with_continuation: último statement não é variável: ${gen.generate_statement(stmt)}')
+					}
+				} else {
+					stmts << gen.generate_statement(stmt)
+					println('[LOG] generate_match_rescue_with_continuation: último statement não é ExprStmt: ${gen.generate_statement(stmt)}')
+				}
+			} else {
+				stmts << gen.generate_statement(stmt) + ','
+			}
+		}
+		success_code = stmts.join('\n        ')
 	} else {
-		'ok'
+		success_code = 'ok'
+		println('[LOG] generate_match_rescue_with_continuation: sem subsequentes, retorna ok')
 	}
 
-	// Format the success code with proper indentation
+	// Se o último statement é uma variável, não gerar statement após o case
+	// (já está incluso no branch de sucesso)
+
 	formatted_success_code := success_code.split('\n').map('        ${it}').join('\n')
 
+	println('[LOG] generate_match_rescue_with_continuation: formatted_success_code = ${formatted_success_code}')
 	return 'case ${value} of\n    ${pattern} ->\n${formatted_success_code};\n    ${rescue_var} ->\n        ${rescue_body}\nend'
 }
 

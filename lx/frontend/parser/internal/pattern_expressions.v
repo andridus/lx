@@ -20,9 +20,9 @@ pub fn (mut p LXParser) parse_pattern() ?ast.Pattern {
 
 // parse_primary_pattern parses primary patterns
 fn (mut p LXParser) parse_primary_pattern() ?ast.Pattern {
-	return match p.current {
+	match p.current {
 		lexer.IdentToken {
-			p.parse_variable_pattern()
+			return p.parse_variable_pattern()
 		}
 		lexer.UpperIdentToken {
 			// Check if this is a record pattern
@@ -32,59 +32,66 @@ fn (mut p LXParser) parse_primary_pattern() ?ast.Pattern {
 					return p.parse_record_pattern()
 				}
 			}
-			p.parse_variable_pattern()
+			return p.parse_variable_pattern()
 		}
 		lexer.IntToken {
-			p.parse_integer_pattern()
+			return p.parse_integer_pattern()
 		}
 		lexer.FloatToken {
-			p.parse_float_pattern()
+			return p.parse_float_pattern()
 		}
 		lexer.StringToken {
-			p.parse_string_pattern()
+			return p.parse_string_pattern()
 		}
 		lexer.BoolToken {
-			p.parse_boolean_pattern()
+			return p.parse_boolean_pattern()
 		}
 		lexer.AtomToken {
-			p.parse_atom_pattern()
+			return p.parse_atom_pattern()
 		}
 		lexer.NilToken {
-			p.parse_nil_pattern()
+			return p.parse_nil_pattern()
+		}
+		lexer.BinaryPatternToken {
+			return p.parse_binary_pattern()
 		}
 		lexer.PunctuationToken {
 			punct := p.current as lexer.PunctuationToken
 			match punct.value {
 				.lparen {
-					p.parse_parenthesized_pattern()
+					return p.parse_parenthesized_pattern()
 				}
 				.lbrace {
-					p.parse_tuple_pattern()
+					return p.parse_tuple_pattern()
 				}
 				.lbracket {
-					p.parse_list_pattern()
+					return p.parse_list_pattern()
 				}
 				else {
 					p.add_error('Unexpected punctuation in pattern', 'Got ${p.current.str()}')
-					none
+					return none
 				}
 			}
 		}
 		lexer.OperatorToken {
 			op := p.current as lexer.OperatorToken
 			match op.value {
+				.lshift {
+					// Trata << como padrão binário
+					return p.parse_binary_pattern()
+				}
 				.modulo {
-					p.parse_map_pattern()
+					return p.parse_map_pattern()
 				}
 				else {
 					p.add_error('Unexpected operator in pattern', 'Got ${p.current.str()}')
-					none
+					return none
 				}
 			}
 		}
 		else {
 			p.add_error('Unexpected token in pattern', 'Got ${p.current.str()}')
-			none
+			return none
 		}
 	}
 }
@@ -375,5 +382,115 @@ fn (mut p LXParser) parse_map_pattern() ?ast.Pattern {
 	return ast.MapPattern{
 		entries:         entries
 		assign_variable: none
+	}
+}
+
+// parse_binary_pattern parses binary patterns like <<a::32, b::16>>
+fn (mut p LXParser) parse_binary_pattern() ?ast.Pattern {
+	start_pos := p.get_current_position()
+	p.advance() // consume '<<'
+
+	mut segments := []ast.BinarySegment{}
+
+	for !p.check(operator_token(.rshift)) && !p.is_at_end() {
+		if p.check(punctuation_token(.comma)) {
+			p.advance()
+			continue
+		}
+
+		if p.current is lexer.IdentToken && p.peek() is lexer.PunctuationToken && (p.peek() as lexer.PunctuationToken).value == .colon {
+			var_name := p.current.get_value()
+			p.advance() // consume IdentToken
+			p.advance() // consume ':'
+			mut size := ?ast.Expr(none)
+			if !p.check(operator_token(.rshift)) && !p.is_at_end() {
+				size = p.parse_binary_size_literal()?
+			}
+			segments << ast.BinarySegment{
+				value: ast.VariableExpr{
+					name: var_name
+					position: start_pos
+					ast_id: p.generate_ast_id()
+				}
+				size: size
+				options: []
+				position: start_pos
+			}
+			continue
+		}
+
+		if p.current is lexer.KeyToken {
+			key_token := p.current as lexer.KeyToken
+			var_name := key_token.value.trim_string_right(':')
+			p.advance() // consume KeyToken
+			if !p.check(operator_token(.rshift)) && !p.is_at_end() &&
+			   (p.current is lexer.IntToken || p.current is lexer.FloatToken || p.current is lexer.IdentToken || p.current is lexer.StringToken || p.current is lexer.AtomToken) {
+				size := p.parse_binary_size_literal()?
+				segments << ast.BinarySegment{
+					value: ast.VariableExpr{
+						name: var_name
+						position: start_pos
+						ast_id: p.generate_ast_id()
+					}
+					size: size
+					options: []
+					position: start_pos
+				}
+				continue
+			}
+			segments << ast.BinarySegment{
+				value: ast.VariableExpr{
+					name: var_name
+					position: start_pos
+					ast_id: p.generate_ast_id()
+				}
+				size: none
+				options: []
+				position: start_pos
+			}
+			continue
+		}
+
+		if p.check(operator_token(.rshift)) {
+			break
+		}
+		segments << p.parse_binary_segment()?
+	}
+	p.consume(operator_token(.rshift), 'Expected >> to close binary pattern')?
+
+	return ast.BinaryPattern{
+		segments: segments
+	}
+}
+
+fn (mut p LXParser) parse_binary_size_literal() ?ast.Expr {
+	match p.current {
+		lexer.IntToken {
+			return p.parse_integer_literal()
+		}
+		lexer.FloatToken {
+			return p.parse_float_literal()
+		}
+		lexer.IdentToken {
+			return p.parse_identifier_expression()
+		}
+		lexer.AtomToken {
+			value := p.current.get_value()
+			position := p.get_current_position()
+			p.advance()
+			return ast.LiteralExpr{
+				value: ast.AtomLiteral{
+					value: value
+				}
+				position: position
+				ast_id: p.generate_ast_id()
+			}
+		}
+		lexer.StringToken {
+			return p.parse_string_literal()
+		}
+		else {
+			return none
+		}
 	}
 }

@@ -28,6 +28,7 @@ fn get_expression_precedence(expr ast.Expr) ErlangPrecedence {
 				.add, .subtract { return .add_sub }
 				.multiply, .divide, .modulo, .power { return .mul_div }
 				.append { return .add_sub }
+				.bitwise_and, .bitwise_or, .bitwise_xor, .bitwise_not, .lshift, .rshift { return .mul_div }
 			}
 		}
 		ast.UnaryExpr {
@@ -181,6 +182,9 @@ pub fn (mut gen ErlangGenerator) generate_expression(expr ast.Expr) string {
 		ast.FunExpr {
 			return gen.generate_fun_expression(expr)
 		}
+		ast.BinaryPatternExpr {
+			return gen.generate_binary_pattern_expression(expr)
+		}
 		ast.SendExpr {
 			return gen.generate_send(expr)
 		}
@@ -282,6 +286,9 @@ pub fn (mut gen ErlangGenerator) generate_expression_in_guard(expr ast.Expr) str
 		}
 		ast.BlockExpr {
 			return gen.generate_block_expression(expr)
+		}
+		ast.BinaryPatternExpr {
+			return gen.generate_binary_pattern_expression(expr)
 		}
 	}
 }
@@ -392,7 +399,7 @@ fn (mut gen ErlangGenerator) generate_binary_expression(expr ast.BinaryExpr) str
 	return '${left} ${op} ${right}'
 }
 
-// generate_binary_expression_in_guard generates code for binary expressions in guards
+// generate_binary_expression_in_guard generates code for binary expressions in guard context
 fn (mut gen ErlangGenerator) generate_binary_expression_in_guard(expr ast.BinaryExpr) string {
 	left := gen.generate_expression_in_guard(expr.left)
 	right := gen.generate_expression_in_guard(expr.right)
@@ -420,6 +427,7 @@ fn (gen ErlangGenerator) translate_unary_operator(operator ast.UnaryOp, is_guard
 	match operator {
 		.not { return 'not' }
 		.minus { return '-' }
+		.bitwise_not { return 'bnot' }
 	}
 }
 
@@ -474,6 +482,24 @@ fn (gen ErlangGenerator) translate_operator(operator ast.BinaryOp, is_guard bool
 		}
 		.cons {
 			return '|'
+		}
+		.bitwise_and {
+			return 'band'
+		}
+		.bitwise_or {
+			return 'bor'
+		}
+		.bitwise_xor {
+			return 'bxor'
+		}
+		.bitwise_not {
+			return 'bnot'
+		}
+		.lshift {
+			return 'bsl'
+		}
+		.rshift {
+			return 'bsr'
 		}
 	}
 }
@@ -990,4 +1016,20 @@ fn (mut gen ErlangGenerator) generate_for_expression(expr ast.ForExpr) string {
 
 	// Generate list comprehension
 	return '[${body} || ${pattern} <- ${collection}${guard_str}]'
+}
+
+// generate_binary_pattern_expression generates code for binary pattern expressions
+fn (mut gen ErlangGenerator) generate_binary_pattern_expression(expr ast.BinaryPatternExpr) string {
+	mut segments := []string{}
+	for segment in expr.segments {
+		mut seg_code := gen.generate_expression(segment.value)
+		if segment.size != none {
+			seg_code += '::' + gen.generate_expression(segment.size)
+		}
+		if segment.options.len > 0 {
+			seg_code += '/' + segment.options.join("-")
+		}
+		segments << seg_code
+	}
+	return '<<' + segments.join(', ') + '>>'
 }

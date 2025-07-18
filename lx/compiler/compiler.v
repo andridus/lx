@@ -271,15 +271,40 @@ fn (mut comp Compiler) generate_worker_file(worker_stmt ast.WorkerStmt, original
 		position: worker_stmt.position
 	}
 
-	// Compile the worker module
-	result := comp.compile_module(worker_module, original_file_path, output_dir, global_registry)
+	// Use the HM type system for analysis
+	mut analyzer := if comp.debug_types {
+		analysis.new_analyzer_with_debug()
+	} else {
+		analysis.new_analyzer()
+	}
+
+	analysis_result := analyzer.analyze_module(worker_module)
+
+	if analysis_result.errors.len > 0 {
+		source_lines := errors.load_source_lines(original_file_path)
+		mut error_formatter := errors.new_error_formatter()
+		mut formatted_errors := []string{}
+		for err in analysis_result.errors {
+			formatted_errors << error_formatter.format_error(err, source_lines)
+		}
+		println('Analysis errors:\n${formatted_errors.join('\n')}')
+		exit(1)
+	}
+
+	// Generate only function code without module header
+	mut erlang_gen := erlang.new_erlang_generator()
+	type_table := analyzer.get_type_table()
+	erlang_gen.set_type_table(type_table)
+	erlang_gen.set_global_registry(global_registry)
+
+	user_code := erlang_gen.generate_functions_only(worker_stmt.statements, analysis_result.type_context)
 
 	// Write the worker file
 	worker_dir := if output_dir.len > 0 { output_dir } else { os.dir(original_file_path) }
 	worker_file := '${worker_dir}/${worker_stmt.name}.erl'
 
 	// Generate OTP gen_server boilerplate
-	worker_code := comp.generate_worker_boilerplate(worker_stmt, result.code)
+	worker_code := comp.generate_worker_boilerplate(worker_stmt, user_code)
 
 	os.write_file(worker_file, worker_code) or {
 		println('Failed to write worker file ${worker_file}: ${err}')
@@ -293,24 +318,16 @@ fn (mut comp Compiler) generate_worker_file(worker_stmt ast.WorkerStmt, original
 fn (mut comp Compiler) generate_supervisor_file(supervisor_stmt ast.SupervisorStmt, original_file_path string, output_dir string, global_registry &internal.GlobalRegistry) {
 	supervisor_name := if supervisor_stmt.name == '' { 'main_supervisor' } else { supervisor_stmt.name }
 
-	// Create a module for the supervisor
-	supervisor_module := ast.ModuleStmt{
-		name: supervisor_name
-		exports: ['start_link/0', 'init/1'] // Basic OTP supervisor exports
-		imports: []
-		statements: supervisor_stmt.statements
-		position: supervisor_stmt.position
-	}
-
-	// Compile the supervisor module
-	result := comp.compile_module(supervisor_module, original_file_path, output_dir, global_registry)
+	// For supervisors, we typically don't have user-defined functions
+	// So we can directly generate the boilerplate without complex analysis
+	user_code := '' // Supervisors usually don't have user code
 
 	// Write the supervisor file
 	supervisor_dir := if output_dir.len > 0 { output_dir } else { os.dir(original_file_path) }
 	supervisor_file := '${supervisor_dir}/${supervisor_name}.erl'
 
 	// Generate OTP supervisor boilerplate
-	supervisor_code := comp.generate_supervisor_boilerplate(supervisor_stmt, result.code)
+	supervisor_code := comp.generate_supervisor_boilerplate(supervisor_stmt, user_code)
 
 	os.write_file(supervisor_file, supervisor_code) or {
 		println('Failed to write supervisor file ${supervisor_file}: ${err}')
@@ -322,6 +339,49 @@ fn (mut comp Compiler) generate_supervisor_file(supervisor_stmt ast.SupervisorSt
 
 // generate_worker_boilerplate generates OTP gen_server boilerplate for workers
 fn (mut comp Compiler) generate_worker_boilerplate(worker_stmt ast.WorkerStmt, user_code string) string {
+	// Check which functions the user implemented
+	mut user_functions := map[string]bool{}
+	for stmt in worker_stmt.statements {
+		match stmt {
+			ast.FunctionStmt {
+				for clause in stmt.clauses {
+					arity := clause.parameters.len
+					func_key := '${stmt.name}/${arity}'
+					user_functions[func_key] = true
+				}
+			}
+			else {}
+		}
+	}
+
+	// Generate default implementations only for functions not implemented by user
+	mut default_impls := []string{}
+
+	if !user_functions['handle_call/3'] {
+		default_impls << 'handle_call(_Request, _From, State) ->\n    {reply, ok, State}.'
+	}
+
+	if !user_functions['handle_cast/2'] {
+		default_impls << 'handle_cast(_Msg, State) ->\n    {noreply, State}.'
+	}
+
+	if !user_functions['handle_info/2'] {
+		default_impls << 'handle_info(_Info, State) ->\n    {noreply, State}.'
+	}
+
+	if !user_functions['terminate/2'] {
+		default_impls << 'terminate(_Reason, _State) ->\n    ok.'
+	}
+
+	if !user_functions['code_change/3'] {
+		default_impls << 'code_change(_OldVsn, State, _Extra) ->\n    {ok, State}.'
+	}
+
+	mut default_section := ''
+	if default_impls.len > 0 {
+		default_section = '\n%% Default implementations (if not provided by user)\n' + default_impls.join('\n\n') + '\n'
+	}
+
 	return '-module(${worker_stmt.name}).
 -behaviour(gen_server).
 
@@ -336,24 +396,7 @@ start_link(Args) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).
 
 %% User-defined functions and records
-${user_code}
-
-%% Default implementations (if not provided by user)
-handle_call(_Request, _From, State) ->
-    {reply, ok, State}.
-
-handle_cast(_Msg, State) ->
-    {noreply, State}.
-
-handle_info(_Info, State) ->
-    {noreply, State}.
-
-terminate(_Reason, _State) ->
-    ok.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
-'
+${user_code}${default_section}'
 }
 
 // generate_supervisor_boilerplate generates OTP supervisor boilerplate

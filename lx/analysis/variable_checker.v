@@ -3,6 +3,19 @@ module analysis
 import ast
 import errors
 
+fn is_special_identifier(s string) bool {
+	if !(s.starts_with('__') && s.ends_with('__')) {
+		return false
+	}
+	inner := s[2..s.len - 2]
+	for c in inner {
+		if !(c.is_capital() || c == `_`) {
+			return false
+		}
+	}
+	return true
+}
+
 pub struct VariableChecker {
 pub mut:
 	scope_manager ScopeManager
@@ -50,19 +63,17 @@ fn (mut vc VariableChecker) check_expression_statement(stmt ast.ExprStmt) {
 fn (mut vc VariableChecker) check_assignment_expression(expr ast.AssignExpr) {
 	// Check for rebind in current scope
 	if vc.scope_manager.has_binding_local(expr.name) {
-		vc.report_error("Variable '${expr.name}' cannot be reassigned", 'Variables in LX are immutable and cannot be reassigned. Use a different variable name or restructure your code.',
-			expr.position)
+		vc.report_error("Variable '${expr.name}' cannot be reassigned", 'Variables in LX are immutable and cannot be reassigned. Use a different variable name or restructure your code.', expr.position)
 		return
 	}
 
 	// Check for shadowing from parent scopes
 	if vc.scope_manager.has_binding_in_parent(expr.name) {
-		vc.report_error("Variable '${expr.name}' shadows variable from outer scope", 'Shadowing is not allowed in LX. Use a different variable name: ${expr.name}_inner',
-			expr.position)
+		vc.report_error("Variable '${expr.name}' shadows variable from outer scope", 'Shadowing is not allowed in LX. Use a different variable name: ${expr.name}_inner', expr.position)
 		return
 	}
 
-	// Check the value expression
+		// Check the value expression
 	vc.check_expression(expr.value)
 
 	// Bind the variable to current scope
@@ -113,6 +124,7 @@ fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 		ast.ListEmptyExpr {}
 		ast.SimpleMatchExpr { vc.check_simple_match_expression(expr) }
 		ast.MatchRescueExpr { vc.check_match_rescue_expression(expr) }
+		ast.BinaryPatternExpr { /* Binary pattern expressions don't need special handling */ }
 	}
 }
 
@@ -129,6 +141,9 @@ fn (mut vc VariableChecker) check_call_expression(expr ast.CallExpr) {
 }
 
 fn (mut vc VariableChecker) check_variable_expression(expr ast.VariableExpr) {
+	if is_special_identifier(expr.name) {
+		return
+	}
 	// Check if variable is bound
 	if !vc.scope_manager.has_binding(expr.name) {
 		vc.report_error("Unbound variable '${expr.name}'", 'Variable must be defined before use. Check spelling or define the variable first.',
@@ -319,7 +334,12 @@ fn (mut vc VariableChecker) check_record_pattern(pattern ast.RecordPattern) {
 }
 
 fn (mut vc VariableChecker) check_binary_pattern(pattern ast.BinaryPattern) {
-	// Binary patterns don't introduce variables
+	for segment in pattern.segments {
+		if segment.value is ast.VariableExpr {
+			var_expr := segment.value as ast.VariableExpr
+			vc.scope_manager.bind_variable(var_expr.name, segment.position)
+		}
+	}
 }
 
 fn (mut vc VariableChecker) check_wildcard_pattern(pattern ast.WildcardPattern) {

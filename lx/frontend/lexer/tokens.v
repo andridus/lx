@@ -39,6 +39,7 @@ pub type Token = IdentToken
 	| DirectiveToken
 	| EOFToken
 	| ErrorToken
+	| BinaryPatternToken
 
 // IdentToken represents an identifier token
 pub struct IdentToken {
@@ -97,6 +98,13 @@ pub:
 
 // KeyToken represents a key literal token (identifier followed by colon)
 pub struct KeyToken {
+pub:
+	value    string
+	position TokenPosition
+}
+
+// BinaryPatternToken represents a binary pattern token like <<a::32, b::16>>
+pub struct BinaryPatternToken {
 pub:
 	value    string
 	position TokenPosition
@@ -178,6 +186,12 @@ pub enum OperatorValue {
 	and_
 	or_
 	not_
+	bitwise_and   // &&&
+	bitwise_or    // |||
+	bitwise_xor   // ^^^
+	bitwise_not   // ~~~
+	lshift        // <<
+	rshift        // >>
 }
 
 // OperatorToken represents an operator token
@@ -252,6 +266,7 @@ pub fn (t Token) str() string {
 		DirectiveToken { 'Directive(${t.directive})' }
 		EOFToken { 'EOF' }
 		ErrorToken { '${t.message}' }
+		BinaryPatternToken { 'BinaryPattern(${t.value})' }
 	}
 }
 
@@ -327,6 +342,12 @@ pub fn (o OperatorValue) str() string {
 		.and_ { 'and' }
 		.or_ { 'or' }
 		.not_ { 'not' }
+		.bitwise_and { '&&&' }
+		.bitwise_or { '|||' }
+		.bitwise_xor { '^^^' }
+		.bitwise_not { '~~~' }
+		.lshift { '<<' }
+		.rshift { '>>' }
 	}
 }
 
@@ -384,6 +405,7 @@ pub fn (t Token) get_value() string {
 		UpperIdentToken { t.value }
 		StringToken { t.value }
 		AtomToken { t.value }
+		BinaryPatternToken { t.value }
 		ErrorToken { t.message }
 		else { '' }
 	}
@@ -444,6 +466,7 @@ pub fn (t Token) get_position() TokenPosition {
 		DirectiveToken { t.position }
 		EOFToken { t.position }
 		ErrorToken { t.position }
+		BinaryPatternToken { t.position }
 	}
 }
 
@@ -546,6 +569,13 @@ pub fn new_eof_token() EOFToken {
 pub fn new_error_token(message string) ErrorToken {
 	return ErrorToken{
 		message:  message
+		position: new_token_position(1, 1, 'test')
+	}
+}
+
+pub fn new_binary_pattern_token(value string) BinaryPatternToken {
+	return BinaryPatternToken{
+		value:    value
 		position: new_token_position(1, 1, 'test')
 	}
 }

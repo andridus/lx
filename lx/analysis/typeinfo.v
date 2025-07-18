@@ -101,6 +101,14 @@ pub fn typeinfo_nil() TypeInfo {
 	}
 }
 
+pub fn typeinfo_binary() TypeInfo {
+	return TypeInfo{
+		generic: 'binary'
+		value:   none
+		values:  []
+	}
+}
+
 pub fn typeinfo_any() TypeInfo {
 	return TypeInfo{
 		generic: 'any'
