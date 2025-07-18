@@ -41,9 +41,7 @@ pub fn (mut gen ErlangGenerator) generate_statement(stmt ast.Stmt) string {
 
 // generate_function_body generates code for function body with special handling for match rescue and block expressions
 pub fn (mut gen ErlangGenerator) generate_function_body(statements []ast.Stmt) string {
-	println('[LOG] generate_function_body: statements.len = ${statements.len}')
 	if statements.len == 0 {
-		println('[LOG] generate_function_body: vazio, retorna ok')
 		return 'ok'
 	}
 	if statements.len == 1 {
@@ -65,9 +63,7 @@ pub fn (mut gen ErlangGenerator) generate_function_body(statements []ast.Stmt) s
 				if is_default_guard {
 					pattern := gen.generate_pattern_with_binding(simple_match.pattern)
 					value := gen.generate_expression(simple_match.value)
-					result := '${pattern} = ${value}'
-					println('[LOG] generate_function_body: simple match, result = ${result}')
-					return result
+					return '${pattern} = ${value}'
 				}
 			}
 		}
@@ -97,7 +93,6 @@ pub fn (mut gen ErlangGenerator) generate_function_body(statements []ast.Stmt) s
 					subsequent_exprs << statements[j]
 					j++
 				}
-				println('[LOG] generate_function_body: simple_match com subsequentes: ${subsequent_exprs.len}')
 				result << gen.generate_simple_match_with_continuation(simple_match, subsequent_exprs)
 				i = statements.len
 				continue
@@ -109,7 +104,6 @@ pub fn (mut gen ErlangGenerator) generate_function_body(statements []ast.Stmt) s
 					subsequent_exprs << statements[j]
 					j++
 				}
-				println('[LOG] generate_function_body: match_rescue com subsequentes: ${subsequent_exprs.len}')
 				result << gen.generate_match_rescue_with_continuation(match_rescue, subsequent_exprs)
 				i = statements.len
 				break
@@ -136,7 +130,6 @@ pub fn (mut gen ErlangGenerator) generate_function_body(statements []ast.Stmt) s
 	// Exit the function body scope
 	gen.exit_scope()
 
-	println('[LOG] generate_function_body: result = ${result.join(',\n')}')
 	return result.join(',\n')
 }
 
@@ -200,7 +193,6 @@ fn (mut gen ErlangGenerator) generate_simple_match_with_continuation(expr ast.Si
 
 // generate_match_rescue_with_continuation generates match rescue with subsequent expressions in success branch
 fn (mut gen ErlangGenerator) generate_match_rescue_with_continuation(expr ast.MatchRescueExpr, subsequent_exprs []ast.Stmt) string {
-	println('[LOG] generate_match_rescue_with_continuation: subsequentes = ${subsequent_exprs.len}')
 	pattern := gen.generate_pattern(expr.pattern)
 	value := gen.generate_expression(expr.value)
 	rescue_var := gen.capitalize_variable(expr.rescue_var)
@@ -208,26 +200,21 @@ fn (mut gen ErlangGenerator) generate_match_rescue_with_continuation(expr ast.Ma
 	// Generate rescue body
 	rescue_body := gen.generate_block_expression(expr.rescue_body)
 
-	// Novo: gerar statements do branch de sucesso corretamente
 	mut success_code := ''
 	if subsequent_exprs.len > 0 {
 		mut stmts := []string{}
 		for i, stmt in subsequent_exprs {
 			if i == subsequent_exprs.len - 1 {
-				// Último statement: valor de retorno
 				if stmt is ast.ExprStmt {
 					expr_stmt := stmt as ast.ExprStmt
 					if expr_stmt.expr is ast.VariableExpr {
 						var_expr := expr_stmt.expr as ast.VariableExpr
 						stmts << gen.capitalize_variable(var_expr.name)
-						println('[LOG] generate_match_rescue_with_continuation: último statement é variável: ${gen.capitalize_variable(var_expr.name)}')
 					} else {
 						stmts << gen.generate_statement(stmt)
-						println('[LOG] generate_match_rescue_with_continuation: último statement não é variável: ${gen.generate_statement(stmt)}')
 					}
 				} else {
 					stmts << gen.generate_statement(stmt)
-					println('[LOG] generate_match_rescue_with_continuation: último statement não é ExprStmt: ${gen.generate_statement(stmt)}')
 				}
 			} else {
 				stmts << gen.generate_statement(stmt) + ','
@@ -236,15 +223,9 @@ fn (mut gen ErlangGenerator) generate_match_rescue_with_continuation(expr ast.Ma
 		success_code = stmts.join('\n        ')
 	} else {
 		success_code = 'ok'
-		println('[LOG] generate_match_rescue_with_continuation: sem subsequentes, retorna ok')
 	}
 
-	// Se o último statement é uma variável, não gerar statement após o case
-	// (já está incluso no branch de sucesso)
-
 	formatted_success_code := success_code.split('\n').map('        ${it}').join('\n')
-
-	println('[LOG] generate_match_rescue_with_continuation: formatted_success_code = ${formatted_success_code}')
 	return 'case ${value} of\n    ${pattern} ->\n${formatted_success_code};\n    ${rescue_var} ->\n        ${rescue_body}\nend'
 }
 
@@ -1017,7 +998,12 @@ fn (gen ErlangGenerator) typeinfo_to_erlang_type(type_info analysis.TypeInfo) st
 		'list' {
 			if type_info.values.len > 0 {
 				element_type := gen.typeinfo_to_erlang_type(type_info.values[0])
-				'[${element_type}]'
+				// Se já termina com '()', não adicionar de novo
+				if element_type.ends_with('()') || element_type.ends_with(']') {
+					'[${element_type}]'
+				} else {
+					'[${element_type}()]'
+				}
 			} else {
 				'[any()]'
 			}

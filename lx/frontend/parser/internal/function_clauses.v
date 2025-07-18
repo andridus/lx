@@ -68,7 +68,8 @@ fn (mut p LXParser) parse_single_function_clause() ?ast.FunctionClause {
 					}
 					// Add support for other pattern types as needed
 				} else {
-					p.add_error('Expected variable name after = in function parameter', 'Invalid syntax')
+					p.add_error('Expected variable name after = in function parameter',
+						'Invalid syntax')
 					return none
 				}
 			}

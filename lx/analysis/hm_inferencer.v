@@ -232,6 +232,12 @@ pub fn (mut hmi HMInferencer) infer_expression(expr ast.Expr) !TypeInfo {
 			}
 			hmi.infer_simple_match(expr)!
 		}
+		ast.MatchExpr {
+			if hmi.type_table.debug_mode {
+				println('[HM_INFERENCER] Matched MatchExpr')
+			}
+			hmi.infer_match(expr)!
+		}
 		ast.IfExpr {
 			if hmi.type_table.debug_mode {
 				println('[HM_INFERENCER] Matched IfExpr')
@@ -328,7 +334,12 @@ pub fn (mut hmi HMInferencer) infer_variable(expr ast.VariableExpr) !TypeInfo {
 		println('[HM_INFERENCER] Variable ${expr.name} not found in environment')
 	}
 
-	return error('Variable ${expr.name} not found in environment')
+	// Report error using error_reporter instead of throwing exception
+	hmi.error_reporter.report_error(.type_error, 'Variable "${expr.name}" is not defined',
+		expr.position, 'Make sure the variable is declared before use')
+
+	// Return any() type to allow analysis to continue
+	return typeinfo_any()
 }
 
 // infer_literal infers the type of a literal
@@ -1039,25 +1050,84 @@ pub fn (mut hmi HMInferencer) infer_with(expr ast.WithExpr) !TypeInfo {
 // infer_simple_match infers the type of a simple match expression
 pub fn (mut hmi HMInferencer) infer_simple_match(expr ast.SimpleMatchExpr) !TypeInfo {
 	if hmi.type_table.debug_mode {
-		println('[HM_INFERENCER] infer_simple_match: processing simple match')
+		println('[HM_INFERENCER] infer_simple_match')
 	}
 
-	// Infer type of the value being matched
+	// Infer the type of the value being matched
 	value_type := hmi.infer_expression(expr.value)!
-	if hmi.type_table.debug_mode {
-		println('[HM_INFERENCER] Simple match value type: ${value_type}')
-	}
 
 	// Extract variables from the pattern and bind them to the type environment
-	if hmi.type_table.debug_mode {
-		println('[HM_INFERENCER] Pattern type: ${typeof(expr.pattern).name}')
-		println('[HM_INFERENCER] Pattern: ${expr.pattern}')
-	}
 	hmi.extract_pattern_variables(expr.pattern, value_type)
 
-	// For simple match, we return the type of the value
-	// The pattern matching is handled by the backend
+	// For simple match, return the value type
 	return value_type
+}
+
+// Função auxiliar recursiva para coletar tipos de rescue e o tipo de sucesso final
+fn (mut hmi HMInferencer) collect_match_types(expr ast.MatchExpr, mut rescue_types []TypeInfo) !TypeInfo {
+	// Inferir o tipo do valor sendo casado
+	value_type := hmi.infer_expression(expr.value)!
+	// Extrair variáveis do padrão
+	if expr.cases.len > 0 {
+		hmi.extract_pattern_variables(expr.cases[0].pattern, value_type)
+	}
+
+	// Só acumular o tipo de erro propagado se NÃO houver rescue
+	if expr.rescue == none {
+		rescue_types << value_type
+	}
+
+	// Se o próximo expr for outro MatchExpr, descer recursivamente
+	if expr.expr is ast.MatchExpr {
+		final_success_type := hmi.collect_match_types(expr.expr as ast.MatchExpr, mut
+			rescue_types)!
+		// Se houver rescue neste nível, acumular
+		if expr.rescue != none {
+			if expr.rescue is ast.MatchRescueExpr {
+				match_rescue := expr.rescue as ast.MatchRescueExpr
+				// Vincular a variável de rescue ao ambiente com o tipo do valor
+				hmi.type_env.bind(match_rescue.rescue_var, monotype(value_type))
+				rescue_type := hmi.infer_block(match_rescue.rescue_body)!
+				rescue_types << rescue_type
+			}
+		}
+		return final_success_type
+	} else {
+		// Último nível: inferir o tipo de sucesso final
+		success_type := hmi.infer_expression(expr.expr)!
+		if expr.rescue != none {
+			if expr.rescue is ast.MatchRescueExpr {
+				match_rescue := expr.rescue as ast.MatchRescueExpr
+				// Vincular a variável de rescue ao ambiente com o tipo do valor
+				hmi.type_env.bind(match_rescue.rescue_var, monotype(value_type))
+				rescue_type := hmi.infer_block(match_rescue.rescue_body)!
+				rescue_types << rescue_type
+			}
+		}
+		return success_type
+	}
+}
+
+// infer_match infers the type of a match expression com rescue profundo
+pub fn (mut hmi HMInferencer) infer_match(expr ast.MatchExpr) !TypeInfo {
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] infer_match (recursivo)')
+	}
+
+	mut rescue_types := []TypeInfo{}
+	final_success_type := hmi.collect_match_types(expr, mut rescue_types)!
+	// Union de todos os tipos de rescue + sucesso final
+	mut all_types := rescue_types.clone()
+	all_types << final_success_type
+	// Remover duplicatas
+	all_types = remove_duplicate_types(all_types)
+	union_type := typeinfo_union(all_types)
+
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] MatchExpr tipos finais: rescues=${rescue_types}, sucesso=${final_success_type}, union=${union_type}')
+	}
+
+	return union_type
 }
 
 // infer_match_rescue infers the type of a match_rescue expression

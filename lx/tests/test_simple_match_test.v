@@ -14,8 +14,8 @@ test_basic() ->
 case {ok, 123} of
     {ok, Data} ->
         Data;
-    Other ->
-        Other
+    Error ->
+        Error
 end.
 
 '
@@ -39,8 +39,8 @@ test_cons() ->
 case [1, 2, 3] of
     [H | T] ->
         {H, T};
-    Other ->
-        Other
+    Error ->
+        Error
 end.
 
 '
@@ -65,13 +65,13 @@ test_sequential() ->
 case get_user() of
     {ok, User} ->
         case get_permissions(User) of
-            {ok, Perms} ->
-                {User, Perms};
-            Other ->
-                Other
-        end;
-    Other ->
-        Other
+    {ok, Perms} ->
+        {User, Perms};
+    Error ->
+        Error
+end;
+    Error ->
+        Error
 end.
 
 '
@@ -97,18 +97,18 @@ test_cons() ->
 case [1, 2, 3] of
     [H | T] ->
         case [1, 2, 3] of
-            [H | T] ->
-                case [1, 2, 3] of
-                    [H | T] ->
-                        {H, T};
-                    Other ->
-                        Other
-                end;
-            Other ->
-                Other
-        end;
-    Other ->
-        Other
+    [H | T] ->
+        case [1, 2, 3] of
+    [H | T] ->
+        {H, T};
+    Error ->
+        Error
+end;
+    Error ->
+        Error
+end;
+    Error ->
+        Error
 end.
 
 '
@@ -153,8 +153,8 @@ test_tuple() ->
 case get_coordinates() of
     {X, Y, Z} ->
         {X, Y, Z};
-    Other ->
-        Other
+    Error ->
+        Error
 end.
 
 '
@@ -178,8 +178,8 @@ test_atom() ->
 case process_data() of
     ok ->
         <<"success"/utf8>>;
-    Other ->
-        Other
+    Error ->
+        Error
 end.
 
 '
@@ -203,8 +203,8 @@ test_computation() ->
 case compute_value(10, 20) of
     {ok, Value} ->
         Value;
-    Other ->
-        Other
+    Error ->
+        Error
 end.
 
 '
@@ -228,8 +228,8 @@ test_empty() ->
 case get_list() of
     [] ->
         <<"empty list"/utf8>>;
-    Other ->
-        Other
+    Error ->
+        Error
 end.
 
 '
@@ -256,13 +256,13 @@ test_mixed() ->
 case get_user() of
     {ok, User} ->
         case get_data(User) of
-            {ok, Data} ->
-                Data;
-            Error ->
-                {error, Error}
-        end;
-    Other ->
-        Other
+    {ok, Data} ->
+        Data;
+    Error ->
+        {error, Error}
+end;
+    Error ->
+        Error
 end.
 
 '

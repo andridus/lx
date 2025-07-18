@@ -186,12 +186,12 @@ pub enum OperatorValue {
 	and_
 	or_
 	not_
-	bitwise_and   // &&&
-	bitwise_or    // |||
-	bitwise_xor   // ^^^
-	bitwise_not   // ~~~
-	lshift        // <<
-	rshift        // >>
+	bitwise_and // &&&
+	bitwise_or  // |||
+	bitwise_xor // ^^^
+	bitwise_not // ~~~
+	lshift      // <<
+	rshift      // >>
 }
 
 // OperatorToken represents an operator token

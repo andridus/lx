@@ -17,7 +17,7 @@ end'
 -spec simple_case() -> integer().
 simple_case() ->
 case 1 of
-    1 -> X_aaaa = 10,
+    1 -> X_baaa = 10,
     20;
     2 -> 0;
     _ -> -1
@@ -73,9 +73,9 @@ end'
 -spec case_with_block() -> integer().
 case_with_block() ->
 case 1 of
-    1 -> X_aaaa = 10,
-    Y_baaa = 20,
-    X_aaaa + Y_baaa;
+    1 -> X_caaa = 10,
+    Y_daaa = 20,
+    X_caaa + Y_daaa;
     2 -> 0;
     _ -> -1
 end.

@@ -63,17 +63,19 @@ fn (mut vc VariableChecker) check_expression_statement(stmt ast.ExprStmt) {
 fn (mut vc VariableChecker) check_assignment_expression(expr ast.AssignExpr) {
 	// Check for rebind in current scope
 	if vc.scope_manager.has_binding_local(expr.name) {
-		vc.report_error("Variable '${expr.name}' cannot be reassigned", 'Variables in LX are immutable and cannot be reassigned. Use a different variable name or restructure your code.', expr.position)
+		vc.report_error("Variable '${expr.name}' cannot be reassigned", 'Variables in LX are immutable and cannot be reassigned. Use a different variable name or restructure your code.',
+			expr.position)
 		return
 	}
 
 	// Check for shadowing from parent scopes
 	if vc.scope_manager.has_binding_in_parent(expr.name) {
-		vc.report_error("Variable '${expr.name}' shadows variable from outer scope", 'Shadowing is not allowed in LX. Use a different variable name: ${expr.name}_inner', expr.position)
+		vc.report_error("Variable '${expr.name}' shadows variable from outer scope", 'Shadowing is not allowed in LX. Use a different variable name: ${expr.name}_inner',
+			expr.position)
 		return
 	}
 
-		// Check the value expression
+	// Check the value expression
 	vc.check_expression(expr.value)
 
 	// Bind the variable to current scope
@@ -124,7 +126,7 @@ fn (mut vc VariableChecker) check_expression(expr ast.Expr) {
 		ast.ListEmptyExpr {}
 		ast.SimpleMatchExpr { vc.check_simple_match_expression(expr) }
 		ast.MatchRescueExpr { vc.check_match_rescue_expression(expr) }
-		ast.BinaryPatternExpr { /* Binary pattern expressions don't need special handling */ }
+		ast.BinaryPatternExpr {}
 	}
 }
 
@@ -425,8 +427,8 @@ fn (mut vc VariableChecker) check_worker_statement(stmt ast.WorkerStmt) {
 	// Check for duplicate module names
 	if stmt.name in vc.module_names {
 		existing_pos := vc.module_names[stmt.name]
-		vc.report_error("Duplicate module name '${stmt.name}'",
-			'Module name already defined at ${existing_pos.str()}.', stmt.position)
+		vc.report_error("Duplicate module name '${stmt.name}'", 'Module name already defined at ${existing_pos.str()}.',
+			stmt.position)
 	} else {
 		vc.module_names[stmt.name] = stmt.position
 	}
@@ -440,7 +442,9 @@ fn (mut vc VariableChecker) check_worker_statement(stmt ast.WorkerStmt) {
 		if worker_stmt is ast.FunctionStmt {
 			func_stmt := worker_stmt as ast.FunctionStmt
 			match func_stmt.name {
-				'init' { has_init = true }
+				'init' {
+					has_init = true
+				}
 				'handle_call', 'handle_cast', 'handle_continue', 'handle_info' {
 					has_handle_function = true
 				}
@@ -453,8 +457,8 @@ fn (mut vc VariableChecker) check_worker_statement(stmt ast.WorkerStmt) {
 
 	// Validate required functions
 	if !has_init {
-		vc.report_error("Worker '${stmt.name}' must implement 'init' function",
-			'Workers require an init/1 function for OTP compliance.', stmt.position)
+		vc.report_error("Worker '${stmt.name}' must implement 'init' function", 'Workers require an init/1 function for OTP compliance.',
+			stmt.position)
 	}
 
 	if !has_handle_function {
@@ -469,8 +473,8 @@ fn (mut vc VariableChecker) check_supervisor_statement(stmt ast.SupervisorStmt) 
 	if stmt.name != '' {
 		if stmt.name in vc.module_names {
 			existing_pos := vc.module_names[stmt.name]
-			vc.report_error("Duplicate module name '${stmt.name}'",
-				'Module name already defined at ${existing_pos.str()}.', stmt.position)
+			vc.report_error("Duplicate module name '${stmt.name}'", 'Module name already defined at ${existing_pos.str()}.',
+				stmt.position)
 		} else {
 			vc.module_names[stmt.name] = stmt.position
 		}
@@ -482,8 +486,8 @@ fn (mut vc VariableChecker) check_supervisor_statement(stmt ast.SupervisorStmt) 
 			// Check that all children names are valid identifiers
 			for child in stmt.children.children {
 				if child.trim_space() == '' {
-					vc.report_error("Empty child name in supervisor '${stmt.name}'",
-						'Child names cannot be empty.', stmt.children.position)
+					vc.report_error("Empty child name in supervisor '${stmt.name}'", 'Child names cannot be empty.',
+						stmt.children.position)
 				}
 			}
 		}
@@ -506,13 +510,14 @@ fn (mut vc VariableChecker) check_supervisor_statement(stmt ast.SupervisorStmt) 
 			// Check tuple children specification
 			for child in stmt.children.children {
 				if child.name.trim_space() == '' {
-					vc.report_error("Empty child name in supervisor '${stmt.name}'",
-						'Child names cannot be empty.', child.position)
+					vc.report_error("Empty child name in supervisor '${stmt.name}'", 'Child names cannot be empty.',
+						child.position)
 				}
 				// Validate restart type
 				if child.restart !in ['permanent', 'temporary', 'transient'] {
 					vc.report_error("Invalid restart type '${child.restart}' in supervisor '${stmt.name}'",
-						'Restart type must be :permanent, :temporary, or :transient.', child.position)
+						'Restart type must be :permanent, :temporary, or :transient.',
+						child.position)
 				}
 				// Validate child type
 				if child.type_ !in ['worker', 'supervisor'] {

@@ -584,9 +584,9 @@ pub fn (mut p LXParser) parse_binary_segment() ?ast.BinarySegment {
 			lexer.FloatToken {
 				p.parse_float_literal()?
 			}
-		else {
-			p.add_error('Invalid binary segment', 'Got ${p.current.str()}')
-			return none
+			else {
+				p.add_error('Invalid binary segment', 'Got ${p.current.str()}')
+				return none
 			}
 		}
 	}
@@ -605,17 +605,21 @@ pub fn (mut p LXParser) parse_binary_segment() ?ast.BinarySegment {
 	if p.check(operator_token(.div)) {
 		p.advance()
 		for {
-			if !p.current.is_identifier() { break }
+			if !p.current.is_identifier() {
+				break
+			}
 			options << p.current.get_value()
 			p.advance()
-			if !p.check(operator_token(.minus)) { break }
+			if !p.check(operator_token(.minus)) {
+				break
+			}
 			p.advance()
 		}
 	}
 	return ast.BinarySegment{
-		value: value
-		size: size
-		options: options
+		value:    value
+		size:     size
+		options:  options
 		position: start_pos
 	}
 }
@@ -664,11 +668,11 @@ fn (mut p LXParser) parse_external_atom() ?ast.Expr {
 
 // parse_identifier_expression parses identifier expressions
 fn (mut p LXParser) parse_identifier_expression() ?ast.Expr {
-// 	mut name := ''
-// 	if p.current is lexer.KeyToken {
-// 		name = p.current.get_key_value()
-// 	} else {
-		name := p.current.get_value()
+	// 	mut name := ''
+	// 	if p.current is lexer.KeyToken {
+	// 		name = p.current.get_key_value()
+	// 	} else {
+	name := p.current.get_value()
 	// }
 	position := p.get_current_position()
 	p.advance()
@@ -926,6 +930,13 @@ fn (mut p LXParser) parse_if_expression() ?ast.Expr {
 	}
 }
 
+// ========================================
+// CASE EXPRESSIONS
+// Grammar: case_expression ::= 'case' expression 'do' case_cases 'end'
+// Grammar: case_cases ::= case_case { case_case }
+// Grammar: case_case ::= pattern ['when' expression] '->' expression_list
+// ========================================
+
 // parse_case_expression parses case expressions
 fn (mut p LXParser) parse_case_expression() ?ast.Expr {
 	position := p.get_current_position()
@@ -977,7 +988,7 @@ fn (mut p LXParser) parse_case_expression() ?ast.Expr {
 		// Parse block of statements for the case body
 		mut statements := []ast.Stmt{}
 
-		for !p.check(keyword_token(.end_)) && !p.is_at_end() {
+		for !p.check(keyword_token(.end_)) && !p.check(keyword_token(.after)) && !p.is_at_end() {
 			p.skip_newlines()
 
 			// Check for next case pattern
@@ -1182,6 +1193,7 @@ fn (mut p LXParser) parse_match_expression() ?ast.Expr {
 
 	p.consume(operator_token(.pattern_match), 'Expected <- in match expression')?
 	value := p.parse_expression()?
+	mut rescue_expr := ?ast.Expr(none)
 
 	// Check if this is a simple match or match rescue
 	if p.check(keyword_token(.rescue)) {
@@ -1219,21 +1231,30 @@ fn (mut p LXParser) parse_match_expression() ?ast.Expr {
 
 		p.consume(keyword_token(.end_), 'Expected end after rescue body')?
 
-		return ast.MatchRescueExpr{
+		// Criar rescue expression
+		rescue_expr = ast.MatchRescueExpr{
 			pattern:     pattern
 			value:       value
 			rescue_var:  rescue_var
 			rescue_body: rescue_body
 			position:    position
 		}
-	} else {
-		// Simple match version
-		return ast.SimpleMatchExpr{
-			pattern:  pattern
-			value:    value
-			guard:    guard
-			position: position
-		}
+	}
+
+	// Criar o MatchExpr atual
+	return ast.MatchExpr{
+		value:    value
+		cases:    [
+			ast.MatchCase{
+				pattern:  pattern
+				guard:    guard
+				position: position
+			},
+		]
+		expr:     p.parse_expression()? // placeholder
+		rescue:   rescue_expr
+		position: position
+		ast_id:   p.generate_ast_id()
 	}
 }
 
@@ -2019,7 +2040,8 @@ fn (p &LXParser) is_pattern_matching_statement() bool {
 			match punct.value {
 				.lbrace, .lbracket, .lparen {
 					next_token := p.peek()
-					return next_token is lexer.OperatorToken && (next_token as lexer.OperatorToken).value == .assign
+					return next_token is lexer.OperatorToken
+						&& (next_token as lexer.OperatorToken).value == .assign
 				}
 				else {
 					return false
@@ -2031,12 +2053,14 @@ fn (p &LXParser) is_pattern_matching_statement() bool {
 			if op.value == .modulo {
 				// Só é pattern matching se o próximo token for '='
 				next_token := p.peek()
-				return next_token is lexer.OperatorToken && (next_token as lexer.OperatorToken).value == .assign
+				return next_token is lexer.OperatorToken
+					&& (next_token as lexer.OperatorToken).value == .assign
 			}
 			if op.value == .lshift {
 				// Só é pattern matching se o próximo token for '='
 				next_token := p.peek()
-				return next_token is lexer.OperatorToken && (next_token as lexer.OperatorToken).value == .assign
+				return next_token is lexer.OperatorToken
+					&& (next_token as lexer.OperatorToken).value == .assign
 			}
 			return false
 		}
@@ -2069,7 +2093,8 @@ fn (mut p LXParser) parse_pattern_matching_statement() ?ast.Expr {
 fn (p &LXParser) is_simple_assignment() bool {
 	if p.current is lexer.IdentToken {
 		next_token := p.peek()
-		return next_token is lexer.OperatorToken && (next_token as lexer.OperatorToken).value == .assign
+		return next_token is lexer.OperatorToken
+			&& (next_token as lexer.OperatorToken).value == .assign
 	}
 	return false
 }

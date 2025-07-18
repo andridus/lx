@@ -17,7 +17,7 @@ end'
 -spec simple_case() -> integer().
 simple_case() ->
 case 1 of
-    1 -> X_aaaa = 10,
+    1 -> X_baaa = 10,
     20;
     2 -> 0;
     _ -> -1
@@ -46,8 +46,8 @@ end'
 -spec two_statements() -> integer().
 two_statements() ->
 case 1 of
-    1 -> A_aaaa = 100,
-    B_baaa = 200,
+    1 -> A_caaa = 100,
+    B_daaa = 200,
     300;
     _ -> 999
 end.

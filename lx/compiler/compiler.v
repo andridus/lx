@@ -139,7 +139,8 @@ pub fn (mut comp Compiler) compile(source string, file_path string, output_dir s
 		}
 		ast.ModuleStmt {
 			// Handle module compilation (existing behavior)
-			return comp.compile_module_with_workers_supervisors(program_stmt, file_path, output_dir, global_registry)
+			return comp.compile_module_with_workers_supervisors(program_stmt, file_path,
+				output_dir, global_registry)
 		}
 		else {
 			println('Error: Unsupported program type')
@@ -264,11 +265,11 @@ fn (mut comp Compiler) compile_module_with_workers_supervisors(module_stmt ast.M
 fn (mut comp Compiler) generate_worker_file(worker_stmt ast.WorkerStmt, original_file_path string, output_dir string, global_registry &internal.GlobalRegistry) {
 	// Create a module for the worker
 	worker_module := ast.ModuleStmt{
-		name: worker_stmt.name
-		exports: ['start_link/1', 'init/1'] // Basic OTP gen_server exports
-		imports: []
+		name:       worker_stmt.name
+		exports:    ['start_link/1', 'init/1'] // Basic OTP gen_server exports
+		imports:    []
 		statements: worker_stmt.statements
-		position: worker_stmt.position
+		position:   worker_stmt.position
 	}
 
 	// Use the HM type system for analysis
@@ -316,7 +317,11 @@ fn (mut comp Compiler) generate_worker_file(worker_stmt ast.WorkerStmt, original
 
 // generate_supervisor_file generates a separate .erl file for a supervisor
 fn (mut comp Compiler) generate_supervisor_file(supervisor_stmt ast.SupervisorStmt, original_file_path string, output_dir string, global_registry &internal.GlobalRegistry) {
-	supervisor_name := if supervisor_stmt.name == '' { 'main_supervisor' } else { supervisor_stmt.name }
+	supervisor_name := if supervisor_stmt.name == '' {
+		'main_supervisor'
+	} else {
+		supervisor_stmt.name
+	}
 
 	// For supervisors, we typically don't have user-defined functions
 	// So we can directly generate the boilerplate without complex analysis
@@ -379,7 +384,8 @@ fn (mut comp Compiler) generate_worker_boilerplate(worker_stmt ast.WorkerStmt, u
 
 	mut default_section := ''
 	if default_impls.len > 0 {
-		default_section = '\n%% Default implementations (if not provided by user)\n' + default_impls.join('\n\n') + '\n'
+		default_section = '\n%% Default implementations (if not provided by user)\n' +
+			default_impls.join('\n\n') + '\n'
 	}
 
 	return '-module(${worker_stmt.name}).
@@ -401,7 +407,11 @@ ${user_code}${default_section}'
 
 // generate_supervisor_boilerplate generates OTP supervisor boilerplate
 fn (mut comp Compiler) generate_supervisor_boilerplate(supervisor_stmt ast.SupervisorStmt, user_code string) string {
-	supervisor_name := if supervisor_stmt.name == '' { 'main_supervisor' } else { supervisor_stmt.name }
+	supervisor_name := if supervisor_stmt.name == '' {
+		'main_supervisor'
+	} else {
+		supervisor_stmt.name
+	}
 
 	// Generate children specification
 	children_spec := comp.generate_children_spec(supervisor_stmt.children)
@@ -525,9 +535,9 @@ fn (mut comp Compiler) compile_application(app_stmt ast.ApplicationStmt, file_pa
 // WorkerSupervisorResult holds the results of worker/supervisor compilation for testing
 pub struct WorkerSupervisorResult {
 pub:
-	main_code       string
-	main_hrl        string
-	worker_files    map[string]string  // module_name -> erlang_code
+	main_code        string
+	main_hrl         string
+	worker_files     map[string]string // module_name -> erlang_code
 	supervisor_files map[string]string // module_name -> erlang_code
 }
 
@@ -584,9 +594,9 @@ pub fn (mut comp Compiler) compile_for_testing(source string, file_path string) 
 		ast.ApplicationStmt {
 			// Handle application compilation - for now just return empty
 			return WorkerSupervisorResult{
-				main_code: '-module(test).\n\n'
-				main_hrl: ''
-				worker_files: {}
+				main_code:        '-module(test).\n\n'
+				main_hrl:         ''
+				worker_files:     {}
 				supervisor_files: {}
 			}
 		}
@@ -646,9 +656,9 @@ fn (mut comp Compiler) compile_module_for_testing(module_stmt ast.ModuleStmt, fi
 	}
 
 	return WorkerSupervisorResult{
-		main_code: main_result.code
-		main_hrl: main_result.hrl_content
-		worker_files: worker_files
+		main_code:        main_result.code
+		main_hrl:         main_result.hrl_content
+		worker_files:     worker_files
 		supervisor_files: supervisor_files
 	}
 }
@@ -657,7 +667,7 @@ fn (mut comp Compiler) compile_module_for_testing(module_stmt ast.ModuleStmt, fi
 fn (mut comp Compiler) generate_worker_string(worker_stmt ast.WorkerStmt, original_file_path string, global_registry &internal.GlobalRegistry) string {
 	// Create a temporary module with just the worker functions
 	temp_module := ast.ModuleStmt{
-		name: worker_stmt.name
+		name:       worker_stmt.name
 		statements: worker_stmt.statements
 	}
 
@@ -672,7 +682,7 @@ fn (mut comp Compiler) generate_worker_string(worker_stmt ast.WorkerStmt, origin
 fn (mut comp Compiler) generate_supervisor_string(supervisor_stmt ast.SupervisorStmt, original_file_path string, global_registry &internal.GlobalRegistry) string {
 	// Create a temporary module with just the supervisor functions (if any)
 	temp_module := ast.ModuleStmt{
-		name: supervisor_stmt.name
+		name:       supervisor_stmt.name
 		statements: []
 	}
 

@@ -398,7 +398,8 @@ fn (mut p LXParser) parse_binary_pattern() ?ast.Pattern {
 			continue
 		}
 
-		if p.current is lexer.IdentToken && p.peek() is lexer.PunctuationToken && (p.peek() as lexer.PunctuationToken).value == .colon {
+		if p.current is lexer.IdentToken && p.peek() is lexer.PunctuationToken
+			&& (p.peek() as lexer.PunctuationToken).value == .colon {
 			var_name := p.current.get_value()
 			p.advance() // consume IdentToken
 			p.advance() // consume ':'
@@ -407,13 +408,13 @@ fn (mut p LXParser) parse_binary_pattern() ?ast.Pattern {
 				size = p.parse_binary_size_literal()?
 			}
 			segments << ast.BinarySegment{
-				value: ast.VariableExpr{
-					name: var_name
+				value:    ast.VariableExpr{
+					name:     var_name
 					position: start_pos
-					ast_id: p.generate_ast_id()
+					ast_id:   p.generate_ast_id()
 				}
-				size: size
-				options: []
+				size:     size
+				options:  []
 				position: start_pos
 			}
 			continue
@@ -423,29 +424,30 @@ fn (mut p LXParser) parse_binary_pattern() ?ast.Pattern {
 			key_token := p.current as lexer.KeyToken
 			var_name := key_token.value.trim_string_right(':')
 			p.advance() // consume KeyToken
-			if !p.check(operator_token(.rshift)) && !p.is_at_end() &&
-			   (p.current is lexer.IntToken || p.current is lexer.FloatToken || p.current is lexer.IdentToken || p.current is lexer.StringToken || p.current is lexer.AtomToken) {
+			if !p.check(operator_token(.rshift)) && !p.is_at_end() && (p.current is lexer.IntToken
+				|| p.current is lexer.FloatToken || p.current is lexer.IdentToken
+				|| p.current is lexer.StringToken || p.current is lexer.AtomToken) {
 				size := p.parse_binary_size_literal()?
 				segments << ast.BinarySegment{
-					value: ast.VariableExpr{
-						name: var_name
+					value:    ast.VariableExpr{
+						name:     var_name
 						position: start_pos
-						ast_id: p.generate_ast_id()
+						ast_id:   p.generate_ast_id()
 					}
-					size: size
-					options: []
+					size:     size
+					options:  []
 					position: start_pos
 				}
 				continue
 			}
 			segments << ast.BinarySegment{
-				value: ast.VariableExpr{
-					name: var_name
+				value:    ast.VariableExpr{
+					name:     var_name
 					position: start_pos
-					ast_id: p.generate_ast_id()
+					ast_id:   p.generate_ast_id()
 				}
-				size: none
-				options: []
+				size:     none
+				options:  []
 				position: start_pos
 			}
 			continue
@@ -479,11 +481,11 @@ fn (mut p LXParser) parse_binary_size_literal() ?ast.Expr {
 			position := p.get_current_position()
 			p.advance()
 			return ast.LiteralExpr{
-				value: ast.AtomLiteral{
+				value:    ast.AtomLiteral{
 					value: value
 				}
 				position: position
-				ast_id: p.generate_ast_id()
+				ast_id:   p.generate_ast_id()
 			}
 		}
 		lexer.StringToken {

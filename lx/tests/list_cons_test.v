@@ -11,7 +11,7 @@ end'
 	expected := '-module(test).
 -export([test_cons/0]).
 
--spec test_cons() -> any().
+-spec test_cons() -> {atom(), [integer()]} | {integer(), [integer()]}.
 test_cons() ->
 case [1, 2, 3] of
     [H | T] ->
@@ -37,7 +37,7 @@ end'
 	expected := '-module(test).
 -export([test_success/0]).
 
--spec test_success() -> any().
+-spec test_success() -> {atom(), binary()} | {integer(), [integer()]}.
 test_success() ->
 case [42, 10, 5] of
     [First | Rest] ->

@@ -45,8 +45,13 @@ pub fn (s LexerState) str() string {
 // is_final_state checks if a state is a final state (can emit a token)
 pub fn (s LexerState) is_final_state() bool {
 	return match s {
-		.identifier, .key, .number, .float, .string, .atom, .directive, .error, .punctuation, .binary, .hex_number { true }
-		else { false }
+		.identifier, .key, .number, .float, .string, .atom, .directive, .error, .punctuation,
+		.binary, .hex_number {
+			true
+		}
+		else {
+			false
+		}
 	}
 }
 
@@ -55,7 +60,8 @@ pub fn (current LexerState) can_transition_to(target LexerState) bool {
 	return match current {
 		.initial {
 			match target {
-				.identifier, .number, .string, .atom, .comment, .directive, .operator, .whitespace, .binary, .hex_number {
+				.identifier, .number, .string, .atom, .comment, .directive, .operator, .whitespace,
+				.binary, .hex_number {
 					true
 				}
 				else {
@@ -249,8 +255,8 @@ pub fn (s LexerState) can_transition_from(from LexerState) bool {
 		.whitespace {
 			from == .initial || from == .identifier || from == .number || from == .float
 				|| from == .string || from == .atom || from == .operator || from == .comment
-				|| from == .directive || from == .punctuation || from == .atom_start || from == .binary
-				|| from == .hex_number
+				|| from == .directive || from == .punctuation || from == .atom_start
+				|| from == .binary || from == .hex_number
 		}
 		.error {
 			true

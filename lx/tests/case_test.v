@@ -18,9 +18,9 @@ end'
 -spec simple_case() -> integer().
 simple_case() ->
 case 1 of
-    1 -> X_aaaa = 10,
-    Y_baaa = 20,
-    X_aaaa + Y_baaa;
+    1 -> X_caaa = 10,
+    Y_daaa = 20,
+    X_caaa + Y_daaa;
     2 -> 0;
     _ -> -1
 end.
@@ -111,15 +111,15 @@ end'
 -spec atom_case() -> {binary(), integer()}.
 atom_case() ->
 case ok of
-    ok -> Success_msg_aaaa = <<"Operation successful"/utf8>>,
-    Count_baaa = 1,
-    {Success_msg_aaaa, Count_baaa};
-    error -> Error_msg_caaa = <<"Operation failed"/utf8>>,
-    Error_code_daaa = -1,
-    {Error_msg_caaa, Error_code_daaa};
-    _ -> Unknown_msg_eaaa = <<"Unknown status"/utf8>>,
-    Unknown_code_faaa = 0,
-    {Unknown_msg_eaaa, Unknown_code_faaa}
+    ok -> Success_msg_gaaa = <<"Operation successful"/utf8>>,
+    Count_haaa = 1,
+    {Success_msg_gaaa, Count_haaa};
+    error -> Error_msg_iaaa = <<"Operation failed"/utf8>>,
+    Error_code_jaaa = -1,
+    {Error_msg_iaaa, Error_code_jaaa};
+    _ -> Unknown_msg_kaaa = <<"Unknown status"/utf8>>,
+    Unknown_code_laaa = 0,
+    {Unknown_msg_kaaa, Unknown_code_laaa}
 end.
 
 '

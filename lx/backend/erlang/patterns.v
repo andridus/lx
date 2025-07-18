@@ -78,7 +78,7 @@ pub fn (mut gen ErlangGenerator) generate_pattern(pattern ast.Pattern) string {
 					seg_code += ':' + gen.generate_expression(segment.size)
 				}
 				if segment.options.len > 0 {
-					seg_code += '/' + segment.options.join("-")
+					seg_code += '/' + segment.options.join('-')
 				}
 				segments << seg_code
 			}
@@ -154,12 +154,12 @@ pub fn (mut gen ErlangGenerator) generate_pattern_with_binding(pattern ast.Patte
 					}
 				} else {
 					seg_code += gen.generate_expression(segment.value)
-				if segment.size != none {
-					seg_code += ':' + gen.generate_expression(segment.size)
+					if segment.size != none {
+						seg_code += ':' + gen.generate_expression(segment.size)
 					}
 				}
 				if segment.options.len > 0 {
-					seg_code += '/' + segment.options.join("-")
+					seg_code += '/' + segment.options.join('-')
 				}
 				segments << seg_code
 			}

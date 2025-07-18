@@ -536,16 +536,54 @@ fn (mut gen ErlangGenerator) generate_match(match_expr ast.MatchExpr) string {
 
 	for case_item in match_expr.cases {
 		pattern := gen.generate_pattern(case_item.pattern)
-		guard := if case_item.guard != ast.Expr(ast.GuardExpr{}) {
-			' when ' + gen.generate_expression(case_item.guard)
-		} else {
-			''
+
+		// Check if guard is a default "true" literal - if so, don't generate it
+		mut guard := ''
+		if case_item.guard != ast.Expr(ast.GuardExpr{}) {
+			if case_item.guard is ast.LiteralExpr {
+				lit_expr := case_item.guard as ast.LiteralExpr
+				if lit_expr.value is ast.BooleanLiteral {
+					bool_lit := lit_expr.value as ast.BooleanLiteral
+					// Only generate guard if it's not the default "true"
+					if !bool_lit.value {
+						guard = ' when ' + gen.generate_expression(case_item.guard)
+					}
+				} else {
+					guard = ' when ' + gen.generate_expression(case_item.guard)
+				}
+			} else {
+				guard = ' when ' + gen.generate_expression(case_item.guard)
+			}
 		}
-		body := gen.generate_block_expression(case_item.body)
-		cases << '${pattern}${guard} ->\n${body}'
+
+		mut success_body := ''
+		if match_expr.expr is ast.MatchExpr {
+			next_match := match_expr.expr as ast.MatchExpr
+			success_body = gen.generate_match(next_match)
+		} else {
+			success_body = gen.generate_expression(match_expr.expr)
+		}
+
+		cases << '    ${pattern}${guard} ->\n        ${success_body}'
 	}
 
-	return 'case ${value} of\n${cases.join(';\n')}\nend'
+	// Handle rescue clause if present
+	mut rescue_case := ''
+	if match_expr.rescue != none {
+		rescue_expr := match_expr.rescue
+		if rescue_expr is ast.MatchRescueExpr {
+			match_rescue := rescue_expr as ast.MatchRescueExpr
+			rescue_var := gen.capitalize_variable(match_rescue.rescue_var)
+			rescue_body := gen.generate_block_expression(match_rescue.rescue_body)
+			rescue_case = ';\n    ${rescue_var} ->\n        ${rescue_body}'
+		}
+	} else {
+		// Add default error clause only when no rescue is present
+		rescue_case = ';\n    Error ->\n        Error'
+	}
+
+	result := 'case ${value} of\n${cases.join(';\n')}${rescue_case}\nend'
+	return result
 }
 
 // generate_case generates code for case expressions
@@ -1027,7 +1065,7 @@ fn (mut gen ErlangGenerator) generate_binary_pattern_expression(expr ast.BinaryP
 			seg_code += '::' + gen.generate_expression(segment.size)
 		}
 		if segment.options.len > 0 {
-			seg_code += '/' + segment.options.join("-")
+			seg_code += '/' + segment.options.join('-')
 		}
 		segments << seg_code
 	}

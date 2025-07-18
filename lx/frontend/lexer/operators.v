@@ -91,7 +91,8 @@ pub fn get_all_punctuation() []string {
 // is_single_char_operator checks if a character can be the start of an operator
 pub fn is_single_char_operator(c u8) bool {
 	return c == `=` || c == `<` || c == `>` || c == `!` || c == `:` || c == `+` || c == `-`
-		|| c == `*` || c == `/` || c == `|` || c == `.` || c == `&` || c == `%` || c == `^` || c == `~`
+		|| c == `*` || c == `/` || c == `|` || c == `.` || c == `&` || c == `%` || c == `^`
+		|| c == `~`
 }
 
 // is_operator_start checks if a character can be the start of an operator
@@ -119,8 +120,13 @@ pub fn get_operator_precedence(t OperatorValue) int {
 // is_left_associative checks if an operator is left associative
 pub fn is_left_associative(t OperatorValue) bool {
 	return match t {
-		.plus, .minus, .mult, .div, .modulo, .concat, .and_, .or_, .bitwise_and, .bitwise_or, .bitwise_xor, .lshift, .rshift { true }
-		else { false }
+		.plus, .minus, .mult, .div, .modulo, .concat, .and_, .or_, .bitwise_and, .bitwise_or,
+		.bitwise_xor, .lshift, .rshift {
+			true
+		}
+		else {
+			false
+		}
 	}
 }
 

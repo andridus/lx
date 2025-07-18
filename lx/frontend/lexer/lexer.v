@@ -56,7 +56,8 @@ pub fn (mut l Lexer) next_token() Token {
 	for l.position < l.input.len {
 		ch := l.input[l.position]
 
-		if l.state == .initial && ch == `0` && l.position + 1 < l.input.len && (l.input[l.position + 1] == `x`) {
+		if l.state == .initial && ch == `0` && l.position + 1 < l.input.len
+			&& l.input[l.position + 1] == `x` {
 			l.state = .hex_number
 			l.start_pos = l.get_current_position()
 			l.buffer = '0x'
@@ -106,7 +107,6 @@ pub fn (mut l Lexer) next_token() Token {
 				}
 			}
 		}
-
 
 		match transition.action or { TransitionAction.consume_character } {
 			.consume_character {
@@ -517,7 +517,6 @@ fn (mut l Lexer) create_token_from_buffer() Token {
 				}
 			}
 		}
-
 		.hex_number {
 			mut value := 0
 			if l.buffer.starts_with('0x') {
@@ -529,7 +528,6 @@ fn (mut l Lexer) create_token_from_buffer() Token {
 				position: l.start_pos
 			}
 		}
-
 		else {
 			ErrorToken{
 				message:  'Lexical error: Unexpected state'

@@ -285,7 +285,6 @@ pub fn get_transitions() []Transition {
 			condition:  AlwaysCondition{}
 			action:     .emit_token
 		},
-
 		Transition{
 			from_state: .number
 			to_state:   .number

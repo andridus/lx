@@ -164,13 +164,13 @@ end'
 -spec list_case(any()) -> binary() | {any(), integer()}.
 list_case(Lst) ->
 case Lst of
-    [] -> Empty_msg_aaaa = <<"Empty list"/utf8>>,
-    Empty_msg_aaaa;
-    [Head | Tail] -> First_baaa = Head,
-    Rest_count_caaa = 42,
-    {First_baaa, Rest_count_caaa};
-    _ -> Unknown_daaa = <<"Unknown"/utf8>>,
-    Unknown_daaa
+    [] -> Empty_msg_eaaa = <<"Empty list"/utf8>>,
+    Empty_msg_eaaa;
+    [Head | Tail] -> First_faaa = Head,
+    Rest_count_gaaa = 42,
+    {First_faaa, Rest_count_gaaa};
+    _ -> Unknown_haaa = <<"Unknown"/utf8>>,
+    Unknown_haaa
 end.
 
 '

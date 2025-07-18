@@ -279,9 +279,21 @@ fn (mut a Analyzer) process_function_hm(func_stmt ast.FunctionStmt) ! {
 			// Process parameters first to bind their types
 			a.process_function_parameters_hm(clause)!
 
-			// Infer types for expressions in the function body
-			body_type := hm_inferencer.infer_expression(clause.body)!
+			// Extrair variáveis dos padrões do head (apenas para padrões compostos ou VarPattern sem anotação)
+			for param in clause.parameters {
+				match param {
+					ast.VarPattern {
+						if param.type_annotation == none {
+							hm_inferencer.extract_pattern_variables(param, typeinfo_any())
+						}
+					}
+					else {
+						hm_inferencer.extract_pattern_variables(param, typeinfo_any())
+					}
+				}
+			}
 
+			body_type := hm_inferencer.infer_expression(clause.body)!
 			if hm_inferencer.type_table.debug_mode {
 				println('[HM_INFERENCER] Clause ${i + 1} body type: ${body_type}')
 			}

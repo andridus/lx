@@ -408,7 +408,10 @@ fn (mut p LXParser) parse_supervisor_definition() ?ast.Stmt {
 	p.consume(keyword_token(.do_), 'Expected "do" after supervisor declaration')?
 
 	// Parse supervisor body
-	mut children := ast.ChildrenSpec(ast.ListChildren{children: [], position: p.get_current_position()})
+	mut children := ast.ChildrenSpec(ast.ListChildren{
+		children: []
+		position: p.get_current_position()
+	})
 	mut strategy := ast.SupervisorStrategy.one_for_one
 	mut statements := []ast.Stmt{}
 
@@ -643,8 +646,6 @@ fn (mut p LXParser) parse_application_definition() ?ast.Stmt {
 	}
 }
 
-
-
 // parse_children_spec parses children specification
 fn (mut p LXParser) parse_children_spec() ?ast.ChildrenSpec {
 	p.advance() // consume 'children'
@@ -657,7 +658,7 @@ fn (mut p LXParser) parse_children_spec() ?ast.ChildrenSpec {
 
 	p.context = old_context
 
-			// Convert expression to ChildrenSpec
+	// Convert expression to ChildrenSpec
 	return match expr {
 		ast.ListLiteralExpr {
 			p.parse_list_children_spec(expr)
@@ -695,9 +696,9 @@ fn (mut p LXParser) parse_children_spec() ?ast.ChildrenSpec {
 			}
 
 			ast.MapChildren{
-				workers: workers
+				workers:     workers
 				supervisors: supervisors
-				position: expr.position
+				position:    expr.position
 			}
 		}
 		else {
@@ -721,9 +722,15 @@ fn (mut p LXParser) parse_strategy_spec() ?ast.SupervisorStrategy {
 	p.advance()
 
 	return match strategy_name {
-		'one_for_one' { ast.SupervisorStrategy.one_for_one }
-		'one_for_all' { ast.SupervisorStrategy.one_for_all }
-		'rest_for_one' { ast.SupervisorStrategy.rest_for_one }
+		'one_for_one' {
+			ast.SupervisorStrategy.one_for_one
+		}
+		'one_for_all' {
+			ast.SupervisorStrategy.one_for_all
+		}
+		'rest_for_one' {
+			ast.SupervisorStrategy.rest_for_one
+		}
 		else {
 			p.add_error('Invalid supervision strategy', 'Expected :one_for_one, :one_for_all, or :rest_for_one')
 			ast.SupervisorStrategy.one_for_one
@@ -762,17 +769,19 @@ fn (mut p LXParser) parse_list_children_spec(expr ast.ListLiteralExpr) ast.Child
 						}
 
 						children << ast.ChildTuple{
-							name: name
-							restart: restart
+							name:     name
+							restart:  restart
 							shutdown: shutdown
-							type_: type_
+							type_:    type_
 							position: tuple_expr.position
 						}
 					} else {
-						p.add_error('Child tuple must have at least 4 elements: {name, restart, shutdown, type}', 'Got ${tuple_expr.elements.len} elements')
+						p.add_error('Child tuple must have at least 4 elements: {name, restart, shutdown, type}',
+							'Got ${tuple_expr.elements.len} elements')
 					}
 				} else {
-					p.add_error('Mixed tuple and non-tuple elements in children list', 'Got ${element.str()}')
+					p.add_error('Mixed tuple and non-tuple elements in children list',
+						'Got ${element.str()}')
 				}
 			}
 			return ast.TupleChildren{

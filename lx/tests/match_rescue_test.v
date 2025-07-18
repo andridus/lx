@@ -11,7 +11,7 @@ end'
 	expected := '-module(test).
 -export([test_simple/0]).
 
--spec test_simple() -> any().
+-spec test_simple() -> {atom(), {atom(), integer()}} | integer().
 test_simple() ->
 case {ok, 42} of
     {ok, Value} ->
@@ -63,7 +63,7 @@ end'
 	expected := '-module(test).
 -export([test_complex/0]).
 
--spec test_complex() -> any().
+-spec test_complex() -> {atom(), binary(), {atom(), binary(), integer()}} | {binary(), integer()}.
 test_complex() ->
 case {ok, <<"alice"/utf8>>, 25} of
     {ok, Name, Age} ->
@@ -92,16 +92,16 @@ end'
 	expected := '-module(test).
 -export([test_sequential/0]).
 
--spec test_sequential() -> any().
+-spec test_sequential() -> {atom(), {atom(), binary()}} | {binary(), binary()}.
 test_sequential() ->
 case {ok, <<"alice"/utf8>>} of
     {ok, User} ->
         case {ok, <<"admin"/utf8>>} of
-            {ok, Perms} ->
-                {User, Perms};
-            Result ->
-                {perm_error, Result}
-        end;
+    {ok, Perms} ->
+        {User, Perms};
+    Result ->
+        {perm_error, Result}
+end;
     Result ->
         {user_error, Result}
 end.
@@ -131,7 +131,7 @@ end'
 get_data() ->
 {ok, <<"data"/utf8>>}.
 
--spec test_with_call() -> any().
+-spec test_with_call() -> {atom(), binary(), {atom(), binary()}} | binary().
 test_with_call() ->
 case get_data() of
     {ok, Data} ->
@@ -157,7 +157,7 @@ end'
 	expected := '-module(test).
 -export([test_list/0]).
 
--spec test_list() -> any().
+-spec test_list() -> {atom(), [integer()]} | integer().
 test_list() ->
 case [42] of
     [X] ->
@@ -183,7 +183,7 @@ end'
 	expected := '-module(test).
 -export([test_cons/0]).
 
--spec test_cons() -> any().
+-spec test_cons() -> {atom(), [integer()]} | {integer(), [integer()]}.
 test_cons() ->
 case [1, 2, 3] of
     [H | T] ->

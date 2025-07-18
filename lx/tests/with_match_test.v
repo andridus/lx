@@ -39,8 +39,8 @@ a2() ->
 case ok of
     ok ->
         ok;
-    Other ->
-        Other
+    Error ->
+        Error
 end.
 
 '
@@ -55,6 +55,7 @@ def a3() do
   match :ok <- :error rescue err do
     :error_handled
   end
+  :ok
 end'
 	expected := '-module(test).
 -export([a3/0]).

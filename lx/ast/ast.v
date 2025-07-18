@@ -51,8 +51,11 @@ pub:
 // MatchExpr represents pattern matching
 pub struct MatchExpr {
 pub:
-	value    Expr
-	cases    []MatchCase
+	value Expr
+	cases []MatchCase
+pub mut:
+	expr     Expr  // Próximo match ou expressão subsequente
+	rescue   ?Expr // Rescue opcional para este match
 	position Position
 	ast_id   int = -1 // -1 indicates uninitialized
 }
@@ -155,7 +158,7 @@ pub struct BinaryPatternExpr {
 pub:
 	segments []BinarySegment
 	position Position
-	ast_id     int = -1 // -1 indicates uninitialized
+	ast_id   int = -1 // -1 indicates uninitialized
 }
 
 // SendExpr represents message sending
@@ -562,21 +565,21 @@ pub enum TypeAliasType {
 // WorkerStmt represents a worker definition
 pub struct WorkerStmt {
 pub:
-	name       string          // worker name (identifier)
-	statements []Stmt          // functions, records, types inside worker
+	name       string // worker name (identifier)
+	statements []Stmt // functions, records, types inside worker
 	position   Position
-	ast_id     int = -1        // -1 indicates uninitialized
+	ast_id     int = -1 // -1 indicates uninitialized
 }
 
 // SupervisorStmt represents a supervisor definition
 pub struct SupervisorStmt {
 pub:
-	name       string          // supervisor name (identifier), empty for root supervisor
-	children   ChildrenSpec    // children specification
+	name       string             // supervisor name (identifier), empty for root supervisor
+	children   ChildrenSpec       // children specification
 	strategy   SupervisorStrategy // supervision strategy
-	statements []Stmt          // functions, records, types inside supervisor
+	statements []Stmt             // functions, records, types inside supervisor
 	position   Position
-	ast_id     int = -1        // -1 indicates uninitialized
+	ast_id     int = -1 // -1 indicates uninitialized
 }
 
 // ChildrenSpec represents the children specification for supervisors
@@ -822,9 +825,9 @@ pub:
 // BinarySegment represents a binary segment
 pub struct BinarySegment {
 pub:
-	value Expr
-	size ?Expr
-	options []string
+	value    Expr
+	size     ?Expr
+	options  []string
 	position Position
 }
 
