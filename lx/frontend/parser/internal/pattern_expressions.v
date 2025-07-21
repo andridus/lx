@@ -398,15 +398,79 @@ fn (mut p LXParser) parse_binary_pattern() ?ast.Pattern {
 			continue
 		}
 
-		if p.current is lexer.IdentToken && p.peek() is lexer.PunctuationToken
-			&& (p.peek() as lexer.PunctuationToken).value == .colon {
-			var_name := p.current.get_value()
-			p.advance() // consume IdentToken
-			p.advance() // consume ':'
+		if (p.current is lexer.IdentToken && p.peek() is lexer.PunctuationToken
+			&& (p.peek() as lexer.PunctuationToken).value == .colon)
+			|| p.current is lexer.KeyToken {
+			mut var_name := ''
 			mut size := ?ast.Expr(none)
-			if !p.check(operator_token(.rshift)) && !p.is_at_end() {
+
+			if p.current is lexer.KeyToken {
+				// Handle KeyToken like 'version:'
+				key_token := p.current as lexer.KeyToken
+				var_name = key_token.value.trim_string_right(':')
+				p.advance() // consume KeyToken
+			} else {
+				// Handle IdentToken followed by ':'
+				var_name = p.current.get_value()
+				p.advance() // consume IdentToken
+				p.advance() // consume ':'
+			}
+
+			// Parse size if present
+			if !p.check(operator_token(.rshift)) && !p.is_at_end() && !p.check(operator_token(.div)) {
 				size = p.parse_binary_size_literal()?
 			}
+
+			// Parse qualifications if present
+			mut options := []string{}
+			if p.check(operator_token(.div)) {
+				p.advance() // consume '/'
+
+				// Parse qualifiers (same logic as in block_expressions.v)
+				for !p.check(operator_token(.rshift)) && !p.check(punctuation_token(.comma))
+					&& !p.is_at_end() {
+					mut qualifier := ''
+
+					if p.current is lexer.KeyToken {
+						key_token := p.current as lexer.KeyToken
+						key_name := key_token.value.trim_string_right(':')
+						p.advance()
+
+						if p.current is lexer.IntToken {
+							int_token := p.current as lexer.IntToken
+							int_value := int_token.value.str()
+							qualifier = key_name + ':' + int_value
+							p.advance()
+						} else {
+							qualifier = key_name
+						}
+					} else if p.current.is_identifier() {
+						qualifier = p.current.get_value()
+						p.advance()
+
+						if p.check(punctuation_token(.colon)) {
+							p.advance() // consume ':'
+							if p.current is lexer.IntToken {
+								int_token := p.current as lexer.IntToken
+								int_value := int_token.value.str()
+								qualifier += ':' + int_value
+								p.advance()
+							}
+						}
+					} else {
+						break
+					}
+
+					options << qualifier
+
+					if p.check(operator_token(.minus)) {
+						p.advance() // consume '-'
+					} else {
+						break
+					}
+				}
+			}
+
 			segments << ast.BinarySegment{
 				value:    ast.VariableExpr{
 					name:     var_name
@@ -414,7 +478,7 @@ fn (mut p LXParser) parse_binary_pattern() ?ast.Pattern {
 					ast_id:   p.generate_ast_id()
 				}
 				size:     size
-				options:  []
+				options:  options
 				position: start_pos
 			}
 			continue

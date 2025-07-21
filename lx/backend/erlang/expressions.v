@@ -1062,7 +1062,7 @@ fn (mut gen ErlangGenerator) generate_binary_pattern_expression(expr ast.BinaryP
 	for segment in expr.segments {
 		mut seg_code := gen.generate_expression(segment.value)
 		if segment.size != none {
-			seg_code += '::' + gen.generate_expression(segment.size)
+			seg_code += ':' + gen.generate_expression(segment.size)
 		}
 		if segment.options.len > 0 {
 			seg_code += '/' + segment.options.join('-')

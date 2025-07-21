@@ -158,11 +158,12 @@ fn operator_precedence(op lexer.OperatorValue) int {
 		.type_cons { 2 }
 		.concat { 3 }
 		.plus, .minus { 4 }
-		.mult, .div, .modulo, .bitwise_and, .bitwise_or, .bitwise_xor, .lshift, .rshift { 5 }
+		.mult, .div, .modulo, .bitwise_and, .bitwise_or, .bitwise_xor { 5 }
 		.eq, .neq, .lt, .gt, .leq, .geq { 6 }
 		.and_ { 7 }
 		.or_ { 8 }
 		.fat_arrow, .arrow, .pattern_match, .pipe { -1 }
+		.lshift, .rshift { -1 } // Não são operadores binários, apenas delimitadores
 		else { 11 }
 	}
 }
@@ -516,6 +517,18 @@ fn (mut p LXParser) parse_primary_expression() ?ast.Expr {
 		lexer.OperatorToken {
 			op := p.current as lexer.OperatorToken
 			match op.value {
+				.lshift {
+					mut result := ?ast.Expr(none)
+					if p.peek() is lexer.StringToken || p.peek() is lexer.IntToken
+						|| p.peek() is lexer.AtomToken || p.peek() is lexer.FloatToken
+						|| p.peek() is lexer.IdentToken || p.peek() is lexer.KeyToken {
+						result = p.parse_binary_value_expression()
+					} else {
+						p.add_error('Unexpected token after <<', 'Got ${p.peek().str()}')
+						result = none
+					}
+					result
+				}
 				.modulo {
 					p.parse_map_expression()
 				}
@@ -584,6 +597,10 @@ pub fn (mut p LXParser) parse_binary_segment() ?ast.BinarySegment {
 			lexer.FloatToken {
 				p.parse_float_literal()?
 			}
+			lexer.IdentToken {
+				// Handle variables like 'x'
+				p.parse_identifier_expression()?
+			}
 			else {
 				p.add_error('Invalid binary segment', 'Got ${p.current.str()}')
 				return none
@@ -595,25 +612,60 @@ pub fn (mut p LXParser) parse_binary_segment() ?ast.BinarySegment {
 
 	if p.check(punctuation_token(.colon)) {
 		p.advance()
-	}
-
-	if p.check(operator_token(.type_cons)) {
-		p.advance()
-		size = p.parse_expression()?
+		// Only parse simple literals for size, not full expressions
+		if p.current is lexer.IntToken {
+			size = p.parse_integer_literal()?
+		}
 	}
 
 	if p.check(operator_token(.div)) {
-		p.advance()
-		for {
-			if !p.current.is_identifier() {
+		p.advance() // consume '/'
+
+		// Parse qualifiers until we hit >>, comma, or end (same logic as binary expressions)
+		for !p.check(operator_token(.rshift)) && !p.check(punctuation_token(.comma))
+			&& !p.is_at_end() {
+			mut qualifier := ''
+
+			if p.current is lexer.KeyToken {
+				// Handle KeyToken like 'unit:' and get the value after
+				key_token := p.current as lexer.KeyToken
+				key_name := key_token.value.trim_string_right(':')
+				p.advance()
+
+				if p.current is lexer.IntToken {
+					int_token := p.current as lexer.IntToken
+					int_value := int_token.value.str()
+					qualifier = key_name + ':' + int_value
+					p.advance()
+				} else {
+					qualifier = key_name
+				}
+			} else if p.current.is_identifier() {
+				qualifier = p.current.get_value()
+				p.advance()
+
+				// Check for :value (like unit:8)
+				if p.check(punctuation_token(.colon)) {
+					p.advance() // consume ':'
+					if p.current is lexer.IntToken {
+						int_token := p.current as lexer.IntToken
+						int_value := int_token.value.str()
+						qualifier += ':' + int_value
+						p.advance()
+					}
+				}
+			} else {
 				break
 			}
-			options << p.current.get_value()
-			p.advance()
-			if !p.check(operator_token(.minus)) {
-				break
+
+			options << qualifier
+
+			// Check for - separator for next qualifier
+			if p.check(operator_token(.minus)) {
+				p.advance() // consume '-'
+			} else {
+				break // no more qualifiers
 			}
-			p.advance()
 		}
 	}
 	return ast.BinarySegment{
@@ -2029,6 +2081,41 @@ fn (p &LXParser) is_pattern_matching_statement() bool {
 		lexer.BinaryPatternToken {
 			return true
 		}
+		lexer.OperatorToken {
+			op := p.current as lexer.OperatorToken
+			if op.value == .lshift {
+				mut pos := p.position + 1
+				mut depth := 1
+				for pos < p.tokens.len {
+					match p.tokens[pos] {
+						lexer.OperatorToken {
+							op_token := p.tokens[pos] as lexer.OperatorToken
+							if op_token.value == .lshift {
+								depth++
+							} else if op_token.value == .rshift {
+								depth--
+								if depth == 0 {
+									// Now look for = after >>
+									if pos + 1 < p.tokens.len {
+										next_token := p.tokens[pos + 1]
+										if next_token is lexer.OperatorToken {
+											next_op := next_token as lexer.OperatorToken
+											if next_op.value == .assign {
+												return true
+											}
+										}
+									}
+									break
+								}
+							}
+						}
+						else {}
+					}
+					pos++
+				}
+				return false
+			}
+		}
 		lexer.IdentToken {
 			return false
 		}
@@ -2047,22 +2134,6 @@ fn (p &LXParser) is_pattern_matching_statement() bool {
 					return false
 				}
 			}
-		}
-		lexer.OperatorToken {
-			op := p.current as lexer.OperatorToken
-			if op.value == .modulo {
-				// Só é pattern matching se o próximo token for '='
-				next_token := p.peek()
-				return next_token is lexer.OperatorToken
-					&& (next_token as lexer.OperatorToken).value == .assign
-			}
-			if op.value == .lshift {
-				// Só é pattern matching se o próximo token for '='
-				next_token := p.peek()
-				return next_token is lexer.OperatorToken
-					&& (next_token as lexer.OperatorToken).value == .assign
-			}
-			return false
 		}
 		else {
 			return false
@@ -2113,5 +2184,121 @@ fn (mut p LXParser) parse_simple_assignment() ?ast.Expr {
 		name:     var_name
 		value:    value
 		position: position
+	}
+}
+
+fn (mut p LXParser) parse_binary_value_expression() ?ast.Expr {
+	start_pos := p.get_current_position()
+	p.advance() // consume '<<'
+	mut binary_segments := []ast.BinarySegment{}
+
+	for !p.check(operator_token(.rshift)) && !p.is_at_end() {
+		if p.check(punctuation_token(.comma)) {
+			p.advance()
+			continue
+		}
+
+		// Parse the value (can be literal, variable, etc.)
+		mut value := ast.Expr{}
+		match p.current {
+			lexer.StringToken {
+				value = p.parse_string_literal()?
+			}
+			lexer.IntToken {
+				value = p.parse_integer_literal()?
+			}
+			lexer.FloatToken {
+				value = p.parse_float_literal()?
+			}
+			lexer.AtomToken {
+				value = p.parse_atom_literal()?
+			}
+			lexer.IdentToken {
+				value = p.parse_identifier_expression()?
+			}
+			lexer.KeyToken {
+				key_token := p.current as lexer.KeyToken
+				var_name := key_token.value.trim_string_right(':')
+				value = ast.VariableExpr{
+					name:     var_name
+					position: p.get_current_position()
+					ast_id:   p.generate_ast_id()
+				}
+				p.advance()
+			}
+			else {
+				p.add_error('Invalid value in binary expression', 'Got ${p.current.str()}')
+				return none
+			}
+		}
+
+		mut size := ?ast.Expr(none)
+		if p.check(punctuation_token(.colon)) {
+			p.advance() // consume ':'
+			if p.current is lexer.IntToken {
+				size = p.parse_integer_literal()?
+			}
+		} else if p.current is lexer.IntToken {
+			size = p.parse_integer_literal()?
+		}
+
+		mut options := []string{}
+		if p.check(operator_token(.div)) {
+			p.advance() // consume '/'
+			for !p.check(operator_token(.rshift)) && !p.check(punctuation_token(.comma))
+				&& !p.is_at_end() {
+				mut qualifier := ''
+
+				if p.current is lexer.KeyToken {
+					key_token := p.current as lexer.KeyToken
+					key_name := key_token.value.trim_string_right(':')
+					p.advance()
+
+					if p.current is lexer.IntToken {
+						int_token := p.current as lexer.IntToken
+						int_value := int_token.value.str()
+						qualifier = key_name + ':' + int_value
+						p.advance()
+					} else {
+						qualifier = key_name
+					}
+				} else if p.current.is_identifier() {
+					qualifier = p.current.get_value()
+					p.advance()
+
+					if p.check(punctuation_token(.colon)) {
+						p.advance() // consume ':'
+						if p.current is lexer.IntToken {
+							qualifier += ':' + p.current.get_value()
+							p.advance()
+						}
+					}
+				} else {
+					break
+				}
+
+				options << qualifier
+
+				if p.check(operator_token(.minus)) {
+					p.advance() // consume '-'
+				} else {
+					break // no more qualifiers
+				}
+			}
+		}
+
+		binary_segments << ast.BinarySegment{
+			value:    value
+			size:     size
+			options:  options
+			position: start_pos
+		}
+	}
+	p.consume(operator_token(.rshift), 'Expected >> to close binary expression')?
+
+	return ast.BinaryPatternExpr{
+		segments: binary_segments
+		position: start_pos
+		ast_id:   p.generate_ast_id()
 	}
 }

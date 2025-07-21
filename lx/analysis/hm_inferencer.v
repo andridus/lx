@@ -1529,6 +1529,24 @@ fn (mut hmi HMInferencer) extract_pattern_variables(pattern ast.Pattern, value_t
 				}
 			}
 		}
+		ast.BinaryPattern {
+			// For binary patterns, extract variables from each segment
+			if hmi.type_table.debug_mode {
+				println('[HM_INFERENCER] [BINARY] Extracting variables from binary pattern with ${pattern.segments.len} segments')
+			}
+			for i, segment in pattern.segments {
+				if segment.value is ast.VariableExpr {
+					var_expr := segment.value as ast.VariableExpr
+					// For binary patterns, we typically infer integer type for the extracted values
+					// unless we have more specific type information
+					bind_type := typeinfo_integer()
+					if hmi.type_table.debug_mode {
+						println('[HM_INFERENCER] [BINARY] Binding variable "${var_expr.name}" from segment ${i} to type: ${bind_type}')
+					}
+					hmi.type_env.bind(var_expr.name, monotype(bind_type))
+				}
+			}
+		}
 		else {
 			// For other patterns (wildcard, literal, atom), no variables to bind
 			if hmi.type_table.debug_mode {
