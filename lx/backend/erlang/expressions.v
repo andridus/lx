@@ -342,6 +342,12 @@ fn (gen ErlangGenerator) capitalize_variable(name string) string {
 		'__MODULE__' {
 			return '?MODULE'
 		}
+		'__FILE__' {
+			return '?FILE'
+		}
+		'__LINE__' {
+			return '?LINE'
+		}
 		else {
 			return name[0].ascii_str().to_upper() + name[1..]
 		}

@@ -322,6 +322,15 @@ pub fn (mut hmi HMInferencer) infer_variable(expr ast.VariableExpr) !TypeInfo {
 		println('[HM_INFERENCER] infer_variable: ${expr.name}')
 	}
 
+	// Handle special identifiers
+	if is_special_identifier(expr.name) {
+		if hmi.type_table.debug_mode {
+			println('[HM_INFERENCER] Special identifier: ${expr.name}')
+		}
+		// Special identifiers are always atoms in Erlang
+		return typeinfo_atom()
+	}
+
 	// Look up variable in type environment
 	if scheme := hmi.type_env.lookup(expr.name) {
 		if hmi.type_table.debug_mode {
