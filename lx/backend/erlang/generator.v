@@ -49,14 +49,27 @@ pub fn (mut gen ErlangGenerator) generate_module(module_stmt ast.ModuleStmt, typ
 	// Generate module header
 	mut code := gen.get_module_header(module_stmt.name)
 
+	// Generate behaviour directive if module has behaviour
+	if behaviour := module_stmt.behaviour {
+		match behaviour {
+			ast.WorkerBehaviour {
+				code += '-behaviour(gen_server).\n'
+			}
+			ast.SupervisorBehaviour {
+				code += '-behaviour(supervisor).\n'
+			}
+		}
+		code += '\n'
+	}
+
 	// Generate includes for cross-module types
 	includes := gen.generate_includes(module_stmt.name)
 	if includes.len > 0 {
 		code += includes.join('\n') + '\n\n'
 	}
 
-	// Generate exports
-	exports := gen.generate_exports(module_stmt.statements)
+	// Generate exports (including behaviour-specific exports)
+	exports := gen.generate_exports_with_behaviour(module_stmt.statements, module_stmt.behaviour)
 	if exports.len > 0 {
 		code += '-export([${exports.join(', ')}]).\n'
 	}
@@ -66,6 +79,15 @@ pub fn (mut gen ErlangGenerator) generate_module(module_stmt ast.ModuleStmt, typ
 	for stmt in module_stmt.statements {
 		stmt_code := gen.generate_statement_filtered(stmt)
 		code += stmt_code + '\n'
+	}
+
+	// Add behaviour-specific boilerplate for missing callbacks
+	if behaviour := module_stmt.behaviour {
+		boilerplate := gen.generate_behaviour_boilerplate(module_stmt.statements, behaviour)
+		if boilerplate.len > 0 {
+			code += '\n%% Default implementations (if not provided by user)\n'
+			code += boilerplate
+		}
 	}
 
 	// Add module footer
@@ -150,6 +172,37 @@ fn (gen ErlangGenerator) generate_exports(statements []ast.Stmt) []string {
 	return exports
 }
 
+// generate_exports_with_behaviour generates export list including behaviour-specific exports
+fn (gen ErlangGenerator) generate_exports_with_behaviour(statements []ast.Stmt, behaviour ?ast.Behaviour) []string {
+	mut exports := gen.generate_exports(statements)
+
+	// Add behaviour-specific exports
+	if behaviour_val := behaviour {
+		match behaviour_val {
+			ast.WorkerBehaviour {
+				// Add gen_server callback exports if not already present
+				required_callbacks := ['init/1', 'handle_call/3', 'handle_cast/2', 'handle_info/2', 'terminate/2', 'code_change/3']
+				for callback in required_callbacks {
+					if callback !in exports {
+						exports << callback
+					}
+				}
+			}
+			ast.SupervisorBehaviour {
+				// Add supervisor callback exports if not already present
+				required_callbacks := ['init/1']
+				for callback in required_callbacks {
+					if callback !in exports {
+						exports << callback
+					}
+				}
+			}
+		}
+	}
+
+	return exports
+}
+
 // generate_includes generates include statements for cross-module types
 fn (gen ErlangGenerator) generate_includes(module_name string) []string {
 	mut includes := []string{}
@@ -186,6 +239,22 @@ fn (gen ErlangGenerator) generate_includes(module_name string) []string {
 				external_modules[module_name] = true
 				break
 			}
+		}
+
+		// For child modules (workers/supervisors), also check if they need parent module records
+		// This is a simple heuristic: if the module name is not the main module, include main module .hrl
+		mut main_module_candidates := []string{}
+		for record_key, _ in registry.records {
+			parts := record_key.split('.')
+			if parts.len == 2 {
+				main_module_candidates << parts[0]
+			}
+		}
+
+		// If this module is not in the main candidates but there are records defined,
+		// include the first main module (typically the parent module)
+		if module_name !in main_module_candidates && main_module_candidates.len > 0 {
+			external_modules[main_module_candidates[0]] = true
 		}
 
 		// Generate include statements
@@ -325,4 +394,83 @@ fn (gen ErlangGenerator) lookup_variable(name string) string {
 		}
 	}
 	return gen.capitalize_variable(name) // fallback (should not happen)
+}
+
+// generate_behaviour_boilerplate generates default implementations for missing behaviour callbacks
+fn (gen ErlangGenerator) generate_behaviour_boilerplate(statements []ast.Stmt, behaviour ast.Behaviour) string {
+	// Check which functions the user has implemented
+	mut user_functions := map[string]bool{}
+	for stmt in statements {
+		if stmt is ast.FunctionStmt {
+			func_stmt := stmt as ast.FunctionStmt
+			// Create function signature for lookup
+			arity := func_stmt.clauses[0].parameters.len
+			signature := '${func_stmt.name}/${arity}'
+			user_functions[signature] = true
+		}
+	}
+
+	mut boilerplate := ''
+
+	match behaviour {
+		ast.WorkerBehaviour {
+			// Gen_server callbacks
+			if !user_functions['handle_cast/2'] {
+				boilerplate += 'handle_cast(_Msg, State) ->\n    {noreply, State}.\n\n'
+			}
+			if !user_functions['handle_info/2'] {
+				boilerplate += 'handle_info(_Info, State) ->\n    {noreply, State}.\n\n'
+			}
+			if !user_functions['terminate/2'] {
+				boilerplate += 'terminate(_Reason, _State) ->\n    ok.\n\n'
+			}
+			if !user_functions['code_change/3'] {
+				boilerplate += 'code_change(_OldVsn, State, _Extra) ->\n    {ok, State}.\n\n'
+			}
+		}
+		ast.SupervisorBehaviour {
+			// Generate default init/1 for supervisor if not provided by user
+			if !user_functions['init/1'] {
+				children_spec := gen.generate_children_spec_code(behaviour.children)
+				strategy_atom := match behaviour.strategy {
+					.one_for_one { 'one_for_one' }
+					.one_for_all { 'one_for_all' }
+					.rest_for_one { 'rest_for_one' }
+				}
+				boilerplate += 'init([]) ->\n    {ok, {{${strategy_atom}, 5, 10}, [\n        ${children_spec}\n    ]}}.\n\n'
+			}
+		}
+	}
+
+	return boilerplate
+}
+
+// generate_children_spec_code generates Erlang children specification code
+fn (gen ErlangGenerator) generate_children_spec_code(children_spec ast.ChildrenSpec) string {
+	mut specs := []string{}
+
+	match children_spec {
+		ast.ListChildren {
+			for child in children_spec.children {
+				specs << '{${child}, {${child}, start_link, []}, permanent, 5000, worker, [${child}]}'
+			}
+		}
+		ast.MapChildren {
+			// Add workers
+			for worker in children_spec.workers {
+				specs << '{${worker}, {${worker}, start_link, []}, permanent, 5000, worker, [${worker}]}'
+			}
+			// Add supervisors
+			for supervisor in children_spec.supervisors {
+				specs << '{${supervisor}, {${supervisor}, start_link, []}, permanent, infinity, supervisor, [${supervisor}]}'
+			}
+		}
+		ast.TupleChildren {
+			for child in children_spec.children {
+				specs << '{${child.name}, {${child.name}, start_link, []}, ${child.restart}, ${child.shutdown}, ${child.type_}, [${child.name}]}'
+			}
+		}
+	}
+
+	return specs.join(',\n        ')
 }

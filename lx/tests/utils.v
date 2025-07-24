@@ -14,9 +14,3 @@ fn generates_erlang_result(lx_code string) codegen.CodegenResult {
 	result := comp.compile(lx_code, 'test', '')
 	return result
 }
-
-fn generates_worker_supervisor(lx_code string) compiler.WorkerSupervisorResult {
-	mut comp := compiler.new_compiler()
-	result := comp.compile_for_testing(lx_code, 'test')
-	return result
-}

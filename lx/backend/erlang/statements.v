@@ -30,12 +30,6 @@ pub fn (mut gen ErlangGenerator) generate_statement(stmt ast.Stmt) string {
 		ast.ApplicationStmt {
 			gen.generate_application_statement(stmt)
 		}
-		ast.WorkerStmt {
-			gen.generate_worker_module(stmt)
-		}
-		ast.SupervisorStmt {
-			gen.generate_supervisor_module(stmt)
-		}
 	}
 }
 
@@ -1295,20 +1289,7 @@ fn (gen ErlangGenerator) type_expression_to_erlang_type(type_expr ast.TypeExpres
 	}
 }
 
-// generate_worker_module generates a complete Erlang worker module
-pub fn (mut gen ErlangGenerator) generate_worker_module(stmt ast.WorkerStmt) string {
-	// This will be handled by the compiler to generate a separate .erl file
-	// For now, return a comment indicating this is a worker module
-	return '%% Worker module: ${stmt.name} - will be generated as separate file'
-}
 
-// generate_supervisor_module generates a complete Erlang supervisor module
-pub fn (mut gen ErlangGenerator) generate_supervisor_module(stmt ast.SupervisorStmt) string {
-	// This will be handled by the compiler to generate a separate .erl file
-	// For now, return a comment indicating this is a supervisor module
-	name := if stmt.name == '' { 'main_supervisor' } else { stmt.name }
-	return '%% Supervisor module: ${name} - will be generated as separate file'
-}
 
 // generate_application_statement generates code for application statements
 pub fn (mut gen ErlangGenerator) generate_application_statement(stmt ast.ApplicationStmt) string {

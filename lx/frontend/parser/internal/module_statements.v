@@ -348,7 +348,7 @@ fn (mut p LXParser) parse_test_definition() ?ast.Stmt {
 // Grammar: supervisor_definition ::= 'supervisor' identifier block_top_level
 // ========================================
 
-// parse_worker_definition parses worker definitions
+// parse_worker_definition parses worker definitions as modules with WorkerBehaviour
 fn (mut p LXParser) parse_worker_definition() ?ast.Stmt {
 	p.advance() // consume 'worker'
 
@@ -385,15 +385,22 @@ fn (mut p LXParser) parse_worker_definition() ?ast.Stmt {
 	// Consume 'end'
 	p.consume(keyword_token(.end_), 'Expected "end" after worker body')?
 
-	return ast.WorkerStmt{
+	// Create a module with WorkerBehaviour
+	worker_behaviour := ast.WorkerBehaviour{
+		name: name
+	}
+
+	return ast.ModuleStmt{
 		name:       name
+		exports:    ['start_link/1', 'init/1'] // Basic OTP gen_server exports
+		imports:    []
 		statements: statements
+		behaviour:  worker_behaviour
 		position:   p.get_current_position()
-		ast_id:     p.generate_ast_id()
 	}
 }
 
-// parse_supervisor_definition parses supervisor definitions
+// parse_supervisor_definition parses supervisor definitions as modules with SupervisorBehaviour
 fn (mut p LXParser) parse_supervisor_definition() ?ast.Stmt {
 	p.advance() // consume 'supervisor'
 
@@ -402,6 +409,11 @@ fn (mut p LXParser) parse_supervisor_definition() ?ast.Stmt {
 	if p.current.is_identifier() {
 		name = p.current.get_value()
 		p.advance()
+	}
+
+	// Default name for main supervisor
+	if name == '' {
+		name = 'main_supervisor'
 	}
 
 	// Consume 'do'
@@ -440,13 +452,20 @@ fn (mut p LXParser) parse_supervisor_definition() ?ast.Stmt {
 	// Consume 'end'
 	p.consume(keyword_token(.end_), 'Expected "end" after supervisor body')?
 
-	return ast.SupervisorStmt{
+	// Create a module with SupervisorBehaviour
+	supervisor_behaviour := ast.SupervisorBehaviour{
+		name:     name
+		children: children
+		strategy: strategy
+	}
+
+	return ast.ModuleStmt{
 		name:       name
-		children:   children
-		strategy:   strategy
+		exports:    ['start_link/1', 'init/1'] // Basic OTP supervisor exports
+		imports:    []
 		statements: statements
+		behaviour:  supervisor_behaviour
 		position:   p.get_current_position()
-		ast_id:     p.generate_ast_id()
 	}
 }
 

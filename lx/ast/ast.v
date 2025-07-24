@@ -515,6 +515,7 @@ pub mut:
 	exports    []string
 	imports    []Import
 	statements []Stmt
+	behaviour  ?Behaviour // Optional OTP behaviour
 	position   Position
 }
 
@@ -562,25 +563,7 @@ pub enum TypeAliasType {
 	nominal // nominal type alias
 }
 
-// WorkerStmt represents a worker definition
-pub struct WorkerStmt {
-pub:
-	name       string // worker name (identifier)
-	statements []Stmt // functions, records, types inside worker
-	position   Position
-	ast_id     int = -1 // -1 indicates uninitialized
-}
 
-// SupervisorStmt represents a supervisor definition
-pub struct SupervisorStmt {
-pub:
-	name       string             // supervisor name (identifier), empty for root supervisor
-	children   ChildrenSpec       // children specification
-	strategy   SupervisorStrategy // supervision strategy
-	statements []Stmt             // functions, records, types inside supervisor
-	position   Position
-	ast_id     int = -1 // -1 indicates uninitialized
-}
 
 // ChildrenSpec represents the children specification for supervisors
 pub type ChildrenSpec = ListChildren | MapChildren | TupleChildren
@@ -632,8 +615,6 @@ pub type Stmt = ExprStmt
 	| RecordDefStmt
 	| TypeDefStmt
 	| TypeAliasStmt
-	| WorkerStmt
-	| SupervisorStmt
 
 // str returns a string representation of Expr
 pub fn (e Expr) str() string {
@@ -1097,4 +1078,21 @@ pub:
 	phase    string
 	args     string // Simplified as string for now
 	position Position
+}
+
+// Behaviour types for OTP modules
+pub type Behaviour = WorkerBehaviour | SupervisorBehaviour
+
+// WorkerBehaviour represents gen_server behaviour configuration
+pub struct WorkerBehaviour {
+pub:
+	name string // worker name
+}
+
+// SupervisorBehaviour represents supervisor behaviour configuration
+pub struct SupervisorBehaviour {
+pub:
+	name     string             // supervisor name (empty for main_supervisor)
+	children ChildrenSpec       // children specification
+	strategy SupervisorStrategy // supervision strategy
 }

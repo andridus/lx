@@ -193,28 +193,7 @@ fn (mut a Analyzer) check_module_with_hm(module_stmt ast.ModuleStmt) TypeCheckRe
 				// Process record definitions to register them in the type environment
 				a.process_record_definition_hm(stmt)
 			}
-			ast.WorkerStmt {
-				// Process worker statements recursively
-				a.process_worker_hm(stmt) or {
-					hm_errors := a.hm_inferencer.get_errors()
-					error_list << hm_errors
-					a.hm_inferencer.clear_errors()
-					if hm_errors.len > 0 {
-						break
-					}
-				}
-			}
-			ast.SupervisorStmt {
-				// Process supervisor statements recursively
-				a.process_supervisor_hm(stmt) or {
-					hm_errors := a.hm_inferencer.get_errors()
-					error_list << hm_errors
-					a.hm_inferencer.clear_errors()
-					if hm_errors.len > 0 {
-						break
-					}
-				}
-			}
+
 			else {
 				// For other statements, we can extend HM support later
 			}
@@ -625,41 +604,5 @@ fn (mut a Analyzer) process_record_definition_hm(record_stmt ast.RecordDefStmt) 
 
 	if a.hm_inferencer.type_table.debug_mode {
 		println('[HM_INFERENCER] Registered record "${record_stmt.name}" with type: ${record_type}')
-	}
-}
-
-// process_worker_hm processes worker statements with HM type checking
-fn (mut a Analyzer) process_worker_hm(worker_stmt ast.WorkerStmt) ! {
-	// Process all statements within the worker
-	for stmt in worker_stmt.statements {
-		match stmt {
-			ast.FunctionStmt {
-				a.process_function_hm(stmt)!
-			}
-			ast.RecordDefStmt {
-				a.process_record_definition_hm(stmt)
-			}
-			else {
-				// Handle other statement types as needed
-			}
-		}
-	}
-}
-
-// process_supervisor_hm processes supervisor statements with HM type checking
-fn (mut a Analyzer) process_supervisor_hm(supervisor_stmt ast.SupervisorStmt) ! {
-	// Process all statements within the supervisor
-	for stmt in supervisor_stmt.statements {
-		match stmt {
-			ast.FunctionStmt {
-				a.process_function_hm(stmt)!
-			}
-			ast.RecordDefStmt {
-				a.process_record_definition_hm(stmt)
-			}
-			else {
-				// Handle other statement types as needed
-			}
-		}
 	}
 }

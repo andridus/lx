@@ -51,8 +51,6 @@ fn (mut vc VariableChecker) check_statement(stmt ast.Stmt) {
 		ast.TypeAliasStmt {}
 		ast.ModuleStmt {}
 		ast.ApplicationStmt { vc.check_application_statement(stmt) }
-		ast.WorkerStmt { vc.check_worker_statement(stmt) }
-		ast.SupervisorStmt { vc.check_supervisor_statement(stmt) }
 	}
 }
 
@@ -83,16 +81,19 @@ fn (mut vc VariableChecker) check_assignment_expression(expr ast.AssignExpr) {
 }
 
 fn (mut vc VariableChecker) check_function_statement(stmt ast.FunctionStmt) {
-	// Enter function scope
-	vc.scope_manager.enter_scope()
-	defer { vc.scope_manager.exit_scope() }
-
-	// Bind function parameters
+	// Each clause should have its own scope
 	for clause in stmt.clauses {
+		// Enter scope for this clause
+		vc.scope_manager.enter_scope()
+		defer { vc.scope_manager.exit_scope() }
+
+		// Bind function parameters for this clause
 		for param in clause.parameters {
 			vc.check_pattern(param)
 		}
-		vc.check_expression(clause.body)
+
+		// Check the body with special handling for match expressions
+		vc.check_expression_with_match_context(clause.body)
 	}
 }
 
@@ -420,113 +421,62 @@ fn (mut vc VariableChecker) check_application_statement(stmt ast.ApplicationStmt
 	}
 }
 
-fn (mut vc VariableChecker) check_worker_statement(stmt ast.WorkerStmt) {
-	// Check for duplicate module names
-	if stmt.name in vc.module_names {
-		existing_pos := vc.module_names[stmt.name]
-		vc.report_error("Duplicate module name '${stmt.name}'", 'Module name already defined at ${existing_pos.str()}.',
-			stmt.position)
+
+
+fn (mut vc VariableChecker) check_expression_with_match_context(expr ast.Expr) {
+	if expr is ast.BlockExpr {
+		block_expr := expr as ast.BlockExpr
+		vc.check_block_with_match_context(block_expr)
 	} else {
-		vc.module_names[stmt.name] = stmt.position
-	}
-
-	// Check that worker has required functions
-	mut has_init := false
-	mut has_handle_function := false
-
-	// Check all statements in the worker
-	for worker_stmt in stmt.statements {
-		if worker_stmt is ast.FunctionStmt {
-			func_stmt := worker_stmt as ast.FunctionStmt
-			match func_stmt.name {
-				'init' {
-					has_init = true
-				}
-				'handle_call', 'handle_cast', 'handle_continue', 'handle_info' {
-					has_handle_function = true
-				}
-				else {}
-			}
-		}
-		// Check the statement recursively
-		vc.check_statement(worker_stmt)
-	}
-
-	// Validate required functions
-	if !has_init {
-		vc.report_error("Worker '${stmt.name}' must implement 'init' function", 'Workers require an init/1 function for OTP compliance.',
-			stmt.position)
-	}
-
-	if !has_handle_function {
-		vc.report_error("Worker '${stmt.name}' must implement at least one handle function",
-			'Workers require at least one of: handle_call, handle_cast, handle_continue, handle_info.',
-			stmt.position)
+		vc.check_expression(expr)
 	}
 }
 
-fn (mut vc VariableChecker) check_supervisor_statement(stmt ast.SupervisorStmt) {
-	// Check for duplicate module names (only if supervisor has a name)
-	if stmt.name != '' {
-		if stmt.name in vc.module_names {
-			existing_pos := vc.module_names[stmt.name]
-			vc.report_error("Duplicate module name '${stmt.name}'", 'Module name already defined at ${existing_pos.str()}.',
-				stmt.position)
-		} else {
-			vc.module_names[stmt.name] = stmt.position
-		}
-	}
+fn (mut vc VariableChecker) check_block_with_match_context(expr ast.BlockExpr) {
+	vc.scope_manager.enter_scope()
+	defer { vc.scope_manager.exit_scope() }
 
-	// Validate children specification
-	match stmt.children {
-		ast.ListChildren {
-			// Check that all children names are valid identifiers
-			for child in stmt.children.children {
-				if child.trim_space() == '' {
-					vc.report_error("Empty child name in supervisor '${stmt.name}'", 'Child names cannot be empty.',
-						stmt.children.position)
-				}
-			}
-		}
-		ast.MapChildren {
-			// Check workers and supervisors lists
-			for worker in stmt.children.workers {
-				if worker.trim_space() == '' {
-					vc.report_error("Empty worker name in supervisor '${stmt.name}'",
-						'Worker names cannot be empty.', stmt.children.position)
-				}
-			}
-			for supervisor in stmt.children.supervisors {
-				if supervisor.trim_space() == '' {
-					vc.report_error("Empty supervisor name in supervisor '${stmt.name}'",
-						'Supervisor names cannot be empty.', stmt.children.position)
-				}
-			}
-		}
-		ast.TupleChildren {
-			// Check tuple children specification
-			for child in stmt.children.children {
-				if child.name.trim_space() == '' {
-					vc.report_error("Empty child name in supervisor '${stmt.name}'", 'Child names cannot be empty.',
-						child.position)
-				}
-				// Validate restart type
-				if child.restart !in ['permanent', 'temporary', 'transient'] {
-					vc.report_error("Invalid restart type '${child.restart}' in supervisor '${stmt.name}'",
-						'Restart type must be :permanent, :temporary, or :transient.',
-						child.position)
-				}
-				// Validate child type
-				if child.type_ !in ['worker', 'supervisor'] {
-					vc.report_error("Invalid child type '${child.type_}' in supervisor '${stmt.name}'",
-						'Child type must be :worker or :supervisor.', child.position)
-				}
-			}
-		}
-	}
+	mut i := 0
+	for i < expr.body.len {
+		stmt := expr.body[i]
 
-	// Check all statements in the supervisor
-	for supervisor_stmt in stmt.statements {
-		vc.check_statement(supervisor_stmt)
+		// Check if this is a match expression statement
+		if stmt is ast.ExprStmt {
+			expr_stmt := stmt as ast.ExprStmt
+			mut is_match_expr := false
+
+			if expr_stmt.expr is ast.SimpleMatchExpr {
+				simple_match := expr_stmt.expr as ast.SimpleMatchExpr
+				// Check the match expression itself
+				vc.check_simple_match_expression(simple_match)
+				is_match_expr = true
+			} else if expr_stmt.expr is ast.MatchExpr {
+				match_expr := expr_stmt.expr as ast.MatchExpr
+				// Check the match expression itself
+				vc.check_match_expression(match_expr)
+				is_match_expr = true
+			}
+
+			if is_match_expr {
+				// All subsequent statements are part of the match success branch
+				// Enter a new scope for the match success branch
+				vc.scope_manager.enter_scope()
+				defer { vc.scope_manager.exit_scope() }
+
+				// Process all subsequent statements in the match context
+				mut j := i + 1
+				for j < expr.body.len {
+					vc.check_statement(expr.body[j])
+					j++
+				}
+
+				// We've processed all remaining statements, so we're done
+				break
+			}
+		}
+
+		// Regular statement processing
+		vc.check_statement(stmt)
+		i++
 	}
 }
