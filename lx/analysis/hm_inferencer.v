@@ -1151,8 +1151,13 @@ pub fn (mut hmi HMInferencer) infer_match_rescue(expr ast.MatchRescueExpr) !Type
 		println('[HM_INFERENCER] MatchRescue value type: ${value_type}')
 	}
 
-	// Add the rescue variable to the type environment
-	// The rescue variable has the same type as the value being matched
+	// Extract variables from the pattern and bind them to the type environment global
+	hmi.extract_pattern_variables(expr.pattern, value_type)
+	if hmi.type_table.debug_mode {
+		println('[HM_INFERENCER] Extracted pattern variables from MatchRescue')
+	}
+
+	// Add the rescue variable to the type environment global
 	hmi.type_env.bind(expr.rescue_var, monotype(value_type))
 	if hmi.type_table.debug_mode {
 		println('[HM_INFERENCER] Bound rescue variable "${expr.rescue_var}" to type: ${value_type}')
@@ -1536,6 +1541,14 @@ fn (mut hmi HMInferencer) extract_pattern_variables(pattern ast.Pattern, value_t
 				for field in pattern.fields {
 					hmi.extract_pattern_variables(field.pattern, typeinfo_any())
 				}
+			}
+
+			// Handle assign_variable if present
+			if assign_var := pattern.assign_variable {
+				if hmi.type_table.debug_mode {
+					println('[HM_INFERENCER] [RECORD] Binding assign_variable: ${assign_var} to type: ${record_type}')
+				}
+				hmi.type_env.bind(assign_var, monotype(record_type))
 			}
 		}
 		ast.BinaryPattern {

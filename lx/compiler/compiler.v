@@ -120,6 +120,7 @@ pub fn (mut comp Compiler) compile(source string, file_path string, output_dir s
 	mut parser1_instance := parser.new_parser(tokens, module_name, global_registry)
 	program_stmt := parser1_instance.parse_program() or { ast.ModuleStmt{} }
 
+
 	if parser1_instance.has_errors() {
 		// Format parser errors properly
 		source_lines := errors.load_source_lines(file_path)

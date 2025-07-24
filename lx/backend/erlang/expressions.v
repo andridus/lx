@@ -928,11 +928,10 @@ fn (mut gen ErlangGenerator) generate_simple_match(expr ast.SimpleMatchExpr) str
 	}
 	gen.exit_scope()
 
-	value := gen.generate_expression(expr.value)
+	match_value := gen.generate_expression(expr.value)
 
-	// Simple match returns the original value if pattern doesn't match
-	// Note: This é uma versão simplificada. O correto seria tratar no nível de statements.
-	return 'case ${value} of\n    ${pattern}${guard_clause} ->\n        ${value};\n    Other ->\n        Other\nend'
+	// Simple match executes the body when pattern matches, returns error otherwise
+	return 'case ${match_value} of\n    ${pattern}${guard_clause} ->\n        ${match_value};\n    Other ->\n        Other\nend'
 }
 
 // generate_match_rescue generates code for match rescue expressions

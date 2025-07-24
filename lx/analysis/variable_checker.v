@@ -224,6 +224,10 @@ fn (mut vc VariableChecker) check_block_expression(expr ast.BlockExpr) {
 }
 
 fn (mut vc VariableChecker) check_with_expression(expr ast.WithExpr) {
+	// Enter a new scope for the with expression
+	vc.scope_manager.enter_scope()
+	defer { vc.scope_manager.exit_scope() }
+
 	for binding in expr.bindings {
 		vc.check_expression(binding.value)
 		vc.check_pattern(binding.pattern)
@@ -262,16 +266,9 @@ fn (mut vc VariableChecker) check_simple_match_expression(expr ast.SimpleMatchEx
 }
 
 fn (mut vc VariableChecker) check_match_rescue_expression(expr ast.MatchRescueExpr) {
-	// Check the value being matched
 	vc.check_expression(expr.value)
-
-	// Check the pattern and bind variables from it
 	vc.check_pattern(expr.pattern)
-
-	// Bind the rescue variable
 	vc.scope_manager.bind_variable(expr.rescue_var, expr.position)
-
-	// Check the rescue body
 	vc.check_expression(expr.rescue_body)
 }
 

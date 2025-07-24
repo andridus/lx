@@ -160,35 +160,18 @@ fn (mut gen ErlangGenerator) generate_simple_match_with_continuation(expr ast.Si
 
 	value := gen.generate_expression(expr.value)
 
-	// Se há guarda, usa case. Senão, gera sequência simples
-	if guard_clause.len > 0 {
-		// Generate success body with subsequent expressions
-		success_code := if subsequent_exprs.len > 0 {
-			gen.generate_function_body(subsequent_exprs)
-		} else {
-			'ok'
-		}
-
-		// Format the success code with proper indentation
-		formatted_success_code := success_code.split('\n').map('        ${it}').join('\n')
-
-		// Simple match returns the original value if pattern doesn't match
-		return 'case ${value} of\n    ${pattern}${guard_clause} ->\n${formatted_success_code};\n    Other ->\n        Other\nend'
+	// Generate success body with subsequent expressions
+	success_code := if subsequent_exprs.len > 0 {
+		gen.generate_function_body(subsequent_exprs)
 	} else {
-		// Sem guarda: gera sequência simples de statements
-		mut statements := []string{}
-
-		// Primeiro statement: pattern matching
-		statements << '${pattern} = ${value}'
-
-		// Statements subsequentes
-		for stmt in subsequent_exprs {
-			stmt_code := gen.generate_statement(stmt)
-			statements << stmt_code
-		}
-
-		return statements.join(',\n')
+		'ok'
 	}
+
+	// Format the success code with proper indentation
+	formatted_success_code := success_code.split('\n').map('        ${it}').join('\n')
+
+	// Simple match always generates a case expression that can fail
+	return 'case ${value} of\n    ${pattern}${guard_clause} ->\n${formatted_success_code};\n    Error ->\n        Error\nend'
 }
 
 // generate_match_rescue_with_continuation generates match rescue with subsequent expressions in success branch

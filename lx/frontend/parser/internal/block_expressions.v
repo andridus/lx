@@ -34,7 +34,14 @@ pub fn (mut p LXParser) parse_block_expression() ?ast.Expr {
 			break
 		}
 
-		if p.is_pattern_matching_statement() {
+		// Check if this is a match expression
+		if p.check(keyword_token(.match_)) {
+			// Parse just the match expression, let backend handle continuation
+			match_expr := p.parse_simple_match_expression()?
+			statements << ast.ExprStmt{
+				expr: match_expr
+			}
+		} else if p.is_pattern_matching_statement() {
 			statements << ast.ExprStmt{
 				expr: p.parse_pattern_matching_statement()?
 			}
@@ -500,7 +507,7 @@ fn (mut p LXParser) parse_primary_expression() ?ast.Expr {
 					p.parse_with_expression()
 				}
 				.match_ {
-					p.parse_match_expression()
+					p.parse_simple_match_expression()
 				}
 				.for_ {
 					p.parse_for_expression()
@@ -2300,5 +2307,108 @@ fn (mut p LXParser) parse_binary_value_expression() ?ast.Expr {
 		segments: binary_segments
 		position: start_pos
 		ast_id:   p.generate_ast_id()
+	}
+}
+
+
+
+// parse_simple_match_expression parses just the match pattern <- value part
+fn (mut p LXParser) parse_simple_match_expression() ?ast.Expr {
+	position := p.get_current_position()
+	p.advance() // consume 'match'
+
+	// Parse pattern
+	mut pattern := p.parse_pattern()?
+
+	// Check for optional assignment to variable (pattern = variable)
+	mut assign_variable := ''
+	if p.match(operator_token(.assign)) {
+		if p.current.is_identifier() {
+			assign_variable = p.current.get_value()
+			p.advance() // consume the identifier
+		} else {
+			p.add_error('Expected variable name after = in match pattern', 'Invalid syntax')
+			return none
+		}
+	}
+
+	// Parse guard if present
+	mut guard := ast.Expr(ast.LiteralExpr{
+		value: ast.BooleanLiteral{
+			value: true
+		}
+	})
+
+	if p.match(keyword_token(.when)) {
+		guard = p.parse_expression()?
+	}
+
+	// If we have an assign_variable, update the pattern to include it
+	if assign_variable.len > 0 {
+		if pattern is ast.RecordPattern {
+			record_pattern := pattern as ast.RecordPattern
+			pattern = ast.RecordPattern{
+				name:            record_pattern.name
+				fields:          record_pattern.fields
+				assign_variable: assign_variable
+			}
+		}
+	}
+
+	// Consume '<-'
+	p.consume(operator_token(.pattern_match), 'Expected <- in match expression')?
+
+	// Parse the value being matched
+	match_value := p.parse_expression()?
+
+	// Check if this is a match rescue
+	if p.check(keyword_token(.rescue)) {
+		// Handle match rescue - parse rescue clause
+		p.consume(keyword_token(.rescue), 'Expected rescue after match expression')?
+
+		if p.current !is lexer.IdentToken {
+			p.add_error('Expected variable name after rescue', 'Got ${p.current.str()}')
+			return none
+		}
+		rescue_var_token := p.current as lexer.IdentToken
+		rescue_var := rescue_var_token.value
+		p.advance()
+
+		p.consume(keyword_token(.do_), 'Expected do after rescue variable')?
+
+		rescue_body_expr := p.with_context(.expression, fn (mut parser LXParser) ?ast.Expr {
+			return parser.parse_block_expression_with_delimiter([
+				keyword_token(.end_),
+			])
+		})?
+
+		// Convert to BlockExpr if needed
+		rescue_body := if rescue_body_expr is ast.BlockExpr {
+			rescue_body_expr as ast.BlockExpr
+		} else {
+			ast.BlockExpr{
+				body:     [ast.ExprStmt{
+					expr: rescue_body_expr
+				}]
+				position: position
+			}
+		}
+
+		p.consume(keyword_token(.end_), 'Expected end after rescue body')?
+
+		return ast.MatchRescueExpr{
+			pattern:     pattern
+			value:       match_value
+			rescue_var:  rescue_var
+			rescue_body: rescue_body
+			position:    position
+		}
+	}
+
+	return ast.SimpleMatchExpr{
+		pattern:  pattern
+		value:    match_value
+		guard:    guard
+		position: position
 	}
 }
