@@ -246,6 +246,262 @@ usuario_atualizado = %{usuario | idade: 26}
 usuario_com_email = %{usuario | email: "joao@email.com"}
 ```
 
+### Binários e Bitstrings
+
+Os binários em LX seguem a sintaxe do Erlang, permitindo manipulação eficiente de dados binários e bitstrings.
+
+#### Sintaxe Básica
+
+```lx
+# Binário vazio
+<<>>
+
+# Binário com bytes
+<<1, 2, 3>>
+<<255, 0, 128>>
+
+# Binário com strings
+<<"hello">>
+<<"world", 0>>  # String com byte nulo
+
+# Binário com variáveis
+x = 42
+y = 100
+<<x, y>>  # <<42, 100>>
+```
+
+#### Especificação de Tamanho
+
+```lx
+# Tamanho em bits (apenas em pattern matching)
+# <<version:8, type:16, length:32>> = data
+
+# Em expressões, use valores sem tamanho específico
+<<42, 100, 255>>    # Bytes individuais
+<<1000, 2000>>      # Valores maiores serão truncados para bytes
+```
+
+#### Qualificações (Type Specifiers)
+
+As qualificações permitem especificar como os dados devem ser interpretados **apenas em pattern matching**:
+
+##### Pattern Matching com Qualificações
+```lx
+# Extração com tipos específicos
+<<version:8/integer, type:16/integer-big, data:32/binary>> = packet
+
+# Tipos suportados
+<<value:8/integer>>      # Inteiro (padrão)
+<<data:4/binary>>        # Dados binários
+<<char/utf8>>            # Caractere UTF-8
+
+# Sinal e endianness
+<<signed_val:16/integer-signed>>    # Com sinal
+<<big_val:16/integer-big>>          # Big-endian
+<<little_val:16/integer-little>>    # Little-endian
+
+# Unidade
+<<data:32/binary-unit:8>>           # 32 unidades de 8 bits
+```
+
+##### Qualificações Combinadas
+```lx
+# Múltiplas qualificações separadas por hífen (apenas em pattern matching)
+<<version:8/integer,
+  msg_type:16/integer-big,
+  payload_size:32/integer-little,
+  payload:payload_size/binary>> = data
+```
+
+#### Pattern Matching com Binários
+
+```lx
+# Extração de valores
+def parse_header(packet) do
+  <<version:8, type:16, length:32>> = packet
+  {version, type, length}
+end
+
+# Pattern matching com qualificações
+def parse_message(data) do
+  <<version:8/integer,
+    msg_type:16/integer-big,
+    payload_size:32/integer-little,
+    payload:payload_size/binary>> = data
+  %{
+    version: version,
+    type: msg_type,
+    size: payload_size,
+    payload: payload
+  }
+end
+
+# Pattern matching com guards
+def process_packet(packet) do
+  case packet do
+    <<version:8, type:16>> when version == 1 and type == 100 ->
+      :valid_packet
+    <<version:8, _:16>> when version != 1 ->
+      {:error, :invalid_version}
+    _ ->
+      {:error, :malformed_packet}
+  end
+end
+```
+
+#### Construção de Binários
+
+```lx
+# Construção simples (expressões)
+def create_simple_binary() do
+  <<42, 100, 255>>  # Bytes individuais
+end
+
+def create_with_variables() do
+  version = 1
+  command = 200
+  <<version, command, 0, 0>>  # Header simples
+end
+
+# Para construção complexa, use pattern matching + concatenação
+def create_header(version, msg_type, payload) do
+  # Criar header básico
+  header = <<version, msg_type>>
+
+  # Concatenar com payload se necessário
+  case payload do
+    nil -> header
+    _ -> <<header/binary, payload/binary>>
+  end
+end
+```
+
+#### Exemplos Práticos
+
+##### Protocolo de Rede
+```lx
+record NetworkPacket {
+  version :: integer,
+  command :: integer,
+  payload :: binary
+}
+
+def encode_packet(packet) do
+  NetworkPacket{version: version, command: command, payload: payload} = packet
+  payload_size = byte_size(payload)
+  <<version:8, command:16/big, payload_size:32/big, payload/binary>>
+end
+
+def decode_packet(binary_data) do
+  <<version:8, command:16/big, payload_size:32/big, payload:payload_size/binary>> = binary_data
+  NetworkPacket{
+    version: version,
+    command: command,
+    payload: payload
+  }
+end
+```
+
+##### Processamento de Imagens
+```lx
+def parse_bmp_header(bmp_data) do
+  <<
+    # BMP Header
+    signature:2/binary,           # "BM"
+    file_size:32/little,         # Tamanho do arquivo
+    reserved:32,                 # Reservado
+    data_offset:32/little,       # Offset para dados da imagem
+
+    # DIB Header
+    header_size:32/little,       # Tamanho do header
+    width:32/signed-little,      # Largura da imagem
+    height:32/signed-little,     # Altura da imagem
+    planes:16/little,            # Número de planos
+    bits_per_pixel:16/little,    # Bits por pixel
+
+    rest/binary
+  >> = bmp_data
+
+  %{
+    signature: signature,
+    file_size: file_size,
+    data_offset: data_offset,
+    width: width,
+    height: height,
+    bits_per_pixel: bits_per_pixel,
+    rest: rest
+  }
+end
+```
+
+##### Serialização de Dados
+```lx
+def serialize_user(user) do
+  User{name: name, age: age, active: active} = user
+  name_bytes = String.to_binary(name)
+  name_length = byte_size(name_bytes)
+  active_flag = if active do 1 else 0 end
+
+  <<name_length:16, name_bytes/binary, age:32, active_flag:8>>
+end
+
+def deserialize_user(binary_data) do
+  <<name_length:16, name_bytes:name_length/binary, age:32, active_flag:8>> = binary_data
+  name = String.from_binary(name_bytes)
+  active = active_flag == 1
+
+  User{name: name, age: age, active: active}
+end
+```
+
+#### Referência de Qualificações
+
+| Qualificação | Descrição | Exemplo |
+|--------------|-----------|---------|
+| `integer` | Inteiro (padrão) | `<<42:16/integer>>` |
+| `float` | Ponto flutuante | `<<3.14:32/float>>` |
+| `binary` | Dados binários | `<<data:8/binary>>` |
+| `bitstring` | Sequência de bits | `<<bits:12/bitstring>>` |
+| `utf8` | Caractere UTF-8 | `<<char/utf8>>` |
+| `utf16` | Caractere UTF-16 | `<<char/utf16>>` |
+| `utf32` | Caractere UTF-32 | `<<char/utf32>>` |
+| `signed` | Com sinal | `<<-42:8/signed>>` |
+| `unsigned` | Sem sinal (padrão) | `<<200:8/unsigned>>` |
+| `big` | Big-endian (padrão) | `<<1000:16/big>>` |
+| `little` | Little-endian | `<<1000:16/little>>` |
+| `native` | Endianness nativo | `<<1000:16/native>>` |
+| `unit:N` | N bits por unidade | `<<data:4/binary-unit:8>>` |
+
+#### Limitações e Considerações
+
+**Limitações Atuais:**
+- **Expressões binárias**: Suportam apenas valores simples sem especificação de tamanho ou qualificações
+- **Pattern matching**: Suporta tamanhos e qualificações completas
+- **Construção complexa**: Use pattern matching para extrair e concatenação para construir
+
+**Regras Gerais:**
+- Pattern matching com binários falha se os dados não corresponderem exatamente ao padrão
+- Valores em expressões são tratados como bytes individuais
+- Para manipulação avançada de binários, combine pattern matching com funções de concatenação
+
+**Exemplos do que funciona:**
+```lx
+# Expressões simples
+<<1, 2, 3>>
+<<version, command>>
+
+# Pattern matching completo
+<<version:8/integer, data:32/binary>> = packet
+
+# Combinação
+def process(packet) do
+  <<version:8, command:8, payload/binary>> = packet
+  new_command = command + 1
+  response = <<version, new_command>>
+  {response, payload}
+end
+```
+
 ### Records
 
 ```lx
