@@ -1,0 +1,75 @@
+# Examples of all literal types supported in Task 1
+
+# Integer literals
+def small_number() do
+    1
+end
+
+def big_number() do
+    1000000
+end
+
+def zero() do
+    0
+end
+
+# Float literals
+def pi() do
+    3.14159
+end
+
+def small_float() do
+    0.1
+end
+
+def precise_float() do
+    2.718281828
+end
+
+# String literals
+def simple_string() do
+    "Hello"
+end
+
+def string_with_spaces() do
+    "Hello, World!"
+end
+
+def string_with_escapes() do
+    "Line 1\nLine 2\tTabbed"
+end
+
+def empty_string() do
+    ""
+end
+
+# Boolean literals
+def truth() do
+    true
+end
+
+def falsehood() do
+    false
+end
+
+# Atom literals
+def success_atom() do
+    :ok
+end
+
+def error_atom() do
+    :error
+end
+
+def timeout_atom() do
+    :timeout
+end
+
+def custom_atom() do
+    :my_custom_atom
+end
+
+# Nil literal
+def nothing() do
+    nil
+end
