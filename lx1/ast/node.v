@@ -23,7 +23,7 @@ pub enum NodeKind {
 	function_body
 
 	// Module structure
-	module // Raiz do módulo
+	module
 }
 
 pub struct Position {

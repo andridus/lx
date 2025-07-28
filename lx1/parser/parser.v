@@ -63,7 +63,7 @@ fn (mut p Parser) parse_module() !ast.Node {
 		functions << func
 	}
 
-	return ast.new_module_with_id(module_id, 'main', functions, start_pos)
+	return ast.new_module(module_id, 'main', functions, start_pos)
 }
 
 pub fn (mut p Parser) parse_with_modname(modname string) !ast.Node {
@@ -90,7 +90,7 @@ fn (mut p Parser) parse_module_with_name(modname string) !ast.Node {
 		functions << func
 	}
 
-	return ast.new_module_with_id(module_id, modname, functions, start_pos)
+	return ast.new_module(module_id, modname, functions, start_pos)
 }
 
 fn (mut p Parser) parse_function() !ast.Node {
@@ -143,7 +143,7 @@ fn (mut p Parser) parse_function() !ast.Node {
 	}
 	p.advance()
 
-	return ast.new_function_with_id(func_id, func_name, body, start_pos)
+	return ast.new_function(func_id, func_name, body, start_pos)
 }
 
 fn (mut p Parser) parse_literal() !ast.Node {
@@ -154,34 +154,34 @@ fn (mut p Parser) parse_literal() !ast.Node {
 		.integer {
 			value := p.current.value.int()
 			p.advance()
-			ast.new_integer_with_id(lit_id, value, pos)
+			ast.new_integer(lit_id, value, pos)
 		}
 		.float {
 			value := p.current.value.f64()
 			p.advance()
-			ast.new_float_with_id(lit_id, value, pos)
+			ast.new_float(lit_id, value, pos)
 		}
 		.string {
 			value := p.current.value
 			p.advance()
-			ast.new_string_with_id(lit_id, value, pos)
+			ast.new_string(lit_id, value, pos)
 		}
 		.true_ {
 			p.advance()
-			ast.new_boolean_with_id(lit_id, true, pos)
+			ast.new_boolean(lit_id, true, pos)
 		}
 		.false_ {
 			p.advance()
-			ast.new_boolean_with_id(lit_id, false, pos)
+			ast.new_boolean(lit_id, false, pos)
 		}
 		.atom {
 			value := p.current.value
 			p.advance()
-			ast.new_atom_with_id(lit_id, value, pos)
+			ast.new_atom(lit_id, value, pos)
 		}
 		.nil_ {
 			p.advance()
-			ast.new_nil_with_id(lit_id, pos)
+			ast.new_nil(lit_id, pos)
 		}
 		else {
 			p.error('Expected literal, got "${p.current.value}"')
