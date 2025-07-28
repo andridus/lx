@@ -18,6 +18,13 @@ pub enum NodeKind {
 	atom
 	nil
 
+	// Variables
+	variable_binding // x = value
+	variable_ref     // x (usage)
+
+	// Blocks
+	block // do ... end or -> ... end (multiple expressions)
+
 	// Function structure
 	function
 	function_body
@@ -48,6 +55,9 @@ pub fn (n Node) str() string {
 		.boolean { 'Bool(${n.value})' }
 		.atom { 'Atom(${n.value})' }
 		.nil { 'Nil' }
+		.variable_binding { 'VarBinding(${n.value})' }
+		.variable_ref { 'VarRef(${n.value})' }
+		.block { 'Block(${n.children.len} exprs)' }
 		.function { 'Function(${n.value})' }
 		.function_body { 'FunctionBody' }
 		.module { 'Module' }

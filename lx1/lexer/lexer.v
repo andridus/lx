@@ -32,6 +32,8 @@ pub fn (mut l Lexer) next_token() Token {
 	return match ch {
 		`(` { l.advance_and_return(.lparen, '(') }
 		`)` { l.advance_and_return(.rparen, ')') }
+		`=` { l.advance_and_return(.equals, '=') }
+		`;` { l.advance_and_return(.semicolon, ';') }
 		`"` { l.read_string() }
 		`:` { l.read_atom() }
 		`0`...`9` { l.read_number() }

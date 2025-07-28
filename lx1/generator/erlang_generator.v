@@ -10,10 +10,14 @@ mut:
 	output     strings.Builder
 	errors     []string
 	type_table &analysis.TypeTable = unsafe { nil }
+	var_map    map[string]string // Maps original var names to unique Erlang names
+	next_hash  int = 1
 }
 
 pub fn new_generator() ErlangGenerator {
-	return ErlangGenerator{}
+	return ErlangGenerator{
+		var_map: map[string]string{}
+	}
 }
 
 pub fn (mut g ErlangGenerator) generate(node ast.Node) !string {
@@ -38,6 +42,20 @@ pub fn (g ErlangGenerator) get_errors() []string {
 	return g.errors
 }
 
+fn (mut g ErlangGenerator) get_unique_var_name(original_name string) string {
+	if original_name in g.var_map {
+		return g.var_map[original_name]
+	}
+
+	// Capitalize the first letter and add hash
+	capitalized := original_name.to_upper()
+	unique_name := '${capitalized}_${g.next_hash}'
+	g.var_map[original_name] = unique_name
+	g.next_hash++
+
+	return unique_name
+}
+
 fn (mut g ErlangGenerator) error(msg string) {
 	g.errors << 'Generation error: ${msg}'
 }
@@ -50,11 +68,48 @@ fn (mut g ErlangGenerator) generate_node(node ast.Node) ! {
 		.function {
 			g.generate_function(node)!
 		}
+		.variable_binding {
+			g.generate_binding(node)!
+		}
+		.variable_ref {
+			g.generate_variable_ref(node)!
+		}
+		.block {
+			g.generate_block(node)!
+		}
 		.integer, .float, .string, .boolean, .atom, .nil {
 			g.generate_literal(node)!
 		}
 		else {
 			return error('Unsupported node type: ${node.kind}')
+		}
+	}
+}
+
+fn (mut g ErlangGenerator) generate_binding(node ast.Node) ! {
+	if node.children.len != 1 {
+		return error('Invalid binding node')
+	}
+
+	original_name := node.value
+	unique_name := g.get_unique_var_name(original_name)
+	value_node := node.children[0]
+
+	g.output.write_string('${unique_name} = ')
+	g.generate_node(value_node)!
+}
+
+fn (mut g ErlangGenerator) generate_variable_ref(node ast.Node) ! {
+	original_name := node.value
+	unique_name := g.get_unique_var_name(original_name)
+	g.output.write_string(unique_name)
+}
+
+fn (mut g ErlangGenerator) generate_block(node ast.Node) ! {
+	for i, expr in node.children {
+		g.generate_node(expr)!
+		if i < node.children.len - 1 {
+			g.output.write_string(',\n    ')
 		}
 	}
 }

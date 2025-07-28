@@ -81,3 +81,31 @@ pub fn new_position(line int, column int, file string) Position {
 		file:   file
 	}
 }
+
+pub fn new_variable_binding(id int, name string, value Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .variable_binding
+		value:    name
+		children: [value]
+		position: pos
+	}
+}
+
+pub fn new_variable_ref(id int, name string, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .variable_ref
+		value:    name
+		position: pos
+	}
+}
+
+pub fn new_block(id int, expressions []Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .block
+		children: expressions
+		position: pos
+	}
+}

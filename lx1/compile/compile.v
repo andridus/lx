@@ -1,7 +1,6 @@
 module compile
 
 import os
-import lexer
 import parser
 import analysis
 import generator
@@ -46,8 +45,7 @@ pub fn compile_string(code string, file_path string, show_type_table bool, show_
 }
 
 pub fn compile_string_with_modname(code string, file_path string, module_name string, show_type_table bool, show_nodes bool) !string {
-	mut lex := lexer.new_lexer(code, file_path)
-	mut p := parser.new_parser(mut lex)
+	mut p := parser.new_parser(code, file_path)
 	ast_node := p.parse_with_modname(module_name) or {
 		parser_errors := p.get_errors()
 		if parser_errors.len > 0 {
@@ -81,23 +79,23 @@ pub fn compile_string_with_modname(code string, file_path string, module_name st
 	analyzed_ast := analyzer.analyze(ast_node) or {
 		analysis_errors := analyzer.get_errors()
 		if analysis_errors.len > 0 {
-			println('Analysis errors:')
+			mut error_msg := ''
 			for e in analysis_errors {
-				println(errors.format_error(e))
+				error_msg += errors.format_error(e) + '\n'
 			}
-			return error('Analysis failed')
+			return error(error_msg)
 		}
 		return error('Analysis error: ${err}')
 	}
-
 	analysis_errors := analyzer.get_errors()
 	if analysis_errors.len > 0 {
 		file_lines := os.read_file(file_path) or { '' }
 		lines := file_lines.split('\n')
+		mut error_msg := ''
 		for e in analysis_errors {
-			println(errors.format_error_detailed(e, lines))
+			error_msg += errors.format_error_detailed(e, lines) + '\n'
 		}
-		return error('Analysis failed')
+		return error(error_msg)
 	}
 
 	if show_type_table {
@@ -117,7 +115,7 @@ pub fn compile_string_with_modname(code string, file_path string, module_name st
 	if generation_errors.len > 0 {
 		return error('Generation errors:\n${generation_errors.join('\n')}')
 	}
-
+	println('Compiled ${file_path}')
 	return erlang_code
 }
 

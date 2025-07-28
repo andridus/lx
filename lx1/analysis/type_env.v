@@ -2,37 +2,16 @@ module analysis
 
 import ast
 
-@[heap]
 pub struct TypeEnv {
+	scope_name string
 mut:
 	bindings map[string]ast.Type
-	parent   &TypeEnv = unsafe { nil }
+	parent   int
 }
 
-pub fn new_type_env() TypeEnv {
+pub fn new_type_env(scope_name string) TypeEnv {
 	return TypeEnv{
-		bindings: map[string]ast.Type{}
-		parent:   unsafe { nil }
-	}
-}
-
-pub fn (env &TypeEnv) lookup(name string) ?ast.Type {
-	if name in env.bindings {
-		return env.bindings[name]
-	}
-	if env.parent != unsafe { nil } {
-		return env.parent.lookup(name)
-	}
-	return none
-}
-
-pub fn (mut env TypeEnv) bind(name string, typ ast.Type) {
-	env.bindings[name] = typ
-}
-
-pub fn (env &TypeEnv) extend() &TypeEnv {
-	return &TypeEnv{
-		bindings: map[string]ast.Type{}
-		parent:   env
+		scope_name: scope_name
+		bindings:   map[string]ast.Type{}
 	}
 }

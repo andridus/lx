@@ -1,0 +1,5 @@
+def reuse_variable() do
+    x = 5
+    x = 10
+    x
+end

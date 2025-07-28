@@ -8,16 +8,19 @@ pub struct Parser {
 mut:
 	lexer          lexer.Lexer
 	current        lexer.Token
+	next           lexer.Token
 	error_reporter errors.ErrorReporter
 	next_ast_id    int = 1
 }
 
-pub fn new_parser(mut l lexer.Lexer) Parser {
+pub fn new_parser(code string, file_path string) Parser {
+	mut l := lexer.new_lexer(code, file_path)
 	mut p := Parser{
 		lexer:          l
 		error_reporter: errors.new_error_reporter()
 	}
-	p.advance()
+	p.current = p.lexer.next_token()
+	p.next = p.lexer.next_token()
 	return p
 }
 
@@ -36,7 +39,8 @@ pub fn (mut p Parser) get_next_id() int {
 }
 
 fn (mut p Parser) advance() {
-	p.current = p.lexer.next_token()
+	p.current = p.next
+	p.next = p.lexer.next_token()
 }
 
 fn (mut p Parser) error(msg string) {
@@ -131,15 +135,10 @@ fn (mut p Parser) parse_function() !ast.Node {
 		p.advance()
 	}
 
-	body := p.parse_literal()!
+	body := p.parse_block()!
 
 	for p.current.type_ == .newline {
 		p.advance()
-	}
-
-	if p.current.type_ != .end {
-		p.error('Expected "end", got "${p.current.value}"')
-		return error('Expected end')
 	}
 	p.advance()
 
@@ -188,4 +187,91 @@ fn (mut p Parser) parse_literal() !ast.Node {
 			return error('Expected literal')
 		}
 	}
+}
+
+fn (mut p Parser) parse_binding() !ast.Node {
+	if p.current.type_ != .identifier {
+		p.error('Expected variable name')
+		return error('Expected variable name')
+	}
+
+	var_name := p.current.value
+	pos := p.current.position
+	p.advance()
+
+	if p.current.type_ != .equals {
+		p.error('Expected =')
+		return error('Expected =')
+	}
+	p.advance()
+
+	value := p.parse_expression()!
+
+	return ast.new_variable_binding(p.get_next_id(), var_name, value, pos)
+}
+
+fn (mut p Parser) parse_variable_ref() !ast.Node {
+	if p.current.type_ != .identifier {
+		p.error('Expected variable name')
+		return error('Expected variable name')
+	}
+
+	var_name := p.current.value
+	pos := p.current.position
+
+	p.advance()
+
+	return ast.new_variable_ref(p.get_next_id(), var_name, pos)
+}
+
+fn (mut p Parser) parse_block() !ast.Node {
+	mut expressions := []ast.Node{}
+	start_pos := p.current.position
+
+	// Skip initial newlines after 'do' or '->'
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+
+	for {
+		// Stop if we encounter 'end' or other non-expression tokens
+		if p.current.type_ == .end || p.current.type_ == .eof {
+			break
+		}
+
+		expr := p.parse_expression()!
+		expressions << expr
+
+		// Check for semicolon or newline separator
+		if p.current.type_ == .semicolon {
+			p.advance()
+			// Skip newlines after semicolon
+			for p.current.type_ == .newline {
+				p.advance()
+			}
+		} else if p.current.type_ == .newline {
+			p.advance()
+			// Skip multiple newlines
+			for p.current.type_ == .newline {
+				p.advance()
+			}
+		} else {
+			break
+		}
+	}
+	return ast.new_block(p.get_next_id(), expressions, start_pos)
+}
+
+fn (mut p Parser) parse_expression() !ast.Node {
+	// If it's an identifier, check if next token is equals
+	if p.current.type_ == .identifier {
+		if p.next.type_ == .equals {
+			return p.parse_binding()
+		} else {
+			return p.parse_variable_ref()
+		}
+	}
+
+	// Fall back to literal parsing
+	return p.parse_literal()
 }

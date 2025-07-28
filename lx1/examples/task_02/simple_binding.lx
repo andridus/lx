@@ -1,0 +1,4 @@
+def main() do
+    x = 42
+    x
+end
