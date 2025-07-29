@@ -3,6 +3,7 @@ module parser
 import lexer
 import ast
 import errors
+import kernel
 
 pub struct Parser {
 mut:
@@ -199,7 +200,7 @@ fn (mut p Parser) parse_binding() !ast.Node {
 	pos := p.current.position
 	p.advance()
 
-	if p.current.type_ != .equals {
+	if p.current.type_ != .bind {
 		p.error('Expected =')
 		return error('Expected =')
 	}
@@ -239,6 +240,16 @@ fn (mut p Parser) parse_block() !ast.Node {
 			break
 		}
 
+		// Skip newlines before expression
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+
+		// Stop if we encounter 'end' after skipping newlines
+		if p.current.type_ == .end || p.current.type_ == .eof {
+			break
+		}
+
 		expr := p.parse_expression()!
 		expressions << expr
 
@@ -256,6 +267,11 @@ fn (mut p Parser) parse_block() !ast.Node {
 				p.advance()
 			}
 		} else {
+			// If we reach here, we have a complete expression
+			// Continue to next expression if there are more tokens
+			if p.current.type_ != .end && p.current.type_ != .eof {
+				continue
+			}
 			break
 		}
 	}
@@ -263,15 +279,143 @@ fn (mut p Parser) parse_block() !ast.Node {
 }
 
 fn (mut p Parser) parse_expression() !ast.Node {
-	// If it's an identifier, check if next token is equals
-	if p.current.type_ == .identifier {
-		if p.next.type_ == .equals {
-			return p.parse_binding()
-		} else {
-			return p.parse_variable_ref()
+	return p.parse_expression_with_precedence(0)
+}
+
+fn (mut p Parser) parse_expression_with_precedence(precedence int) !ast.Node {
+	mut left := p.parse_prefix_expression()!
+
+	for {
+		if p.current.type_ == .identifier && p.is_infix_function(p.current.value) {
+			function_info := kernel.get_function_info(p.current.value) or { break }
+			if precedence >= function_info.precedence {
+				break
+			}
+			left = p.parse_infix_expression(left)!
+			continue
+		}
+		break
+	}
+
+	return left
+}
+
+fn (mut p Parser) parse_prefix_expression() !ast.Node {
+	return match p.current.type_ {
+		.integer, .float, .string, .true_, .false_, .atom, .nil_ { p.parse_literal() }
+		.identifier { p.parse_identifier_expression() }
+		.lparen { p.parse_parentheses() }
+		else { error('Unexpected token: ${p.current.type_}') }
+	}
+}
+
+fn (mut p Parser) parse_identifier_expression() !ast.Node {
+	identifier := p.current.value
+	pos := p.current.position
+
+	p.advance()
+
+	// Verifica se é uma chamada de função (com parênteses)
+	if p.current.type_ == .lparen {
+		return p.parse_function_call(identifier, pos)
+	}
+
+	// Verifica se é um binding (identificador seguido de =)
+	if p.current.type_ == .bind {
+		p.advance() // Skip '='
+		value := p.parse_expression()!
+		return ast.new_variable_binding(p.get_next_id(), identifier, value, pos)
+	}
+
+	// Apenas referência de variável
+	return ast.new_variable_ref(p.get_next_id(), identifier, pos)
+}
+
+fn (mut p Parser) parse_function_call(function_name string, pos ast.Position) !ast.Node {
+	p.advance() // Skip '('
+
+	mut arguments := []ast.Node{}
+
+	if p.current.type_ != .rparen {
+		for {
+			arg := p.parse_expression()!
+			arguments << arg
+
+			if p.current.type_ == .rparen {
+				break
+			}
+
+			if p.current.type_ != .comma {
+				return error('Expected comma or closing parenthesis')
+			}
+
+			p.advance() // Skip comma
 		}
 	}
 
-	// Fall back to literal parsing
-	return p.parse_literal()
+	if p.current.type_ != .rparen {
+		return error('Expected closing parenthesis')
+	}
+
+	p.advance() // Skip ')'
+
+	return ast.new_function_caller(p.get_next_id(), function_name, arguments, pos)
+}
+
+fn (mut p Parser) parse_function_call_no_parens(function_name string, pos ast.Position) !ast.Node {
+	mut arguments := []ast.Node{}
+
+	// Parse argumentos até encontrar um token que não seja argumento
+	for {
+		arg := p.parse_expression()!
+		arguments << arg
+
+		// Para se encontrar um token que não seja parte de uma expressão
+		if p.current.type_ == .eof || p.current.type_ == .semicolon || p.current.type_ == .comma
+			|| p.current.type_ == .rparen || p.current.type_ == .newline {
+			break
+		}
+	}
+
+	return ast.new_function_caller(p.get_next_id(), function_name, arguments, pos)
+}
+
+fn (mut p Parser) parse_infix_expression(left ast.Node) !ast.Node {
+	function_name := p.current.value // Nome da função (ex: "+", "*", ">")
+	pos := p.current.position
+
+	// Obtém informações da função nativa
+	function_info := kernel.get_function_info(function_name) or {
+		return error('Unknown function: ${function_name}')
+	}
+
+	p.advance()
+
+	right := p.parse_expression_with_precedence(function_info.precedence)!
+
+	// Cria um nó de chamada de função com os dois argumentos
+	return ast.new_function_caller(p.get_next_id(), function_name, [left, right], pos)
+}
+
+fn (mut p Parser) parse_parentheses() !ast.Node {
+	p.advance() // Skip '('
+
+	expr := p.parse_expression()! // 0 = precedência mais baixa
+
+	if p.current.type_ != .rparen {
+		return error('Expected closing parenthesis')
+	}
+	p.advance() // Skip ')'
+
+	return ast.new_parentheses(p.get_next_id(), expr, p.current.position)
+}
+
+fn (p Parser) is_operator(identifier string) bool {
+	return identifier in ['+', '-', '*', '/', '==', '!=', '<', '<=', '>', '>=', '&&&', '|||', '^^^',
+		'<<<', '>>>', 'and', 'or']
+}
+
+fn (p Parser) is_infix_function(name string) bool {
+	function_info := kernel.get_function_info(name) or { return false }
+	return function_info.fixity == .infix
 }

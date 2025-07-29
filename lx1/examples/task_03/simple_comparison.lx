@@ -1,0 +1,5 @@
+def test() do
+    a = 10
+    b = 5
+    a == b
+end

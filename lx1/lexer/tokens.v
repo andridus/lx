@@ -21,8 +21,9 @@ pub enum TokenType {
 	// Delimiters
 	lparen    // (
 	rparen    // )
-	equals    // =
 	semicolon // ;
+	comma     // ,
+	bind      // =
 
 	// Special
 	newline
@@ -64,8 +65,9 @@ pub fn (tt TokenType) str() string {
 		.identifier { 'identifier' }
 		.lparen { '(' }
 		.rparen { ')' }
-		.equals { '=' }
+		.bind { '=' }
 		.semicolon { ';' }
+		.comma { ',' }
 		.newline { 'newline' }
 		.eof { 'eof' }
 		.error { 'error' }

@@ -1,0 +1,21 @@
+def simple_arithmetic() do
+    a = 10
+    b = 5
+    a + b
+end
+
+def multiplication() do
+    3 * 4
+end
+
+def division() do
+    15 / 3
+end
+
+def subtraction() do
+    10 - 3
+end
+
+def test() do
+    10 + 5
+end

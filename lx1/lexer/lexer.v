@@ -32,12 +32,12 @@ pub fn (mut l Lexer) next_token() Token {
 	return match ch {
 		`(` { l.advance_and_return(.lparen, '(') }
 		`)` { l.advance_and_return(.rparen, ')') }
-		`=` { l.advance_and_return(.equals, '=') }
 		`;` { l.advance_and_return(.semicolon, ';') }
+		`,` { l.advance_and_return(.comma, ',') }
 		`"` { l.read_string() }
 		`:` { l.read_atom() }
 		`0`...`9` { l.read_number() }
-		`a`...`z`, `A`...`Z`, `_` { l.read_identifier() }
+		`+`, `-`, `*`, `/`, `!`, `<`, `>`, `&`, `|`, `^`, `=`, `a`...`z`, `A`...`Z`, `_` { l.read_identifier() }
 		`\n` { l.advance_and_return(.newline, '\n') }
 		else { l.make_error('Unexpected character: ${ch.ascii_str()}') }
 	}
@@ -178,10 +178,15 @@ fn (mut l Lexer) read_number() Token {
 fn (mut l Lexer) read_identifier() Token {
 	start_pos := l.current_position()
 	start := l.position
-
+	mut before_has_operator := false
 	for l.position < l.input.len {
 		ch := l.input[l.position]
-		if ch.is_alnum() || ch == `_` {
+		if l.is_operator_char(ch) && l.position > start && before_has_operator {
+			l.advance()
+		} else if l.is_operator_char(ch) && l.position == start {
+			l.advance()
+			before_has_operator = true
+		} else if ch.is_alnum() || ch == `_` {
 			l.advance()
 		} else {
 			break
@@ -189,8 +194,8 @@ fn (mut l Lexer) read_identifier() Token {
 	}
 
 	value := l.input[start..l.position]
-
 	token_type := match value {
+		'=' { TokenType.bind }
 		'def' { TokenType.def }
 		'do' { TokenType.do }
 		'end' { TokenType.end }
@@ -201,4 +206,9 @@ fn (mut l Lexer) read_identifier() Token {
 	}
 
 	return l.make_token_at(token_type, value, start_pos)
+}
+
+fn (l Lexer) is_operator_char(ch u8) bool {
+	return ch == `+` || ch == `-` || ch == `*` || ch == `/` || ch == `=` || ch == `!` || ch == `<`
+		|| ch == `>` || ch == `&` || ch == `|` || ch == `^`
 }

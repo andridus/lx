@@ -2,6 +2,7 @@ module analysis
 
 import ast
 import errors
+import kernel
 
 pub struct Analyzer {
 mut:
@@ -63,6 +64,12 @@ fn (mut a Analyzer) analyze_node(node ast.Node) !ast.Node {
 		}
 		.integer, .float, .string, .boolean, .atom, .nil {
 			a.analyze_literal(node)
+		}
+		.function_caller {
+			a.analyze_function_caller(node)
+		}
+		.parentheses {
+			a.analyze_parentheses(node)
 		}
 		else {
 			a.error('Unsupported node type: ${node.kind}', node.position)
@@ -260,4 +267,128 @@ fn (mut a Analyzer) analyze_block(node ast.Node) !ast.Node {
 
 pub fn (a &Analyzer) get_type_table() &TypeTable {
 	return &a.type_table
+}
+
+fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
+	if node.children.len < 1 {
+		return error('Function call must have at least one argument')
+	}
+
+	function_name := node.value // Nome da função (ex: "+", "*", ">")
+
+	// Obtém informações da função nativa
+	function_info := kernel.get_function_info(function_name) or {
+		a.error('Unknown function: ${function_name}', node.position)
+		return error('Unknown function')
+	}
+
+	// Analisa todos os argumentos
+	mut analyzed_args := []ast.Node{}
+	for arg in node.children {
+		analyzed_arg := a.analyze_node(arg)!
+		analyzed_args << analyzed_arg
+	}
+
+	// Verifica aridade da função (número de argumentos)
+	expected_arity := function_info.signatures[0].parameters.len
+	if analyzed_args.len != expected_arity {
+		a.error('Function ${function_name}/${expected_arity} called with ${analyzed_args.len} arguments',
+			node.position)
+		return error('Invalid function arity')
+	}
+
+	// Verifica número de argumentos baseado no fixity
+	match function_info.fixity {
+		.infix {
+			if analyzed_args.len != 2 {
+				a.error('Infix operator ${function_name} requires exactly 2 arguments, got ${analyzed_args.len}',
+					node.position)
+				return error('Invalid number of arguments')
+			}
+		}
+		.prefix {
+			if analyzed_args.len != 1 {
+				a.error('Prefix operator ${function_name} requires exactly 1 argument, got ${analyzed_args.len}',
+					node.position)
+				return error('Invalid number of arguments')
+			}
+		}
+		.postfix {
+			if analyzed_args.len != 1 {
+				a.error('Postfix operator ${function_name} requires exactly 1 argument, got ${analyzed_args.len}',
+					node.position)
+				return error('Invalid number of arguments')
+			}
+		}
+	}
+
+	// Para operadores binários, verifica tipos dos argumentos
+	if function_info.fixity == .infix && analyzed_args.len == 2 {
+		left_type := a.type_table.get_type(analyzed_args[0].id) or {
+			ast.Type{
+				name:   'unknown'
+				params: []
+			}
+		}
+		right_type := a.type_table.get_type(analyzed_args[1].id) or {
+			ast.Type{
+				name:   'unknown'
+				params: []
+			}
+		}
+
+		// Verifica se os tipos correspondem a alguma das assinaturas da função
+		result_type := a.check_function_signatures(function_name, left_type, right_type,
+			function_info.signatures) or {
+			a.error('Invalid operator: ${function_name}(${left_type.name}, ${right_type.name})',
+				node.position)
+			return error('Type mismatch in function call')
+		}
+
+		// Assign result type to function call node
+		a.type_table.assign_type(node.id, result_type)
+	}
+
+	return ast.Node{
+		...node
+		children: analyzed_args
+	}
+}
+
+fn (mut a Analyzer) check_function_signatures(function_name string, left_type ast.Type, right_type ast.Type, signatures []kernel.TypeSignature) !ast.Type {
+	// Tenta encontrar uma assinatura que corresponda aos tipos dos argumentos
+	for signature in signatures {
+		if signature.parameters.len != 2 {
+			continue // Pula assinaturas inválidas
+		}
+
+		expected_left := signature.parameters[0]
+		expected_right := signature.parameters[1]
+
+		// Verifica se os tipos correspondem
+		if left_type.name == expected_left.name && right_type.name == expected_right.name {
+			return signature.return_type
+		}
+	}
+
+	return error('No matching signature found for function ${function_name}(${left_type.name}, ${right_type.name})')
+}
+
+fn (mut a Analyzer) analyze_parentheses(node ast.Node) !ast.Node {
+	if node.children.len != 1 {
+		return error('Parentheses must contain exactly one expression')
+	}
+
+	expr := a.analyze_node(node.children[0])!
+	expr_type := a.type_table.get_type(expr.id) or {
+		ast.Type{
+			name:   'unknown'
+			params: []
+		}
+	}
+
+	// Parentheses don't change the type
+	a.type_table.assign_type(node.id, expr_type)
+
+	return node
 }

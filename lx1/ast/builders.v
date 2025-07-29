@@ -109,3 +109,22 @@ pub fn new_block(id int, expressions []Node, pos Position) Node {
 		position: pos
 	}
 }
+
+pub fn new_function_caller(id int, function_name string, arguments []Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .function_caller
+		value:    function_name
+		children: arguments
+		position: pos
+	}
+}
+
+pub fn new_parentheses(id int, expression Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .parentheses
+		children: [expression]
+		position: pos
+	}
+}

@@ -1,0 +1,27 @@
+def bitwise_and() do
+    a = 5  # 101 in binary
+    b = 3  # 011 in binary
+    a &&& b  # Should be 1 (001 in binary)
+end
+
+def bitwise_or() do
+    a = 5  # 101 in binary
+    b = 3  # 011 in binary
+    a ||| b  # Should be 7 (111 in binary)
+end
+
+def bitwise_xor() do
+    a = 5  # 101 in binary
+    b = 3  # 011 in binary
+    a ^^^ b  # Should be 6 (110 in binary)
+end
+
+def shift_left() do
+    a = 5  # 101 in binary
+    a <<< 2  # Should be 20 (10100 in binary)
+end
+
+def shift_right() do
+    a = 20  # 10100 in binary
+    a >>> 2  # Should be 5 (101 in binary)
+end

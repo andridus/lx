@@ -31,6 +31,10 @@ pub enum NodeKind {
 
 	// Module structure
 	module
+
+	// Binary operators
+	function_caller // +(a, b), *(a, b), >(a, b), etc.
+	parentheses     // (expression)
 }
 
 pub struct Position {
@@ -61,6 +65,8 @@ pub fn (n Node) str() string {
 		.function { 'Function(${n.value})' }
 		.function_body { 'FunctionBody' }
 		.module { 'Module' }
+		.function_caller { 'FunctionCall(${n.value})' }
+		.parentheses { 'Parentheses' }
 	}
 }
 
