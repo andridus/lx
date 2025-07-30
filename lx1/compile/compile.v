@@ -51,10 +51,11 @@ pub fn compile_string_with_modname(code string, file_path string, module_name st
 		if parser_errors.len > 0 {
 			file_lines := os.read_file(file_path) or { '' }
 			lines := file_lines.split('\n')
+			mut error_msg := ''
 			for e in parser_errors {
-				println(errors.format_error_detailed(e, lines))
+				error_msg += errors.format_error_detailed(e, lines) + '\n'
 			}
-			return error('Parse failed')
+			return error(error_msg)
 		}
 		return error('Parse error: ${err}')
 	}
@@ -63,10 +64,11 @@ pub fn compile_string_with_modname(code string, file_path string, module_name st
 	if parser_errors.len > 0 {
 		file_lines := os.read_file(file_path) or { '' }
 		lines := file_lines.split('\n')
+		mut error_msg := ''
 		for e in parser_errors {
-			println(errors.format_error_detailed(e, lines))
+			error_msg += errors.format_error_detailed(e, lines) + '\n'
 		}
-		return error('Parse failed')
+		return error(error_msg)
 	}
 
 	if show_nodes {

@@ -71,6 +71,9 @@ fn (mut a Analyzer) analyze_node(node ast.Node) !ast.Node {
 		.parentheses {
 			a.analyze_parentheses(node)
 		}
+		.directive_call {
+			a.analyze_directive_call(node)
+		}
 		else {
 			a.error('Unsupported node type: ${node.kind}', node.position)
 			return error('Unsupported node type: ${node.kind}')
@@ -389,6 +392,34 @@ fn (mut a Analyzer) analyze_parentheses(node ast.Node) !ast.Node {
 
 	// Parentheses don't change the type
 	a.type_table.assign_type(node.id, expr_type)
+
+	return node
+}
+
+fn (mut a Analyzer) analyze_directive_call(node ast.Node) !ast.Node {
+	directive_name := node.value
+	directive_info := get_directive_info(directive_name) or {
+		a.error('Unknown directive: $${directive_name}', node.position)
+		return error('Unknown directive')
+	}
+
+	mut analyzed_args := []ast.Node{}
+	for arg in node.children {
+		analyzed_arg := a.analyze_node(arg)!
+		analyzed_args << analyzed_arg
+	}
+	if analyzed_args.len != directive_info.argument_count {
+		a.error('Directive $${directive_name} requires ${directive_info.argument_count} arguments, got ${analyzed_args.len}',
+			node.position)
+		return error('Invalid directive argument count')
+	}
+
+	if handler := directive_info.handler {
+		handler(analyzed_args, a) or {
+			a.error('Directive $${directive_name} failed: ${err}', node.position)
+			return error('Directive execution failed')
+		}
+	}
 
 	return node
 }

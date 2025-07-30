@@ -1,0 +1,23 @@
+def demo_directives() do
+    # Variáveis simples
+    x = 10
+    y = 20
+    z = "hello"
+
+    # Diretiva $print - mostra AST durante compilação
+    $print(x)
+    $print(y)
+    $print(z)
+    $print(x + y)
+    $print((x + y) * 2)
+
+    # Diretiva $type - mostra tipos durante compilação
+    $type(x)
+    $type(y)
+    $type(z)
+    $type(x + y)
+    $type((x + y) * 2)
+
+    # Apenas esta expressão aparece no código final
+    (x + y) * 2
+end

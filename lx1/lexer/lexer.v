@@ -37,7 +37,7 @@ pub fn (mut l Lexer) next_token() Token {
 		`"` { l.read_string() }
 		`:` { l.read_atom() }
 		`0`...`9` { l.read_number() }
-		`+`, `-`, `*`, `/`, `!`, `<`, `>`, `&`, `|`, `^`, `=`, `a`...`z`, `A`...`Z`, `_` { l.read_identifier() }
+		`+`, `-`, `*`, `/`, `!`, `<`, `>`, `&`, `|`, `^`, `=`, `$`, `a`...`z`, `A`...`Z`, `_` { l.read_identifier() }
 		`\n` { l.advance_and_return(.newline, '\n') }
 		else { l.make_error('Unexpected character: ${ch.ascii_str()}') }
 	}
@@ -181,7 +181,9 @@ fn (mut l Lexer) read_identifier() Token {
 	mut before_has_operator := false
 	for l.position < l.input.len {
 		ch := l.input[l.position]
-		if l.is_operator_char(ch) && l.position > start && before_has_operator {
+		if ch == `$` && l.position == start {
+			l.advance() // Skip $
+		} else if l.is_operator_char(ch) && l.position > start && before_has_operator {
 			l.advance()
 		} else if l.is_operator_char(ch) && l.position == start {
 			l.advance()

@@ -128,3 +128,13 @@ pub fn new_parentheses(id int, expression Node, pos Position) Node {
 		position: pos
 	}
 }
+
+pub fn new_directive_call(id int, directive_name string, arguments []Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .directive_call
+		value:    directive_name
+		children: arguments
+		position: pos
+	}
+}

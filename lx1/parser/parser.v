@@ -314,6 +314,9 @@ fn (mut p Parser) parse_identifier_expression() !ast.Node {
 	pos := p.current.position
 
 	p.advance()
+	if identifier.starts_with('$') {
+		return p.parse_directive_call(identifier, pos)
+	}
 
 	// Verifica se é uma chamada de função (com parênteses)
 	if p.current.type_ == .lparen {
@@ -360,6 +363,53 @@ fn (mut p Parser) parse_function_call(function_name string, pos ast.Position) !a
 	p.advance() // Skip ')'
 
 	return ast.new_function_caller(p.get_next_id(), function_name, arguments, pos)
+}
+
+fn (mut p Parser) parse_directive_call(directive_name string, pos ast.Position) !ast.Node {
+	actual_name := directive_name[1..]
+
+	if !p.is_valid_directive(actual_name) {
+		p.error('Unknown directive: ${directive_name}')
+		return error('Unknown directive: ${directive_name}')
+	}
+
+	if p.current.type_ != .lparen {
+		p.error('Directive ${directive_name} requires parentheses')
+		return error('Directive ${directive_name} requires parentheses')
+	}
+
+	p.advance() // Skip '('
+
+	mut arguments := []ast.Node{}
+
+	if p.current.type_ != .rparen {
+		for {
+			arg := p.parse_expression()!
+			arguments << arg
+
+			if p.current.type_ == .rparen {
+				break
+			}
+
+			if p.current.type_ != .comma {
+				return error('Expected comma or closing parenthesis')
+			}
+
+			p.advance() // Skip comma
+		}
+	}
+
+	if p.current.type_ != .rparen {
+		return error('Expected closing parenthesis')
+	}
+
+	p.advance() // Skip ')'
+
+	return ast.new_directive_call(p.get_next_id(), actual_name, arguments, pos)
+}
+
+fn (p Parser) is_valid_directive(name string) bool {
+	return name in ['print', 'type']
 }
 
 fn (mut p Parser) parse_function_call_no_parens(function_name string, pos ast.Position) !ast.Node {

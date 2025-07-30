@@ -1,0 +1,5 @@
+def test() do
+    x = 42
+    $unknown(x)
+    x
+end

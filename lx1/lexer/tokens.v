@@ -24,7 +24,6 @@ pub enum TokenType {
 	semicolon // ;
 	comma     // ,
 	bind      // =
-
 	// Special
 	newline
 	eof

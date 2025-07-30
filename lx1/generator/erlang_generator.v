@@ -114,6 +114,9 @@ fn (mut g ErlangGenerator) generate_variable_ref(node ast.Node) ! {
 
 fn (mut g ErlangGenerator) generate_block(node ast.Node) ! {
 	for i, expr in node.children {
+		if expr.kind == .directive_call {
+			continue
+		}
 		g.generate_node(expr)!
 		if i < node.children.len - 1 {
 			g.output.write_string(',\n    ')

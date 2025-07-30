@@ -1,0 +1,26 @@
+def complex_directives() do
+    a = 5
+    b = 3
+    c = 2
+
+    # Mostra AST de expressão complexa (não aparece no código final)
+    $print((a + b) * c)
+
+    # Mostra tipo da expressão (não aparece no código final)
+    $type((a + b) * c)
+
+    (a + b) * c  # Esta é a única expressão que aparece no código final
+end
+
+def nested_directives() do
+    x = 10
+    y = 20
+
+    # Mostra o tipo da soma (não aparece no código final)
+    $type(x + y)
+
+    # Mostra o AST da expressão (não aparece no código final)
+    $print(x + y)
+
+    x + y  # Esta é a única expressão que aparece no código final
+end

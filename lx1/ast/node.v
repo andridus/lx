@@ -35,6 +35,7 @@ pub enum NodeKind {
 	// Binary operators
 	function_caller // +(a, b), *(a, b), >(a, b), etc.
 	parentheses     // (expression)
+	directive_call  // $print(a), $type(a)
 }
 
 pub struct Position {
@@ -52,22 +53,7 @@ pub:
 
 // Helper methods for Node
 pub fn (n Node) str() string {
-	return match n.kind {
-		.integer { 'Int(${n.value})' }
-		.float { 'Float(${n.value})' }
-		.string { 'String("${n.value}")' }
-		.boolean { 'Bool(${n.value})' }
-		.atom { 'Atom(${n.value})' }
-		.nil { 'Nil' }
-		.variable_binding { 'VarBinding(${n.value})' }
-		.variable_ref { 'VarRef(${n.value})' }
-		.block { 'Block(${n.children.len} exprs)' }
-		.function { 'Function(${n.value})' }
-		.function_body { 'FunctionBody' }
-		.module { 'Module' }
-		.function_caller { 'FunctionCall(${n.value})' }
-		.parentheses { 'Parentheses' }
-	}
+	return '{${n.kind}, [id: ${n.id}, pos: ${n.position}], ${n.value}, ${n.children}}'
 }
 
 pub fn (p Position) str() string {
@@ -80,4 +66,26 @@ pub fn (t Type) str() string {
 	}
 	params_str := t.params.map(it.str()).join(', ')
 	return '${t.name}(${params_str})'
+}
+
+pub fn (n Node) tree_str(indent int) string {
+	pad := '  '.repeat(indent)
+	mut result := '${pad}{${n.kind}, [], ${n.value}, ['
+
+	if n.children.len > 0 {
+		result += '\n'
+		for i, child in n.children {
+			result += child.tree_str(indent + 1)
+			if i < n.children.len - 1 {
+				result += ','
+			}
+			result += '\n'
+		}
+		result += '${pad}]'
+	} else {
+		result += ']'
+	}
+
+	result += '}'
+	return result
 }
