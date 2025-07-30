@@ -36,6 +36,10 @@ pub enum NodeKind {
 	function_caller // +(a, b), *(a, b), >(a, b), etc.
 	parentheses     // (expression)
 	directive_call  // $print(a), $type(a)
+
+	// List Operations
+	list_literal // [1, 2, 3] ou []
+	list_cons    // [head | tail]
 }
 
 pub struct Position {

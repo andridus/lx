@@ -31,7 +31,7 @@ pub enum Fixity {
 // Native functions table with type signatures
 pub const native_functions = {
 	// Arithmetic operators (infix)
-	'+':   FunctionInfo{
+	'+':      FunctionInfo{
 		precedence:    1
 		associativity: .left
 		fixity:        .infix
@@ -67,7 +67,7 @@ pub const native_functions = {
 			'erl': '$1 + $2'
 		}]
 	}
-	'-':   FunctionInfo{
+	'-':      FunctionInfo{
 		precedence:    1
 		associativity: .left
 		fixity:        .infix
@@ -103,7 +103,7 @@ pub const native_functions = {
 			'erl': '$1 - $2'
 		}]
 	}
-	'*':   FunctionInfo{
+	'*':      FunctionInfo{
 		precedence:    2
 		associativity: .left
 		fixity:        .infix
@@ -139,7 +139,7 @@ pub const native_functions = {
 			'erl': '$1 * $2'
 		}]
 	}
-	'/':   FunctionInfo{
+	'/':      FunctionInfo{
 		precedence:    2
 		associativity: .left
 		fixity:        .infix
@@ -176,7 +176,7 @@ pub const native_functions = {
 		}]
 	}
 	// Comparison operators (infix)
-	'==':  FunctionInfo{
+	'==':     FunctionInfo{
 		precedence:    3
 		associativity: .left
 		fixity:        .infix
@@ -212,7 +212,7 @@ pub const native_functions = {
 			'erl': '$1 == $2'
 		}]
 	}
-	'!=':  FunctionInfo{
+	'!=':     FunctionInfo{
 		precedence:    3
 		associativity: .left
 		fixity:        .infix
@@ -248,7 +248,7 @@ pub const native_functions = {
 			'erl': '$1 != $2'
 		}]
 	}
-	'<':   FunctionInfo{
+	'<':      FunctionInfo{
 		precedence:    3
 		associativity: .left
 		fixity:        .infix
@@ -284,7 +284,7 @@ pub const native_functions = {
 			'erl': '$1 < $2'
 		}]
 	}
-	'<=':  FunctionInfo{
+	'<=':     FunctionInfo{
 		precedence:    3
 		associativity: .left
 		fixity:        .infix
@@ -320,7 +320,7 @@ pub const native_functions = {
 			'erl': '$1 <= $2'
 		}]
 	}
-	'>':   FunctionInfo{
+	'>':      FunctionInfo{
 		precedence:    3
 		associativity: .left
 		fixity:        .infix
@@ -356,7 +356,7 @@ pub const native_functions = {
 			'erl': '$1 > $2'
 		}]
 	}
-	'>=':  FunctionInfo{
+	'>=':     FunctionInfo{
 		precedence:    3
 		associativity: .left
 		fixity:        .infix
@@ -393,7 +393,7 @@ pub const native_functions = {
 		}]
 	}
 	// Logical operators (infix)
-	'and': FunctionInfo{
+	'and':    FunctionInfo{
 		precedence:    4
 		associativity: .left
 		fixity:        .infix
@@ -416,7 +416,7 @@ pub const native_functions = {
 			'erl': '$1 andalso $2'
 		}]
 	}
-	'or':  FunctionInfo{
+	'or':     FunctionInfo{
 		precedence:    4
 		associativity: .left
 		fixity:        .infix
@@ -439,8 +439,29 @@ pub const native_functions = {
 			'erl': '$1 orelse $2'
 		}]
 	}
+	// Logical negation operator (prefix)
+	'not':    FunctionInfo{
+		precedence:    4
+		associativity: .right
+		fixity:        .prefix
+		signatures:    [
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'boolean'
+					params: []
+				}]
+				return_type: ast.Type{
+					name:   'boolean'
+					params: []
+				}
+			},
+		]
+		gen:           [{
+			'erl': 'not $1'
+		}]
+	}
 	// Bitwise operators (infix) - apenas integer
-	'&&&': FunctionInfo{
+	'&&&':    FunctionInfo{
 		precedence:    5
 		associativity: .left
 		fixity:        .infix
@@ -463,7 +484,7 @@ pub const native_functions = {
 			'erl': '$1 band $2'
 		}]
 	}
-	'|||': FunctionInfo{
+	'|||':    FunctionInfo{
 		precedence:    5
 		associativity: .left
 		fixity:        .infix
@@ -486,7 +507,7 @@ pub const native_functions = {
 			'erl': '$1 bor $2'
 		}]
 	}
-	'^^^': FunctionInfo{
+	'^^^':    FunctionInfo{
 		precedence:    5
 		associativity: .left
 		fixity:        .infix
@@ -509,7 +530,7 @@ pub const native_functions = {
 			'erl': '$1 bxor $2'
 		}]
 	}
-	'<<<': FunctionInfo{
+	'<<<':    FunctionInfo{
 		precedence:    6
 		associativity: .left
 		fixity:        .infix
@@ -532,7 +553,7 @@ pub const native_functions = {
 			'erl': '$1 bsl $2'
 		}]
 	}
-	'>>>': FunctionInfo{
+	'>>>':    FunctionInfo{
 		precedence:    6
 		associativity: .left
 		fixity:        .infix
@@ -553,6 +574,97 @@ pub const native_functions = {
 		]
 		gen:           [{
 			'erl': '$1 bsr $2'
+		}]
+	}
+	// List concatenation operator
+	'++':     FunctionInfo{
+		precedence:    1
+		associativity: .right
+		fixity:        .infix
+		signatures:    [
+			TypeSignature{
+				parameters:  [
+					ast.Type{
+						name:   'list'
+						params: [ast.Type{
+							name:   'any'
+							params: []
+						}]
+					},
+					ast.Type{
+						name:   'list'
+						params: [ast.Type{
+							name:   'any'
+							params: []
+						}]
+					},
+				]
+				return_type: ast.Type{
+					name:   'list'
+					params: [
+						ast.Type{
+							name:   'any'
+							params: []
+						},
+					]
+				}
+			},
+		]
+		gen:           [{
+			'erl': '$1 ++ $2'
+		}]
+	}
+	// List length function
+	'length': FunctionInfo{
+		precedence:    0
+		associativity: .left
+		fixity:        .prefix
+		signatures:    [
+			TypeSignature{
+				parameters:  [
+					ast.Type{
+						name:   'list'
+						params: [ast.Type{
+							name:   'any'
+							params: []
+						}]
+					},
+				]
+				return_type: ast.Type{
+					name:   'integer'
+					params: []
+				}
+			},
+		]
+		gen:           [{
+			'erl': 'length($1)'
+		}]
+	}
+	// List membership operator
+	'in':     FunctionInfo{
+		precedence:    3
+		associativity: .left
+		fixity:        .infix
+		signatures:    [
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'any'
+					params: []
+				}, ast.Type{
+					name:   'list'
+					params: [ast.Type{
+						name:   'any'
+						params: []
+					}]
+				}]
+				return_type: ast.Type{
+					name:   'boolean'
+					params: []
+				}
+			},
+		]
+		gen:           [{
+			'erl': 'lists:member($1, $2)'
 		}]
 	}
 }

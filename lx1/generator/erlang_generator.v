@@ -87,6 +87,12 @@ fn (mut g ErlangGenerator) generate_node(node ast.Node) ! {
 		.parentheses {
 			g.generate_parentheses(node)!
 		}
+		.list_literal {
+			g.generate_list_literal(node)!
+		}
+		.list_cons {
+			g.generate_list_cons(node)!
+		}
 		else {
 			return error('Unsupported node type: ${node.kind}')
 		}
@@ -206,6 +212,15 @@ fn (g ErlangGenerator) escape_string(s string) string {
 
 fn type_to_erlang_spec(t ast.Type) string {
 	match t.name {
+		'union' {
+			// Para tipos de união, gerar: integer() | binary() | atom() | float()
+			if t.params.len > 0 {
+				union_types := t.params.map(type_to_erlang_spec).join(' | ')
+				return union_types
+			} else {
+				return 'any()'
+			}
+		}
 		'integer' {
 			return 'integer()'
 		}
@@ -285,6 +300,21 @@ fn (mut g ErlangGenerator) generate_function_caller(node ast.Node) ! {
 			result := template.replace('$1', left_code).replace('$2', right_code)
 			g.output.write_string(result)
 		}
+		.prefix {
+			if node.children.len != 1 {
+				return error('Prefix operator requires exactly 1 argument')
+			}
+			arg_code := g.generate_node_to_string(node.children[0])!
+
+			if function_info.gen.len == 0 {
+				return error('No templates found for function: ${function_name}')
+			}
+			template := function_info.gen[0]['erl'] or {
+				return error('No Erlang template found for function: ${function_name}')
+			}
+			result := template.replace('$1', arg_code)
+			g.output.write_string(result)
+		}
 		else {
 			return error('Unsupported fixity: ${function_info.fixity}')
 		}
@@ -317,6 +347,12 @@ fn (mut g ErlangGenerator) generate_node_to_string(node ast.Node) !string {
 		}
 		.parentheses {
 			return g.generate_parentheses_to_string(node)
+		}
+		.list_literal {
+			return g.generate_list_literal_to_string(node)
+		}
+		.list_cons {
+			return g.generate_list_cons_to_string(node)
 		}
 		else {
 			return error('Unsupported node type for string generation: ${node.kind}')
@@ -373,6 +409,19 @@ fn (mut g ErlangGenerator) generate_function_caller_to_string(node ast.Node) !st
 			right_code := g.generate_node_to_string(node.children[1])!
 			return template.replace('$1', left_code).replace('$2', right_code)
 		}
+		.prefix {
+			if node.children.len != 1 {
+				return error('Prefix operator requires exactly 1 argument')
+			}
+			if function_info.gen.len == 0 {
+				return error('No templates found for function: ${function_name}')
+			}
+			template := function_info.gen[0]['erl'] or {
+				return error('No Erlang template found for function: ${function_name}')
+			}
+			arg_code := g.generate_node_to_string(node.children[0])!
+			return template.replace('$1', arg_code)
+		}
 		else {
 			return error('Unsupported fixity: ${function_info.fixity}')
 		}
@@ -395,4 +444,61 @@ fn (mut g ErlangGenerator) generate_parentheses(node ast.Node) ! {
 	g.output.write_string('(')
 	g.generate_node(node.children[0])!
 	g.output.write_string(')')
+}
+
+fn (mut g ErlangGenerator) generate_list_literal(node ast.Node) ! {
+	if node.children.len == 0 {
+		g.output.write_string('[]')
+		return
+	}
+
+	g.output.write_string('[')
+
+	for i, element in node.children {
+		if i > 0 {
+			g.output.write_string(', ')
+		}
+		g.generate_node(element)!
+	}
+
+	g.output.write_string(']')
+}
+
+fn (mut g ErlangGenerator) generate_list_cons(node ast.Node) ! {
+	if node.children.len != 2 {
+		return error('List cons must have exactly 2 children')
+	}
+
+	g.output.write_string('[')
+	g.generate_node(node.children[0])!
+	g.output.write_string(' | ')
+	g.generate_node(node.children[1])!
+	g.output.write_string(']')
+}
+
+fn (mut g ErlangGenerator) generate_list_literal_to_string(node ast.Node) !string {
+	if node.children.len == 0 {
+		return '[]'
+	}
+
+	mut result := '['
+	for i, element in node.children {
+		if i > 0 {
+			result += ', '
+		}
+		element_code := g.generate_node_to_string(element)!
+		result += element_code
+	}
+	result += ']'
+	return result
+}
+
+fn (mut g ErlangGenerator) generate_list_cons_to_string(node ast.Node) !string {
+	if node.children.len != 2 {
+		return error('List cons must have exactly 2 children')
+	}
+
+	head_code := g.generate_node_to_string(node.children[0])!
+	tail_code := g.generate_node_to_string(node.children[1])!
+	return '[${head_code} | ${tail_code}]'
 }

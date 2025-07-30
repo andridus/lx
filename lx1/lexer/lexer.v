@@ -34,10 +34,12 @@ pub fn (mut l Lexer) next_token() Token {
 		`)` { l.advance_and_return(.rparen, ')') }
 		`;` { l.advance_and_return(.semicolon, ';') }
 		`,` { l.advance_and_return(.comma, ',') }
+		`[` { l.advance_and_return(.lbracket, '[') }
+		`]` { l.advance_and_return(.rbracket, ']') }
 		`"` { l.read_string() }
 		`:` { l.read_atom() }
 		`0`...`9` { l.read_number() }
-		`+`, `-`, `*`, `/`, `!`, `<`, `>`, `&`, `|`, `^`, `=`, `$`, `a`...`z`, `A`...`Z`, `_` { l.read_identifier() }
+		`+`, `-`, `*`, `/`, `!`, `<`, `>`, `&`, `^`, `|`, `=`, `$`, `a`...`z`, `A`...`Z`, `_` { l.read_identifier() }
 		`\n` { l.advance_and_return(.newline, '\n') }
 		else { l.make_error('Unexpected character: ${ch.ascii_str()}') }
 	}
@@ -198,6 +200,7 @@ fn (mut l Lexer) read_identifier() Token {
 	value := l.input[start..l.position]
 	token_type := match value {
 		'=' { TokenType.bind }
+		'|' { TokenType.pipe }
 		'def' { TokenType.def }
 		'do' { TokenType.do }
 		'end' { TokenType.end }

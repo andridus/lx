@@ -138,3 +138,23 @@ pub fn new_directive_call(id int, directive_name string, arguments []Node, pos P
 		position: pos
 	}
 }
+
+pub fn new_list_literal(id int, elements []Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .list_literal
+		value:    '[]'
+		children: elements
+		position: pos
+	}
+}
+
+pub fn new_list_cons(id int, head Node, tail Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .list_cons
+		value:    '[]'
+		children: [head, tail]
+		position: pos
+	}
+}

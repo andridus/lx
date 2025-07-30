@@ -305,6 +305,7 @@ fn (mut p Parser) parse_prefix_expression() !ast.Node {
 		.integer, .float, .string, .true_, .false_, .atom, .nil_ { p.parse_literal() }
 		.identifier { p.parse_identifier_expression() }
 		.lparen { p.parse_parentheses() }
+		.lbracket { p.parse_list_expression() }
 		else { error('Unexpected token: ${p.current.type_}') }
 	}
 }
@@ -321,6 +322,13 @@ fn (mut p Parser) parse_identifier_expression() !ast.Node {
 	// Verifica se é uma chamada de função (com parênteses)
 	if p.current.type_ == .lparen {
 		return p.parse_function_call(identifier, pos)
+	}
+
+	// Verifica se é uma função nativa prefix (como not, length)
+	if p.is_native_prefix_function(identifier) {
+		// Para funções prefix, o próximo token deve ser um argumento
+		arg := p.parse_expression()!
+		return ast.new_function_caller(p.get_next_id(), identifier, [arg], pos)
 	}
 
 	// Verifica se é um binding (identificador seguido de =)
@@ -468,4 +476,54 @@ fn (p Parser) is_operator(identifier string) bool {
 fn (p Parser) is_infix_function(name string) bool {
 	function_info := kernel.get_function_info(name) or { return false }
 	return function_info.fixity == .infix
+}
+
+fn (p Parser) is_native_prefix_function(identifier string) bool {
+	// Lista de funções nativas prefix
+	prefix_functions := ['not', 'length']
+	return identifier in prefix_functions
+}
+
+fn (mut p Parser) parse_list_expression() !ast.Node {
+	pos := p.current.position
+	p.advance() // Skip '['
+
+	// Check for empty list
+	if p.current.type_ == .rbracket {
+		p.advance() // Skip ']'
+		return ast.new_list_literal(p.get_next_id(), [], pos)
+	}
+
+	// Parse first element
+	first_element := p.parse_expression()!
+
+	// Check if it's a cons operation
+	if p.current.type_ == .pipe {
+		p.advance() // Skip '|'
+		tail := p.parse_expression()!
+
+		if p.current.type_ != .rbracket {
+			return error('Expected closing bracket')
+		}
+		p.advance() // Skip ']'
+
+		return ast.new_list_cons(p.get_next_id(), first_element, tail, pos)
+	}
+
+	// It's a regular list literal
+	mut elements := [first_element]
+
+	// Parse remaining elements
+	for p.current.type_ == .comma {
+		p.advance() // Skip comma
+		element := p.parse_expression()!
+		elements << element
+	}
+
+	if p.current.type_ != .rbracket {
+		return error('Expected closing bracket')
+	}
+	p.advance() // Skip ']'
+
+	return ast.new_list_literal(p.get_next_id(), elements, pos)
 }

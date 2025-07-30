@@ -24,6 +24,10 @@ pub enum TokenType {
 	semicolon // ;
 	comma     // ,
 	bind      // =
+	lbracket  // [
+	rbracket  // ]
+	pipe      // |
+
 	// Special
 	newline
 	eof
@@ -67,6 +71,9 @@ pub fn (tt TokenType) str() string {
 		.bind { '=' }
 		.semicolon { ';' }
 		.comma { ',' }
+		.lbracket { '[' }
+		.rbracket { ']' }
+		.pipe { '|' }
 		.newline { 'newline' }
 		.eof { 'eof' }
 		.error { 'error' }

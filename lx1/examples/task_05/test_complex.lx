@@ -1,0 +1,7 @@
+def complex_list_operations() do
+    numbers = [1, 2, 3]
+    extended = [0 | numbers]
+    combined = [1, 2] ++ [3, 4] ++ [5, 6]
+    matrix = [[1, 2], [3, 4], [5, 6]]
+    extended
+end

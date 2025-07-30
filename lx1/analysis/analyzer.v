@@ -74,6 +74,12 @@ fn (mut a Analyzer) analyze_node(node ast.Node) !ast.Node {
 		.directive_call {
 			a.analyze_directive_call(node)
 		}
+		.list_literal {
+			a.analyze_list_literal(node)
+		}
+		.list_cons {
+			a.analyze_list_cons(node)
+		}
 		else {
 			a.error('Unsupported node type: ${node.kind}', node.position)
 			return error('Unsupported node type: ${node.kind}')
@@ -279,20 +285,50 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 
 	function_name := node.value // Nome da função (ex: "+", "*", ">")
 
-	// Obtém informações da função nativa
 	function_info := kernel.get_function_info(function_name) or {
 		a.error('Unknown function: ${function_name}', node.position)
 		return error('Unknown function')
 	}
 
-	// Analisa todos os argumentos
 	mut analyzed_args := []ast.Node{}
 	for arg in node.children {
 		analyzed_arg := a.analyze_node(arg)!
 		analyzed_args << analyzed_arg
 	}
 
-	// Verifica aridade da função (número de argumentos)
+	if function_info.fixity == .infix && analyzed_args.len == 2 && function_info.signatures.len > 0 {
+		expected_return := function_info.signatures[0].return_type
+		if expected_return.name == 'list' {
+			mut all_types := collect_list_types_rec(ast.Node{
+				...node
+				children: analyzed_args
+			}, &a.type_table)
+			mut unique_types := []ast.Type{}
+			mut seen := map[string]bool{}
+			for t in all_types {
+				if !seen[t.name] {
+					seen[t.name] = true
+					unique_types << t
+				}
+			}
+			final_type := if unique_types.len == 1 {
+				unique_types[0]
+			} else {
+				ast.Type{
+					name:   'union'
+					params: unique_types
+				}
+			}
+			a.type_table.assign_type(node.id, ast.Type{ name: 'list', params: [
+				final_type,
+			] })
+			return ast.Node{
+				...node
+				children: analyzed_args
+			}
+		}
+	}
+
 	expected_arity := function_info.signatures[0].parameters.len
 	if analyzed_args.len != expected_arity {
 		a.error('Function ${function_name}/${expected_arity} called with ${analyzed_args.len} arguments',
@@ -300,7 +336,6 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 		return error('Invalid function arity')
 	}
 
-	// Verifica número de argumentos baseado no fixity
 	match function_info.fixity {
 		.infix {
 			if analyzed_args.len != 2 {
@@ -325,7 +360,6 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 		}
 	}
 
-	// Para operadores binários, verifica tipos dos argumentos
 	if function_info.fixity == .infix && analyzed_args.len == 2 {
 		left_type := a.type_table.get_type(analyzed_args[0].id) or {
 			ast.Type{
@@ -340,7 +374,6 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 			}
 		}
 
-		// Verifica se os tipos correspondem a alguma das assinaturas da função
 		result_type := a.check_function_signatures(function_name, left_type, right_type,
 			function_info.signatures) or {
 			a.error('Invalid operator: ${function_name}(${left_type.name}, ${right_type.name})',
@@ -348,7 +381,22 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 			return error('Type mismatch in function call')
 		}
 
-		// Assign result type to function call node
+		a.type_table.assign_type(node.id, result_type)
+	}
+
+	if function_info.fixity == .prefix && analyzed_args.len == 1 {
+		arg_type := a.type_table.get_type(analyzed_args[0].id) or {
+			ast.Type{
+				name:   'unknown'
+				params: []
+			}
+		}
+
+		result_type := a.check_prefix_function_signatures(function_name, arg_type, function_info.signatures) or {
+			a.error('Invalid function: ${function_name}(${arg_type.name})', node.position)
+			return error('Type mismatch in function call')
+		}
+
 		a.type_table.assign_type(node.id, result_type)
 	}
 
@@ -359,22 +407,49 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 }
 
 fn (mut a Analyzer) check_function_signatures(function_name string, left_type ast.Type, right_type ast.Type, signatures []kernel.TypeSignature) !ast.Type {
-	// Tenta encontrar uma assinatura que corresponda aos tipos dos argumentos
 	for signature in signatures {
 		if signature.parameters.len != 2 {
-			continue // Pula assinaturas inválidas
+			continue
 		}
-
 		expected_left := signature.parameters[0]
 		expected_right := signature.parameters[1]
 
-		// Verifica se os tipos correspondem
-		if left_type.name == expected_left.name && right_type.name == expected_right.name {
+		if a.types_compatible(left_type, expected_left)
+			&& a.types_compatible(right_type, expected_right) {
 			return signature.return_type
 		}
 	}
 
 	return error('No matching signature found for function ${function_name}(${left_type.name}, ${right_type.name})')
+}
+
+fn (a Analyzer) types_compatible(actual ast.Type, expected ast.Type) bool {
+	// Tipos exatos são sempre compatíveis
+	if actual.name == expected.name {
+		return true
+	}
+
+	// Tipos específicos são compatíveis com 'any'
+	if expected.name == 'any' {
+		return true
+	}
+	return false
+}
+
+fn (mut a Analyzer) check_prefix_function_signatures(function_name string, arg_type ast.Type, signatures []kernel.TypeSignature) !ast.Type {
+	for signature in signatures {
+		if signature.parameters.len != 1 {
+			continue
+		}
+
+		expected_arg := signature.parameters[0]
+
+		if a.types_compatible(arg_type, expected_arg) {
+			return signature.return_type
+		}
+	}
+
+	return error('No matching signature found for function ${function_name}(${arg_type.name})')
 }
 
 fn (mut a Analyzer) analyze_parentheses(node ast.Node) !ast.Node {
@@ -422,4 +497,200 @@ fn (mut a Analyzer) analyze_directive_call(node ast.Node) !ast.Node {
 	}
 
 	return node
+}
+
+fn (mut a Analyzer) analyze_list_literal(node ast.Node) !ast.Node {
+	if node.children.len == 0 {
+		// Empty list
+		a.type_table.assign_type(node.id, ast.Type{
+			name:   'list'
+			params: [ast.Type{
+				name:   'any'
+				params: []
+			}]
+		})
+		return node
+	}
+
+	// Analyze all elements
+	mut analyzed_elements := []ast.Node{}
+	mut element_types := []ast.Type{}
+
+	for element in node.children {
+		analyzed_element := a.analyze_node(element)!
+		analyzed_elements << analyzed_element
+
+		element_type := a.type_table.get_type(analyzed_element.id) or {
+			ast.Type{
+				name:   'unknown'
+				params: []
+			}
+		}
+		element_types << element_type
+	}
+
+	// Infer common type for list elements
+	common_type := a.infer_common_type(element_types) or {
+		ast.Type{
+			name:   'any'
+			params: []
+		}
+	}
+
+	// Assign list type
+	list_type := ast.Type{
+		name:   'list'
+		params: [common_type]
+	}
+	a.type_table.assign_type(node.id, list_type)
+
+	return ast.Node{
+		id:       node.id
+		kind:     node.kind
+		value:    node.value
+		children: analyzed_elements
+		position: node.position
+	}
+}
+
+fn (mut a Analyzer) analyze_list_cons(node ast.Node) !ast.Node {
+	if node.children.len != 2 {
+		return error('List cons must have exactly 2 children (head and tail)')
+	}
+
+	head := a.analyze_node(node.children[0])!
+	tail := a.analyze_node(node.children[1])!
+
+	head_type := a.type_table.get_type(head.id) or {
+		ast.Type{
+			name:   'unknown'
+			params: []
+		}
+	}
+	tail_type := a.type_table.get_type(tail.id) or {
+		ast.Type{
+			name:   'unknown'
+			params: []
+		}
+	}
+
+	// Verify tail is a list
+	if tail_type.name != 'list' {
+		a.error('Tail must be a list, got ${tail_type.name}', node.position)
+		return error('Type mismatch in list cons')
+	}
+
+	// Determine the element type for the resulting list
+	mut element_type := head_type
+
+	// If tail has elements, create union type with head
+	if tail_type.params.len == 1 {
+		tail_elem_type := tail_type.params[0]
+
+		// If tail element is 'any' (empty list), preserve head type
+		if tail_elem_type.name == 'any' {
+			element_type = head_type
+		} else if head_type.name != tail_elem_type.name {
+			// If head and tail element types are different, create union
+			element_type = ast.Type{
+				name:   'union'
+				params: [head_type, tail_elem_type]
+			}
+		}
+	}
+
+	// Create list type with determined element type
+	list_type := ast.Type{
+		name:   'list'
+		params: [element_type]
+	}
+	a.type_table.assign_type(node.id, list_type)
+
+	return ast.Node{
+		id:       node.id
+		kind:     node.kind
+		value:    node.value
+		children: [head, tail]
+		position: node.position
+	}
+}
+
+fn (mut a Analyzer) infer_common_type(types []ast.Type) ?ast.Type {
+	if types.len == 0 {
+		return ast.Type{
+			name:   'any'
+			params: []
+		}
+	}
+
+	if types.len == 1 {
+		return types[0]
+	}
+
+	// Check if all types are the same
+	mut all_same := true
+	first_type := types[0]
+	for i := 1; i < types.len; i++ {
+		if types[i].name != first_type.name {
+			all_same = false
+			break
+		}
+	}
+
+	if all_same {
+		return first_type
+	}
+
+	// Create union type with all unique types
+	mut unique_types := []ast.Type{}
+	mut seen_types := map[string]bool{}
+
+	for typ in types {
+		if typ.name == 'any' {
+			// If any type is 'any', the result is 'any'
+			return ast.Type{
+				name:   'any'
+				params: []
+			}
+		}
+
+		if !seen_types[typ.name] {
+			seen_types[typ.name] = true
+			unique_types << typ
+		}
+	}
+
+	// If we have multiple different types, create a union type
+	if unique_types.len > 1 {
+		return ast.Type{
+			name:   'union'
+			params: unique_types
+		}
+	}
+
+	// If we have only one unique type, return it
+	return unique_types[0]
+}
+
+fn collect_list_types_rec(node ast.Node, type_table &TypeTable) []ast.Type {
+	mut types := []ast.Type{}
+	if node.kind == .function_caller && node.value == '++' && node.children.len == 2 {
+		types << collect_list_types_rec(node.children[0], type_table)
+		types << collect_list_types_rec(node.children[1], type_table)
+	} else {
+		typ := type_table.get_type(node.id) or {
+			ast.Type{
+				name:   'unknown'
+				params: []
+			}
+		}
+		if typ.name == 'list' && typ.params.len == 1 {
+			if typ.params[0].name == 'union' {
+				types << typ.params[0].params
+			} else {
+				types << typ.params[0]
+			}
+		}
+	}
+	return types
 }
