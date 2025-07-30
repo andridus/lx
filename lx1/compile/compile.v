@@ -7,7 +7,7 @@ import generator
 import ast
 import errors
 
-pub fn compile_file(file_path string, show_type_table bool, show_nodes bool) {
+pub fn compile_file(file_path string) {
 	if !os.exists(file_path) {
 		eprintln('Error: File "${file_path}" not found')
 		exit(1)
@@ -25,8 +25,7 @@ pub fn compile_file(file_path string, show_type_table bool, show_nodes bool) {
 
 	module_name := os.file_name(file_path).all_before_last('.')
 
-	result := compile_string_with_modname(content, file_path, module_name, show_type_table,
-		show_nodes) or {
+	result := compile_string_with_modname(content, file_path, module_name) or {
 		eprintln('Compilation failed: ${err}')
 		exit(1)
 	}
@@ -38,13 +37,12 @@ pub fn compile_file(file_path string, show_type_table bool, show_nodes bool) {
 	}
 }
 
-pub fn compile_string(code string, file_path string, show_type_table bool, show_nodes bool) !string {
+pub fn compile_string(code string, file_path string) !string {
 	module_name := os.file_name(file_path).all_before_last('.')
-	return compile_string_with_modname(code, file_path, module_name, show_type_table,
-		show_nodes)
+	return compile_string_with_modname(code, file_path, module_name)
 }
 
-pub fn compile_string_with_modname(code string, file_path string, module_name string, show_type_table bool, show_nodes bool) !string {
+pub fn compile_string_with_modname(code string, file_path string, module_name string) !string {
 	mut p := parser.new_parser(code, file_path)
 	ast_node := p.parse_with_modname(module_name) or {
 		parser_errors := p.get_errors()
@@ -70,13 +68,6 @@ pub fn compile_string_with_modname(code string, file_path string, module_name st
 		}
 		return error(error_msg)
 	}
-
-	if show_nodes {
-		println('=== AST NODES ===')
-		print_ast_nodes(ast_node, 0)
-		println('=================')
-	}
-
 	mut analyzer := analysis.new_analyzer()
 	analyzed_ast := analyzer.analyze(ast_node) or {
 		analysis_errors := analyzer.get_errors()
@@ -99,11 +90,6 @@ pub fn compile_string_with_modname(code string, file_path string, module_name st
 		}
 		return error(error_msg)
 	}
-
-	if show_type_table {
-		analyzer.get_type_table().debug_print()
-	}
-
 	mut gen := generator.new_generator()
 	erlang_code := gen.generate_with_types(analyzed_ast, analyzer.get_type_table()) or {
 		errs := gen.get_errors()

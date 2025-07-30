@@ -13,8 +13,6 @@ fn main() {
 	}
 
 	arg := os.args[1]
-	show_type_table := os.args.contains('--type-table')
-	show_nodes := os.args.contains('--nodes')
 
 	match arg {
 		'--version' {
@@ -33,7 +31,7 @@ fn main() {
 			file := os.args[2]
 			module_name := os.file_name(file).all_before_last('.')
 			dir := os.dir(file)
-			compile.compile_file(file, false, false)
+			compile.compile_file(file)
 			original_dir := os.getwd()
 			os.chdir(dir) or {
 				eprintln('Failed to change directory: ${err}')
@@ -60,7 +58,7 @@ fn main() {
 			return
 		}
 		else {
-			compile.compile_file(arg, show_type_table, show_nodes)
+			compile.compile_file(arg)
 		}
 	}
 }

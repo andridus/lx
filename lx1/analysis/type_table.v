@@ -29,11 +29,3 @@ pub fn (mut tt TypeTable) generate_id() int {
 	tt.next_id++
 	return id
 }
-
-pub fn (tt TypeTable) debug_print() {
-	println('=== TYPE TABLE ===')
-	for id, typ in tt.types {
-		println('  Node ${id}: ${typ.str()}')
-	}
-	println('==================')
-}
