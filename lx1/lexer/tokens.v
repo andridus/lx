@@ -27,6 +27,8 @@ pub enum TokenType {
 	lbracket  // [
 	rbracket  // ]
 	pipe      // |
+	lbrace    // {
+	rbrace    // }
 
 	// Special
 	newline
@@ -74,6 +76,8 @@ pub fn (tt TokenType) str() string {
 		.lbracket { '[' }
 		.rbracket { ']' }
 		.pipe { '|' }
+		.lbrace { '{' }
+		.rbrace { '}' }
 		.newline { 'newline' }
 		.eof { 'eof' }
 		.error { 'error' }

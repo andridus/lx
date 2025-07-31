@@ -158,3 +158,13 @@ pub fn new_list_cons(id int, head Node, tail Node, pos Position) Node {
 		position: pos
 	}
 }
+
+pub fn new_tuple_literal(id int, elements []Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .tuple_literal
+		value:    '{}'
+		children: elements
+		position: pos
+	}
+}

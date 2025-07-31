@@ -80,6 +80,9 @@ fn (mut a Analyzer) analyze_node(node ast.Node) !ast.Node {
 		.list_cons {
 			a.analyze_list_cons(node)
 		}
+		.tuple_literal {
+			a.analyze_tuple_literal(node)
+		}
 		else {
 			a.error('Unsupported node type: ${node.kind}', node.position)
 			return error('Unsupported node type: ${node.kind}')
@@ -216,7 +219,7 @@ fn (mut a Analyzer) analyze_binding(node ast.Node) !ast.Node {
 
 	value_type := a.type_table.get_type(value_node.id) or {
 		ast.Type{
-			name:   'unknown'
+			name:   'any'
 			params: []
 		}
 	}
@@ -261,7 +264,7 @@ fn (mut a Analyzer) analyze_block(node ast.Node) !ast.Node {
 	if analyzed_exprs.len > 0 {
 		last_type := a.type_table.get_type(analyzed_exprs.last().id) or {
 			ast.Type{
-				name:   'unknown'
+				name:   'any'
 				params: []
 			}
 		}
@@ -319,9 +322,12 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 					params: unique_types
 				}
 			}
-			a.type_table.assign_type(node.id, ast.Type{ name: 'list', params: [
-				final_type,
-			] })
+			a.type_table.assign_type(node.id, ast.Type{
+				name:   'list'
+				params: [
+					final_type,
+				]
+			})
 			return ast.Node{
 				...node
 				children: analyzed_args
@@ -345,10 +351,23 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 			}
 		}
 		.prefix {
-			if analyzed_args.len != 1 {
-				a.error('Prefix operator ${function_name} requires exactly 1 argument, got ${analyzed_args.len}',
-					node.position)
-				return error('Invalid number of arguments')
+			// Check if this is a multi-arg prefix function
+			if a.is_multi_arg_prefix_function(function_name) {
+				// Multi-arg prefix functions can have variable number of arguments
+				// Just check that we have at least the minimum required
+				min_args := function_info.signatures[0].parameters.len
+				if analyzed_args.len < min_args {
+					a.error('Function ${function_name} requires at least ${min_args} arguments, got ${analyzed_args.len}',
+						node.position)
+					return error('Invalid number of arguments')
+				}
+			} else {
+				// Single-arg prefix functions
+				if analyzed_args.len != 1 {
+					a.error('Prefix operator ${function_name} requires exactly 1 argument, got ${analyzed_args.len}',
+						node.position)
+					return error('Invalid number of arguments')
+				}
 			}
 		}
 		.postfix {
@@ -363,13 +382,13 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 	if function_info.fixity == .infix && analyzed_args.len == 2 {
 		left_type := a.type_table.get_type(analyzed_args[0].id) or {
 			ast.Type{
-				name:   'unknown'
+				name:   'any'
 				params: []
 			}
 		}
 		right_type := a.type_table.get_type(analyzed_args[1].id) or {
 			ast.Type{
-				name:   'unknown'
+				name:   'any'
 				params: []
 			}
 		}
@@ -387,7 +406,7 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 	if function_info.fixity == .prefix && analyzed_args.len == 1 {
 		arg_type := a.type_table.get_type(analyzed_args[0].id) or {
 			ast.Type{
-				name:   'unknown'
+				name:   'any'
 				params: []
 			}
 		}
@@ -460,7 +479,7 @@ fn (mut a Analyzer) analyze_parentheses(node ast.Node) !ast.Node {
 	expr := a.analyze_node(node.children[0])!
 	expr_type := a.type_table.get_type(expr.id) or {
 		ast.Type{
-			name:   'unknown'
+			name:   'any'
 			params: []
 		}
 	}
@@ -680,7 +699,7 @@ fn collect_list_types_rec(node ast.Node, type_table &TypeTable) []ast.Type {
 	} else {
 		typ := type_table.get_type(node.id) or {
 			ast.Type{
-				name:   'unknown'
+				name:   'any'
 				params: []
 			}
 		}
@@ -693,4 +712,57 @@ fn collect_list_types_rec(node ast.Node, type_table &TypeTable) []ast.Type {
 		}
 	}
 	return types
+}
+
+fn (mut a Analyzer) analyze_tuple_literal(node ast.Node) !ast.Node {
+	if node.children.len == 0 {
+		// Empty tuple
+		tuple_type := ast.Type{
+			name:   'tuple'
+			params: [ast.Type{
+				name:   'any'
+				params: []
+			}]
+		}
+		a.type_table.assign_type(node.id, tuple_type)
+		return node
+	}
+
+	// Analyze all elements
+	mut analyzed_elements := []ast.Node{}
+	mut element_types := []ast.Type{}
+
+	for element in node.children {
+		analyzed_element := a.analyze_node(element)!
+		analyzed_elements << analyzed_element
+
+		element_type := a.type_table.get_type(analyzed_element.id) or {
+			ast.Type{
+				name:   'any'
+				params: []
+			}
+		}
+		element_types << element_type
+	}
+
+	// Create tuple type with specific element types
+	tuple_type := ast.Type{
+		name:   'tuple'
+		params: element_types
+	}
+	a.type_table.assign_type(node.id, tuple_type)
+
+	return ast.Node{
+		id:       node.id
+		kind:     node.kind
+		value:    node.value
+		children: analyzed_elements
+		position: node.position
+	}
+}
+
+fn (a Analyzer) is_multi_arg_prefix_function(function_name string) bool {
+	// Lista de funções nativas prefix que recebem múltiplos argumentos
+	multi_arg_prefix_functions := ['element', 'setelement']
+	return function_name in multi_arg_prefix_functions
 }

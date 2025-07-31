@@ -40,6 +40,9 @@ pub enum NodeKind {
 	// List Operations
 	list_literal // [1, 2, 3] ou []
 	list_cons    // [head | tail]
+
+	// Tuple Operations
+	tuple_literal // {1, 2, 3} ou {}
 }
 
 pub struct Position {

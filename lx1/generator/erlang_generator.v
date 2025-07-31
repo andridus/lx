@@ -93,6 +93,9 @@ fn (mut g ErlangGenerator) generate_node(node ast.Node) ! {
 		.list_cons {
 			g.generate_list_cons(node)!
 		}
+		.tuple_literal {
+			g.generate_tuple_literal(node)!
+		}
 		else {
 			return error('Unsupported node type: ${node.kind}')
 		}
@@ -301,19 +304,46 @@ fn (mut g ErlangGenerator) generate_function_caller(node ast.Node) ! {
 			g.output.write_string(result)
 		}
 		.prefix {
-			if node.children.len != 1 {
-				return error('Prefix operator requires exactly 1 argument')
-			}
-			arg_code := g.generate_node_to_string(node.children[0])!
+			// Check if this is a multi-arg prefix function
+			if g.is_multi_arg_prefix_function(function_name) {
+				// Multi-arg prefix functions are called as regular functions
+				if function_info.gen.len == 0 {
+					return error('No templates found for function: ${function_name}')
+				}
+				template := function_info.gen[0]['erl'] or {
+					return error('No Erlang template found for function: ${function_name}')
+				}
 
-			if function_info.gen.len == 0 {
-				return error('No templates found for function: ${function_name}')
+				// Generate all arguments
+				mut arg_codes := []string{}
+				for child in node.children {
+					arg_code := g.generate_node_to_string(child)!
+					arg_codes << arg_code
+				}
+
+				// Replace placeholders in template
+				mut result := template
+				for i, arg_code in arg_codes {
+					placeholder := '$${i + 1}'
+					result = result.replace(placeholder, arg_code)
+				}
+				g.output.write_string(result)
+			} else {
+				// Single-arg prefix functions
+				if node.children.len != 1 {
+					return error('Prefix operator requires exactly 1 argument')
+				}
+				arg_code := g.generate_node_to_string(node.children[0])!
+
+				if function_info.gen.len == 0 {
+					return error('No templates found for function: ${function_name}')
+				}
+				template := function_info.gen[0]['erl'] or {
+					return error('No Erlang template found for function: ${function_name}')
+				}
+				result := template.replace('$1', arg_code)
+				g.output.write_string(result)
 			}
-			template := function_info.gen[0]['erl'] or {
-				return error('No Erlang template found for function: ${function_name}')
-			}
-			result := template.replace('$1', arg_code)
-			g.output.write_string(result)
 		}
 		else {
 			return error('Unsupported fixity: ${function_info.fixity}')
@@ -353,6 +383,9 @@ fn (mut g ErlangGenerator) generate_node_to_string(node ast.Node) !string {
 		}
 		.list_cons {
 			return g.generate_list_cons_to_string(node)
+		}
+		.tuple_literal {
+			return g.generate_tuple_literal_to_string(node)
 		}
 		else {
 			return error('Unsupported node type for string generation: ${node.kind}')
@@ -410,17 +443,44 @@ fn (mut g ErlangGenerator) generate_function_caller_to_string(node ast.Node) !st
 			return template.replace('$1', left_code).replace('$2', right_code)
 		}
 		.prefix {
-			if node.children.len != 1 {
-				return error('Prefix operator requires exactly 1 argument')
+			// Check if this is a multi-arg prefix function
+			if g.is_multi_arg_prefix_function(function_name) {
+				// Multi-arg prefix functions are called as regular functions
+				if function_info.gen.len == 0 {
+					return error('No templates found for function: ${function_name}')
+				}
+				template := function_info.gen[0]['erl'] or {
+					return error('No Erlang template found for function: ${function_name}')
+				}
+
+				// Generate all arguments
+				mut arg_codes := []string{}
+				for child in node.children {
+					arg_code := g.generate_node_to_string(child)!
+					arg_codes << arg_code
+				}
+
+				// Replace placeholders in template
+				mut result := template
+				for i, arg_code in arg_codes {
+					placeholder := '$${i + 1}'
+					result = result.replace(placeholder, arg_code)
+				}
+				return result
+			} else {
+				// Single-arg prefix functions
+				if node.children.len != 1 {
+					return error('Prefix operator requires exactly 1 argument')
+				}
+				if function_info.gen.len == 0 {
+					return error('No templates found for function: ${function_name}')
+				}
+				template := function_info.gen[0]['erl'] or {
+					return error('No Erlang template found for function: ${function_name}')
+				}
+				arg_code := g.generate_node_to_string(node.children[0])!
+				return template.replace('$1', arg_code)
 			}
-			if function_info.gen.len == 0 {
-				return error('No templates found for function: ${function_name}')
-			}
-			template := function_info.gen[0]['erl'] or {
-				return error('No Erlang template found for function: ${function_name}')
-			}
-			arg_code := g.generate_node_to_string(node.children[0])!
-			return template.replace('$1', arg_code)
 		}
 		else {
 			return error('Unsupported fixity: ${function_info.fixity}')
@@ -501,4 +561,45 @@ fn (mut g ErlangGenerator) generate_list_cons_to_string(node ast.Node) !string {
 	head_code := g.generate_node_to_string(node.children[0])!
 	tail_code := g.generate_node_to_string(node.children[1])!
 	return '[${head_code} | ${tail_code}]'
+}
+
+fn (mut g ErlangGenerator) generate_tuple_literal(node ast.Node) ! {
+	if node.children.len == 0 {
+		g.output.write_string('{}')
+		return
+	}
+
+	g.output.write_string('{')
+
+	for i, element in node.children {
+		if i > 0 {
+			g.output.write_string(', ')
+		}
+		g.generate_node(element)!
+	}
+
+	g.output.write_string('}')
+}
+
+fn (mut g ErlangGenerator) generate_tuple_literal_to_string(node ast.Node) !string {
+	if node.children.len == 0 {
+		return '{}'
+	}
+
+	mut result := '{'
+	for i, element in node.children {
+		if i > 0 {
+			result += ', '
+		}
+		element_code := g.generate_node_to_string(element)!
+		result += element_code
+	}
+	result += '}'
+	return result
+}
+
+fn (g ErlangGenerator) is_multi_arg_prefix_function(function_name string) bool {
+	// Lista de funções nativas prefix que recebem múltiplos argumentos
+	multi_arg_prefix_functions := ['element', 'setelement']
+	return function_name in multi_arg_prefix_functions
 }

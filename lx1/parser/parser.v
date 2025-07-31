@@ -306,6 +306,7 @@ fn (mut p Parser) parse_prefix_expression() !ast.Node {
 		.identifier { p.parse_identifier_expression() }
 		.lparen { p.parse_parentheses() }
 		.lbracket { p.parse_list_expression() }
+		.lbrace { p.parse_tuple_expression() }
 		else { error('Unexpected token: ${p.current.type_}') }
 	}
 }
@@ -324,9 +325,8 @@ fn (mut p Parser) parse_identifier_expression() !ast.Node {
 		return p.parse_function_call(identifier, pos)
 	}
 
-	// Verifica se é uma função nativa prefix (como not, length)
-	if p.is_native_prefix_function(identifier) {
-		// Para funções prefix, o próximo token deve ser um argumento
+	// used to not required parameters
+	if p.is_single_arg_prefix_function(identifier) {
 		arg := p.parse_expression()!
 		return ast.new_function_caller(p.get_next_id(), identifier, [arg], pos)
 	}
@@ -478,10 +478,9 @@ fn (p Parser) is_infix_function(name string) bool {
 	return function_info.fixity == .infix
 }
 
-fn (p Parser) is_native_prefix_function(identifier string) bool {
-	// Lista de funções nativas prefix
-	prefix_functions := ['not', 'length']
-	return identifier in prefix_functions
+fn (p Parser) is_single_arg_prefix_function(identifier string) bool {
+	single_arg_prefix_functions := ['not']
+	return identifier in single_arg_prefix_functions
 }
 
 fn (mut p Parser) parse_list_expression() !ast.Node {
@@ -526,4 +525,35 @@ fn (mut p Parser) parse_list_expression() !ast.Node {
 	p.advance() // Skip ']'
 
 	return ast.new_list_literal(p.get_next_id(), elements, pos)
+}
+
+fn (mut p Parser) parse_tuple_expression() !ast.Node {
+	pos := p.current.position
+	p.advance() // Skip '{'
+
+	// Check for empty tuple
+	if p.current.type_ == .rbrace {
+		p.advance() // Skip '}'
+		return ast.new_tuple_literal(p.get_next_id(), [], pos)
+	}
+
+	// Parse first element
+	first_element := p.parse_expression()!
+
+	// It's a regular tuple literal
+	mut elements := [first_element]
+
+	// Parse remaining elements
+	for p.current.type_ == .comma {
+		p.advance() // Skip comma
+		element := p.parse_expression()!
+		elements << element
+	}
+
+	if p.current.type_ != .rbrace {
+		return error('Expected closing brace')
+	}
+	p.advance() // Skip '}'
+
+	return ast.new_tuple_literal(p.get_next_id(), elements, pos)
 }
