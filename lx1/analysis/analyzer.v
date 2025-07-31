@@ -849,8 +849,18 @@ fn (mut a Analyzer) analyze_map_access(node ast.Node) !ast.Node {
 	key_expr := a.analyze_node(node.children[1])!
 
 	// Get types
-	map_type := a.type_table.get_type(map_expr.id) or { ast.Type{name: 'unknown', params: []} }
-	_ := a.type_table.get_type(key_expr.id) or { ast.Type{name: 'unknown', params: []} }
+	map_type := a.type_table.get_type(map_expr.id) or {
+		ast.Type{
+			name:   'unknown'
+			params: []
+		}
+	}
+	_ := a.type_table.get_type(key_expr.id) or {
+		ast.Type{
+			name:   'unknown'
+			params: []
+		}
+	}
 
 	// Check if map_expr is actually a map
 	if map_type.name != 'map' {
@@ -859,7 +869,10 @@ fn (mut a Analyzer) analyze_map_access(node ast.Node) !ast.Node {
 	}
 
 	// Result type is 'any' since we don't know the specific value type
-	result_type := ast.Type{name: 'any', params: []}
+	result_type := ast.Type{
+		name:   'any'
+		params: []
+	}
 	a.type_table.assign_type(node.id, result_type)
 
 	return ast.Node{

@@ -495,6 +495,11 @@ fn (mut p Parser) parse_list_expression() !ast.Node {
 	pos := p.current.position
 	p.advance() // Skip '['
 
+	// Skip newlines after opening bracket
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+
 	// Check for empty list
 	if p.current.type_ == .rbracket {
 		p.advance() // Skip ']'
@@ -523,8 +528,19 @@ fn (mut p Parser) parse_list_expression() !ast.Node {
 	// Parse remaining elements
 	for p.current.type_ == .comma {
 		p.advance() // Skip comma
+
+		// Skip newlines after comma
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+
 		element := p.parse_expression()!
 		elements << element
+	}
+
+	// Skip newlines before closing bracket
+	for p.current.type_ == .newline {
+		p.advance()
 	}
 
 	if p.current.type_ != .rbracket {
@@ -538,6 +554,11 @@ fn (mut p Parser) parse_list_expression() !ast.Node {
 fn (mut p Parser) parse_tuple_expression() !ast.Node {
 	pos := p.current.position
 	p.advance() // Skip '{'
+
+	// Skip newlines after opening brace
+	for p.current.type_ == .newline {
+		p.advance()
+	}
 
 	// Check for empty tuple
 	if p.current.type_ == .rbrace {
@@ -554,8 +575,19 @@ fn (mut p Parser) parse_tuple_expression() !ast.Node {
 	// Parse remaining elements
 	for p.current.type_ == .comma {
 		p.advance() // Skip comma
+
+		// Skip newlines after comma
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+
 		element := p.parse_expression()!
 		elements << element
+	}
+
+	// Skip newlines before closing brace
+	for p.current.type_ == .newline {
+		p.advance()
 	}
 
 	if p.current.type_ != .rbrace {
@@ -574,6 +606,11 @@ fn (mut p Parser) parse_map_literal() !ast.Node {
 		return error('Expected opening brace after %')
 	}
 	p.advance() // Skip '{'
+
+	// Skip newlines after opening brace
+	for p.current.type_ == .newline {
+		p.advance()
+	}
 
 	// Check for empty map
 	if p.current.type_ == .rbrace {
@@ -608,6 +645,16 @@ fn (mut p Parser) parse_map_literal() !ast.Node {
 		}
 
 		p.advance() // Skip comma
+
+		// Skip newlines after comma
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+	}
+
+	// Skip newlines before closing brace
+	for p.current.type_ == .newline {
+		p.advance()
 	}
 
 	if p.current.type_ != .rbrace {

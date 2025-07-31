@@ -850,3 +850,66 @@ membership_var_refs() ->
 	result := compile_lx(lx_code)
 	assert result == expected
 }
+
+fn test_list_with_multiline() {
+	lx_code := 'def multiline_list() do
+    [1,
+     2,
+     3,
+     4,
+     5]
+end'
+
+	expected := '-module(test).
+-export([multiline_list/0]).
+
+-spec multiline_list() -> [integer()].
+multiline_list() ->
+    [1, 2, 3, 4, 5].
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+fn test_list_with_multiline_nested() {
+	lx_code := 'def multiline_nested() do
+    [[1, 2, 3],
+     [4, 5, 6],
+     [7, 8, 9]]
+end'
+
+	expected := '-module(test).
+-export([multiline_nested/0]).
+
+-spec multiline_nested() -> [[integer()]].
+multiline_nested() ->
+    [[1, 2, 3], [4, 5, 6], [7, 8, 9]].
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+fn test_list_cons_with_multiline() {
+	lx_code := 'def cons_multiline() do
+    head = 1
+    tail = [2,
+            3,
+            4]
+    [head | tail]
+end'
+
+	expected := '-module(test).
+-export([cons_multiline/0]).
+
+-spec cons_multiline() -> [integer()].
+cons_multiline() ->
+    HEAD_1 = 1,
+    TAIL_2 = [2, 3, 4],
+    [HEAD_1 | TAIL_2].
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}

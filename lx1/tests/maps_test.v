@@ -909,3 +909,44 @@ access_complex() ->
 	result := compile_lx(lx_code)
 	assert result == expected
 }
+
+fn test_map_with_multiline() {
+	lx_code := 'def multiline_map() do
+    %{"name": "João",
+      age: 30,
+      active: true}
+end'
+
+	expected := '-module(test).
+-export([multiline_map/0]).
+
+-spec multiline_map() -> map().
+multiline_map() ->
+    #{<<"name"/utf8>> => <<"João"/utf8>>, age => 30, active => true}.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+fn test_map_with_multiline_nested() {
+	lx_code := 'def multiline_nested() do
+    %{user: %{name: "Ana",
+               age: 25,
+               settings: %{theme: "dark",
+                          notifications: true}},
+      config: %{database: "postgres",
+                port: 5432}}
+end'
+
+	expected := '-module(test).
+-export([multiline_nested/0]).
+
+-spec multiline_nested() -> map().
+multiline_nested() ->
+    #{user => #{name => <<"Ana"/utf8>>, age => 25, settings => #{theme => <<"dark"/utf8>>, notifications => true}}, config => #{database => <<"postgres"/utf8>>, port => 5432}}.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}

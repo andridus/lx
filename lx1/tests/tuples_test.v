@@ -904,3 +904,71 @@ tuple_with_newlines() ->
 	result := compile_lx(lx_code)
 	assert result == expected
 }
+
+fn test_tuple_with_multiline() {
+	lx_code := 'def multiline_tuple() do
+    {1,
+     2,
+     3,
+     4,
+     5}
+end'
+
+	expected := '-module(test).
+-export([multiline_tuple/0]).
+
+-spec multiline_tuple() -> {integer(), integer(), integer(), integer(), integer()}.
+multiline_tuple() ->
+    {1, 2, 3, 4, 5}.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+fn test_tuple_with_multiline_nested() {
+	lx_code := 'def multiline_nested() do
+    {{1, 2, 3},
+     {4, 5, 6},
+     {7, 8, 9}}
+end'
+
+	expected := '-module(test).
+-export([multiline_nested/0]).
+
+-spec multiline_nested() -> {{integer(), integer(), integer()}, {integer(), integer(), integer()}, {integer(), integer(), integer()}}.
+multiline_nested() ->
+    {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+fn test_tuple_with_multiline_complex() {
+	lx_code := 'def multiline_complex() do
+    point = {10,
+             20}
+    rectangle = {{0, 0},
+                 {100, 200}}
+    user = {1,
+            "João",
+            30,
+            true}
+    {point, rectangle, user}
+end'
+
+	expected := '-module(test).
+-export([multiline_complex/0]).
+
+-spec multiline_complex() -> {{integer(), integer()}, {{integer(), integer()}, {integer(), integer()}}, {integer(), binary(), integer(), boolean()}}.
+multiline_complex() ->
+    POINT_1 = {10, 20},
+    RECTANGLE_2 = {{0, 0}, {100, 200}},
+    USER_3 = {1, <<"João"/utf8>>, 30, true},
+    {POINT_1, RECTANGLE_2, USER_3}.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
