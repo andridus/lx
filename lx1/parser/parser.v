@@ -294,6 +294,13 @@ fn (mut p Parser) parse_expression_with_precedence(precedence int) !ast.Node {
 			left = p.parse_infix_expression(left)!
 			continue
 		}
+
+		// Map access: expr[key]
+		if p.current.type_ == .lbracket {
+			left = p.parse_map_access(left)!
+			continue
+		}
+
 		break
 	}
 
@@ -307,6 +314,7 @@ fn (mut p Parser) parse_prefix_expression() !ast.Node {
 		.lparen { p.parse_parentheses() }
 		.lbracket { p.parse_list_expression() }
 		.lbrace { p.parse_tuple_expression() }
+		.percent { p.parse_map_literal() }
 		else { error('Unexpected token: ${p.current.type_}') }
 	}
 }
@@ -556,4 +564,87 @@ fn (mut p Parser) parse_tuple_expression() !ast.Node {
 	p.advance() // Skip '}'
 
 	return ast.new_tuple_literal(p.get_next_id(), elements, pos)
+}
+
+fn (mut p Parser) parse_map_literal() !ast.Node {
+	pos := p.current.position
+	p.advance() // Skip '%'
+
+	if p.current.type_ != .lbrace {
+		return error('Expected opening brace after %')
+	}
+	p.advance() // Skip '{'
+
+	// Check for empty map
+	if p.current.type_ == .rbrace {
+		p.advance() // Skip '}'
+		return ast.new_map_literal(p.get_next_id(), [], pos)
+	}
+
+	mut entries := []ast.Node{}
+
+	// Parse key-value pairs
+	for {
+		// Parse key (can be any term LX)
+		key := p.parse_map_key()!
+
+		if p.current.type_ != .colon {
+			return error('Expected colon after map key')
+		}
+		p.advance() // Skip ':'
+
+		// Parse value
+		value := p.parse_expression()!
+
+		entries << key
+		entries << value
+
+		if p.current.type_ == .rbrace {
+			break
+		}
+
+		if p.current.type_ != .comma {
+			return error('Expected comma or closing brace')
+		}
+
+		p.advance() // Skip comma
+	}
+
+	if p.current.type_ != .rbrace {
+		return error('Expected closing brace')
+	}
+
+	p.advance() // Skip '}'
+
+	return ast.new_map_literal(p.get_next_id(), entries, pos)
+}
+
+fn (mut p Parser) parse_map_key() !ast.Node {
+	// In map context, identifiers without : are treated as atoms
+	if p.current.type_ == .identifier {
+		// Check if next token is : (meaning this is an atom)
+		if p.next.type_ == .colon {
+			atom_name := p.current.value
+			pos := p.current.position
+			p.advance() // Skip identifier
+			return ast.new_atom(p.get_next_id(), atom_name, pos)
+		}
+	}
+
+	// Otherwise, parse as normal expression
+	return p.parse_expression()
+}
+
+fn (mut p Parser) parse_map_access(map_expr ast.Node) !ast.Node {
+	pos := p.current.position
+	p.advance() // Skip '['
+
+	key_expr := p.parse_expression()!
+
+	if p.current.type_ != .rbracket {
+		return error('Expected closing bracket for map access')
+	}
+	p.advance() // Skip ']'
+
+	return ast.new_map_access(p.get_next_id(), map_expr, key_expr, pos)
 }

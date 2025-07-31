@@ -753,6 +753,122 @@ pub const native_functions = {
 			'erl': 'setelement($1, $2, $3)'
 		}]
 	}
+	// Map size function
+	'map_size':   FunctionInfo{
+		precedence:    0
+		associativity: .left
+		fixity:        .prefix
+		signatures:    [
+			TypeSignature{
+				parameters:  [
+					ast.Type{
+						name:   'map'
+						params: [ast.Type{
+							name:   'any'
+							params: []
+						}]
+					},
+				]
+				return_type: ast.Type{
+					name:   'integer'
+					params: []
+				}
+			},
+		]
+		gen:           [{
+			'erl': 'map_size($1)'
+		}]
+	}
+	// Map get function
+	'map_get':    FunctionInfo{
+		precedence:    0
+		associativity: .left
+		fixity:        .prefix
+		signatures:    [
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'any'
+					params: []
+				}, ast.Type{
+					name:   'map'
+					params: [ast.Type{
+						name:   'any'
+						params: []
+					}]
+				}]
+				return_type: ast.Type{
+					name:   'any'
+					params: []
+				}
+			},
+		]
+		gen:           [{
+			'erl': 'map_get($1, $2)'
+		}]
+	}
+	// Maps put function
+	'map_put':    FunctionInfo{
+		precedence:    0
+		associativity: .left
+		fixity:        .prefix
+		signatures:    [
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'any'
+					params: []
+				}, ast.Type{
+					name:   'any'
+					params: []
+				}, ast.Type{
+					name:   'map'
+					params: [ast.Type{
+						name:   'any'
+						params: []
+					}]
+				}]
+				return_type: ast.Type{
+					name:   'map'
+					params: [ast.Type{
+						name:   'any'
+						params: []
+					}]
+				}
+			},
+		]
+		gen:           [{
+			'erl': 'maps:put($1, $2, $3)'
+		}]
+	}
+	// Maps remove function
+	'map_remove': FunctionInfo{
+		precedence:    0
+		associativity: .left
+		fixity:        .prefix
+		signatures:    [
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'any'
+					params: []
+				}, ast.Type{
+					name:   'map'
+					params: [ast.Type{
+						name:   'any'
+						params: []
+					}]
+				}]
+				return_type: ast.Type{
+					name:   'map'
+					params: [ast.Type{
+						name:   'any'
+						params: []
+					}]
+				}
+			},
+		]
+		gen:           [{
+			'erl': 'maps:remove($1, $2)'
+		}]
+	}
 }
 
 pub fn get_function_info(function_name string) ?FunctionInfo {

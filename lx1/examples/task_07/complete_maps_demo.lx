@@ -1,0 +1,67 @@
+def complete_maps_demo() do
+    # Map literals básicos
+    empty_map = %{}
+    simple_map = %{name: "João", age: 30, active: true}
+    mixed_map = %{id: 1, name: "Ana", "key": "value", 42: "answer", true: "boolean"}
+
+    # Maps aninhados
+    nested_map = %{user: %{profile: %{name: "Maria", age: 25}, settings: %{theme: "dark"}}, data: [1, 2, 3]}
+
+    # Acesso usando sintaxe nativa map[key]
+    name1 = simple_map[:name]
+    age1 = simple_map[:age]
+    email1 = mixed_map["key"]
+    magic1 = mixed_map[42]
+
+    # Acesso usando função map_get
+    name2 = map_get(:name, simple_map)
+    age2 = map_get(:age, simple_map)
+    email2 = map_get("key", mixed_map)
+    magic2 = map_get(42, mixed_map)
+
+    # Tamanho do map
+    size1 = map_size(simple_map)
+    size2 = map_size(mixed_map)
+    size3 = map_size(empty_map)
+
+    # Atualização usando map_put
+    updated1 = map_put(:age, 31, simple_map)
+    updated2 = map_put("key", "new_value", updated1)
+    updated3 = map_put(42, "new_answer", updated2)
+
+    # Remoção usando map_remove
+    cleaned1 = map_remove(:active, updated3)
+    cleaned2 = map_remove("key", cleaned1)
+    cleaned3 = map_remove(42, cleaned2)
+
+    # Acesso com variáveis
+    key1 = :name
+    key2 = "key"
+    value1 = simple_map[key1]
+    value2 = mixed_map[key2]
+
+    # Operações complexas
+    user = %{id: 1, name: "João", age: 30, "email": "joao@example.com", 42: "magic"}
+    config = %{database: %{host: "localhost", port: 5432}, "api_key": "secret123"}
+
+    # Acesso nativo
+    user_name = user[:name]
+    user_age = user[:age]
+    user_email = user["email"]
+    user_magic = user[42]
+
+    # Acesso com função
+    db_host = map_get(:host, map_get(:database, config))
+    api_key = map_get("api_key", config)
+
+    # Atualização
+    updated_user = map_put(:age, 31, user)
+    updated_user2 = map_put("email", "new@example.com", updated_user)
+
+    # Remoção
+    clean_user = map_remove(:id, updated_user2)
+    clean_user2 = map_remove("email", clean_user)
+
+    # Resultado final
+    {empty_map, simple_map, mixed_map, nested_map, name1, age1, email1, magic1, name2, age2, email2, magic2, size1, size2, size3, updated1, updated2, updated3, cleaned1, cleaned2, cleaned3, value1, value2, user_name, user_age, user_email, user_magic, db_host, api_key, clean_user2}
+end

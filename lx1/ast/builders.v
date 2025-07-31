@@ -168,3 +168,23 @@ pub fn new_tuple_literal(id int, elements []Node, pos Position) Node {
 		position: pos
 	}
 }
+
+pub fn new_map_literal(id int, entries []Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .map_literal
+		value:    '%{}'
+		children: entries
+		position: pos
+	}
+}
+
+pub fn new_map_access(id int, map_expr Node, key_expr Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .map_access
+		value:    'map[key]'
+		children: [map_expr, key_expr]
+		position: pos
+	}
+}

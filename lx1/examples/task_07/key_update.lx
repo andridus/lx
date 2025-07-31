@@ -1,0 +1,6 @@
+def key_update_example() do
+    map = %{name: "João", age: 30, "key": "old"}
+    updated1 = map_put(:age, 31, map)
+    updated2 = map_put("key", "new", updated1)
+    updated2
+end

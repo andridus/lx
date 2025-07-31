@@ -38,8 +38,9 @@ pub fn (mut l Lexer) next_token() Token {
 		`]` { l.advance_and_return(.rbracket, ']') }
 		`{` { l.advance_and_return(.lbrace, '{') }
 		`}` { l.advance_and_return(.rbrace, '}') }
+		`%` { l.advance_and_return(.percent, '%') }
+		`:` { l.read_colon_or_atom() }
 		`"` { l.read_string() }
-		`:` { l.read_atom() }
 		`0`...`9` { l.read_number() }
 		`+`, `-`, `*`, `/`, `!`, `<`, `>`, `&`, `^`, `|`, `=`, `$`, `a`...`z`, `A`...`Z`, `_` { l.read_identifier() }
 		`\n` { l.advance_and_return(.newline, '\n') }
@@ -53,6 +54,13 @@ fn (mut l Lexer) skip_whitespace() {
 		if ch == ` ` || ch == `\t` || ch == `\r` {
 			l.advance()
 		} else if ch == `#` {
+			for l.position < l.input.len && l.input[l.position] != `\n` {
+				l.advance()
+			}
+		} else if ch == `/` && l.position + 1 < l.input.len && l.input[l.position + 1] == `/` {
+			// Skip // comments
+			l.advance() // Skip first /
+			l.advance() // Skip second /
 			for l.position < l.input.len && l.input[l.position] != `\n` {
 				l.advance()
 			}
@@ -129,6 +137,32 @@ fn (mut l Lexer) read_string() Token {
 
 	l.advance()
 	return l.make_token_at(.string, value, start_pos)
+}
+
+fn (mut l Lexer) read_colon_or_atom() Token {
+	start_pos := l.current_position()
+	l.advance() // Skip ':'
+
+	// Check if next character is a letter (atom) or something else (colon)
+	if l.position >= l.input.len || !l.input[l.position].is_letter() {
+		// This is just a colon token
+		return l.make_token_at(.colon, ':', start_pos)
+	}
+
+	// This is an atom, read the identifier part
+	mut value := ''
+
+	for l.position < l.input.len {
+		ch := l.input[l.position]
+		if ch.is_alnum() || ch == `_` {
+			value += ch.ascii_str()
+			l.advance()
+		} else {
+			break
+		}
+	}
+
+	return l.make_token_at(.atom, value, start_pos)
 }
 
 fn (mut l Lexer) read_atom() Token {

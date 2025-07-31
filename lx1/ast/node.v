@@ -43,6 +43,10 @@ pub enum NodeKind {
 
 	// Tuple Operations
 	tuple_literal // {1, 2, 3} ou {}
+
+	// Map Operations
+	map_literal // %{key: value} ou %{}
+	map_access  // map[key]
 }
 
 pub struct Position {

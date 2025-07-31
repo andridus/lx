@@ -83,6 +83,12 @@ fn (mut a Analyzer) analyze_node(node ast.Node) !ast.Node {
 		.tuple_literal {
 			a.analyze_tuple_literal(node)
 		}
+		.map_literal {
+			a.analyze_map_literal(node)
+		}
+		.map_access {
+			a.analyze_map_access(node)
+		}
 		else {
 			a.error('Unsupported node type: ${node.kind}', node.position)
 			return error('Unsupported node type: ${node.kind}')
@@ -763,6 +769,104 @@ fn (mut a Analyzer) analyze_tuple_literal(node ast.Node) !ast.Node {
 
 fn (a Analyzer) is_multi_arg_prefix_function(function_name string) bool {
 	// Lista de funções nativas prefix que recebem múltiplos argumentos
-	multi_arg_prefix_functions := ['element', 'setelement']
+	multi_arg_prefix_functions := ['element', 'setelement', 'map_size', 'map_get', 'map_put',
+		'map_remove']
 	return function_name in multi_arg_prefix_functions
+}
+
+fn (mut a Analyzer) analyze_map_literal(node ast.Node) !ast.Node {
+	if node.children.len == 0 {
+		// Empty map
+		map_type := ast.Type{
+			name:   'map'
+			params: [ast.Type{
+				name:   'any'
+				params: []
+			}]
+		}
+		a.type_table.assign_type(node.id, map_type)
+		return node
+	}
+
+	// Analyze all key-value pairs
+	mut analyzed_entries := []ast.Node{}
+	mut key_types := []ast.Type{}
+	mut value_types := []ast.Type{}
+
+	for i := 0; i < node.children.len; i += 2 {
+		if i + 1 >= node.children.len {
+			return error('Map must have key-value pairs')
+		}
+
+		key := a.analyze_node(node.children[i])!
+		value := a.analyze_node(node.children[i + 1])!
+
+		analyzed_entries << key
+		analyzed_entries << value
+
+		key_type := a.type_table.get_type(key.id) or {
+			ast.Type{
+				name:   'unknown'
+				params: []
+			}
+		}
+		value_type := a.type_table.get_type(value.id) or {
+			ast.Type{
+				name:   'unknown'
+				params: []
+			}
+		}
+
+		key_types << key_type
+		value_types << value_type
+	}
+
+	// Create map type with key and value types
+	map_type := ast.Type{
+		name:   'map'
+		params: [ast.Type{
+			name:   'any'
+			params: []
+		}]
+	}
+	a.type_table.assign_type(node.id, map_type)
+
+	return ast.Node{
+		id:       node.id
+		kind:     node.kind
+		value:    node.value
+		children: analyzed_entries
+		position: node.position
+	}
+}
+
+fn (mut a Analyzer) analyze_map_access(node ast.Node) !ast.Node {
+	if node.children.len != 2 {
+		return error('Map access must have exactly 2 children (map and key)')
+	}
+
+	map_expr := a.analyze_node(node.children[0])!
+	key_expr := a.analyze_node(node.children[1])!
+
+	// Get types
+	map_type := a.type_table.get_type(map_expr.id) or { ast.Type{name: 'unknown', params: []} }
+	_ := a.type_table.get_type(key_expr.id) or { ast.Type{name: 'unknown', params: []} }
+
+	// Check if map_expr is actually a map
+	if map_type.name != 'map' {
+		a.error('Cannot access key on non-map type: ${map_type.name}', node.position)
+		return error('Cannot access key on non-map type: ${map_type.name}')
+	}
+
+	// Result type is 'any' since we don't know the specific value type
+	result_type := ast.Type{name: 'any', params: []}
+	a.type_table.assign_type(node.id, result_type)
+
+	return ast.Node{
+		id:       node.id
+		kind:     node.kind
+		value:    node.value
+		children: [map_expr, key_expr]
+		position: node.position
+	}
 }

@@ -1,0 +1,6 @@
+def simple_maps() do
+    empty = %{}
+    user = %{name: "João", age: 30, active: true}
+    mixed = %{name: "Ana", "key": "value", 42: "answer", true: "boolean"}
+    {empty, user, mixed}
+end

@@ -96,6 +96,12 @@ fn (mut g ErlangGenerator) generate_node(node ast.Node) ! {
 		.tuple_literal {
 			g.generate_tuple_literal(node)!
 		}
+		.map_literal {
+			g.generate_map_literal(node)!
+		}
+		.map_access {
+			g.generate_map_access(node)!
+		}
 		else {
 			return error('Unsupported node type: ${node.kind}')
 		}
@@ -387,6 +393,12 @@ fn (mut g ErlangGenerator) generate_node_to_string(node ast.Node) !string {
 		.tuple_literal {
 			return g.generate_tuple_literal_to_string(node)
 		}
+		.map_literal {
+			return g.generate_map_literal_to_string(node)
+		}
+		.map_access {
+			return g.generate_map_access_to_string(node)
+		}
 		else {
 			return error('Unsupported node type for string generation: ${node.kind}')
 		}
@@ -598,8 +610,92 @@ fn (mut g ErlangGenerator) generate_tuple_literal_to_string(node ast.Node) !stri
 	return result
 }
 
+fn (mut g ErlangGenerator) generate_map_literal(node ast.Node) ! {
+	if node.children.len == 0 {
+		g.output.write_string('#{}')
+		return
+	}
+
+	g.output.write_string('#{')
+
+	for i := 0; i < node.children.len; i += 2 {
+		if i > 0 {
+			g.output.write_string(', ')
+		}
+
+		// Generate key (can be any term LX)
+		key := node.children[i]
+		g.generate_node(key)!
+		g.output.write_string(' => ')
+
+		// Generate value
+		value := node.children[i + 1]
+		g.generate_node(value)!
+	}
+
+	g.output.write_string('}')
+}
+
+fn (mut g ErlangGenerator) generate_map_literal_to_string(node ast.Node) !string {
+	if node.children.len == 0 {
+		return '#{}'
+	}
+
+	mut result := '#{'
+	for i := 0; i < node.children.len; i += 2 {
+		if i > 0 {
+			result += ', '
+		}
+
+		// Generate key
+		key := node.children[i]
+		key_code := g.generate_node_to_string(key)!
+		result += key_code
+		result += ' => '
+
+		// Generate value
+		value := node.children[i + 1]
+		value_code := g.generate_node_to_string(value)!
+		result += value_code
+	}
+	result += '}'
+	return result
+}
+
 fn (g ErlangGenerator) is_multi_arg_prefix_function(function_name string) bool {
 	// Lista de funções nativas prefix que recebem múltiplos argumentos
-	multi_arg_prefix_functions := ['element', 'setelement']
+	multi_arg_prefix_functions := ['element', 'setelement', 'map_size', 'map_get', 'map_put',
+		'map_remove']
 	return function_name in multi_arg_prefix_functions
+}
+
+fn (mut g ErlangGenerator) generate_map_access(node ast.Node) ! {
+	if node.children.len != 2 {
+		return error('Map access must have exactly 2 children (map and key)')
+	}
+
+	map_expr := node.children[0]
+	key_expr := node.children[1]
+
+	// Generate maps:get(key, map)
+	g.output.write_string('maps:get(')
+	g.generate_node(key_expr)!
+	g.output.write_string(', ')
+	g.generate_node(map_expr)!
+	g.output.write_string(')')
+}
+
+fn (mut g ErlangGenerator) generate_map_access_to_string(node ast.Node) !string {
+	if node.children.len != 2 {
+		return error('Map access must have exactly 2 children (map and key)')
+	}
+
+	map_expr := node.children[0]
+	key_expr := node.children[1]
+
+	// Generate maps:get(key, map)
+	key_code := g.generate_node_to_string(key_expr)!
+	map_code := g.generate_node_to_string(map_expr)!
+
+	return 'maps:get(${key_code}, ${map_code})'
 }

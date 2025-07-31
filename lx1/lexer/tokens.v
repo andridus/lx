@@ -29,6 +29,8 @@ pub enum TokenType {
 	pipe      // |
 	lbrace    // {
 	rbrace    // }
+	percent   // %
+	colon     // :
 
 	// Special
 	newline
@@ -78,6 +80,8 @@ pub fn (tt TokenType) str() string {
 		.pipe { '|' }
 		.lbrace { '{' }
 		.rbrace { '}' }
+		.percent { '%' }
+		.colon { ':' }
 		.newline { 'newline' }
 		.eof { 'eof' }
 		.error { 'error' }
