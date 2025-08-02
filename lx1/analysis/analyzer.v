@@ -45,6 +45,10 @@ fn (mut a Analyzer) error(msg string, pos ast.Position) {
 	a.error_reporter.report(.analysis, msg, pos)
 }
 
+fn (mut a Analyzer) error_with_suggestion(msg string, pos ast.Position, suggestion string) {
+	a.error_reporter.report_with_suggestion(.analysis, msg, pos, suggestion)
+}
+
 fn (mut a Analyzer) analyze_node(node ast.Node) !ast.Node {
 	return match node.kind {
 		.module {
@@ -434,9 +438,17 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 
 		result_type := a.check_function_signatures(function_name, left_type, right_type,
 			function_info.signatures) or {
-			a.error('Invalid operator: ${function_name}(${left_type.name}, ${right_type.name})',
-				node.position)
-			return error('Type mismatch in function call')
+			// Check if it's an infix operator and format accordingly
+			if function_info.fixity == .infix {
+				suggestion := 'Use explicit conversion: ${left_type.name}.to_float() or ${right_type.name}.to_integer()'
+				a.error_with_suggestion('Invalid operator: ${left_type.name} ${function_name} ${right_type.name}',
+					node.position, suggestion)
+				return error('Type mismatch in function call')
+			} else {
+				a.error('Invalid operator: ${function_name}(${left_type.name}, ${right_type.name})',
+					node.position)
+				return error('Type mismatch in function call')
+			}
 		}
 
 		a.type_table.assign_type(node.id, result_type)
@@ -1022,7 +1034,15 @@ fn (mut a Analyzer) analyze_record_literal(node ast.Node) !ast.Node {
 
 		// Get expected field type
 		expected_type := a.type_table.get_field_type(record_name, field_name) or {
-			a.error('Unknown field ${field_name} in record ${record_name}', node.position)
+			// Get available fields for suggestion
+			record_type := a.type_table.get_record_type(record_name) or {
+				a.error('Unknown field ${field_name} in record ${record_name}', node.position)
+				return error('Unknown field ${field_name} in record ${record_name}')
+			}
+			available_fields := record_type.fields.keys()
+			suggestion := 'Available fields: ${available_fields.join(', ')}'
+			a.error_with_suggestion('Unknown field ${field_name} in record ${record_name}',
+				node.position, suggestion)
 			return error('Unknown field ${field_name} in record ${record_name}')
 		}
 
@@ -1106,8 +1126,23 @@ fn (mut a Analyzer) analyze_record_access(node ast.Node) !ast.Node {
 
 	// Get field type from record definition
 	field_type := a.type_table.get_field_type(record_type.name, field_name) or {
-		a.error('Unknown field ${field_name} in record ${record_type.name}', node.position)
-		return error('Unknown field ${field_name} in record ${record_type.name}')
+		// Check if the record type is actually a record or just an identifier
+		if record_type.name == 'identifier' || record_type.name == 'unknown' {
+			a.error_with_suggestion('Cannot access field ${field_name} on undefined variable',
+				node.position, 'Define the variable first or use a record instance')
+			return error('Cannot access field ${field_name} on undefined variable')
+		} else {
+			// Get available fields for suggestion
+			record_type_info := a.type_table.get_record_type(record_type.name) or {
+				a.error('Unknown field ${field_name} in record ${record_type.name}', node.position)
+				return error('Unknown field ${field_name} in record ${record_type.name}')
+			}
+			available_fields := record_type_info.fields.keys()
+			suggestion := 'Available fields: ${available_fields.join(', ')}'
+			a.error_with_suggestion('Unknown field ${field_name} in record ${record_type.name}',
+				node.position, suggestion)
+			return error('Unknown field ${field_name} in record ${record_type.name}')
+		}
 	}
 
 	// Assign the field type to this node

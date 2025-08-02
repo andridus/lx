@@ -72,9 +72,11 @@ pub fn compile_string_with_modname(code string, file_path string, module_name st
 	analyzed_ast := analyzer.analyze(ast_node) or {
 		analysis_errors := analyzer.get_errors()
 		if analysis_errors.len > 0 {
+			file_lines := os.read_file(file_path) or { '' }
+			lines := file_lines.split('\n')
 			mut error_msg := ''
 			for e in analysis_errors {
-				error_msg += errors.format_error(e) + '\n'
+				error_msg += errors.format_error_detailed(e, lines) + '\n'
 			}
 			return error(error_msg)
 		}

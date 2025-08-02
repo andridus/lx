@@ -105,7 +105,7 @@ fn test_type_mismatch_error() {
         42 + "hello"
     end'
 	result := compile_lx_with_error(lx_code)
-	assert result.contains('Invalid operator: +(integer, string)')
+	assert result.contains('Invalid operator: integer + string')
 }
 
 fn test_incompatible_numeric_types() {
@@ -115,7 +115,7 @@ fn test_incompatible_numeric_types() {
         a + b
     end'
 	result := compile_lx_with_error(lx_code)
-	assert result.contains('Invalid operator: +(integer, float)')
+	assert result.contains('Invalid operator: integer + float')
 }
 
 fn test_bitwise_with_non_integer() {
@@ -125,7 +125,7 @@ fn test_bitwise_with_non_integer() {
         a &&& b
     end'
 	result := compile_lx_with_error(lx_code)
-	assert result.contains('Invalid operator: &&&(integer, float)')
+	assert result.contains('Invalid operator: integer &&& float')
 }
 
 fn test_multiple_operators() {

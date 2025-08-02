@@ -37,6 +37,16 @@ pub fn (mut er ErrorReporter) report(kind ErrorKind, message string, position as
 	er.errors << err_obj
 }
 
+pub fn (mut er ErrorReporter) report_with_suggestion(kind ErrorKind, message string, position ast.Position, suggestion string) {
+	err_obj := Err{
+		kind:       kind
+		message:    message
+		position:   position
+		suggestion: suggestion
+	}
+	er.errors << err_obj
+}
+
 pub fn (er &ErrorReporter) has_errors() bool {
 	return er.errors.len > 0
 }

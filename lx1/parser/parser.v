@@ -48,6 +48,16 @@ fn (mut p Parser) error(msg string) {
 	p.error_reporter.report(.parser, msg, p.current.position)
 }
 
+fn (mut p Parser) error_and_return(msg string) !ast.Node {
+	p.error_reporter.report(.parser, msg, p.current.position)
+	return error(msg)
+}
+
+fn (mut p Parser) error_and_return_with_suggestion(msg string, suggestion string) !ast.Node {
+	p.error_reporter.report_with_suggestion(.parser, msg, p.current.position, suggestion)
+	return error(msg)
+}
+
 fn (mut p Parser) parse_module() !ast.Node {
 	mut functions := []ast.Node{}
 	mut records := []ast.Node{}
@@ -143,20 +153,20 @@ fn (mut p Parser) parse_function() !ast.Node {
 	p.advance()
 
 	if p.current.type_ != .lparen {
-		p.error('Expected "(", got "${p.current.value}"')
-		return error('Expected (')
+		return p.error_and_return_with_suggestion('Function definition requires parentheses after name',
+			'Add empty parentheses: ${func_name}()')
 	}
 	p.advance()
 
 	if p.current.type_ != .rparen {
-		p.error('Function parameters not supported in Task 1')
-		return error('Function parameters not supported')
+		return p.error_and_return_with_suggestion('Function parameters not supported in Task 1',
+			'Use empty parentheses: ${func_name}()')
 	}
 	p.advance()
 
 	if p.current.type_ != .do {
-		p.error('Expected "do", got "${p.current.value}"')
-		return error('Expected do')
+		return p.error_and_return_with_suggestion('Function definition requires "do" keyword',
+			'Add "do" after parentheses: ${func_name}() do')
 	}
 	p.advance()
 
@@ -775,13 +785,13 @@ fn (mut p Parser) parse_record_definition() !ast.Node {
 	p.advance() // Skip 'record'
 
 	if p.current.type_ != .identifier {
-		return error('Expected record name after record keyword')
+		return p.error_and_return('Expected record name after record keyword')
 	}
 	record_name := p.current.value
 	p.advance() // Skip record name
 
 	if p.current.type_ != .lbrace {
-		return error('Expected opening brace after record name')
+		return p.error_and_return('Expected opening brace after record name')
 	}
 	p.advance() // Skip '{'
 
@@ -790,7 +800,7 @@ fn (mut p Parser) parse_record_definition() !ast.Node {
 	if p.current.type_ != .rbrace {
 		for {
 			if p.current.type_ != .identifier {
-				return error('Expected field name')
+				return p.error_and_return('Expected field name')
 			}
 			field_name := p.current.value
 			p.advance() // Skip field name
@@ -810,7 +820,7 @@ fn (mut p Parser) parse_record_definition() !ast.Node {
 					p.advance() // Skip ::
 
 					if p.current.type_ != .identifier {
-						return error('Expected field type after ::')
+						return p.error_and_return('Expected field type after ::')
 					}
 					field_type = p.current.value
 					p.advance() // Skip field type
@@ -821,12 +831,13 @@ fn (mut p Parser) parse_record_definition() !ast.Node {
 			} else {
 				// No default value, expect :: and type
 				if p.current.type_ != .double_colon {
-					return error('Expected :: after field name')
+					return p.error_and_return_with_suggestion('Expected :: after field name',
+						'Add type annotation: ${field_name} :: integer or ${field_name} :: string')
 				}
 				p.advance() // Skip ::
 
 				if p.current.type_ != .identifier {
-					return error('Expected field type')
+					return p.error_and_return('Expected field type')
 				}
 				field_type = p.current.value
 				p.advance() // Skip field type
@@ -857,7 +868,7 @@ fn (mut p Parser) parse_record_definition() !ast.Node {
 			}
 
 			if p.current.type_ != .comma {
-				return error('Expected comma or closing brace')
+				return p.error_and_return('Expected comma or closing brace')
 			}
 
 			p.advance() // Skip comma
@@ -865,7 +876,7 @@ fn (mut p Parser) parse_record_definition() !ast.Node {
 	}
 
 	if p.current.type_ != .rbrace {
-		return error('Expected closing brace')
+		return p.error_and_return('Expected closing brace')
 	}
 
 	p.advance() // Skip '}'
