@@ -21,6 +21,7 @@ pub enum NodeKind {
 	// Variables
 	variable_binding // x = value
 	variable_ref     // x (usage)
+	identifier       // Generic identifier
 
 	// Blocks
 	block // do ... end or -> ... end (multiple expressions)
@@ -47,6 +48,13 @@ pub enum NodeKind {
 	// Map Operations
 	map_literal // %{key: value} ou %{}
 	map_access  // map[key]
+
+	// Record Operations
+	record_definition // record Person { name :: string, age :: integer }
+	record_field      // name :: string or name = value :: type or name = value
+	record_literal    // Person{name: "João", age: 30}
+	record_access     // user.name
+	record_update     // %{record | campo: valor}
 }
 
 pub struct Position {

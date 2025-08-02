@@ -39,7 +39,8 @@ pub fn (mut l Lexer) next_token() Token {
 		`{` { l.advance_and_return(.lbrace, '{') }
 		`}` { l.advance_and_return(.rbrace, '}') }
 		`%` { l.advance_and_return(.percent, '%') }
-		`:` { l.read_colon_or_atom() }
+		`.` { l.advance_and_return(.dot, '.') }
+		`:` { l.read_colon_or_double_colon() }
 		`"` { l.read_string() }
 		`0`...`9` { l.read_number() }
 		`+`, `-`, `*`, `/`, `!`, `<`, `>`, `&`, `^`, `|`, `=`, `$`, `a`...`z`, `A`...`Z`, `_` { l.read_identifier() }
@@ -54,13 +55,6 @@ fn (mut l Lexer) skip_whitespace() {
 		if ch == ` ` || ch == `\t` || ch == `\r` {
 			l.advance()
 		} else if ch == `#` {
-			for l.position < l.input.len && l.input[l.position] != `\n` {
-				l.advance()
-			}
-		} else if ch == `/` && l.position + 1 < l.input.len && l.input[l.position + 1] == `/` {
-			// Skip // comments
-			l.advance() // Skip first /
-			l.advance() // Skip second /
 			for l.position < l.input.len && l.input[l.position] != `\n` {
 				l.advance()
 			}
@@ -139,9 +133,15 @@ fn (mut l Lexer) read_string() Token {
 	return l.make_token_at(.string, value, start_pos)
 }
 
-fn (mut l Lexer) read_colon_or_atom() Token {
+fn (mut l Lexer) read_colon_or_double_colon() Token {
 	start_pos := l.current_position()
 	l.advance() // Skip ':'
+
+	// Check if next character is also ':' (double colon)
+	if l.position < l.input.len && l.input[l.position] == `:` {
+		l.advance() // Skip second ':'
+		return l.make_token_at(.double_colon, '::', start_pos)
+	}
 
 	// Check if next character is a letter (atom) or something else (colon)
 	if l.position >= l.input.len || !l.input[l.position].is_letter() {
@@ -243,6 +243,7 @@ fn (mut l Lexer) read_identifier() Token {
 		'true' { TokenType.true_ }
 		'false' { TokenType.false_ }
 		'nil' { TokenType.nil_ }
+		'record' { TokenType.record }
 		else { TokenType.identifier }
 	}
 

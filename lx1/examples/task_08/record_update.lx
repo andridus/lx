@@ -1,0 +1,8 @@
+# Record definido no escopo global
+record Person { name :: string, age :: integer }
+
+def record_update() do
+    person = Person{name: "João", age: 30}
+    updated_person = %Person{person | age: 31} # Atualiza campo age
+    updated_person
+end

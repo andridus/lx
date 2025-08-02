@@ -59,6 +59,9 @@ fn (mut a Analyzer) analyze_node(node ast.Node) !ast.Node {
 		.variable_ref {
 			a.analyze_variable_ref(node)
 		}
+		.identifier {
+			a.analyze_identifier(node)
+		}
 		.block {
 			a.analyze_block(node)
 		}
@@ -88,6 +91,18 @@ fn (mut a Analyzer) analyze_node(node ast.Node) !ast.Node {
 		}
 		.map_access {
 			a.analyze_map_access(node)
+		}
+		.record_definition {
+			a.analyze_record_definition(node)
+		}
+		.record_literal {
+			a.analyze_record_literal(node)
+		}
+		.record_access {
+			a.analyze_record_access(node)
+		}
+		.record_update {
+			a.analyze_record_update(node)
 		}
 		else {
 			a.error('Unsupported node type: ${node.kind}', node.position)
@@ -255,6 +270,24 @@ fn (mut a Analyzer) analyze_variable_ref(node ast.Node) !ast.Node {
 	} else {
 		a.error('Undefined variable: ${var_name}', node.position)
 		return error('Undefined variable: ${var_name}')
+	}
+}
+
+fn (mut a Analyzer) analyze_identifier(node ast.Node) !ast.Node {
+	// Identifiers should be treated as variable references
+	var_name := node.value
+
+	// Look up variable in current function's type environment
+	if typ := a.lookup(var_name) {
+		a.type_table.assign_type(node.id, typ)
+		return node
+	} else {
+		// If not found, assign a placeholder type
+		a.type_table.assign_type(node.id, ast.Type{
+			name:   'identifier'
+			params: []
+		})
+		return node
 	}
 }
 
@@ -880,6 +913,267 @@ fn (mut a Analyzer) analyze_map_access(node ast.Node) !ast.Node {
 		kind:     node.kind
 		value:    node.value
 		children: [map_expr, key_expr]
+		position: node.position
+	}
+}
+
+// Record analysis functions
+fn (mut a Analyzer) analyze_record_definition(node ast.Node) !ast.Node {
+	// Validate that record definitions are only allowed in global scope
+	if a.current_env > 0 {
+		a.error('Record definitions are only allowed in global scope, not inside functions',
+			node.position)
+		return error('Record definitions are only allowed in global scope, not inside functions')
+	}
+
+	record_name := node.value
+	mut field_types := map[string]ast.Type{}
+	mut field_defaults := map[string]ast.Node{}
+
+	// Analyze all fields and build field type map
+	for field in node.children {
+		if field.kind != .record_field {
+			a.error('Expected record field, got ${field.kind}', node.position)
+			return error('Expected record field, got ${field.kind}')
+		}
+
+		field_name := field.value
+		field_type_node := field.children[0]
+
+		// Check if field has default value
+		if field.children.len > 1 {
+			// Field has default value
+			default_value := a.analyze_node(field.children[1])!
+			default_type := a.type_table.get_type(default_value.id) or {
+				ast.Type{
+					name:   'unknown'
+					params: []
+				}
+			}
+
+			// Get field type
+			mut field_type := ast.Type{}
+			if field_type_node.value != '' {
+				// Has explicit type
+				field_type = ast.Type{
+					name:   field_type_node.value
+					params: []
+				}
+
+				// Validate that default value type matches field type
+				if !unify_with_records(field_type, default_type, &a.type_table) {
+					a.error('Type mismatch in default value for field ${field_name}: expected ${field_type}, got ${default_type}',
+						node.position)
+					return error('Type mismatch in default value for field ${field_name}: expected ${field_type}, got ${default_type}')
+				}
+			} else {
+				// Infer type from default value
+				field_type = default_type
+			}
+
+			field_types[field_name] = field_type
+			field_defaults[field_name] = default_value
+		} else {
+			// Field without default value
+			if field_type_node.value == '' {
+				a.error('Field ${field_name} must have a type or default value', node.position)
+				return error('Field ${field_name} must have a type or default value')
+			}
+
+			// Create field type
+			field_type := ast.Type{
+				name:   field_type_node.value
+				params: []
+			}
+			field_types[field_name] = field_type
+		}
+	}
+
+	// Register record type in global type table with defaults
+	a.type_table.register_record_type(record_name, field_types, field_defaults)
+
+	// Create record type for this node
+	record_type := ast.Type{
+		name:   record_name
+		params: []
+	}
+	a.type_table.assign_type(node.id, record_type)
+
+	return node
+}
+
+fn (mut a Analyzer) analyze_record_literal(node ast.Node) !ast.Node {
+	record_name := node.value
+
+	// Check if record type exists
+	record_type_info := a.type_table.get_record_type(record_name) or {
+		a.error('Undefined record type: ${record_name}', node.position)
+		return error('Undefined record type: ${record_name}')
+	}
+
+	mut analyzed_fields := []ast.Node{}
+	mut provided_fields := map[string]bool{}
+
+	// Analyze all provided field values and validate types using HM unification
+	for field in node.children {
+		field_name := field.value
+		field_value := a.analyze_node(field.children[0])!
+		provided_fields[field_name] = true
+
+		// Get expected field type
+		expected_type := a.type_table.get_field_type(record_name, field_name) or {
+			a.error('Unknown field ${field_name} in record ${record_name}', node.position)
+			return error('Unknown field ${field_name} in record ${record_name}')
+		}
+
+		// Get actual field value type
+		actual_type := a.type_table.get_type(field_value.id) or {
+			ast.Type{
+				name:   'unknown'
+				params: []
+			}
+		}
+
+		// Use HM unification to validate type compatibility
+		if !unify_with_records(expected_type, actual_type, &a.type_table) {
+			a.error('Type mismatch in field ${field_name}: expected ${expected_type}, got ${actual_type}',
+				node.position)
+			return error('Type mismatch in field ${field_name}: expected ${expected_type}, got ${actual_type}')
+		}
+
+		analyzed_fields << ast.Node{
+			id:       field.id
+			kind:     field.kind
+			value:    field_name
+			children: [field_value]
+			position: field.position
+		}
+	}
+
+	// Add default values for fields that were not provided
+	for field_name, _ in record_type_info.fields {
+		if !provided_fields[field_name] {
+			// Check if this field has a default value
+			if default_value := a.type_table.get_field_default(record_name, field_name) {
+				// Create a field node with the default value
+				default_field := ast.Node{
+					id:       a.type_table.generate_id()
+					kind:     .identifier
+					value:    field_name
+					children: [default_value]
+					position: node.position
+				}
+				analyzed_fields << default_field
+			}
+		}
+	}
+
+	// Create record type using HM type inference
+	record_type_result := ast.Type{
+		name:   record_name
+		params: []
+	}
+	a.type_table.assign_type(node.id, record_type_result)
+
+	return ast.Node{
+		id:       node.id
+		kind:     node.kind
+		value:    node.value
+		children: analyzed_fields
+		position: node.position
+	}
+}
+
+fn (mut a Analyzer) analyze_record_access(node ast.Node) !ast.Node {
+	if node.children.len != 1 {
+		return error('Record access must have exactly one child (record expression)')
+	}
+
+	record_expr := a.analyze_node(node.children[0])!
+	field_name := node.value
+
+	// Get record type
+	record_type := a.type_table.get_type(record_expr.id) or {
+		a.error('Cannot determine type of record expression', node.position)
+		return error('Cannot determine type of record expression')
+	}
+
+	// Check if it's actually a record type
+	if record_type.name == 'unknown' {
+		a.error('Cannot access field ${field_name} on unknown type', node.position)
+		return error('Cannot access field ${field_name} on unknown type')
+	}
+
+	// Get field type from record definition
+	field_type := a.type_table.get_field_type(record_type.name, field_name) or {
+		a.error('Unknown field ${field_name} in record ${record_type.name}', node.position)
+		return error('Unknown field ${field_name} in record ${record_type.name}')
+	}
+
+	// Assign the field type to this node
+	a.type_table.assign_type(node.id, field_type)
+
+	return ast.Node{
+		id:       node.id
+		kind:     node.kind
+		value:    node.value
+		children: [record_expr]
+		position: node.position
+	}
+}
+
+fn (mut a Analyzer) analyze_record_update(node ast.Node) !ast.Node {
+	if node.children.len != 3 {
+		return error('Record update must have exactly 3 children (record, field_name, field_value)')
+	}
+
+	record_expr := a.analyze_node(node.children[0])!
+	field_name_node := node.children[1]
+	field_value := a.analyze_node(node.children[2])!
+
+	// Get record type using HM type inference
+	record_type := a.type_table.get_type(record_expr.id) or {
+		a.error('Cannot determine type of record expression', node.position)
+		return error('Cannot determine type of record expression')
+	}
+
+	// Check if it's actually a record type
+	if record_type.name == 'unknown' {
+		a.error('Cannot update field on unknown type', node.position)
+		return error('Cannot update field on unknown type')
+	}
+
+	field_name := field_name_node.value
+
+	// Check if field exists in record
+	expected_field_type := a.type_table.get_field_type(record_type.name, field_name) or {
+		a.error('Unknown field ${field_name} in record ${record_type.name}', node.position)
+		return error('Unknown field ${field_name} in record ${record_type.name}')
+	}
+
+	// Get actual field value type
+	actual_field_type := a.type_table.get_type(field_value.id) or {
+		ast.Type{
+			name:   'unknown'
+			params: []
+		}
+	}
+
+	// Use HM unification to validate type compatibility
+	if !unify_with_records(expected_field_type, actual_field_type, &a.type_table) {
+		a.error('Type mismatch in field update ${field_name}: expected ${expected_field_type}, got ${actual_field_type}',
+			node.position)
+		return error('Type mismatch in field update ${field_name}: expected ${expected_field_type}, got ${actual_field_type}')
+	}
+
+	// Result type is the same as the original record (HM type preservation)
+	a.type_table.assign_type(node.id, record_type)
+
+	return ast.Node{
+		id:       node.id
+		kind:     node.kind
+		value:    node.value
+		children: [record_expr, field_name_node, field_value]
 		position: node.position
 	}
 }

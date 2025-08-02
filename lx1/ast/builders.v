@@ -188,3 +188,70 @@ pub fn new_map_access(id int, map_expr Node, key_expr Node, pos Position) Node {
 		position: pos
 	}
 }
+
+// Record builders
+pub fn new_record_field(id int, field_name string, field_type Node, default_value Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .record_field
+		value:    field_name
+		children: [field_type, default_value]
+		position: pos
+	}
+}
+
+pub fn new_record_field_without_default(id int, field_name string, field_type Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .record_field
+		value:    field_name
+		children: [field_type]
+		position: pos
+	}
+}
+
+pub fn new_record_definition(id int, name string, fields []Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .record_definition
+		value:    name
+		children: fields
+		position: pos
+	}
+}
+
+pub fn new_record_literal(id int, name string, field_values []Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .record_literal
+		value:    name
+		children: field_values
+		position: pos
+	}
+}
+
+pub fn new_record_access(id int, record_expr Node, field_name string, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .record_access
+		value:    field_name
+		children: [record_expr]
+		position: pos
+	}
+}
+
+pub fn new_record_update(id int, record_name string, record_expr Node, field_name string, field_value Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .record_update
+		value:    record_name
+		children: [record_expr, Node{
+			id:       -1
+			kind:     .identifier
+			value:    field_name
+			children: []
+			position: pos
+		}, field_value]
+		position: pos
+	}
+}

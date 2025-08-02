@@ -75,6 +75,9 @@ fn (mut g ErlangGenerator) generate_node(node ast.Node) ! {
 		.variable_ref {
 			g.generate_variable_ref(node)!
 		}
+		.identifier {
+			g.generate_identifier(node)!
+		}
 		.block {
 			g.generate_block(node)!
 		}
@@ -102,6 +105,18 @@ fn (mut g ErlangGenerator) generate_node(node ast.Node) ! {
 		.map_access {
 			g.generate_map_access(node)!
 		}
+		.record_definition {
+			g.generate_record_definition(node)!
+		}
+		.record_literal {
+			g.generate_record_literal(node)!
+		}
+		.record_access {
+			g.generate_record_access(node)!
+		}
+		.record_update {
+			g.generate_record_update(node)!
+		}
 		else {
 			return error('Unsupported node type: ${node.kind}')
 		}
@@ -114,6 +129,7 @@ fn (mut g ErlangGenerator) generate_binding(node ast.Node) ! {
 	}
 
 	original_name := node.value
+	// Use normal capitalization instead of uppercase with underscore
 	unique_name := g.get_unique_var_name(original_name)
 	value_node := node.children[0]
 
@@ -122,6 +138,13 @@ fn (mut g ErlangGenerator) generate_binding(node ast.Node) ! {
 }
 
 fn (mut g ErlangGenerator) generate_variable_ref(node ast.Node) ! {
+	original_name := node.value
+	unique_name := g.get_unique_var_name(original_name)
+	g.output.write_string(unique_name)
+}
+
+fn (mut g ErlangGenerator) generate_identifier(node ast.Node) ! {
+	// Identifiers should be treated as variable references
 	original_name := node.value
 	unique_name := g.get_unique_var_name(original_name)
 	g.output.write_string(unique_name)
@@ -144,10 +167,17 @@ fn (mut g ErlangGenerator) generate_module(node ast.Node) ! {
 	g.output.write_string('-module(' + mod_name + ').\n')
 
 	mut exports := []string{}
+	mut records := []ast.Node{}
+	mut functions := []ast.Node{}
+
+	// Separate records and functions
 	for child in node.children {
 		if child.kind == .function {
 			func_name := child.value
 			exports << '${func_name}/0'
+			functions << child
+		} else if child.kind == .record_definition {
+			records << child
 		}
 	}
 
@@ -155,9 +185,16 @@ fn (mut g ErlangGenerator) generate_module(node ast.Node) ! {
 		g.output.write_string('-export([${exports.join(', ')}]).\n\n')
 	}
 
-	for i, child in node.children {
+	// Generate record definitions first
+	for record in records {
+		g.generate_node(record)!
+		g.output.write_string('\n')
+	}
+
+	// Generate functions
+	for i, child in functions {
 		g.generate_node(child)!
-		if i < node.children.len - 1 {
+		if i < functions.len - 1 {
 			g.output.write_string('\n')
 		}
 	}
@@ -220,68 +257,72 @@ fn (g ErlangGenerator) escape_string(s string) string {
 }
 
 fn type_to_erlang_spec(t ast.Type) string {
-	match t.name {
+	return match t.name {
 		'union' {
-			// Para tipos de união, gerar: integer() | binary() | atom() | float()
 			if t.params.len > 0 {
 				union_types := t.params.map(type_to_erlang_spec).join(' | ')
-				return union_types
+				union_types
 			} else {
-				return 'any()'
+				'any()'
 			}
 		}
 		'integer' {
-			return 'integer()'
+			'integer()'
 		}
 		'float' {
-			return 'float()'
+			'float()'
 		}
 		'string' {
-			return 'binary()'
+			'binary()'
 		}
 		'boolean' {
-			return 'boolean()'
+			'boolean()'
 		}
 		'atom' {
-			return 'atom()'
+			'atom()'
 		}
 		'nil' {
-			return 'nil'
+			'nil'
 		}
 		'module' {
-			return 'atom()'
+			'atom()'
 		}
 		'any' {
-			return 'any()'
+			'any()'
 		}
 		'term' {
-			return 'term()'
+			'term()'
 		}
 		'list' {
 			if t.params.len == 1 {
-				return '[' + type_to_erlang_spec(t.params[0]) + ']'
+				'[' + type_to_erlang_spec(t.params[0]) + ']'
 			} else {
-				return 'list()'
+				'list()'
 			}
 		}
 		'tuple' {
 			if t.params.len > 0 {
 				elems := t.params.map(type_to_erlang_spec).join(', ')
-				return '{' + elems + '}'
+				'{' + elems + '}'
 			} else {
-				return 'tuple()'
+				'tuple()'
 			}
 		}
 		'map' {
 			if t.params.len == 2 {
-				return '#{' + type_to_erlang_spec(t.params[0]) + ' => ' +
+				'#{' + type_to_erlang_spec(t.params[0]) + ' => ' +
 					type_to_erlang_spec(t.params[1]) + '}'
 			} else {
-				return 'map()'
+				'map()'
 			}
 		}
 		else {
-			return t.name + '()'
+			// Check if this is a record type (should be converted to lowercase)
+			if t.name.len > 0 && t.name[0].is_capital() {
+				'#${t.name.to_lower()}{}'
+			} else {
+				t.name + '()'
+			}
 		}
 	}
 }
@@ -378,6 +419,9 @@ fn (mut g ErlangGenerator) generate_node_to_string(node ast.Node) !string {
 		.variable_ref {
 			return g.generate_variable_ref_to_string(node)
 		}
+		.identifier {
+			return g.generate_identifier_to_string(node)
+		}
 		.function_caller {
 			return g.generate_function_caller_to_string(node)
 		}
@@ -398,6 +442,9 @@ fn (mut g ErlangGenerator) generate_node_to_string(node ast.Node) !string {
 		}
 		.map_access {
 			return g.generate_map_access_to_string(node)
+		}
+		.record_access {
+			return g.generate_record_access_to_string(node)
 		}
 		else {
 			return error('Unsupported node type for string generation: ${node.kind}')
@@ -424,6 +471,12 @@ fn (mut g ErlangGenerator) generate_literal_to_string(node ast.Node) !string {
 }
 
 fn (mut g ErlangGenerator) generate_variable_ref_to_string(node ast.Node) !string {
+	original_name := node.value
+	unique_name := g.get_unique_var_name(original_name)
+	return unique_name
+}
+
+fn (mut g ErlangGenerator) generate_identifier_to_string(node ast.Node) !string {
 	original_name := node.value
 	unique_name := g.get_unique_var_name(original_name)
 	return unique_name
@@ -698,4 +751,167 @@ fn (mut g ErlangGenerator) generate_map_access_to_string(node ast.Node) !string 
 	map_code := g.generate_node_to_string(map_expr)!
 
 	return 'maps:get(${key_code}, ${map_code})'
+}
+
+// Record generation functions
+fn (mut g ErlangGenerator) generate_record_definition(node ast.Node) ! {
+	record_name := node.value.to_lower() // Convert to lowercase for Erlang convention
+
+	// Generate record definition header
+	g.output.write_string('-record(${record_name}, {')
+
+	// Generate field definitions
+	for i, field in node.children {
+		if i > 0 {
+			g.output.write_string(', ')
+		}
+
+		if field.kind != .record_field {
+			g.error('Expected record field, got ${field.kind}')
+			return error('Expected record field, got ${field.kind}')
+		}
+
+		field_name := field.value
+		field_type_node := field.children[0]
+
+		// Determine field type
+		mut field_type := ast.Type{}
+		if field_type_node.value != '' {
+			// Use explicit type
+			field_type = ast.Type{
+				name:   field_type_node.value
+				params: []
+			}
+		} else if g.type_table != unsafe { nil } {
+			// Try to get inferred type from type table
+			if _ := g.type_table.get_record_type(node.value) {
+				if inferred_type := g.type_table.get_field_type(node.value, field_name) {
+					field_type = inferred_type
+				} else {
+					// Fallback to any() if type not found
+					field_type = ast.Type{
+						name:   'any'
+						params: []
+					}
+				}
+			} else {
+				// Fallback to any() if record type not found
+				field_type = ast.Type{
+					name:   'any'
+					params: []
+				}
+			}
+		} else {
+			// No type table available, fallback to any()
+			field_type = ast.Type{
+				name:   'any'
+				params: []
+			}
+		}
+
+		// Use the standard type conversion function
+		erlang_type := type_to_erlang_spec(field_type)
+
+		// Generate field with or without default value
+		if field.children.len > 1 {
+			// Field has default value
+			default_value := field.children[1]
+			g.output.write_string('${field_name} = ')
+			g.generate_node(default_value)!
+			g.output.write_string(' :: ${erlang_type}')
+		} else {
+			// Field without default value
+			g.output.write_string('${field_name} = nil :: ${erlang_type}')
+		}
+	}
+
+	g.output.write_string('}).')
+}
+
+fn (mut g ErlangGenerator) generate_record_literal(node ast.Node) ! {
+	record_name := node.value.to_lower() // Convert to lowercase for Erlang convention
+
+	g.output.write_string('#${record_name}{')
+
+	for i, field in node.children {
+		if i > 0 {
+			g.output.write_string(', ')
+		}
+
+		field_name := field.value
+		field_value := field.children[0]
+
+		g.output.write_string('${field_name} = ')
+		g.generate_node(field_value)!
+	}
+
+	g.output.write_string('}')
+}
+
+fn (mut g ErlangGenerator) generate_record_access(node ast.Node) ! {
+	if node.children.len != 1 {
+		return error('Record access must have exactly one child')
+	}
+
+	record_expr := node.children[0]
+	field_name := node.value
+
+	// Get the record name from the type table
+	record_name := g.get_record_name_from_type(record_expr)
+
+	g.generate_node(record_expr)!
+	g.output.write_string('#${record_name}.${field_name}')
+}
+
+fn (g ErlangGenerator) get_record_name_from_type(record_expr ast.Node) string {
+	// If we have access to type_table, try to get the record type
+	if g.type_table != unsafe { nil } {
+		if record_type := g.type_table.get_type(record_expr.id) {
+			// If it's a record type, the name should be the type name
+			if record_type.name.len > 0 && record_type.name[0].is_capital() {
+				return record_type.name.to_lower()
+			}
+		}
+	}
+
+	// If it's a record literal, we can get the name directly
+	if record_expr.kind == .record_literal {
+		return record_expr.value.to_lower()
+	}
+
+	// Default fallback
+	return 'record'
+}
+
+fn (mut g ErlangGenerator) generate_record_update(node ast.Node) ! {
+	if node.children.len != 3 {
+		return error('Record update must have exactly 3 children')
+	}
+
+	record_name := node.value.to_lower() // Convert to lowercase for Erlang convention
+	record_expr := node.children[0]
+	field_name_node := node.children[1]
+	field_value := node.children[2]
+
+	g.generate_node(record_expr)!
+	g.output.write_string('#${record_name}{')
+	g.output.write_string(field_name_node.value)
+	g.output.write_string(' = ')
+	g.generate_node(field_value)!
+	g.output.write_string('}')
+}
+
+fn (mut g ErlangGenerator) generate_record_access_to_string(node ast.Node) !string {
+	if node.children.len != 1 {
+		return error('Record access must have exactly one child')
+	}
+
+	record_expr := node.children[0]
+	field_name := node.value
+
+	// Get the record name from the type table
+	record_name := g.get_record_name_from_type(record_expr)
+
+	record_code := g.generate_node_to_string(record_expr)!
+	return '${record_code}#${record_name}.${field_name}'
 }

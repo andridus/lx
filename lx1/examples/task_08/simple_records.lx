@@ -1,0 +1,9 @@
+# Record definido no escopo global
+record Person { name :: string, age = 10 :: integer }
+
+def main() do
+    user = Person{name: "fulano"}
+    name = user.name
+    age = user.age
+    {user, name, age}
+end

@@ -10,6 +10,7 @@ pub enum TokenType {
 	true_
 	false_
 	nil_
+	record
 
 	// Literals
 	integer
@@ -19,18 +20,20 @@ pub enum TokenType {
 	identifier
 
 	// Delimiters
-	lparen    // (
-	rparen    // )
-	semicolon // ;
-	comma     // ,
-	bind      // =
-	lbracket  // [
-	rbracket  // ]
-	pipe      // |
-	lbrace    // {
-	rbrace    // }
-	percent   // %
-	colon     // :
+	lparen       // (
+	rparen       // )
+	semicolon    // ;
+	comma        // ,
+	bind         // =
+	lbracket     // [
+	rbracket     // ]
+	pipe         // |
+	lbrace       // {
+	rbrace       // }
+	percent      // %
+	colon        // :
+	dot          // .
+	double_colon // ::
 
 	// Special
 	newline
@@ -65,6 +68,7 @@ pub fn (tt TokenType) str() string {
 		.true_ { 'true' }
 		.false_ { 'false' }
 		.nil_ { 'nil' }
+		.record { 'record' }
 		.integer { 'integer' }
 		.float { 'float' }
 		.string { 'string' }
@@ -82,6 +86,8 @@ pub fn (tt TokenType) str() string {
 		.rbrace { '}' }
 		.percent { '%' }
 		.colon { ':' }
+		.dot { '.' }
+		.double_colon { '::' }
 		.newline { 'newline' }
 		.eof { 'eof' }
 		.error { 'error' }

@@ -1,0 +1,5 @@
+def test() do
+%{"name": "João",
+age: 30,
+active: true}
+end
