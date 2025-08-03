@@ -1,0 +1,47 @@
+.PHONY: all compile clean test dialyzer generate debug
+
+# Default target
+all: compile
+
+# Compile the project
+compile:
+	rebar3 compile
+
+
+# Clean build artifacts
+clean:
+	rebar3 clean
+
+# Run tests
+test:
+	rebar3 eunit
+	rebar3 ct
+
+# Run dialyzer
+dialyzer:
+	rebar3 dialyzer
+
+# Generate lexer and parser
+generate:
+	rebar3 compile
+
+# Debug with observer
+debug:
+	rebar3 shell
+
+# Install dependencies
+deps:
+	rebar3 get-deps
+
+# Run specific test
+test-specific:
+	rebar3 eunit --module=$(TEST)
+
+# Format code
+format:
+	rebar3 fmt
+
+# Check code
+check:
+	rebar3 fmt --check
+	rebar3 dialyzer

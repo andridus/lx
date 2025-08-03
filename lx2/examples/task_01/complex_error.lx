@@ -1,0 +1,5 @@
+def answer() do
+    x = 42
+    y = @invalid_here
+    z = 100
+end

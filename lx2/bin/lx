@@ -1,0 +1,8 @@
+#!/usr/bin/env escript
+%%! -pa _build/default/lib/lx2/ebin
+
+%% LX2 Compiler - Command Line Interface
+%% Usage: lx [compile|run] <file.lx>
+
+main(Args) ->
+    lx2_cli:main(Args).

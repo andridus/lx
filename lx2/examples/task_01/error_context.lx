@@ -1,0 +1,20 @@
+def answer() do
+    42
+end
+
+def greeting() do
+    "Hello, World!"
+end
+
+def status() do
+    :ok
+end
+
+def invalid() do
+    # This line has an error
+    @invalid_token_here
+end
+
+def pi() do
+    3.14159
+end

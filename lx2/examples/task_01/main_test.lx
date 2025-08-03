@@ -1,0 +1,7 @@
+def main() do
+    "Hello from main_test module!"
+end
+
+def other_function() do
+    456
+end

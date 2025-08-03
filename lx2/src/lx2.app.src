@@ -1,0 +1,16 @@
+{application, lx2,
+ [{description, "LX2 Compiler - Erlang implementation of LX language"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {mod, {lx2, []}},
+  {applications,
+   [kernel,
+    stdlib
+   ]},
+  {env,[]},
+  {modules, []},
+
+  {maintainers, []},
+  {licenses, ["MIT"]},
+  {links, []}
+ ]}.

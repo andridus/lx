@@ -1,0 +1,11 @@
+def answer() do
+    42
+end
+
+def invalid() do
+    def missing_do
+end
+
+def greeting() do
+    "Hello, World!"
+end
