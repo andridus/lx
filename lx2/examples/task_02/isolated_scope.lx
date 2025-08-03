@@ -1,0 +1,9 @@
+def isolated_scope() do
+    x = 42
+    x
+end
+
+def another_scope() do
+    x = 100
+    x
+end

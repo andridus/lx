@@ -8,7 +8,7 @@ lexer_basic_test() ->
     {ok, Tokens, _} = lx2_lexer:string(Source),
     ?assertMatch([
         {def, 1},
-        {identifier, 1, answer},
+        {identifier, 1, "answer"},
         {'(', 1},
         {')', 1},
         {do, 1},
@@ -29,7 +29,7 @@ parser_basic_test() ->
 compilation_basic_test() ->
     Source = "def answer() do 42 end",
     {ok, ModuleName, BeamCode, _} = lx2:compile(Source),
-    ?assertEqual(unamed, ModuleName),
+    ?assertEqual(unknown, ModuleName),
     ?assert(is_binary(BeamCode)).
 
 %% Test function execution
@@ -49,7 +49,7 @@ literals_test() ->
     Source = "def test() do 42 end\ndef test2() do 3.14 end\ndef test3() do \"hello\" end\ndef test4() do :ok end\ndef test5() do true end\ndef test6() do nil end",
     {ok, ModuleName, BeamCode, _} = lx2:compile(Source),
 
-    % Load the module
+    % Load the modules
     {module, ModuleName} = code:load_binary(ModuleName, "", BeamCode),
 
     % Test each function
@@ -88,7 +88,7 @@ erl_generation_test() ->
 %% Test both modes
 both_modes_test() ->
     Source = "def answer() do 42 end",
-    {ok, _ModuleName, BeamCode, ErlCode, _DebugInfo} = lx2:compile(Source, #{mode => both}),
+    {ok, _ModuleName, BeamCode, #{source := ErlCode}} = lx2:compile(Source, #{mode => both}),
 
     % Check BEAM compilation
     ?assert(is_binary(BeamCode)),

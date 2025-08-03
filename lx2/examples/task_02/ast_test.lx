@@ -1,0 +1,4 @@
+def ast_test() do
+  x = 42
+  x
+end

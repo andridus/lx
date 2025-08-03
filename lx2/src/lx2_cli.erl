@@ -97,6 +97,30 @@ run_file(FilePath) ->
                             io:format("Error loading module: ~p~n", [Reason]),
                             {error, Reason}
                     end;
+                {ModuleName, BeamCode, _} ->
+                    % Load the module
+                    case code:load_binary(ModuleName, "", BeamCode) of
+                        {module, ModuleName} ->
+                            % Try to find a main function or the first function
+                            case find_main_function(ModuleName) of
+                                {ok, FunName} ->
+                                    % Execute the function
+                                    try
+                                        Result = ModuleName:FunName(),
+                                        io:format("~p~n", [Result])
+                                    catch
+                                        _:Error ->
+                                            io:format("Runtime error: ~p~n", [Error]),
+                                            {error, Error}
+                                    end;
+                                {error, Reason} ->
+                                    io:format("No executable function found: ~p~n", [Reason]),
+                                    {error, Reason}
+                            end;
+                        {error, Reason} ->
+                            io:format("Error loading module: ~p~n", [Reason]),
+                            {error, Reason}
+                    end;
                 {error, Error} ->
                     print_error(FilePath, Source, Error),
                     {error, Error}
@@ -174,8 +198,8 @@ find_main_function(ModuleName) ->
 find_zero_arity_function(ModuleName) ->
     % This is a simplified approach - in a real implementation,
     % you might want to parse the AST to find functions
-    % For now, we'll try common function names
-    CommonNames = [answer, test, main, start, init],
+    % For now, we'll try common function names and the module name itself
+    CommonNames = [answer, test, main, start, init, simple, ModuleName],
     find_function_in_list(ModuleName, CommonNames).
 
 %% Try to find a function from a list of names
@@ -214,27 +238,37 @@ print_ast(AST, Indent) ->
 %% Print error with context
 print_error(FilePath, Source, Error) ->
     case Error of
-        {lexical_error, Line, Message} ->
-            print_compilation_error(FilePath, Source, Line, "Lexical Error", Message);
+        {semantic_error, {undefined_variable, Var}} ->
+            % Find the line where the undefined variable appears
+            Lines = string:split(Source, "\n", all),
+            Line = find_variable_line(Lines, Var),
+            print_compilation_error(FilePath, Source, Line, "Type Error", "Undefined variable: " ++ atom_to_list(Var));
+        {semantic_error, ErrorDetails} ->
+            io:format("Compilation failed: [Semantic Error] ~s~n", [FilePath]),
+            io:format("~p~n", [ErrorDetails]);
         {syntax_error, Line, Message} ->
             print_compilation_error(FilePath, Source, Line, "Syntax Error", Message);
-        {type_error, Line, Message} ->
-            print_compilation_error(FilePath, Source, Line, "Type Error", Message);
-        {codegen_error, Message} ->
-            io:format("Compilation failed: [Code Generation Error] ~s~n", [Message]);
-        {erl_generation_error, Message} ->
-            io:format("Compilation failed: [Erlang Generation Error] ~s~n", [Message]);
-        {compilation_errors, Errors, Warnings} ->
-            io:format("Compilation failed: [Analysis Error] ~s~n", [FilePath]),
-            [print_compilation_error(FilePath, Source, Line, "Error", Message) || {Line, Message} <- Errors],
-            case Warnings of
-                [] -> ok;
-                _ ->
-                    io:format("~nWarnings:~n"),
-                    [print_compilation_error(FilePath, Source, Line, "Warning", Message) || {Line, Message} <- Warnings]
-            end;
+        {syntax_error, {syntax_error, Line, Message}} ->
+            print_compilation_error(FilePath, Source, Line, "Syntax Error", Message);
+        {lexical_error, Line, Message} ->
+            print_compilation_error(FilePath, Source, Line, "Lexical Error", Message);
         _ ->
             io:format("Compilation failed: [Unknown Error] ~p~n", [Error])
+    end.
+
+%% Find the line where a variable appears
+find_variable_line(Lines, Var) ->
+    VarStr = atom_to_list(Var),
+    find_variable_line_rec(Lines, VarStr, 1).
+
+find_variable_line_rec([], _VarStr, _LineNum) ->
+    1; % Default to line 1 if not found
+find_variable_line_rec([Line | Rest], VarStr, LineNum) ->
+    case string:find(Line, VarStr) of
+        nomatch ->
+            find_variable_line_rec(Rest, VarStr, LineNum + 1);
+        _ ->
+            LineNum
     end.
 
 %% Print compilation error with improved formatting and colors
@@ -320,12 +354,18 @@ find_error_position(LineContent, Message, ErrorType) ->
                     end
             end;
         "Type Error" ->
-            % For type errors with undefined variable, find the underscore
-            case string:find(Message, "Undefined variable: _") of
+            % For type errors with undefined variable, find the variable name
+            case string:find(Message, "Undefined variable: ") of
                 nomatch ->
                     string:length(LineContent);
                 _ ->
-                    find_char_position(LineContent, "_")
+                    % Extract variable name from message like "Undefined variable: y"
+                    case re:run(Message, "Undefined variable: ([a-zA-Z_][a-zA-Z0-9_]*)", [{capture, all_but_first, list}]) of
+                        {match, [VarName]} ->
+                            find_char_position(LineContent, VarName);
+                        _ ->
+                            string:length(LineContent)
+                    end
             end;
         "Syntax Error" ->
             % For syntax errors, try to find the problematic token

@@ -17,6 +17,10 @@ test:
 	rebar3 eunit
 	rebar3 ct
 
+# Run Task 2 specific tests
+test-task2:
+	rebar3 eunit --module=lx2_task2_tests
+
 # Run dialyzer
 dialyzer:
 	rebar3 dialyzer

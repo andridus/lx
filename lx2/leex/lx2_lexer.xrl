@@ -18,8 +18,9 @@ def : {token, {def, TokenLine}}.
 do : {token, {do, TokenLine}}.
 end : {token, {'end', TokenLine}}.
 _ : {token, {underscore, TokenLine}}.
-{L}({L}|{D})* : {token, {identifier, TokenLine, list_to_atom(TokenChars)}}.
+{L}({L}|{D})* : {token, {identifier, TokenLine, TokenChars}}.
 = : {token, {equals, TokenLine}}.
+; : {token, {semicolon, TokenLine}}.
 \( : {token, {'(', TokenLine}}.
 \) : {token, {')', TokenLine}}.
 {WS}+ : skip_token.

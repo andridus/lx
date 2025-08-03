@@ -1,0 +1,1 @@
+def invalid() do x = 42; x; end

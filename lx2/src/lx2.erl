@@ -8,22 +8,23 @@
 compile(Source) ->
     compile(Source, #{}).
 
+%% Compile LX source code
 compile(Source, Options) ->
     case lexical_analysis(Source) of
         {ok, Tokens} ->
             case syntactic_analysis(Tokens) of
                 {ok, AST} ->
                     case semantic_analysis(AST) of
-                        {ok, TypedAST, Specs} ->
-                            code_generation(TypedAST, Specs, Options);
-                        {error, TypeErrors} ->
-                            {error, TypeErrors}
+                        {ok, Specs} ->
+                            code_generation(AST, Specs, Options);
+                        {error, TypeError} ->
+                            {error, {semantic_error, TypeError}}
                     end;
                 {error, SyntaxError} ->
-                    {error, SyntaxError}
+                    {error, {syntax_error, SyntaxError}}
             end;
-        {error, LexicalError} ->
-            {error, LexicalError}
+        {error, LexError} ->
+            {error, {lexical_error, LexError}}
     end.
 
 %% Lexical analysis
@@ -44,6 +45,8 @@ syntactic_analysis(Tokens) ->
     case lx2_parser:parse(Tokens) of
         {ok, AST} ->
             {ok, AST};
+        {error, {syntax_error, Message}} ->
+            {error, {syntax_error, 1, Message}};
         {error, {Line, yecc, {syntax_error, Message}}} ->
             {error, {syntax_error, Line, Message}};
         {error, {Line, yecc, {user, Error}}} ->
@@ -52,14 +55,14 @@ syntactic_analysis(Tokens) ->
             {error, {syntax_error, Line, Error}}
     end.
 
-%% Semantic analysis (basic for now)
+%% Semantic analysis with type inference
 semantic_analysis(AST) ->
-    % Check for undefined variables (underscore)
-    case check_undefined_variables(AST) of
-        {ok, _} ->
-            {ok, AST, []};
-        {error, {Line, Message}} ->
-            {error, {type_error, Line, Message}}
+    % Infer types using Hindley-Milner
+    case lx2_types:infer_types(AST) of
+        {ok, Specs} ->
+            {ok, Specs};
+        {error, TypeErrors} ->
+            {error, TypeErrors}
     end.
 
 %% Check for undefined variables
@@ -72,53 +75,81 @@ check_undefined_variables_in_list([Node | Rest]) ->
     case check_undefined_variables_in_node(Node) of
         {ok, _} ->
             check_undefined_variables_in_list(Rest);
-        {error, Error} ->
-            {error, Error}
+        {error, NodeError} ->
+            {error, NodeError}
     end.
 
 check_undefined_variables_in_node({function_def, _Name, _Params, Body}) ->
     check_undefined_variables_in_list(Body);
 check_undefined_variables_in_node({literal, undefined, _}) ->
     {error, {2, "Undefined variable: _"}};
+check_undefined_variables_in_node({variable_ref, _Var}) ->
+    % For now, we'll check this during type inference
+    {ok, []};
+check_undefined_variables_in_node({variable_binding, _Var, Expr}) ->
+    check_undefined_variables_in_node(Expr);
 check_undefined_variables_in_node(_) ->
     {ok, []}.
 
-%% Code generation
-code_generation(AST, _Specs, Options) ->
-    % Get module name from options or use default
-    ModuleName = maps:get(module_name, Options, unamed),
+%% Type inference
+infer_types(AST) ->
+    % Create initial type environment
+    Env = lx2_types:new_type_env(),
 
-    case maps:get(mode, Options, direct) of
-        direct ->
-            % Direct compilation to BEAM (default)
-            case lx2_codegen:compile_direct(AST, ModuleName) of
-                {ModuleName, BeamCode, DebugInfo} ->
-                    {ok, ModuleName, BeamCode, DebugInfo};
-                {error, CodegenError} ->
-                    {error, {codegen_error, CodegenError}}
+    % Infer types for all functions
+    case infer_function_types(AST, Env) of
+        {ok, TypedAST, Specs} ->
+            {ok, TypedAST, Specs};
+        {error, TypeErrors} ->
+            {error, TypeErrors}
+    end.
+
+infer_function_types([], _Env) ->
+    {ok, [], []};
+infer_function_types([Fun | Rest], Env) ->
+    case infer_function_type(Fun, Env) of
+        {ok, TypedFun, Spec} ->
+            case infer_function_types(Rest, Env) of
+                {ok, TypedRest, Specs} ->
+                    {ok, [TypedFun | TypedRest], [Spec | Specs]};
+                {error, RestError} ->
+                    {error, RestError}
             end;
+        {error, FunError} ->
+            {error, FunError}
+    end.
+
+infer_function_type({function_def, Name, Params, Body}, _Env) ->
+    % Create local environment for function
+    LocalEnv = lx2_types:new_type_env(),
+
+    % Infer types for function body
+    {ReturnType, _Sub} = lx2_types:infer_block(Body, LocalEnv),
+    Spec = {Name, length(Params), ReturnType},
+    {ok, {function_def, Name, Params, Body}, Spec}.
+
+%% Code generation
+code_generation(AST, Specs, Options) ->
+    ModuleName = maps:get(module_name, Options, unknown),
+    case maps:get(mode, Options, both) of
+        beam ->
+            lx2_codegen:compile_direct(AST, ModuleName);
+        source ->
+            lx2_codegen:generate_erl_with_specs(AST, ModuleName, Specs);
         erl ->
-            % Generate .erl file
-            case lx2_codegen:generate_erl(AST, ModuleName) of
-                {ok, ErlCode} ->
-                    {ok, ErlCode};
-                {error, CodegenError} ->
-                    {error, {codegen_error, CodegenError}}
-            end;
-        both ->
-            % Both: BEAM + .erl file for debugging
-            case lx2_codegen:compile_direct(AST, ModuleName) of
-                {ModuleName, BeamCode, DebugInfo} ->
-                    case lx2_codegen:generate_erl(AST, ModuleName) of
-                        {ok, ErlCode} ->
-                            {ok, ModuleName, BeamCode, ErlCode, DebugInfo};
-                        {error, ErlError} ->
-                            {error, {erl_generation_error, ErlError}}
-                    end;
-                {error, CodegenError} ->
-                    {error, {codegen_error, CodegenError}}
-            end;
+            lx2_codegen:generate_erl_with_specs(AST, ModuleName, Specs);
         ast ->
-            % Return AST for inspection
-            {ok, AST}
+           {ok, AST};
+        both ->
+            case lx2_codegen:compile_direct(AST, ModuleName) of
+                {ModuleName, BeamCode, Meta} ->
+                    case lx2_codegen:generate_erl_with_specs(AST, ModuleName, Specs) of
+                        {ok, ErlCode} ->
+                            {ok, ModuleName, BeamCode, Meta#{source => ErlCode}};
+                        {error, SourceError} ->
+                            {error, SourceError}
+                    end;
+                {error, BeamError} ->
+                    {error, BeamError}
+            end
     end.
