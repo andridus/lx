@@ -1,0 +1,11 @@
+def add(a, b) do
+    a + b
+end
+
+def greet(name) do
+    "Hello, " + name
+end
+
+def calculate(x, y, z) do
+    x * y + z
+end

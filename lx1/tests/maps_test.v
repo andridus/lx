@@ -25,7 +25,7 @@ end'
 	expected := '-module(test).
 -export([user/0]).
 
--spec user() -> map().
+-spec user() -> #{any() => any()}.
 user() ->
     #{name => <<"João"/utf8>>, age => 30}.
 '
@@ -42,7 +42,7 @@ end'
 	expected := '-module(test).
 -export([mixed/0]).
 
--spec mixed() -> map().
+-spec mixed() -> #{any() => any()}.
 mixed() ->
     #{id => 1, name => <<"Ana"/utf8>>, <<"key"/utf8>> => <<"value"/utf8>>, 42 => <<"answer"/utf8>>, true => <<"boolean"/utf8>>}.
 '
@@ -59,7 +59,7 @@ end'
 	expected := '-module(test).
 -export([nested/0]).
 
--spec nested() -> map().
+-spec nested() -> #{any() => any()}.
 nested() ->
     #{user => #{name => <<"Ana"/utf8>>, age => 25}, settings => #{theme => <<"dark"/utf8>>}}.
 '
@@ -99,7 +99,7 @@ end'
 -spec get_atom() -> any().
 get_atom() ->
     MAP_1 = #{name => <<"João"/utf8>>, age => 30},
-    map_get(name, MAP_1).
+    maps:get(name, MAP_1).
 '
 
 	result := compile_lx(lx_code)
@@ -118,7 +118,7 @@ end'
 -spec get_string() -> any().
 get_string() ->
     MAP_1 = #{name => <<"Ana"/utf8>>, <<"key"/utf8>> => <<"value"/utf8>>},
-    map_get(<<"key"/utf8>>, MAP_1).
+    maps:get(<<"key"/utf8>>, MAP_1).
 '
 
 	result := compile_lx(lx_code)
@@ -137,7 +137,7 @@ end'
 -spec get_integer() -> any().
 get_integer() ->
     MAP_1 = #{name => <<"Ana"/utf8>>, 42 => <<"answer"/utf8>>},
-    map_get(42, MAP_1).
+    maps:get(42, MAP_1).
 '
 
 	result := compile_lx(lx_code)
@@ -153,7 +153,7 @@ end'
 	expected := '-module(test).
 -export([put_atom/0]).
 
--spec put_atom() -> any().
+-spec put_atom() -> map().
 put_atom() ->
     MAP_1 = #{name => <<"João"/utf8>>, age => 30},
     maps:put(age, 31, MAP_1).
@@ -172,7 +172,7 @@ end'
 	expected := '-module(test).
 -export([put_string/0]).
 
--spec put_string() -> any().
+-spec put_string() -> map().
 put_string() ->
     MAP_1 = #{name => <<"Ana"/utf8>>, <<"key"/utf8>> => <<"old"/utf8>>},
     maps:put(<<"key"/utf8>>, <<"new"/utf8>>, MAP_1).
@@ -191,7 +191,7 @@ end'
 	expected := '-module(test).
 -export([remove_atom/0]).
 
--spec remove_atom() -> any().
+-spec remove_atom() -> map().
 remove_atom() ->
     MAP_1 = #{name => <<"Ana"/utf8>>, age => 25, temp => <<"value"/utf8>>},
     maps:remove(temp, MAP_1).
@@ -210,7 +210,7 @@ end'
 	expected := '-module(test).
 -export([remove_string/0]).
 
--spec remove_string() -> any().
+-spec remove_string() -> map().
 remove_string() ->
     MAP_1 = #{name => <<"Ana"/utf8>>, <<"key"/utf8>> => <<"data"/utf8>>},
     maps:remove(<<"key"/utf8>>, MAP_1).
@@ -231,7 +231,7 @@ end'
 	expected := '-module(test).
 -export([map_with_vars/0]).
 
--spec map_with_vars() -> map().
+-spec map_with_vars() -> #{any() => any()}.
 map_with_vars() ->
     NAME_1 = <<"João"/utf8>>,
     AGE_2 = 30,
@@ -253,7 +253,7 @@ end'
 	expected := '-module(test).
 -export([map_with_expr/0]).
 
--spec map_with_expr() -> map().
+-spec map_with_expr() -> #{any() => any()}.
 map_with_expr() ->
     A_1 = 5,
     B_2 = 3,
@@ -274,7 +274,7 @@ end'
 	expected := '-module(test).
 -export([map_with_parens/0]).
 
--spec map_with_parens() -> map().
+-spec map_with_parens() -> #{any() => any()}.
 map_with_parens() ->
     A_1 = 2,
     B_2 = 3,
@@ -293,7 +293,7 @@ end'
 	expected := '-module(test).
 -export([deep_nested/0]).
 
--spec deep_nested() -> map().
+-spec deep_nested() -> #{any() => any()}.
 deep_nested() ->
     #{level1 => #{level2 => #{level3 => <<"deep"/utf8>>}}}.
 '
@@ -310,7 +310,7 @@ end'
 	expected := '-module(test).
 -export([all_literals/0]).
 
--spec all_literals() -> map().
+-spec all_literals() -> #{any() => any()}.
 all_literals() ->
     #{integer => 42, float => 3.14, string => <<"hello"/utf8>>, atom => ok, boolean => true, nil => nil}.
 '
@@ -329,7 +329,7 @@ end'
 	expected := '-module(test).
 -export([comparison_map/0]).
 
--spec comparison_map() -> map().
+-spec comparison_map() -> #{any() => any()}.
 comparison_map() ->
     A_1 = 5,
     B_2 = 3,
@@ -350,7 +350,7 @@ end'
 	expected := '-module(test).
 -export([logical_map/0]).
 
--spec logical_map() -> map().
+-spec logical_map() -> #{any() => any()}.
 logical_map() ->
     A_1 = true,
     B_2 = false,
@@ -371,7 +371,7 @@ end'
 	expected := '-module(test).
 -export([bitwise_map/0]).
 
--spec bitwise_map() -> map().
+-spec bitwise_map() -> #{any() => any()}.
 bitwise_map() ->
     A_1 = 5,
     B_2 = 3,
@@ -388,10 +388,17 @@ fn test_map_with_shift_operators() {
     %{left_shift: a <<< 2, right_shift: a >>> 1}
 end'
 
+	expected := '-module(test).
+-export([shift_map/0]).
+
+-spec shift_map() -> #{any() => any()}.
+shift_map() ->
+    A_1 = 8,
+    #{left_shift => A_1 bsl 2, right_shift => A_1 bsr 1}.
+'
+
 	result := compile_lx(lx_code)
-	assert result.contains('shift_map() ->')
-	assert result.contains('#{left_shift => A_1 bsl 2, right_shift => A_1 bsr 1}')
-	assert result.contains('-spec shift_map() -> map()')
+	assert result == expected
 }
 
 fn test_map_with_floating_point() {
@@ -402,7 +409,7 @@ end'
 	expected := '-module(test).
 -export([float_map/0]).
 
--spec float_map() -> map().
+-spec float_map() -> #{any() => any()}.
 float_map() ->
     #{pi => 3.14, e => 2.718, one => 1.0}.
 '
@@ -419,7 +426,7 @@ end'
 	expected := '-module(test).
 -export([atom_map/0]).
 
--spec atom_map() -> map().
+-spec atom_map() -> #{any() => any()}.
 atom_map() ->
     #{status => ok, error => error, timeout => timeout}.
 '
@@ -436,7 +443,7 @@ end'
 	expected := '-module(test).
 -export([boolean_map/0]).
 
--spec boolean_map() -> map().
+-spec boolean_map() -> #{any() => any()}.
 boolean_map() ->
     #{flag1 => true, flag2 => false, flag3 => true}.
 '
@@ -453,7 +460,7 @@ end'
 	expected := '-module(test).
 -export([nil_map/0]).
 
--spec nil_map() -> map().
+-spec nil_map() -> #{any() => any()}.
 nil_map() ->
     #{value1 => nil, value2 => nil, value3 => nil}.
 '
@@ -470,7 +477,7 @@ end'
 	expected := '-module(test).
 -export([mixed_map/0]).
 
--spec mixed_map() -> map().
+-spec mixed_map() -> #{any() => any()}.
 mixed_map() ->
     #{number => 42, text => <<"hello"/utf8>>, flag => ok, value => 3.14, active => true}.
 '
@@ -508,7 +515,7 @@ end'
 -spec get_nonexistent() -> any().
 get_nonexistent() ->
     MAP_1 = #{name => <<"Ana"/utf8>>, age => 25},
-    map_get(nonexistent, MAP_1).
+    maps:get(nonexistent, MAP_1).
 '
 
 	result := compile_lx(lx_code)
@@ -524,7 +531,7 @@ end'
 	expected := '-module(test).
 -export([remove_nonexistent/0]).
 
--spec remove_nonexistent() -> any().
+-spec remove_nonexistent() -> map().
 remove_nonexistent() ->
     MAP_1 = #{name => <<"Ana"/utf8>>, age => 25},
     maps:remove(nonexistent, MAP_1).
@@ -544,7 +551,7 @@ end'
 	expected := '-module(test).
 -export([function_calls/0]).
 
--spec function_calls() -> map().
+-spec function_calls() -> #{any() => any()}.
 function_calls() ->
     A_1 = 10,
     B_2 = 5,
@@ -566,7 +573,7 @@ end'
 	expected := '-module(test).
 -export([parens_expressions/0]).
 
--spec parens_expressions() -> map().
+-spec parens_expressions() -> #{any() => any()}.
 parens_expressions() ->
     A_1 = 2,
     B_2 = 3,
@@ -589,7 +596,7 @@ end'
 	expected := '-module(test).
 -export([var_refs/0]).
 
--spec var_refs() -> map().
+-spec var_refs() -> #{any() => any()}.
 var_refs() ->
     X_1 = 10,
     Y_2 = 20,
@@ -634,7 +641,7 @@ end'
 get_var_refs() ->
     MY_MAP_1 = #{name => <<"Ana"/utf8>>, age => 25},
     MY_KEY_2 = name,
-    map_get(MY_KEY_2, MY_MAP_1).
+    maps:get(MY_KEY_2, MY_MAP_1).
 '
 
 	result := compile_lx(lx_code)
@@ -652,7 +659,7 @@ end'
 	expected := '-module(test).
 -export([put_var_refs/0]).
 
--spec put_var_refs() -> any().
+-spec put_var_refs() -> map().
 put_var_refs() ->
     MY_MAP_1 = #{name => <<"Ana"/utf8>>, age => 25},
     MY_KEY_2 = age,
@@ -674,7 +681,7 @@ end'
 	expected := '-module(test).
 -export([remove_var_refs/0]).
 
--spec remove_var_refs() -> any().
+-spec remove_var_refs() -> map().
 remove_var_refs() ->
     MY_MAP_1 = #{name => <<"Ana"/utf8>>, age => 25, temp => <<"value"/utf8>>},
     MY_KEY_2 = temp,
@@ -703,14 +710,14 @@ end'
 	expected := '-module(test).
 -export([complex_operations/0]).
 
--spec complex_operations() -> {map(), map(), any()}.
+-spec complex_operations() -> {#{any() => any()}, #{any() => any()}, map()}.
 complex_operations() ->
     USER_1 = #{id => 1, name => <<"João"/utf8>>, age => 30, <<"email"/utf8>> => <<"joao@example.com"/utf8>>, 42 => <<"magic"/utf8>>},
     CONFIG_2 = #{database => #{host => <<"localhost"/utf8>>, port => 5432}, <<"api_key"/utf8>> => <<"secret123"/utf8>>},
-    NAME_3 = map_get(name, USER_1),
-    AGE_4 = map_get(age, USER_1),
-    EMAIL_5 = map_get(<<"email"/utf8>>, USER_1),
-    MAGIC_6 = map_get(42, USER_1),
+    NAME_3 = maps:get(name, USER_1),
+    AGE_4 = maps:get(age, USER_1),
+    EMAIL_5 = maps:get(<<"email"/utf8>>, USER_1),
+    MAGIC_6 = maps:get(42, USER_1),
     UPDATED_USER_7 = maps:put(age, 31, USER_1),
     UPDATED_USER2_8 = maps:put(<<"email"/utf8>>, <<"new@example.com"/utf8>>, UPDATED_USER_7),
     CLEAN_USER_9 = maps:remove(id, UPDATED_USER2_8),
@@ -740,14 +747,14 @@ end'
 	expected := '-module(test).
 -export([multiple_ops/0]).
 
--spec multiple_ops() -> {integer(), integer(), any(), any(), any(), any()}.
+-spec multiple_ops() -> {integer(), integer(), any(), any(), map(), map()}.
 multiple_ops() ->
     MAP1_1 = #{a => 1, b => 2},
     MAP2_2 = #{c => 3, d => 4},
     SIZE1_3 = map_size(MAP1_1),
     SIZE2_4 = map_size(MAP2_2),
-    VALUE1_5 = map_get(a, MAP1_1),
-    VALUE2_6 = map_get(c, MAP2_2),
+    VALUE1_5 = maps:get(a, MAP1_1),
+    VALUE2_6 = maps:get(c, MAP2_2),
     UPDATED1_7 = maps:put(e, 5, MAP1_1),
     UPDATED2_8 = maps:put(f, 6, MAP2_2),
     REMOVED1_9 = maps:remove(b, UPDATED1_7),
@@ -767,7 +774,7 @@ end'
 	expected := '-module(test).
 -export([map_with_lists/0]).
 
--spec map_with_lists() -> map().
+-spec map_with_lists() -> #{any() => any()}.
 map_with_lists() ->
     #{numbers => [1, 2, 3], names => [<<"Ana"/utf8>>, <<"João"/utf8>>], mixed => [1, <<"hello"/utf8>>, ok]}.
 '
@@ -784,7 +791,7 @@ end'
 	expected := '-module(test).
 -export([map_with_tuples/0]).
 
--spec map_with_tuples() -> map().
+-spec map_with_tuples() -> #{any() => any()}.
 map_with_tuples() ->
     #{point => {10, 20}, person => {<<"Ana"/utf8>>, 25}, mixed => {1, <<"hello"/utf8>>, ok}}.
 '
@@ -798,10 +805,16 @@ fn test_map_with_nested_structures() {
     %{user: %{profile: %{name: "Ana", age: 25}, settings: %{theme: "dark"}}, data: [1, 2, 3]}
 end'
 
+	expected := '-module(test).
+-export([nested_structures/0]).
+
+-spec nested_structures() -> #{any() => any()}.
+nested_structures() ->
+    #{user => #{profile => #{name => <<"Ana"/utf8>>, age => 25}, settings => #{theme => <<"dark"/utf8>>}}, data => [1, 2, 3]}.
+'
+
 	result := compile_lx(lx_code)
-	assert result.contains('nested_structures() ->')
-	assert result.contains('#{user => #{profile => #{name => <<"Ana"/utf8>>, age => 25}, settings => #{theme => <<"dark"/utf8>>}}, data => [1, 2, 3]}')
-	assert result.contains('-spec nested_structures() -> map()')
+	assert result == expected
 }
 
 // Native Map Access Tests
@@ -920,7 +933,7 @@ end'
 	expected := '-module(test).
 -export([multiline_map/0]).
 
--spec multiline_map() -> map().
+-spec multiline_map() -> #{any() => any()}.
 multiline_map() ->
     #{<<"name"/utf8>> => <<"João"/utf8>>, age => 30, active => true}.
 '
@@ -942,7 +955,7 @@ end'
 	expected := '-module(test).
 -export([multiline_nested/0]).
 
--spec multiline_nested() -> map().
+-spec multiline_nested() -> #{any() => any()}.
 multiline_nested() ->
     #{user => #{name => <<"Ana"/utf8>>, age => 25, settings => #{theme => <<"dark"/utf8>>, notifications => true}}, config => #{database => <<"postgres"/utf8>>, port => 5432}}.
 '

@@ -12,6 +12,9 @@ pub enum TokenType {
 	nil_
 	record
 
+	// Function tokens
+	arrow // ->
+
 	// Literals
 	integer
 	float
@@ -88,6 +91,7 @@ pub fn (tt TokenType) str() string {
 		.colon { ':' }
 		.dot { '.' }
 		.double_colon { '::' }
+		.arrow { '->' }
 		.newline { 'newline' }
 		.eof { 'eof' }
 		.error { 'error' }

@@ -134,6 +134,32 @@ pub const native_functions = {
 					params: []
 				}
 			},
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'integer'
+					params: []
+				}, ast.Type{
+					name:   'float'
+					params: []
+				}]
+				return_type: ast.Type{
+					name:   'float'
+					params: []
+				}
+			},
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'float'
+					params: []
+				}, ast.Type{
+					name:   'integer'
+					params: []
+				}]
+				return_type: ast.Type{
+					name:   'float'
+					params: []
+				}
+			},
 		]
 		gen:           [{
 			'erl': '$1 * $2'
@@ -576,7 +602,7 @@ pub const native_functions = {
 			'erl': '$1 bsr $2'
 		}]
 	}
-	// List concatenation operator
+	// List and string concatenation operator
 	'++':         FunctionInfo{
 		precedence:    1
 		associativity: .right
@@ -607,6 +633,22 @@ pub const native_functions = {
 							params: []
 						},
 					]
+				}
+			},
+			TypeSignature{
+				parameters:  [
+					ast.Type{
+						name:   'string'
+						params: []
+					},
+					ast.Type{
+						name:   'string'
+						params: []
+					},
+				]
+				return_type: ast.Type{
+					name:   'string'
+					params: []
 				}
 			},
 		]
@@ -803,7 +845,7 @@ pub const native_functions = {
 			},
 		]
 		gen:           [{
-			'erl': 'map_get($1, $2)'
+			'erl': 'maps:get($1, $2)'
 		}]
 	}
 	// Maps put function

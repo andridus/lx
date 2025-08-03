@@ -107,7 +107,7 @@ end'
 	expected := '-module(test).
 -export([set_example/0]).
 
--spec set_example() -> any().
+-spec set_example() -> tuple().
 set_example() ->
     TUPLE_1 = {1, 2, 3, 4},
     MODIFIED_2 = setelement(2, TUPLE_1, <<"changed"/utf8>>),
@@ -148,16 +148,22 @@ fn test_complex_tuple_operations() {
     {point, rectangle, updated_user}
 end'
 
+	expected := '-module(test).
+-export([complex/0]).
+
+-spec complex() -> {{integer(), integer()}, {{integer(), integer()}, {integer(), integer()}}, tuple()}.
+complex() ->
+    POINT_1 = {10, 20},
+    RECTANGLE_2 = {{0, 0}, {100, 200}},
+    USER_3 = {1, <<"João"/utf8>>, 30, true},
+    X_4 = element(1, POINT_1),
+    Y_5 = element(2, POINT_1),
+    UPDATED_USER_6 = setelement(3, USER_3, 31),
+    {POINT_1, RECTANGLE_2, UPDATED_USER_6}.
+'
+
 	result := compile_lx(lx_code)
-	assert result.contains('complex() ->')
-	assert result.contains('POINT_1 = {10, 20}')
-	assert result.contains('RECTANGLE_2 = {{0, 0}, {100, 200}}')
-	assert result.contains('USER_3 = {1, <<"João"/utf8>>, 30, true}')
-	assert result.contains('X_4 = element(1, POINT_1)')
-	assert result.contains('Y_5 = element(2, POINT_1)')
-	assert result.contains('UPDATED_USER_6 = setelement(3, USER_3, 31)')
-	assert result.contains('{POINT_1, RECTANGLE_2, UPDATED_USER_6}')
-	assert result.contains('-spec complex() -> {{integer(), integer()}, {{integer(), integer()}, {integer(), integer()}}, any()}')
+	assert result == expected
 }
 
 fn test_tuple_with_variables() {
@@ -234,7 +240,7 @@ end'
 	expected := '-module(test).
 -export([set_with_vars/0]).
 
--spec set_with_vars() -> any().
+-spec set_with_vars() -> tuple().
 set_with_vars() ->
     MY_TUPLE_1 = {1, 2, 3, 4},
     INDEX_2 = 3,
@@ -396,7 +402,7 @@ end'
 	expected := '-module(test).
 -export([set_out_of_bounds/0]).
 
--spec set_out_of_bounds() -> any().
+-spec set_out_of_bounds() -> tuple().
 set_out_of_bounds() ->
     TUPLE_1 = {1, 2, 3},
     setelement(5, TUPLE_1, <<"new"/utf8>>).
@@ -684,7 +690,7 @@ end'
 	expected := '-module(test).
 -export([set_var_refs/0]).
 
--spec set_var_refs() -> any().
+-spec set_var_refs() -> tuple().
 set_var_refs() ->
     MY_TUPLE_1 = {1, 2, 3, 4, 5},
     MY_INDEX_2 = 2,
@@ -709,7 +715,7 @@ end'
 	expected := '-module(test).
 -export([operations_chain/0]).
 
--spec operations_chain() -> {integer(), any(), any(), any()}.
+-spec operations_chain() -> {integer(), any(), any(), tuple()}.
 operations_chain() ->
     TUPLE_1 = {1, 2, 3, 4, 5},
     SIZE_2 = tuple_size(TUPLE_1),

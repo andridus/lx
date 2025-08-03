@@ -1,0 +1,11 @@
+def typed_add(a :: integer, b :: integer) :: integer do
+    a + b
+end
+
+def typed_greet(name :: string) :: string do
+    "Hello, " + name
+end
+
+def typed_calculate(x :: float, y :: float) :: float do
+    x * y
+end

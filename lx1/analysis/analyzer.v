@@ -13,9 +13,11 @@ mut:
 }
 
 pub fn (a Analyzer) lookup(name string) ?ast.Type {
-	if env := a.type_envs[a.current_env] {
-		if name in env.bindings {
-			return env.bindings[name]
+	if a.current_env >= 0 && a.current_env < a.type_envs.len {
+		if env := a.type_envs[a.current_env] {
+			if name in env.bindings {
+				return env.bindings[name]
+			}
 		}
 	}
 	return none
@@ -55,6 +57,7 @@ fn (mut a Analyzer) analyze_node(node ast.Node) !ast.Node {
 			a.analyze_module(node)
 		}
 		.function {
+			// All functions are named functions (no anonymous functions)
 			a.analyze_function(node)
 		}
 		.variable_binding {
@@ -145,25 +148,384 @@ fn (mut a Analyzer) analyze_module(node ast.Node) !ast.Node {
 }
 
 fn (mut a Analyzer) analyze_function(node ast.Node) !ast.Node {
-	a.type_envs << new_type_env(node.value)
-	a.current_env = a.type_envs.len - 1
-
-	if node.children.len != 1 {
-		a.error('Function must have exactly one body expression', node.position)
-		return error('Function must have exactly one body expression')
+	// Only check scope for named functions, not anonymous functions (heads)
+	if node.value != '' && a.current_env > 0 {
+		a.error('Function definitions are only allowed in global scope, not inside functions',
+			node.position)
+		return error('Function definitions are only allowed in global scope, not inside functions')
 	}
 
-	body := a.analyze_node(node.children[0])!
+	function_name := node.value
 
-	body_type := a.type_table.get_type(body.id) or {
-		ast.Type{
-			name:   'unknown'
-			params: []
+	// Parse args, body, and optional return type from children
+	if node.children.len < 2 {
+		a.error('Function must have args and body', node.position)
+		return error('Function must have args and body')
+	}
+
+	args_block := node.children[0]
+	body := node.children[1]
+
+	// Check for return type annotation (third child)
+	mut return_type_annotation := ast.Type{
+		name:   'any'
+		params: []
+	}
+	if node.children.len > 2 {
+		return_type_annotation = a.analyze_type_annotation(node.children[2])!
+	}
+
+	// Create a new environment for this function (only for named functions)
+	if function_name != '' {
+		a.type_envs << new_type_env(function_name)
+		a.current_env = a.type_envs.len - 1
+	}
+
+	// Analyze args and add them to the function's environment
+	mut parameters := []ast.Type{}
+	mut parameter_names := []string{}
+
+	for arg in args_block.children {
+		arg_name := arg.value
+		arg_type := if arg.children.len > 0 {
+			a.analyze_type_annotation(arg.children[0])!
+		} else {
+			ast.Type{
+				name:   'any'
+				params: []
+			}
+		}
+
+		parameters << arg_type
+		parameter_names << arg_name
+
+		// Add argument to the function's environment
+		a.bind(arg_name, arg_type)
+	}
+
+	// Register function type in global type table FIRST (only for named functions)
+	if function_name != '' {
+		// Check if this is a multi-head function (no args in definition but heads have args)
+		has_function_heads := args_block.children.len == 0 && body.kind == .block
+			&& body.children.len > 0 && body.children[0].kind == .function
+
+		// Validate: cannot have both arguments in definition AND multiple heads in body
+		if args_block.children.len > 0 && body.kind == .block && body.children.len > 0
+			&& body.children[0].kind == .function {
+			a.error('Function ${function_name} cannot have both arguments in definition and multiple heads in body. Use either "def ${function_name}(args) do body end" or "def ${function_name} do (args) -> body end"',
+				node.position)
+			return error('Invalid function definition: cannot mix argument definition with multiple heads')
+		}
+
+		if has_function_heads {
+			// Collect all parameter types from all heads to create union types
+			parameters = [] // Reset parameters array
+			parameter_names = [] // Reset parameter names
+
+			// For single-argument functions, collect all argument types
+			if body.children.len > 0 {
+				first_head := body.children[0]
+				if first_head.children.len > 0 {
+					first_head_args := first_head.children[0]
+
+					// Determine if this is a single-argument or multi-argument function
+					is_single_arg := first_head_args.kind != .block
+						|| first_head_args.children.len == 1
+
+					if is_single_arg {
+						// Single argument function - collect types from all heads
+						mut all_arg_types := []ast.Type{}
+
+						for head in body.children {
+							if head.kind == .function && head.children.len > 0 {
+								head_args := head.children[0]
+
+								// Get the actual argument (handle both direct and block cases)
+								actual_arg := if head_args.kind == .block
+									&& head_args.children.len == 1 {
+									head_args.children[0]
+								} else {
+									head_args
+								}
+
+								// Extract type based on argument kind
+								arg_type := if actual_arg.kind == .identifier
+									&& actual_arg.children.len > 0 {
+									// Has type annotation
+									a.analyze_type_annotation(actual_arg.children[0])!
+								} else {
+									// No type annotation, infer from kind
+									match actual_arg.kind {
+										.integer {
+											ast.Type{
+												name:   'integer'
+												params: []
+											}
+										}
+										.float {
+											ast.Type{
+												name:   'float'
+												params: []
+											}
+										}
+										.string {
+											ast.Type{
+												name:   'string'
+												params: []
+											}
+										}
+										.boolean {
+											ast.Type{
+												name:   'boolean'
+												params: []
+											}
+										}
+										.atom {
+											ast.Type{
+												name:   'atom'
+												params: []
+											}
+										}
+										.nil {
+											ast.Type{
+												name:   'nil'
+												params: []
+											}
+										}
+										.identifier {
+											ast.Type{
+												name:   'any'
+												params: []
+											}
+										} // Variable binding
+										else {
+											ast.Type{
+												name:   'any'
+												params: []
+											}
+										}
+									}
+								}
+								all_arg_types << arg_type
+							}
+						}
+
+						// Create union type from all argument types
+						if all_arg_types.len > 0 {
+							mut unified_type := all_arg_types[0]
+							for i in 1 .. all_arg_types.len {
+								unified_type = a.unify_types(unified_type, all_arg_types[i])
+							}
+							parameters << unified_type
+							parameter_names << 'arg_0'
+						}
+					} else {
+						// Multi-argument function - collect types from all heads for each position
+						// First, determine the number of arguments from the first head
+						num_args := first_head_args.children.len
+
+						// For each argument position, collect all types from all heads
+						for arg_pos in 0 .. num_args {
+							mut all_types_for_position := []ast.Type{}
+
+							for head in body.children {
+								if head.kind == .function && head.children.len > 0 {
+									head_args := head.children[0]
+									if head_args.kind == .block && head_args.children.len > arg_pos {
+										arg := head_args.children[arg_pos]
+
+										// Extract type based on argument kind and annotations
+										arg_type := if arg.kind == .identifier
+											&& arg.children.len > 0 {
+											// Has type annotation
+											a.analyze_type_annotation(arg.children[0])!
+										} else {
+											// No type annotation, infer from kind
+											match arg.kind {
+												.integer {
+													ast.Type{
+														name:   'integer'
+														params: []
+													}
+												}
+												.float {
+													ast.Type{
+														name:   'float'
+														params: []
+													}
+												}
+												.string {
+													ast.Type{
+														name:   'string'
+														params: []
+													}
+												}
+												.boolean {
+													ast.Type{
+														name:   'boolean'
+														params: []
+													}
+												}
+												.atom {
+													ast.Type{
+														name:   'atom'
+														params: []
+													}
+												}
+												.nil {
+													ast.Type{
+														name:   'nil'
+														params: []
+													}
+												}
+												.identifier {
+													ast.Type{
+														name:   'any'
+														params: []
+													}
+												} // Variable binding
+												else {
+													ast.Type{
+														name:   'any'
+														params: []
+													}
+												}
+											}
+										}
+										all_types_for_position << arg_type
+									}
+								}
+							}
+
+							// Create union type for this argument position
+							if all_types_for_position.len > 0 {
+								mut unified_type := all_types_for_position[0]
+								for i in 1 .. all_types_for_position.len {
+									unified_type = a.unify_types(unified_type, all_types_for_position[i])
+								}
+								parameters << unified_type
+								parameter_names << 'arg_${arg_pos}'
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// Register function with extracted parameters
+		temp_return_type := if return_type_annotation.name != 'any' {
+			return_type_annotation
+		} else {
+			ast.Type{
+				name:   'any'
+				params: []
+			}
+		}
+		a.type_table.register_function_type(function_name, parameters, temp_return_type)
+	}
+
+	// Analyze function body
+	mut analyzed_body := a.analyze_node(body)!
+
+	// Infer return type from body
+	mut return_type := ast.Type{
+		name:   'any'
+		params: []
+	}
+
+	// Check if this is a function with multiple heads
+	if analyzed_body.kind == .block {
+		// Check if this has function heads
+		has_function_heads := analyzed_body.children.len > 0
+			&& analyzed_body.children[0].kind == .function
+
+		if has_function_heads {
+			// Analyze each head and collect return types for unification
+			mut head_return_types := []ast.Type{}
+			for head in analyzed_body.children {
+				if head.kind == .function {
+					// Register head arguments in the function's environment
+					if head.children.len > 0 {
+						head_args := head.children[0]
+						for arg in head_args.children {
+							if arg.kind == .identifier {
+								arg_type := if arg.children.len > 0 {
+									a.analyze_type_annotation(arg.children[0])!
+								} else {
+									ast.Type{
+										name:   'any'
+										params: []
+									}
+								}
+								a.bind(arg.value, arg_type)
+							}
+						}
+					}
+
+					// Analyze head body and collect return type
+					if head.children.len > 1 {
+						head_body := a.analyze_node(head.children[1])!
+						head_return_type := a.type_table.get_type(head_body.id) or {
+							ast.Type{
+								name:   'any'
+								params: []
+							}
+						}
+						head_return_types << head_return_type
+					}
+				}
+			}
+
+			// Unify return types from all heads
+			if head_return_types.len > 0 {
+				mut unified_type := head_return_types[0]
+				for i in 1 .. head_return_types.len {
+					unified_type = a.unify_types(unified_type, head_return_types[i])
+				}
+				return_type = unified_type
+			}
+		} else {
+			// Single function body
+			body_type := a.type_table.get_type(analyzed_body.id) or {
+				ast.Type{
+					name:   'unknown'
+					params: []
+				}
+			}
+			return_type = body_type
+		}
+	} else {
+		// Single expression body
+		body_type := a.type_table.get_type(analyzed_body.id) or {
+			ast.Type{
+				name:   'unknown'
+				params: []
+			}
+		}
+		return_type = body_type
+	}
+
+	// Para funções com operadores aritméticos, force parâmetros para 'integer'
+	if body.kind == .function_caller && body.value in ['+', '-', '*', '/'] {
+		for i, _ in parameter_names {
+			if parameters[i].name == 'any' {
+				parameters[i] = ast.Type{
+					name:   'integer'
+					params: []
+				}
+			}
 		}
 	}
-	a.type_table.assign_type(node.id, body_type)
 
-	a.current_env = 0
+	// Update function type in global type table (only for named functions)
+	if function_name != '' {
+		a.type_table.register_function_type(function_name, parameters, return_type)
+		// Create function type for this node - use the actual return type, not 'function'
+		a.type_table.assign_type(node.id, return_type)
+		// Restore the previous environment
+		a.current_env = 0
+	}
+
 	return node
 }
 
@@ -240,6 +602,14 @@ fn (mut a Analyzer) analyze_binding(node ast.Node) !ast.Node {
 	}
 
 	var_name := node.value
+
+	// Check for rebind in current scope
+	if _ := a.lookup(var_name) {
+		a.error('Variable "${var_name}" cannot be reassigned. Variables in LX are immutable.',
+			node.position)
+		return error('Variable "${var_name}" cannot be reassigned')
+	}
+
 	value_node := a.analyze_node(node.children[0])!
 
 	value_type := a.type_table.get_type(value_node.id) or {
@@ -247,12 +617,6 @@ fn (mut a Analyzer) analyze_binding(node ast.Node) !ast.Node {
 			name:   'any'
 			params: []
 		}
-	}
-
-	// Check if variable is already defined in current function scope
-	if _ := a.lookup(var_name) {
-		a.error('Variable ${var_name} is already defined in this scope', node.position)
-		return error('Variable already defined')
 	}
 
 	// Bind variable in current function's type environment
@@ -329,145 +693,140 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 		return error('Function call must have at least one argument')
 	}
 
-	function_name := node.value // Nome da função (ex: "+", "*", ">")
+	function_name := node.value // Nome da função (ex: '+', '*', '>')
 
 	function_info := kernel.get_function_info(function_name) or {
-		a.error('Unknown function: ${function_name}', node.position)
-		return error('Unknown function')
+		// Try to get from type table for user-defined functions
+		if function_type := a.type_table.get_function_type(function_name) {
+			// This is a user-defined function
+			mut analyzed_args := []ast.Node{}
+			for arg in node.children {
+				analyzed_args << a.analyze_node(arg)!
+			}
+
+			// Validate argument count
+			if analyzed_args.len != function_type.parameters.len {
+				a.error('Function ${function_name} expects ${function_type.parameters.len} arguments, got ${analyzed_args.len}',
+					node.position)
+				return error('Function ${function_name} expects ${function_type.parameters.len} arguments, got ${analyzed_args.len}')
+			}
+
+			// Assign return type to this node
+			a.type_table.assign_type(node.id, function_type.return_type)
+
+			return ast.Node{
+				id:       node.id
+				kind:     node.kind
+				value:    node.value
+				children: analyzed_args
+				position: node.position
+			}
+		} else {
+			a.error('Unknown function: ${function_name}', node.position)
+			return error('Unknown function: ${function_name}')
+		}
 	}
 
 	mut analyzed_args := []ast.Node{}
 	for arg in node.children {
-		analyzed_arg := a.analyze_node(arg)!
-		analyzed_args << analyzed_arg
+		analyzed_args << a.analyze_node(arg)!
 	}
 
-	if function_info.fixity == .infix && analyzed_args.len == 2 && function_info.signatures.len > 0 {
-		expected_return := function_info.signatures[0].return_type
-		if expected_return.name == 'list' {
-			mut all_types := collect_list_types_rec(ast.Node{
-				...node
-				children: analyzed_args
-			}, &a.type_table)
-			mut unique_types := []ast.Type{}
-			mut seen := map[string]bool{}
-			for t in all_types {
-				if !seen[t.name] {
-					seen[t.name] = true
-					unique_types << t
+	// Para todas as funções do kernel, usa a primeira assinatura válida
+	if function_info.signatures.len > 0 {
+		// Para funções prefix com múltiplos argumentos
+		if function_info.fixity == .prefix && analyzed_args.len > 1 {
+			// Aceita a primeira assinatura (assumindo que é válida)
+			sig := function_info.signatures[0]
+			mut return_type := sig.return_type
+
+			// Special handling for setelement function
+			if function_name == 'setelement' && analyzed_args.len == 3 {
+				// setelement(index, tuple, new_value) returns a tuple with the same structure
+				tuple_type := a.type_table.get_type(analyzed_args[1].id) or {
+					ast.Type{
+						name:   'unknown'
+						params: []
+					}
+				}
+
+				// If the second argument is a tuple, return tuple() instead of {any()}
+				if tuple_type.name == 'tuple' {
+					return_type = ast.Type{
+						name:   'tuple'
+						params: []
+					}
 				}
 			}
-			final_type := if unique_types.len == 1 {
-				unique_types[0]
-			} else {
-				ast.Type{
-					name:   'union'
-					params: unique_types
-				}
-			}
-			a.type_table.assign_type(node.id, ast.Type{
-				name:   'list'
-				params: [
-					final_type,
-				]
-			})
+
+			a.type_table.assign_type(node.id, return_type)
 			return ast.Node{
 				...node
 				children: analyzed_args
 			}
 		}
-	}
 
-	expected_arity := function_info.signatures[0].parameters.len
-	if analyzed_args.len != expected_arity {
-		a.error('Function ${function_name}/${expected_arity} called with ${analyzed_args.len} arguments',
-			node.position)
-		return error('Invalid function arity')
-	}
-
-	match function_info.fixity {
-		.infix {
-			if analyzed_args.len != 2 {
-				a.error('Infix operator ${function_name} requires exactly 2 arguments, got ${analyzed_args.len}',
-					node.position)
-				return error('Invalid number of arguments')
-			}
-		}
-		.prefix {
-			// Check if this is a multi-arg prefix function
-			if a.is_multi_arg_prefix_function(function_name) {
-				// Multi-arg prefix functions can have variable number of arguments
-				// Just check that we have at least the minimum required
-				min_args := function_info.signatures[0].parameters.len
-				if analyzed_args.len < min_args {
-					a.error('Function ${function_name} requires at least ${min_args} arguments, got ${analyzed_args.len}',
-						node.position)
-					return error('Invalid number of arguments')
-				}
-			} else {
-				// Single-arg prefix functions
-				if analyzed_args.len != 1 {
-					a.error('Prefix operator ${function_name} requires exactly 1 argument, got ${analyzed_args.len}',
-						node.position)
-					return error('Invalid number of arguments')
+		// Para operadores infix
+		if function_info.fixity == .infix && analyzed_args.len == 2 {
+			left_type := a.type_table.get_type(analyzed_args[0].id) or {
+				ast.Type{
+					name:   'any'
+					params: []
 				}
 			}
-		}
-		.postfix {
-			if analyzed_args.len != 1 {
-				a.error('Postfix operator ${function_name} requires exactly 1 argument, got ${analyzed_args.len}',
-					node.position)
-				return error('Invalid number of arguments')
+			right_type := a.type_table.get_type(analyzed_args[1].id) or {
+				ast.Type{
+					name:   'any'
+					params: []
+				}
 			}
-		}
-	}
 
-	if function_info.fixity == .infix && analyzed_args.len == 2 {
-		left_type := a.type_table.get_type(analyzed_args[0].id) or {
-			ast.Type{
-				name:   'any'
-				params: []
-			}
-		}
-		right_type := a.type_table.get_type(analyzed_args[1].id) or {
-			ast.Type{
-				name:   'any'
-				params: []
-			}
-		}
+			// Tenta encontrar uma assinatura válida
+			if return_type := a.check_function_signatures(function_name, left_type, right_type,
+				function_info.signatures)
+			{
+				// Special handling for list concatenation operator
+				mut final_return_type := return_type
+				if function_name == '++' {
+					// If both arguments are lists, try to unify their element types
+					if left_type.name == 'list' && right_type.name == 'list'
+						&& left_type.params.len == 1 && right_type.params.len == 1 {
+						left_elem_type := left_type.params[0]
+						right_elem_type := right_type.params[0]
 
-		result_type := a.check_function_signatures(function_name, left_type, right_type,
-			function_info.signatures) or {
-			// Check if it's an infix operator and format accordingly
-			if function_info.fixity == .infix {
-				suggestion := 'Use explicit conversion: ${left_type.name}.to_float() or ${right_type.name}.to_integer()'
-				a.error_with_suggestion('Invalid operator: ${left_type.name} ${function_name} ${right_type.name}',
-					node.position, suggestion)
-				return error('Type mismatch in function call')
+						// Unify element types
+						unified_elem_type := a.unify_types(left_elem_type, right_elem_type)
+
+						// Create more specific list type
+						final_return_type = ast.Type{
+							name:   'list'
+							params: [unified_elem_type]
+						}
+					}
+				}
+
+				a.type_table.assign_type(node.id, final_return_type)
+				return ast.Node{
+					...node
+					children: analyzed_args
+				}
 			} else {
-				a.error('Invalid operator: ${function_name}(${left_type.name}, ${right_type.name})',
+				// Se não encontrou assinatura válida, gera erro
+				a.error('Invalid operator: ${left_type.name} ${function_name} ${right_type.name}',
 					node.position)
-				return error('Type mismatch in function call')
+				return error('Invalid operator: ${left_type.name} ${function_name} ${right_type.name}')
 			}
 		}
 
-		a.type_table.assign_type(node.id, result_type)
-	}
-
-	if function_info.fixity == .prefix && analyzed_args.len == 1 {
-		arg_type := a.type_table.get_type(analyzed_args[0].id) or {
-			ast.Type{
-				name:   'any'
-				params: []
+		// Para funções prefix com um argumento
+		if function_info.fixity == .prefix && analyzed_args.len == 1 {
+			sig := function_info.signatures[0]
+			a.type_table.assign_type(node.id, sig.return_type)
+			return ast.Node{
+				...node
+				children: analyzed_args
 			}
 		}
-
-		result_type := a.check_prefix_function_signatures(function_name, arg_type, function_info.signatures) or {
-			a.error('Invalid function: ${function_name}(${arg_type.name})', node.position)
-			return error('Type mismatch in function call')
-		}
-
-		a.type_table.assign_type(node.id, result_type)
 	}
 
 	return ast.Node{
@@ -867,9 +1226,13 @@ fn (mut a Analyzer) analyze_map_literal(node ast.Node) !ast.Node {
 	}
 
 	// Create map type with key and value types
+	// For now, use 'any' for both key and value types since maps can have mixed types
 	map_type := ast.Type{
 		name:   'map'
 		params: [ast.Type{
+			name:   'any'
+			params: []
+		}, ast.Type{
 			name:   'any'
 			params: []
 		}]
@@ -913,10 +1276,16 @@ fn (mut a Analyzer) analyze_map_access(node ast.Node) !ast.Node {
 		return error('Cannot access key on non-map type: ${map_type.name}')
 	}
 
-	// Result type is 'any' since we don't know the specific value type
-	result_type := ast.Type{
-		name:   'any'
-		params: []
+	// Try to infer the result type based on the map's value types
+	result_type := if map_type.params.len >= 2 {
+		// Use the value type from the map
+		map_type.params[1]
+	} else {
+		// Fallback to 'any' if we don't have value type information
+		ast.Type{
+			name:   'any'
+			params: []
+		}
 	}
 	a.type_table.assign_type(node.id, result_type)
 
@@ -1210,5 +1579,381 @@ fn (mut a Analyzer) analyze_record_update(node ast.Node) !ast.Node {
 		value:    node.value
 		children: [record_expr, field_name_node, field_value]
 		position: node.position
+	}
+}
+
+// Function analysis functions
+fn (mut a Analyzer) analyze_function_definition(node ast.Node) !ast.Node {
+	// Validate that function definitions are only allowed in global scope
+	if a.current_env > 0 {
+		a.error('Function definitions are only allowed in global scope, not inside functions',
+			node.position)
+		return error('Function definitions are only allowed in global scope, not inside functions')
+	}
+
+	function_name := node.value
+	parameters_node := node.children[0]
+	body := node.children[1]
+	return_type_node := node.children[2]
+
+	mut parameters := []ast.Type{}
+	mut parameter_names := []string{}
+
+	// Create a new environment for this function
+	a.type_envs << new_type_env(function_name)
+	a.current_env = a.type_envs.len - 1
+
+	// Analyze parameters and add them to the function's environment
+	for param in parameters_node.children {
+		param_name := param.value
+		param_type := if param.children.len > 0 {
+			a.analyze_type_annotation(param.children[0])!
+		} else {
+			ast.Type{
+				name:   'any'
+				params: []
+			}
+		}
+
+		parameters << param_type
+		parameter_names << param_name
+
+		// Add parameter to the function's environment
+		a.bind(param_name, param_type)
+	}
+
+	// Analyze return type
+	mut return_type := if return_type_node.children.len > 0 {
+		a.analyze_type_annotation(return_type_node)!
+	} else {
+		ast.Type{
+			name:   'any'
+			params: []
+		}
+	}
+
+	// Analyze function body
+	mut analyzed_body := a.analyze_node(body)!
+
+	// Se o corpo é um block com múltiplas heads, analise cada head primeiro
+	if analyzed_body.kind == .block {
+		// Check if this has function heads
+		has_function_heads := analyzed_body.children.len > 0
+			&& analyzed_body.children[0].kind == .function
+
+		if has_function_heads {
+			// For multiple heads, infer return type from the first head's body
+			if analyzed_body.children.len > 0 {
+				first_head := analyzed_body.children[0]
+				if first_head.kind == .function && first_head.children.len > 1 {
+					head_body := first_head.children[1]
+					head_body_type := a.type_table.get_type(head_body.id) or {
+						ast.Type{
+							name:   'unknown'
+							params: []
+						}
+					}
+					return_type = head_body_type
+				}
+			}
+
+			for head in analyzed_body.children {
+				if head.kind == .function {
+					a.analyze_node(head)!
+				}
+			}
+			// Agora analise o corpo novamente para propagar os tipos das variáveis
+			analyzed_body = a.analyze_node(body)!
+		}
+	}
+
+	// Para funções com operadores aritméticos, force parâmetros para 'integer'
+	if body.kind == .function_caller && body.value in ['+', '-', '*', '/'] {
+		for i, _ in parameter_names {
+			if parameters[i].name == 'any' {
+				parameters[i] = ast.Type{
+					name:   'integer'
+					params: []
+				}
+			}
+		}
+	}
+
+	// Infer return type from body if not specified
+	if return_type.name == 'any' {
+		body_type := a.type_table.get_type(analyzed_body.id) or {
+			ast.Type{
+				name:   'unknown'
+				params: []
+			}
+		}
+		return_type = body_type
+	}
+
+	// Register function type in global type table
+	a.type_table.register_function_type(function_name, parameters, return_type)
+
+	// Create function type for this node - use the actual return type, not 'function'
+	a.type_table.assign_type(node.id, return_type)
+
+	// Restore the previous environment
+	a.current_env = 0
+
+	return node
+}
+
+fn (mut a Analyzer) analyze_function_head(node ast.Node) !ast.Node {
+	pattern := a.analyze_node(node.children[0])!
+
+	// Register pattern variables in the current function's environment BEFORE analyzing body
+	if pattern.kind == .identifier {
+		// Simple variable pattern
+		a.bind(pattern.value, ast.Type{ name: 'any', params: [] })
+	} else if pattern.kind == .variable_ref {
+		// Variable reference pattern
+		a.bind(pattern.value, ast.Type{ name: 'any', params: [] })
+	} else if pattern.kind == .tuple_literal {
+		// Tuple pattern (multiple arguments)
+		for arg in pattern.children {
+			if arg.kind == .identifier {
+				a.bind(arg.value, ast.Type{ name: 'any', params: [] })
+			}
+		}
+	}
+
+	body := a.analyze_node(node.children[1])!
+	return_type_node := node.children[2]
+
+	// Analyze return type
+	mut return_type := if return_type_node.children.len > 0 {
+		a.analyze_type_annotation(return_type_node)!
+	} else {
+		ast.Type{
+			name:   'any'
+			params: []
+		}
+	}
+
+	// Infer return type from body if not specified
+	if return_type.name == 'any' {
+		body_type := a.type_table.get_type(body.id) or {
+			ast.Type{
+				name:   'unknown'
+				params: []
+			}
+		}
+		return_type = body_type
+	}
+
+	return ast.Node{
+		id:       node.id
+		kind:     node.kind
+		value:    node.value
+		children: [pattern, body, return_type_node]
+		position: node.position
+	}
+}
+
+fn (mut a Analyzer) analyze_function_call(node ast.Node) !ast.Node {
+	function_name := node.value
+	mut analyzed_args := []ast.Node{}
+
+	// Analyze arguments
+	for arg in node.children {
+		analyzed_arg := a.analyze_node(arg)!
+		analyzed_args << analyzed_arg
+	}
+
+	// Get function type
+	function_type := a.type_table.get_function_type(function_name) or {
+		a.error('Undefined function: ${function_name}', node.position)
+		return error('Undefined function: ${function_name}')
+	}
+
+	// Validate argument types using HM unification
+	if analyzed_args.len != function_type.parameters.len {
+		a.error('Function ${function_name} expects ${function_type.parameters.len} arguments, got ${analyzed_args.len}',
+			node.position)
+		return error('Function ${function_name} expects ${function_type.parameters.len} arguments, got ${analyzed_args.len}')
+	}
+
+	for i, arg in analyzed_args {
+		expected_type := function_type.parameters[i]
+		actual_type := a.type_table.get_type(arg.id) or {
+			ast.Type{
+				name:   'unknown'
+				params: []
+			}
+		}
+
+		if !unify_with_functions(expected_type, actual_type, &a.type_table) {
+			a.error('Type mismatch in parameter ${i}: expected ${expected_type}, got ${actual_type}',
+				node.position)
+			return error('Type mismatch in parameter ${i}: expected ${expected_type}, got ${actual_type}')
+		}
+	}
+
+	// Try to infer a more specific return type based on arguments
+	mut return_type := function_type.return_type
+
+	// Special handling for list concatenation operator
+	if function_name == '++' && analyzed_args.len == 2 {
+		left_type := a.type_table.get_type(analyzed_args[0].id) or {
+			ast.Type{
+				name:   'unknown'
+				params: []
+			}
+		}
+		right_type := a.type_table.get_type(analyzed_args[1].id) or {
+			ast.Type{
+				name:   'unknown'
+				params: []
+			}
+		}
+
+		// If both arguments are lists, try to unify their element types
+		if left_type.name == 'list' && right_type.name == 'list' && left_type.params.len == 1
+			&& right_type.params.len == 1 {
+			left_elem_type := left_type.params[0]
+			right_elem_type := right_type.params[0]
+
+			// Unify element types
+			unified_elem_type := a.unify_types(left_elem_type, right_elem_type)
+
+			// Create more specific list type
+			return_type = ast.Type{
+				name:   'list'
+				params: [unified_elem_type]
+			}
+		}
+	}
+
+	// Special handling for setelement function
+	if function_name == 'setelement' && analyzed_args.len == 3 {
+		// setelement(index, tuple, new_value) returns a tuple with the same structure
+		tuple_type := a.type_table.get_type(analyzed_args[1].id) or {
+			ast.Type{
+				name:   'unknown'
+				params: []
+			}
+		}
+
+		// If the second argument is a tuple, return tuple() instead of {any()}
+		if tuple_type.name == 'tuple' {
+			return_type = ast.Type{
+				name:   'tuple'
+				params: []
+			}
+		}
+	}
+
+	// Assign return type to this node
+	a.type_table.assign_type(node.id, return_type)
+
+	return ast.Node{
+		id:       node.id
+		kind:     node.kind
+		value:    node.value
+		children: analyzed_args
+		position: node.position
+	}
+}
+
+fn (mut a Analyzer) analyze_parameter(node ast.Node) !ast.Node {
+	// Parameters are analyzed in the context of function definitions
+	return node
+}
+
+fn (mut a Analyzer) analyze_block_expression(node ast.Node) !ast.Node {
+	mut analyzed_expressions := []ast.Node{}
+
+	// Analyze all expressions in the block
+	for expr in node.children {
+		analyzed_expr := a.analyze_node(expr)!
+		analyzed_expressions << analyzed_expr
+	}
+
+	// The type of a block is the type of its last expression
+	if analyzed_expressions.len > 0 {
+		last_expr := analyzed_expressions[analyzed_expressions.len - 1]
+		last_type := a.type_table.get_type(last_expr.id) or {
+			ast.Type{
+				name:   'unknown'
+				params: []
+			}
+		}
+		a.type_table.assign_type(node.id, last_type)
+	}
+
+	return ast.Node{
+		id:       node.id
+		kind:     node.kind
+		value:    node.value
+		children: analyzed_expressions
+		position: node.position
+	}
+}
+
+fn (mut a Analyzer) analyze_type_annotation(node ast.Node) !ast.Type {
+	// Convert AST node to Type
+	if node.value != '' {
+		return ast.Type{
+			name:   node.value
+			params: []
+		}
+	} else {
+		return ast.Type{
+			name:   'any'
+			params: []
+		}
+	}
+}
+
+fn (a Analyzer) collect_types_from_union(typ ast.Type, mut all_types []ast.Type, mut seen_types map[string]bool) {
+	if typ.name == 'union' {
+		// If it's a union, recursively collect all its types
+		for param in typ.params {
+			a.collect_types_from_union(param, mut all_types, mut seen_types)
+		}
+	} else {
+		// If it's not a union, add it if we haven't seen it
+		if !seen_types[typ.name] {
+			seen_types[typ.name] = true
+			all_types << typ
+		}
+	}
+}
+
+fn (a Analyzer) unify_types(t1 ast.Type, t2 ast.Type) ast.Type {
+	// If both types are the same and not union, return the type
+	if t1.name == t2.name && t1.name != 'union' {
+		return t1
+	}
+
+	// If one type is 'any', return 'any' (any is the most general type)
+	if t1.name == 'any' || t2.name == 'any' {
+		return ast.Type{
+			name:   'any'
+			params: []
+		}
+	}
+
+	// Collect all types from both arguments (flattening unions)
+	mut all_types := []ast.Type{}
+	mut seen_types := map[string]bool{}
+
+	// Collect types from both arguments
+	a.collect_types_from_union(t1, mut all_types, mut seen_types)
+	a.collect_types_from_union(t2, mut all_types, mut seen_types)
+
+	// If we have only one type, return it
+	if all_types.len == 1 {
+		return all_types[0]
+	}
+
+	// If we have multiple types, create a union
+	return ast.Type{
+		name:   'union'
+		params: all_types
 	}
 }

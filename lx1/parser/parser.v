@@ -152,17 +152,35 @@ fn (mut p Parser) parse_function() !ast.Node {
 	func_name := p.current.value
 	p.advance()
 
-	if p.current.type_ != .lparen {
-		return p.error_and_return_with_suggestion('Function definition requires parentheses after name',
-			'Add empty parentheses: ${func_name}()')
+	mut has_parens := false
+	mut args := []ast.Node{}
+	if p.current.type_ == .lparen {
+		has_parens = true
+		p.advance() // Skip '('
+		if p.current.type_ != .rparen {
+			for {
+				arg := p.parse_arg()!
+				args << arg
+				if p.current.type_ == .rparen {
+					break
+				}
+				if p.current.type_ != .comma {
+					return p.error_and_return('Expected comma or closing parenthesis')
+				}
+				p.advance() // Skip comma
+			}
+		}
+		if p.current.type_ != .rparen {
+			return p.error_and_return('Expected closing parenthesis')
+		}
+		p.advance() // Skip ')'
 	}
-	p.advance()
 
-	if p.current.type_ != .rparen {
-		return p.error_and_return_with_suggestion('Function parameters not supported in Task 1',
-			'Use empty parentheses: ${func_name}()')
+	mut return_type_annotation := ast.Node{}
+	if p.current.type_ == .double_colon {
+		p.advance() // Skip ::
+		return_type_annotation = p.parse_type_annotation()!
 	}
-	p.advance()
 
 	if p.current.type_ != .do {
 		return p.error_and_return_with_suggestion('Function definition requires "do" keyword',
@@ -170,18 +188,313 @@ fn (mut p Parser) parse_function() !ast.Node {
 	}
 	p.advance()
 
+	// Skip newlines
 	for p.current.type_ == .newline {
 		p.advance()
 	}
 
-	body := p.parse_block()!
+	mut body := ast.Node{}
+	if has_parens {
+		// Nunca é multi-head
+		body = p.parse_block()!
+	} else {
+		// Sempre multi-head
+		mut heads := []ast.Node{}
+		for p.current.type_ != .end && p.current.type_ != .eof {
+			for p.current.type_ == .newline {
+				p.advance()
+			}
+			if p.current.type_ == .lparen {
+				head := p.parse_function_head()!
+				heads << head
+			} else {
+				break
+			}
+		}
+		if heads.len == 0 {
+			return p.error_and_return('Expected at least one function head (pattern) in multi-head function')
+		}
+		body = ast.new_block(p.get_next_id(), heads, heads[0].position)
+	}
 
-	for p.current.type_ == .newline {
-		p.advance()
+	if p.current.type_ != .end {
+		return p.error_and_return('Expected end keyword')
 	}
 	p.advance()
 
-	return ast.new_function(func_id, func_name, body, start_pos)
+	mut children := []ast.Node{}
+	children << ast.new_block(p.get_next_id(), args, start_pos) // args block
+	children << body // function body
+
+	// Add return type annotation if present
+	if return_type_annotation.value != '' {
+		children << return_type_annotation
+	}
+
+	return ast.Node{
+		id:       func_id
+		kind:     .function
+		value:    func_name
+		children: children
+		position: start_pos
+	}
+}
+
+fn (mut p Parser) parse_arg() !ast.Node {
+	pos := p.current.position
+
+	if p.current.type_ != .identifier {
+		return p.error_and_return('Expected argument name')
+	}
+	arg_name := p.current.value
+	p.advance()
+
+	// Parse type annotation
+	mut type_annotation := ast.Node{}
+	if p.current.type_ == .double_colon {
+		p.advance() // Skip ::
+		type_annotation = p.parse_type_annotation()!
+	}
+
+	return ast.Node{
+		id:       p.get_next_id()
+		kind:     .identifier
+		value:    arg_name
+		children: if type_annotation.value != '' { [type_annotation] } else { [] }
+		position: pos
+	}
+}
+
+fn (mut p Parser) parse_type_annotation() !ast.Node {
+	pos := p.current.position
+
+	if p.current.type_ != .identifier {
+		return p.error_and_return('Expected type name')
+	}
+	type_name := p.current.value
+	p.advance()
+
+	return ast.Node{
+		id:       p.get_next_id()
+		kind:     .identifier
+		value:    type_name
+		children: []
+		position: pos
+	}
+}
+
+fn (mut p Parser) parse_function_body() !ast.Node {
+	// Skip newlines
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+
+	// Check if this is a block expression with braces
+	if p.current.type_ == .lbrace {
+		return p.parse_block_expression()!
+	}
+
+	// Check if this is a function head pattern: (pattern) -> body
+	if p.current.type_ == .lparen {
+		return p.parse_function_head()!
+	}
+
+	mut expressions := []ast.Node{}
+
+	// Consome múltiplas expressões até encontrar 'end' ou 'eof'
+	for p.current.type_ != .end && p.current.type_ != .eof {
+		// Skip newlines entre expressões
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+		if p.current.type_ == .end || p.current.type_ == .eof {
+			break
+		}
+		expr := p.parse_expression()!
+		expressions << expr
+		// Skip newlines após expressão
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+		// Skip semicolon if present
+		if p.current.type_ == .semicolon {
+			p.advance() // Skip ';'
+		}
+	}
+
+	// Se há apenas uma expressão, retorna ela diretamente
+	if expressions.len == 1 {
+		return expressions[0]
+	}
+
+	// Se há múltiplas expressões, cria um block
+	return ast.new_block(p.get_next_id(), expressions, if expressions.len > 0 {
+		expressions[0].position
+	} else {
+		p.current.position
+	})
+}
+
+fn (mut p Parser) parse_block_expression() !ast.Node {
+	pos := p.current.position
+	p.advance() // Skip '{'
+
+	mut expressions := []ast.Node{}
+
+	for {
+		// Skip newlines
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+
+		if p.current.type_ == .rbrace {
+			break
+		}
+
+		expression := p.parse_expression()!
+		expressions << expression
+
+		// Skip newlines after expression
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+
+		if p.current.type_ == .semicolon {
+			p.advance() // Skip ';'
+		} else if p.current.type_ != .rbrace {
+			return p.error_and_return('Expected semicolon or closing brace')
+		}
+	}
+
+	if p.current.type_ != .rbrace {
+		return p.error_and_return('Expected closing brace')
+	}
+	p.advance() // Skip '}'
+
+	return ast.new_block(p.get_next_id(), expressions, pos)
+}
+
+fn (mut p Parser) parse_function_head() !ast.Node {
+	pos := p.current.position
+
+	if p.current.type_ != .lparen {
+		return p.error_and_return('Expected opening parenthesis for function head')
+	}
+	p.advance() // Skip '('
+
+	// Parse args
+	args := p.parse_args()!
+
+	if p.current.type_ != .rparen {
+		return p.error_and_return('Expected closing parenthesis')
+	}
+	p.advance() // Skip ')'
+
+	// Parse return type annotation (not used in simplified version)
+	if p.current.type_ == .double_colon {
+		p.advance() // Skip ::
+		p.parse_type_annotation()! // Parse but don't store
+	}
+
+	if p.current.type_ != .arrow {
+		return p.error_and_return('Expected arrow (->)')
+	}
+	p.advance() // Skip '->'
+
+	// Parse body
+	body := p.parse_expression()!
+
+	// Create function with args as children[0] and body as children[1]
+	mut children := []ast.Node{}
+	children << args // args block
+	children << body // function body
+
+	return ast.Node{
+		id:       p.get_next_id()
+		kind:     .function
+		value:    '' // anonymous function
+		children: children
+		position: pos
+	}
+}
+
+fn (mut p Parser) parse_args() !ast.Node {
+	// Handle empty args ()
+	if p.current.type_ == .rparen {
+		return ast.Node{
+			id:       p.get_next_id()
+			kind:     .block
+			value:    ''
+			children: []
+			position: p.current.position
+		}
+	}
+
+	// Handle mixed args (literals, identifiers with type annotations, etc.)
+	mut args := []ast.Node{}
+	mut first_pos := p.current.position
+
+	for {
+		// Parse current argument
+		mut arg := ast.Node{}
+
+		if p.current.type_ == .identifier {
+			// Identifier with optional type annotation
+			arg_name := p.current.value
+			arg_pos := p.current.position
+			p.advance()
+
+			// Parse type annotation if present
+			mut type_annotation := ast.Node{}
+			if p.current.type_ == .double_colon {
+				p.advance() // Skip ::
+				type_annotation = p.parse_type_annotation()!
+			}
+
+			arg = ast.Node{
+				id:       p.get_next_id()
+				kind:     .identifier
+				value:    arg_name
+				children: if type_annotation.value != '' { [type_annotation] } else { [] }
+				position: arg_pos
+			}
+		} else if p.current.type_ == .integer || p.current.type_ == .float
+			|| p.current.type_ == .string || p.current.type_ == .atom || p.current.type_ == .true_
+			|| p.current.type_ == .false_ || p.current.type_ == .nil_ {
+			// Literal
+			arg = p.parse_literal()!
+		} else if p.current.type_ == .lbracket {
+			// List literal or list cons
+			arg = p.parse_list_expression()!
+		} else if p.current.type_ == .lbrace {
+			// Tuple literal
+			arg = p.parse_tuple_expression()!
+		} else if p.current.type_ == .percent {
+			// Map literal
+			arg = p.parse_map_literal()!
+		} else {
+			// Try to parse as any other expression
+			arg = p.parse_expression()!
+		}
+
+		args << arg
+
+		// Check if there are more arguments
+		if p.current.type_ == .comma {
+			p.advance() // Skip comma
+		} else {
+			break
+		}
+	}
+
+	// Return args block
+	return ast.Node{
+		id:       p.get_next_id()
+		kind:     .block
+		value:    ''
+		children: args
+		position: first_pos
+	}
 }
 
 fn (mut p Parser) parse_literal() !ast.Node {
@@ -414,6 +727,21 @@ fn (mut p Parser) parse_identifier_expression() !ast.Node {
 		p.advance() // Skip '='
 		value := p.parse_expression()!
 		return ast.new_variable_binding(p.get_next_id(), identifier, value, pos)
+	}
+
+	// Check for type annotation
+	if p.current.type_ == .double_colon {
+		p.advance() // Skip ::
+		type_annotation := p.parse_type_annotation()!
+
+		// Create identifier with type annotation
+		return ast.Node{
+			id:       p.get_next_id()
+			kind:     .identifier
+			value:    identifier
+			children: [type_annotation]
+			position: pos
+		}
 	}
 
 	// Apenas referência de variável

@@ -48,7 +48,7 @@ fn (mut g ErlangGenerator) get_unique_var_name(original_name string) string {
 		return g.var_map[original_name]
 	}
 
-	// Capitalize the first letter and add hash
+	// Capitalize the first letter for Erlang convention
 	capitalized := original_name.to_upper()
 	unique_name := '${capitalized}_${g.next_hash}'
 	g.var_map[original_name] = unique_name
@@ -124,38 +124,41 @@ fn (mut g ErlangGenerator) generate_node(node ast.Node) ! {
 }
 
 fn (mut g ErlangGenerator) generate_binding(node ast.Node) ! {
-	if node.children.len != 1 {
-		return error('Invalid binding node')
+	if node.children.len >= 1 {
+		// Generate variable name with unique hash
+		original_name := node.value
+		unique_name := g.get_unique_var_name(original_name)
+		g.output.write_string('${unique_name} = ')
+
+		// Generate value
+		g.generate_node(node.children[0])!
 	}
-
-	original_name := node.value
-	// Use normal capitalization instead of uppercase with underscore
-	unique_name := g.get_unique_var_name(original_name)
-	value_node := node.children[0]
-
-	g.output.write_string('${unique_name} = ')
-	g.generate_node(value_node)!
 }
 
 fn (mut g ErlangGenerator) generate_variable_ref(node ast.Node) ! {
+	// Generate variable name with unique hash
 	original_name := node.value
 	unique_name := g.get_unique_var_name(original_name)
 	g.output.write_string(unique_name)
 }
 
 fn (mut g ErlangGenerator) generate_identifier(node ast.Node) ! {
-	// Identifiers should be treated as variable references
+	// Generate identifier name with unique hash
 	original_name := node.value
 	unique_name := g.get_unique_var_name(original_name)
 	g.output.write_string(unique_name)
 }
 
 fn (mut g ErlangGenerator) generate_block(node ast.Node) ! {
-	for i, expr in node.children {
-		if expr.kind == .directive_call {
+	if node.children.len == 0 {
+		return
+	}
+
+	for i, child in node.children {
+		if child.kind == .directive_call {
 			continue
 		}
-		g.generate_node(expr)!
+		g.generate_node(child)!
 		if i < node.children.len - 1 {
 			g.output.write_string(',\n    ')
 		}
@@ -163,21 +166,35 @@ fn (mut g ErlangGenerator) generate_block(node ast.Node) ! {
 }
 
 fn (mut g ErlangGenerator) generate_module(node ast.Node) ! {
-	mod_name := if node.value.len > 0 { node.value } else { 'main' }
-	g.output.write_string('-module(' + mod_name + ').\n')
+	module_name := node.value
+	g.output.write_string('-module(${module_name}).\n')
 
+	// Collect function exports
 	mut exports := []string{}
-	mut records := []ast.Node{}
-	mut functions := []ast.Node{}
-
-	// Separate records and functions
 	for child in node.children {
 		if child.kind == .function {
-			func_name := child.value
-			exports << '${func_name}/0'
-			functions << child
-		} else if child.kind == .record_definition {
-			records << child
+			// Calculate arity from args block or from heads
+			mut arity := 0
+			if child.children.len > 0 {
+				args_block := child.children[0]
+				if args_block.children.len > 0 {
+					// Function has arguments in definition
+					arity = args_block.children.len
+				} else if child.children.len > 1 {
+					// Check if this has multiple heads
+					body := child.children[1]
+					if body.kind == .block && body.children.len > 0
+						&& body.children[0].kind == .function {
+						// Multiple heads - get arity from first head
+						first_head := body.children[0]
+						if first_head.children.len > 0 {
+							head_args := first_head.children[0]
+							arity = head_args.children.len
+						}
+					}
+				}
+			}
+			exports << '${child.value}/${arity}'
 		}
 	}
 
@@ -186,42 +203,96 @@ fn (mut g ErlangGenerator) generate_module(node ast.Node) ! {
 	}
 
 	// Generate record definitions first
-	for record in records {
-		g.generate_node(record)!
-		g.output.write_string('\n')
+	for child in node.children {
+		if child.kind == .record_definition {
+			g.generate_record_definition(child)!
+		}
 	}
 
-	// Generate functions
-	for i, child in functions {
-		g.generate_node(child)!
-		if i < functions.len - 1 {
-			g.output.write_string('\n')
+	// Generate function definitions
+	for child in node.children {
+		if child.kind == .function {
+			g.generate_function(child)!
 		}
 	}
 }
 
 fn (mut g ErlangGenerator) generate_function(node ast.Node) ! {
-	func_name := node.value
+	function_name := node.value
 
-	mut spec_str := ''
-	if g.type_table != unsafe { nil } {
-		if typ := g.type_table.get_type(node.id) {
-			spec_type := type_to_erlang_spec(typ)
-			spec_str = '-spec ${func_name}() -> ${spec_type}.'
-			g.output.write_string(spec_str + '\n')
+	// Get function type for spec generation
+	if function_type := g.type_table.get_function_type(function_name) {
+		g.output.write_string('-spec ${function_name}(')
+		if function_type.parameters.len > 0 {
+			for i, param in function_type.parameters {
+				if i > 0 {
+					g.output.write_string(', ')
+				}
+				g.output.write_string(type_to_erlang_spec(param))
+			}
+		}
+		g.output.write_string(') -> ${type_to_erlang_spec(function_type.return_type)}.\n')
+	}
+
+	// Generate function body
+	if node.children.len >= 2 {
+		args_block := node.children[0]
+		body := node.children[1]
+
+		// Check if this is a multi-head function
+		has_function_heads := body.kind == .block && body.children.len > 0
+			&& body.children[0].kind == .function
+
+		if has_function_heads {
+			// Multi-head function - generate each head
+			for i, head in body.children {
+				if head.kind == .function {
+					// Generate head arguments
+					if head.children.len > 0 {
+						head_args := head.children[0]
+						g.output.write_string('${function_name}(')
+						if head_args.kind == .block {
+							for j, arg in head_args.children {
+								if j > 0 {
+									g.output.write_string(', ')
+								}
+								// Generate argument as variable with unique hash
+								if arg.kind == .identifier {
+									unique_name := g.get_unique_var_name(arg.value)
+									g.output.write_string(unique_name)
+								} else {
+									g.generate_node(arg)!
+								}
+							}
+						} else {
+							// Single argument
+							if head_args.kind == .identifier {
+								unique_name := g.get_unique_var_name(head_args.value)
+								g.output.write_string(unique_name)
+							} else {
+								g.generate_node(head_args)!
+							}
+						}
+						g.output.write_string(') ->\n    ')
+
+						// Generate head body
+						if head.children.len > 1 {
+							g.generate_node(head.children[1])!
+						}
+
+						if i < body.children.len - 1 {
+							g.output.write_string(';\n')
+						} else {
+							g.output.write_string('.\n')
+						}
+					}
+				}
+			}
+		} else {
+			// Single function - generate normally
+			g.generate_single_function(function_name, args_block, body)!
 		}
 	}
-
-	g.output.write_string('${func_name}() ->\n')
-	g.output.write_string('    ')
-
-	if node.children.len > 0 {
-		g.generate_node(node.children[0])!
-	} else {
-		g.output.write_string('nil')
-	}
-
-	g.output.write_string('.\n')
 }
 
 fn (mut g ErlangGenerator) generate_literal(node ast.Node) ! {
@@ -320,6 +391,8 @@ fn type_to_erlang_spec(t ast.Type) string {
 			// Check if this is a record type (should be converted to lowercase)
 			if t.name.len > 0 && t.name[0].is_capital() {
 				'#${t.name.to_lower()}{}'
+			} else if t.name.len == 0 {
+				'any()'
 			} else {
 				t.name + '()'
 			}
@@ -329,31 +402,25 @@ fn type_to_erlang_spec(t ast.Type) string {
 
 fn (mut g ErlangGenerator) generate_function_caller(node ast.Node) ! {
 	function_name := node.value
-	function_info := kernel.get_function_info(function_name) or {
-		return error('Unknown function: ${function_name}')
+
+	// First, try to get function type from type table (user-defined functions)
+	if _ := g.type_table.get_function_type(function_name) {
+		g.output.write_string('${function_name}(')
+		for i, arg in node.children {
+			if i > 0 {
+				g.output.write_string(', ')
+			}
+			g.generate_node(arg)!
+		}
+		g.output.write_string(')')
+		return
 	}
 
-	match function_info.fixity {
-		.infix {
-			if node.children.len != 2 {
-				return error('Infix operator requires exactly 2 arguments')
-			}
-			left_code := g.generate_node_to_string(node.children[0])!
-			right_code := g.generate_node_to_string(node.children[1])!
-
-			if function_info.gen.len == 0 {
-				return error('No templates found for function: ${function_name}')
-			}
-			template := function_info.gen[0]['erl'] or {
-				return error('No Erlang template found for function: ${function_name}')
-			}
-			result := template.replace('$1', left_code).replace('$2', right_code)
-			g.output.write_string(result)
-		}
-		.prefix {
-			// Check if this is a multi-arg prefix function
-			if g.is_multi_arg_prefix_function(function_name) {
-				// Multi-arg prefix functions are called as regular functions
+	// Second, try kernel for built-in functions
+	if function_info := kernel.get_function_info(function_name) {
+		match function_info.fixity {
+			.prefix {
+				// Use kernel template for prefix functions
 				if function_info.gen.len == 0 {
 					return error('No templates found for function: ${function_name}')
 				}
@@ -375,27 +442,47 @@ fn (mut g ErlangGenerator) generate_function_caller(node ast.Node) ! {
 					result = result.replace(placeholder, arg_code)
 				}
 				g.output.write_string(result)
-			} else {
-				// Single-arg prefix functions
-				if node.children.len != 1 {
-					return error('Prefix operator requires exactly 1 argument')
+			}
+			.infix {
+				if node.children.len == 2 {
+					// Use kernel template for infix operators
+					if function_info.gen.len == 0 {
+						return error('No templates found for function: ${function_name}')
+					}
+					template := function_info.gen[0]['erl'] or {
+						return error('No Erlang template found for function: ${function_name}')
+					}
+					left_code := g.generate_node_to_string(node.children[0])!
+					right_code := g.generate_node_to_string(node.children[1])!
+					result := template.replace('$1', left_code).replace('$2', right_code)
+					g.output.write_string(result)
+				} else {
+					g.output.write_string('${function_name}(')
+					for i, arg in node.children {
+						if i > 0 {
+							g.output.write_string(', ')
+						}
+						g.generate_node(arg)!
+					}
+					g.output.write_string(')')
 				}
-				arg_code := g.generate_node_to_string(node.children[0])!
-
-				if function_info.gen.len == 0 {
-					return error('No templates found for function: ${function_name}')
+			}
+			.postfix {
+				g.output.write_string('${function_name}(')
+				for i, arg in node.children {
+					if i > 0 {
+						g.output.write_string(', ')
+					}
+					g.generate_node(arg)!
 				}
-				template := function_info.gen[0]['erl'] or {
-					return error('No Erlang template found for function: ${function_name}')
-				}
-				result := template.replace('$1', arg_code)
-				g.output.write_string(result)
+				g.output.write_string(')')
 			}
 		}
-		else {
-			return error('Unsupported fixity: ${function_info.fixity}')
-		}
+		return
 	}
+
+	// Finally, if not found anywhere
+	return error('Unknown function: ${function_name}')
 }
 
 fn (mut g ErlangGenerator) substitute_template(template string, args ...ast.Node) !string {
@@ -488,6 +575,22 @@ fn (mut g ErlangGenerator) generate_function_caller_to_string(node ast.Node) !st
 	}
 
 	function_name := node.value
+
+	// First, try to get function type from type table (user-defined functions)
+	if _ := g.type_table.get_function_type(function_name) {
+		mut result := '${function_name}('
+		for i, arg in node.children {
+			if i > 0 {
+				result += ', '
+			}
+			arg_code := g.generate_node_to_string(arg)!
+			result += arg_code
+		}
+		result += ')'
+		return result
+	}
+
+	// Second, try kernel for built-in functions
 	function_info := kernel.get_function_info(function_name) or {
 		return error('Unknown function: ${function_name}')
 	}
@@ -825,7 +928,7 @@ fn (mut g ErlangGenerator) generate_record_definition(node ast.Node) ! {
 		}
 	}
 
-	g.output.write_string('}).')
+	g.output.write_string('}).\n')
 }
 
 fn (mut g ErlangGenerator) generate_record_literal(node ast.Node) ! {
@@ -914,4 +1017,63 @@ fn (mut g ErlangGenerator) generate_record_access_to_string(node ast.Node) !stri
 
 	record_code := g.generate_node_to_string(record_expr)!
 	return '${record_code}#${record_name}.${field_name}'
+}
+
+fn (mut g ErlangGenerator) generate_single_function(function_name string, args_block ast.Node, body ast.Node) ! {
+	// Generate function signature
+	g.output.write_string('${function_name}(')
+
+	// Generate arguments
+	if args_block.kind == .block {
+		for i, arg in args_block.children {
+			if i > 0 {
+				g.output.write_string(', ')
+			}
+			// Generate argument as variable with unique hash
+			if arg.kind == .identifier {
+				unique_name := g.get_unique_var_name(arg.value)
+				g.output.write_string(unique_name)
+			} else {
+				g.generate_node(arg)!
+			}
+		}
+	}
+
+	g.output.write_string(') ->\n    ')
+
+	// Generate function body
+	if body.kind == .block {
+		for i, expr in body.children {
+			if expr.kind == .directive_call {
+				continue
+			}
+
+			g.generate_node(expr)!
+			if i < body.children.len - 1 {
+				g.output.write_string(',\n    ')
+			}
+		}
+	} else {
+		g.generate_node(body)!
+	}
+
+	g.output.write_string('.\n')
+}
+
+fn (g ErlangGenerator) needs_parentheses(node ast.Node) bool {
+	match node.kind {
+		.integer, .float, .string, .boolean, .atom, .nil, .identifier, .variable_ref {
+			return false
+		}
+		.function_caller {
+			// Function calls don't need parentheses around them
+			return false
+		}
+		.parentheses {
+			return false
+		}
+		else {
+			return true
+		}
+	}
 }

@@ -1,0 +1,8 @@
+record Point { x :: integer, y :: integer }
+record Person { name :: string, age :: integer, active :: boolean }
+
+def record_complex() do
+    point = Point{x: 10, y: 20}
+    person = Person{name: "Maria", age: 25, active: true}
+    {point, person}
+end

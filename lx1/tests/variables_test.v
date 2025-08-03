@@ -94,7 +94,6 @@ fn test_isolated_scope() {
 func1() ->
     X_1 = 42,
     X_1.
-
 -spec func2() -> binary().
 func2() ->
     X_1 = <<"hello"/utf8>>,
@@ -119,5 +118,5 @@ fn test_variable_reuse_error() {
         x
     end'
 	result := compile_lx_with_error(lx_code)
-	assert result.contains('Variable x is already defined in this scope')
+	assert result.contains('Variable "x" cannot be reassigned')
 }

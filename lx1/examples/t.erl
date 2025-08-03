@@ -1,6 +1,7 @@
 -module(t).
--export([test/0]).
+-export([simple_record/0]).
 
--spec test() -> map().
-test() ->
-    #{<<"name"/utf8>> => <<"João"/utf8>>, age => 30, active => true}.
+-record(person, {name = nil :: binary(), age = nil :: integer()}).-spec simple_record() -> #person{}.
+simple_record() ->
+    PERSON_1 = #person{name = <<"João"/utf8>>, age = 30},
+    PERSON_1.

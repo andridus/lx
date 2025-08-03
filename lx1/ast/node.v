@@ -21,14 +21,13 @@ pub enum NodeKind {
 	// Variables
 	variable_binding // x = value
 	variable_ref     // x (usage)
-	identifier       // Generic identifier
+	identifier       // Generic identifier (including function args)
 
 	// Blocks
 	block // do ... end or -> ... end (multiple expressions)
 
 	// Function structure
-	function
-	function_body
+	function // def function_name(args) do body end or (args) -> body
 
 	// Module structure
 	module

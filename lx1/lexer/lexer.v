@@ -41,9 +41,10 @@ pub fn (mut l Lexer) next_token() Token {
 		`%` { l.advance_and_return(.percent, '%') }
 		`.` { l.advance_and_return(.dot, '.') }
 		`:` { l.read_colon_or_double_colon() }
+		`-` { l.read_arrow_or_minus() }
 		`"` { l.read_string() }
 		`0`...`9` { l.read_number() }
-		`+`, `-`, `*`, `/`, `!`, `<`, `>`, `&`, `^`, `|`, `=`, `$`, `a`...`z`, `A`...`Z`, `_` { l.read_identifier() }
+		`+`, `*`, `/`, `!`, `<`, `>`, `&`, `^`, `|`, `=`, `$`, `a`...`z`, `A`...`Z`, `_` { l.read_identifier() }
 		`\n` { l.advance_and_return(.newline, '\n') }
 		else { l.make_error('Unexpected character: ${ch.ascii_str()}') }
 	}
@@ -253,4 +254,16 @@ fn (mut l Lexer) read_identifier() Token {
 fn (l Lexer) is_operator_char(ch u8) bool {
 	return ch == `+` || ch == `-` || ch == `*` || ch == `/` || ch == `=` || ch == `!` || ch == `<`
 		|| ch == `>` || ch == `&` || ch == `|` || ch == `^`
+}
+
+fn (mut l Lexer) read_arrow_or_minus() Token {
+	start_pos := l.current_position()
+	l.advance() // Skip -
+
+	if l.position < l.input.len && l.input[l.position] == `>` {
+		l.advance() // Skip >
+		return l.make_token_at(.arrow, '->', start_pos)
+	}
+
+	return l.make_token_at(.identifier, '-', start_pos)
 }

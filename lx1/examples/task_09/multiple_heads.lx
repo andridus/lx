@@ -1,0 +1,11 @@
+def factorial do
+    (0) -> 1
+    (n) -> n * 2
+end
+
+def sum do
+    () -> 0
+    (x) -> x
+    (x, y) -> x + y
+    (x, y, z) -> x + y + z
+end
