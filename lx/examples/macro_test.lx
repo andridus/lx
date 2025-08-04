@@ -1,0 +1,11 @@
+# Test file for defmacro implementation
+
+# Simple macro
+defmacro a(body) do
+  {:a, {1, 1, any, [{:args, []}]}, [body]}
+end
+
+# Block macro
+defmacro b(body) do
+  {:b, {1, 1, any, [{:args, []}]}, [body]}
+end

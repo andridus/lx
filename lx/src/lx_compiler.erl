@@ -16,7 +16,9 @@ compile(Source) ->
         {ok, Tokens, _} ->
             case lx_parser:parse(Tokens) of
                 {ok, AST} ->
-                    {ok, AST};
+                    % Process macros
+                    ExpandedAST = lx_macros:expand_macros(AST),
+                    {ok, ExpandedAST};
                 {error, {Line, Module, Message}} ->
                     {error, {parse_error, Line, Module, Message}}
             end;

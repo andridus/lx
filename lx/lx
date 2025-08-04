@@ -1,5 +1,0 @@
-#!/usr/bin/env escript
-%%! -pa _build/default/lib/lx/ebin
-
-main(Args) ->
-    lx_cli:main(Args).
