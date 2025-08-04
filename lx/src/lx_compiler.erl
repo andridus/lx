@@ -11,6 +11,8 @@ compile_file(Filename) ->
 
 compile(Source) ->
     case lx_lexer:string(Source) of
+        {ok, Tokens, _} when Tokens =:= [] ->
+            {error, empty_source};
         {ok, Tokens, _} ->
             case lx_parser:parse(Tokens) of
                 {ok, AST} ->

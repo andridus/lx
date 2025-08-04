@@ -7,6 +7,9 @@ main(["run", Filename | _]) ->
             io:format("Compilation successful!~n"),
             io:format("AST: ~p~n", [AST]),
             halt(0);
+        {error, empty_source} ->
+            io:format("Nothing to compile: the file is empty or contains only comments/whitespace.~n"),
+            halt(0);
         {error, Reason} ->
             io:format("Compilation failed: ~p~n", [Reason]),
             halt(1)
