@@ -5,16 +5,15 @@ defmacro a(body) do
 {:a, {1, 1, any, [{:args, []}]}, [body]}
 end
 
+a [1,2,3]
+
 defmacro b(body) do
 {:b, {1, 1, any, [{:args, []}]}, [body]}
 end
 
-# Comentando as chamadas de macro que ainda não são suportadas
-# a [1,2,3]
-
-# b do
-#   [1,2,3]
-# end
+b do
+  [1,2,3]
+end
 
 # defmacro c(args, body) do
 # {:c, {1, 1, any, [{:args, args}]}, [body]}
