@@ -23,8 +23,13 @@ infix : {token, {infix, TokenLine}}.
 {STRING} : {token, {string, TokenLine, string:slice(TokenChars, 1, length(TokenChars) - 2)}}.
 {ATOM} : {token, {atom, TokenLine, list_to_atom(string:slice(TokenChars, 1, length(TokenChars) - 2))}}.
 
+% :atom - átomo literal (com : na frente)
 :({L}({L}|{D})*) : {token, {atom, TokenLine, list_to_atom(string:slice(TokenChars, 1))}}.
-({L}({L}|{D})*) : {token, {atom, TokenLine, list_to_atom(TokenChars)}}.
+% :atom com caracteres especiais (como :'++')
+:'[^']*' : {token, {atom, TokenLine, list_to_atom(string:slice(TokenChars, 2, length(TokenChars) - 3))}}.
+
+% ident - identificador (pode ser macro, função ou variável)
+({L}({L}|{D})*) : {token, {ident, TokenLine, TokenChars}}.
 
 \{ : {token, {'{', TokenLine}}.
 \} : {token, {'}', TokenLine}}.
@@ -38,12 +43,8 @@ infix : {token, {infix, TokenLine}}.
 
 \% : {token, {'%', TokenLine}}.
 
-\+ : {token, {'+', TokenLine}}.
-\- : {token, {'-', TokenLine}}.
-\* : {token, {'*', TokenLine}}.
-\/ : {token, {'/', TokenLine}}.
-= : {token, {'=', TokenLine}}.
-== : {token, {'==', TokenLine}}.
-!= : {token, {'!=', TokenLine}}.
+% Operadores básicos definidos pelo lexer
+\+\+ : {token, {operator, TokenLine, TokenChars}}.
+[+\-*=<>/~] : {token, {operator, TokenLine, TokenChars}}.
 
 Erlang code.

@@ -1,5 +1,5 @@
 -module(lx_compiler).
--export([compile/1, compile/2, compile_file/1, compile_file/2]).
+-export([compile/1, compile/2, compile_file/1, compile_file/2, code_generation/2]).
 
 compile_file(Filename) ->
     compile_file(Filename, #{}).
@@ -25,9 +25,16 @@ compile(Source, Options) ->
             case syntactic_analysis(Tokens) of
                 {ok, AST} ->
                     % Phase 3: Macro expansion
-                    ExpandedAST = lx_macros:expand_macros(AST),
-                    % Phase 4: Code generation
-                    code_generation(ExpandedAST, Options);
+                    case lx_macros:expand_macros(AST) of
+                        {error, {undefined_macro, Line, Name, Arg}} ->
+                            ErrorMsg = lists:flatten(io_lib:format("Undefined macro '~p' called with argument ~p", [Name, Arg])),
+                            {error, {macro_error, Line, lx_macros, ErrorMsg}};
+                        {error, Error} ->
+                            {error, Error};
+                        ExpandedAST ->
+                            % Phase 4: Code generation
+                            code_generation(ExpandedAST, Options)
+                    end;
                 {error, {Line, Module, Message}} ->
                     {error, {parse_error, Line, Module, Message}}
             end;
@@ -56,21 +63,28 @@ code_generation(AST, Options) ->
     case Mode of
         beam ->
             % Direct compilation to BEAM
-            lx_codegen:compile_direct(AST, ModuleName);
+            lx_codegen:compile_direct(AST, #{module_name => ModuleName});
         source ->
             % Generate .erl file
-            lx_codegen:generate_erl(AST, ModuleName);
+            lx_codegen:generate_erl(AST, #{module_name => ModuleName});
         erl ->
             % Generate .erl file
-            lx_codegen:generate_erl(AST, ModuleName);
+            lx_codegen:generate_erl(AST, #{module_name => ModuleName});
         ast ->
-            % Return AST only
+            % Return AST after macro expansion
             {ok, AST};
         both ->
             % Both BEAM and .erl
-            case lx_codegen:compile_direct(AST, ModuleName) of
+            case lx_codegen:compile_direct(AST, #{module_name => ModuleName}) of
+                {ok, BeamCode} ->
+                    case lx_codegen:generate_erl(AST, #{module_name => ModuleName}) of
+                        {ok, ErlCode} ->
+                            {ok, ModuleName, BeamCode, #{source => ErlCode}};
+                        {error, SourceError} ->
+                            {error, SourceError}
+                    end;
                 {ModuleName, BeamCode, Meta} ->
-                    case lx_codegen:generate_erl(AST, ModuleName) of
+                    case lx_codegen:generate_erl(AST, #{module_name => ModuleName}) of
                         {ok, ErlCode} ->
                             {ok, ModuleName, BeamCode, Meta#{source => ErlCode}};
                         {error, SourceError} ->

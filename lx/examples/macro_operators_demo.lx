@@ -1,0 +1,20 @@
+defmacro infix +(left, right) do
+{:__erl__, {:op, 1, :'+', left, right}}
+end
+
+defmacro infix -(left, right) do
+{:__erl__, {:op, 1, :'-', left, right}}
+end
+
+defmacro infix *(left, right) do
+{:__erl__, {:op, 1, :'*', left, right}}
+end
+
+# defmacro infix /(left, right) do
+# :wrong
+# end
+
+1 + 2
+3 - 1
+4 * 5
+10 / 2

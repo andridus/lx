@@ -1,5 +1,5 @@
 -module(lx_cli).
--export([main/1]).
+-export([main/1, compile_file/1, read_file/1]).
 
 %% Main entry point for the CLI
 main(Args) ->
@@ -72,7 +72,7 @@ run_file(FilePath) ->
             % Extract module name from file path
             ModuleName = extract_module_name_from_path(FilePath),
             case lx_compiler:compile(Source, #{module_name => ModuleName}) of
-                {ok, ModuleName, BeamCode, _} ->
+                {ok, BeamCode} ->
                     % Load the module
                     case code:load_binary(ModuleName, "", BeamCode) of
                         {module, ModuleName} ->
@@ -89,7 +89,7 @@ run_file(FilePath) ->
                             io:format("Error loading module: ~p~n", [Reason]),
                             {error, Reason}
                     end;
-                {ModuleName, BeamCode, _} ->
+                {ok, ModuleName, BeamCode, _} ->
                     % Load the module
                     case code:load_binary(ModuleName, "", BeamCode) of
                         {module, ModuleName} ->
@@ -120,7 +120,7 @@ show_ast(FilePath) ->
     case read_file(FilePath) of
         {ok, Source} ->
             case lx_compiler:compile(Source, #{mode => ast}) of
-                {ok, AST} ->
+        {ok, AST} ->
                     io:format("AST for ~s:~n", [FilePath]),
                     print_ast(AST, 0);
                 {error, Error} ->
@@ -177,6 +177,8 @@ print_ast(AST, Indent) ->
             io:format("~s{string, ~p, ~p}~n", [IndentStr, Line, Value]);
         {atom, Line, Value} ->
             io:format("~s{atom, ~p, ~p}~n", [IndentStr, Line, Value]);
+        {ident, Line, Value} ->
+            io:format("~s{ident, ~p, ~p}~n", [IndentStr, Line, Value]);
         {tuple, Line, Elements} ->
             io:format("~s{tuple, ~p,~n", [IndentStr, Line]),
             [print_ast(Elem, Indent + 1) || Elem <- Elements],
@@ -225,6 +227,8 @@ print_error(FilePath, Source, Error) ->
             print_compilation_error(FilePath, Source, Line, "Parse Error", Message);
         {syntax_error, Line, Message} ->
             print_compilation_error(FilePath, Source, Line, "Syntax Error", Message);
+        {macro_error, Line, _Module, Message} ->
+            print_compilation_error(FilePath, Source, Line, "Macro Error", Message);
         _ ->
             io:format("Compilation failed: [Unknown Error] ~p~n", [Error])
     end.
