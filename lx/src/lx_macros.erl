@@ -34,7 +34,7 @@ expand_macros(AST) ->
     % Second pass: detect and combine macro calls (atom followed by args)
     case expand_macros_pass2(AST1, Registry1) of
         {error, Error} -> {error, Error};
-        AST2 -> AST2
+        AST2 -> {ok, AST2}
     end.
 
 % First pass: register macros and expand obvious macro calls
@@ -54,7 +54,15 @@ expand_macros_pass2([], _Registry) ->
     [];
 expand_macros_pass2([Node | Rest], Registry) ->
     case Node of
-        {ident, Line, Name} ->
+        {macro_call, Line, Name, Args} ->
+            case get_macro(Name, Registry) of
+                not_found ->
+                    {error, {undefined_macro, Line, Name, Args}};
+                {_, Body, ParamNames} ->
+                    ExpandedMacro = expand_macro_call(Name, [Args], Body, Line, Registry),
+                    [ExpandedMacro | expand_macros_pass2(Rest, Registry)]
+            end;
+        {atom, Line, Name} ->
             case get_macro(Name, Registry) of
                 not_found ->
                     [expand_node_pass2(Node, Registry) | expand_macros_pass2(Rest, Registry)];

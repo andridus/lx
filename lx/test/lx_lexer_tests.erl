@@ -63,7 +63,7 @@ map_expression_test() ->
 
 %% Test error cases
 invalid_token_test() ->
-    {error, {1, lx_lexer, {illegal, "!"}}, _} = lx_lexer:string("!").
+    {error, {1, lx_lexer, {illegal, "@"}}, _} = lx_lexer:string("@").
 
 invalid_float_test() ->
     {error, {1, lx_lexer, {illegal, "."}}, _} = lx_lexer:string(".").

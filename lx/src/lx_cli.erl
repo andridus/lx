@@ -46,7 +46,7 @@ compile_file(FilePath) ->
             % Extract module name from file path
             ModuleName = extract_module_name_from_path(FilePath),
             case lx_compiler:compile(Source, #{mode => erl, module_name => ModuleName}) of
-                {ok, ErlCode} ->
+                {ok, ModuleName, _Beam, #{source := ErlCode}} ->
                     ErlFilePath = get_erl_path(FilePath),
                     case file:write_file(ErlFilePath, ErlCode) of
                         ok ->
@@ -72,7 +72,7 @@ run_file(FilePath) ->
             % Extract module name from file path
             ModuleName = extract_module_name_from_path(FilePath),
             case lx_compiler:compile(Source, #{module_name => ModuleName}) of
-                {ok, BeamCode} ->
+                {ok, ModuleName, BeamCode, _} ->
                     % Load the module
                     case code:load_binary(ModuleName, "", BeamCode) of
                         {module, ModuleName} ->
@@ -119,8 +119,8 @@ run_file(FilePath) ->
 show_ast(FilePath) ->
     case read_file(FilePath) of
         {ok, Source} ->
-            case lx_compiler:compile(Source, #{mode => ast}) of
-        {ok, AST} ->
+            case lx_compiler:compile_ast(Source) of
+                {ok, AST} ->
                     io:format("AST for ~s:~n", [FilePath]),
                     print_ast(AST, 0);
                 {error, Error} ->

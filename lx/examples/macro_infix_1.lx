@@ -1,5 +1,0 @@
-defmacro +(left, right) do
-{:'+', %{infix: true}, [left, right]}
-end
-
-1 + 2

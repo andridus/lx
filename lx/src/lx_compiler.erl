@@ -1,5 +1,5 @@
 -module(lx_compiler).
--export([compile/1, compile/2, compile_file/1, compile_file/2, code_generation/2]).
+-export([compile/1, compile/2, compile_file/1, compile_file/2, code_generation/2, compile_ast/1, compile_file_ast/1]).
 
 compile_file(Filename) ->
     compile_file(Filename, #{}).
@@ -14,10 +14,19 @@ compile_file(Filename, Options) ->
             {error, {file_read_error, Reason}}
     end.
 
+% Convenience function to compile file and return only AST
+compile_file_ast(Filename) ->
+    compile_file(Filename, #{ast_only => true}).
+
 compile(Source) ->
     compile(Source, #{}).
 
 compile(Source, Options) ->
+    % Set default module name if not provided
+    OptionsWithModule = case maps:get(module_name, Options, undefined) of
+        undefined -> Options#{module_name => test};
+        _ -> Options
+    end,
     % Phase 1: Lexical analysis
     case lexical_analysis(Source) of
         {ok, Tokens} ->
@@ -28,32 +37,57 @@ compile(Source, Options) ->
                     case lx_macros:expand_macros(AST) of
                         {error, {undefined_macro, Line, Name, Arg}} ->
                             ErrorMsg = lists:flatten(io_lib:format("Undefined macro '~p' called with argument ~p", [Name, Arg])),
-                            {error, {macro_error, Line, lx_macros, ErrorMsg}};
+                            {error, {parse_error, Line, lx_parser, [ErrorMsg]}};
                         {error, Error} ->
                             {error, Error};
-                        ExpandedAST ->
-                            % Phase 4: Code generation
-                            code_generation(ExpandedAST, Options)
+                        {ok, ExpandedAST} ->
+                            % Check if we should return only AST
+                            case maps:get(ast_only, Options, false) of
+                                true ->
+                                    {ok, ExpandedAST};
+                                false ->
+                                    % Phase 4: Code generation
+                                    case lx_codegen:ast_to_erlang_module(ExpandedAST, maps:get(module_name, OptionsWithModule)) of
+                                        {ok, ModuleName, ByteCode, SourceMap} ->
+                                            {ok, ModuleName, ByteCode, SourceMap};
+                                        {error, Reason} ->
+                                            {error, Reason}
+                                    end
+                            end
                     end;
-                {error, {Line, Module, Message}} ->
-                    {error, {parse_error, Line, Module, Message}}
+                {error, Reason} ->
+                    {error, Reason}
             end;
-        {error, {Line, Module, Message}, _} ->
-            {error, {lexer_error, Line, Module, Message}}
+        {error, Reason} ->
+            {error, Reason}
     end.
+
+% Convenience function to compile and return only AST
+compile_ast(Source) ->
+    compile(Source, #{ast_only => true}).
 
 %% Lexical analysis phase
 lexical_analysis(Source) ->
     case lx_lexer:string(Source) of
         {ok, Tokens, _EndLine} ->
             {ok, Tokens};
+        {error, {Line, Module, Message}, _EndLine} ->
+            {error, {lexer_error, Line, Module, Message}};
         {error, Error, _EndLine} ->
             {error, Error}
     end.
 
 %% Syntactic analysis phase
+syntactic_analysis([]) -> {ok, []};
 syntactic_analysis(Tokens) ->
-    lx_parser:parse(Tokens).
+    case lx_parser:parse(Tokens) of
+        {ok, AST} ->
+            {ok, AST};
+        {error, {Line, Module, Message}} ->
+            {error, {parse_error, Line, Module, Message}};
+        {error, Error} ->
+            {error, Error}
+    end.
 
 %% Code generation phase
 code_generation(AST, Options) ->

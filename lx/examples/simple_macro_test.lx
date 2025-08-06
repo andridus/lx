@@ -1,5 +1,0 @@
-defmacro infix +(left, right) do
-{:__erl__, {:op, 1, :+, left, right}}
-end
-
-1 + 2

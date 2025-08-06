@@ -1,6 +1,0 @@
-# Macro infix simples
-defmacro infix +(left, right) do
-    {'+', %{}, [left, right]}
-end
-
-1 + 2

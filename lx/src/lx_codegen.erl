@@ -4,7 +4,7 @@
 
 -export([compile_direct/1, compile_direct/2, generate_erl/1, generate_erl/2,
          compile_direct_with_specs/2, compile_direct_with_specs/3,
-         ast_to_forms/2, ast_to_forms_with_specs/3, ast_to_erlang_expr/1, form_to_string/1, ast_to_main_function/1, ast_to_erlang_source/2]).
+         ast_to_forms/2, ast_to_forms_with_specs/3, ast_to_erlang_expr/1, form_to_string/1, ast_to_main_function/1, ast_to_erlang_source/2, ast_to_erlang_module/2]).
 
 % Compile AST directly to BEAM
 compile_direct(AST) ->
@@ -103,9 +103,6 @@ ast_to_erlang_expr({string, _Line, Value}) ->
     {bin, 1, [{bin_element, 1, {string, 1, Value}, default, default}]};
 ast_to_erlang_expr({atom, _Line, Value}) ->
     {atom, 1, Value};
-ast_to_erlang_expr({ident, _Line, Name}) ->
-    % Convert ident to atom for Erlang
-    {atom, 1, list_to_atom(Name)};
 ast_to_erlang_expr({list, _Line, Elements}) ->
     FlatElements = ensure_list_elements(Elements),
     ErlElements = [ast_to_erlang_expr(Elem) || Elem <- FlatElements],
@@ -298,3 +295,14 @@ ensure_list_elements({list, _, Els}) -> ensure_list_elements(Els);
 ensure_list_elements(Els) when is_list(Els) ->
     lists:flatmap(fun ensure_list_elements/1, Els);
 ensure_list_elements(Other) -> [Other].
+
+% Convert AST to complete Erlang module with bytecode and source map
+ast_to_erlang_module(AST, ModuleName) ->
+    Forms = ast_to_forms(AST, ModuleName),
+    ErlSource = ast_to_erlang_source(Forms, ModuleName),
+    case compile:forms(Forms, [return_errors]) of
+        {ok, ModuleName, Beam} ->
+            {ok, ModuleName, Beam, #{source => ErlSource}};
+        {error, Errors, Warnings} ->
+            {error, {compilation_errors, Errors, Warnings}}
+    end.

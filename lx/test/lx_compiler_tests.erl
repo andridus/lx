@@ -4,7 +4,7 @@
 %% Test literals compilation
 literals_test() ->
     Source = "#integer\n1\n\n#float\n2.0\n\n#atoms\n:atom\n\n:ok\n\n#tuples\n{1}\n\n{1,2}\n\n{:ok, 1,2,3}\n\n\n#lists\n[1]\n\n[1,2]\n\n[1,2,3, :ok]\n\n# maps\n\n%{a: 1, b: 2}\n%{\"a\": 1, \"b\": 2, 123: 1}",
-    {ok, AST} = lx_compiler:compile(Source),
+    {ok, AST} = lx_compiler:compile_ast(Source),
 
     % Test integer
     ?assert(lists:member({integer, 2, 1}, AST)),
@@ -32,60 +32,60 @@ literals_test() ->
 
 %% Test individual literal types
 integer_test() ->
-    {ok, AST} = lx_compiler:compile("42"),
+    {ok, AST} = lx_compiler:compile_ast("42"),
     ?assertEqual([{integer, 1, 42}], AST).
 
 float_test() ->
-    {ok, AST} = lx_compiler:compile("3.14"),
+    {ok, AST} = lx_compiler:compile_ast("3.14"),
     ?assertEqual([{float, 1, 3.14}], AST).
 
 atom_test() ->
-    {ok, AST} = lx_compiler:compile(":test"),
+    {ok, AST} = lx_compiler:compile_ast(":test"),
     ?assertEqual([{atom, 1, test}], AST).
 
 atom_key_test() ->
-    {ok, AST} = lx_compiler:compile("test"),
+    {ok, AST} = lx_compiler:compile_ast("test"),
     ?assertEqual([{atom, 1, test}], AST).
 
 string_test() ->
-    {ok, AST} = lx_compiler:compile("\"hello\""),
+    {ok, AST} = lx_compiler:compile_ast("\"hello\""),
     ?assertEqual([{string, 1, "hello"}], AST).
 
 %% Test data structures
 empty_tuple_test() ->
-    {ok, AST} = lx_compiler:compile("{}"),
+    {ok, AST} = lx_compiler:compile_ast("{}"),
     ?assertEqual([{tuple, 1, []}], AST).
 
 single_element_tuple_test() ->
-    {ok, AST} = lx_compiler:compile("{1}"),
+    {ok, AST} = lx_compiler:compile_ast("{1}"),
     ?assertEqual([{tuple, 1, [{integer, 1, 1}]}], AST).
 
 multi_element_tuple_test() ->
-    {ok, AST} = lx_compiler:compile("{1, 2, 3}"),
+    {ok, AST} = lx_compiler:compile_ast("{1, 2, 3}"),
     ?assertEqual([{tuple, 1, [{integer, 1, 1}, {integer, 1, 2}, {integer, 1, 3}]}], AST).
 
 empty_list_test() ->
-    {ok, AST} = lx_compiler:compile("[]"),
+    {ok, AST} = lx_compiler:compile_ast("[]"),
     ?assertEqual([{list, 1, []}], AST).
 
 single_element_list_test() ->
-    {ok, AST} = lx_compiler:compile("[1]"),
+    {ok, AST} = lx_compiler:compile_ast("[1]"),
     ?assertEqual([{list, 1, [{integer, 1, 1}]}], AST).
 
 multi_element_list_test() ->
-    {ok, AST} = lx_compiler:compile("[1, 2, 3]"),
+    {ok, AST} = lx_compiler:compile_ast("[1, 2, 3]"),
     ?assertEqual([{list, 1, [{integer, 1, 1}, {integer, 1, 2}, {integer, 1, 3}]}], AST).
 
 empty_map_test() ->
-    {ok, AST} = lx_compiler:compile("%{}"),
+    {ok, AST} = lx_compiler:compile_ast("%{}"),
     ?assertEqual([{map, 1, []}], AST).
 
 simple_map_test() ->
-    {ok, AST} = lx_compiler:compile("%{a: 1}"),
+    {ok, AST} = lx_compiler:compile_ast("%{a: 1}"),
     ?assertEqual([{map, 1, [{map_entry, 1, {atom, 1, a}, {integer, 1, 1}}]}], AST).
 
 complex_map_test() ->
-    {ok, AST} = lx_compiler:compile("%{a: 1, b: 2, \"c\": 3}"),
+    {ok, AST} = lx_compiler:compile_ast("%{a: 1, b: 2, \"c\": 3}"),
     ExpectedMap = [{map_entry, 1, {atom, 1, a}, {integer, 1, 1}},
                    {map_entry, 1, {atom, 1, b}, {integer, 1, 2}},
                    {map_entry, 1, {string, 1, "c"}, {integer, 1, 3}}],
@@ -94,7 +94,7 @@ complex_map_test() ->
 %% Test complex map with nested structures
 complex_nested_map_test() ->
     Source = "%{\n  \"a\": 1,\n  \"b\": 2,\n  123: {tuple,1, 2, 3},\n  list: [1,2,3,4],\n  map: %{a: 1, b: 2}\n}",
-    {ok, AST} = lx_compiler:compile(Source),
+    {ok, AST} = lx_compiler:compile_ast(Source),
     ?assertEqual([
         {map,1,[
             {map_entry,2,{string,2,"a"},{integer,2,1}},
@@ -108,7 +108,7 @@ complex_nested_map_test() ->
 %% Test complex tuple
 complex_tuple_test() ->
     Source = "{1, 2, 3, {4, 5}, [6, 7], %{a: 8}}",
-    {ok, AST} = lx_compiler:compile(Source),
+    {ok, AST} = lx_compiler:compile_ast(Source),
     ?assertEqual([
         {tuple,1,[
             {integer,1,1},
@@ -123,7 +123,7 @@ complex_tuple_test() ->
 %% Test complex list
 complex_list_test() ->
     Source = "[1, 2, {3, 4}, [5, 6], %{a: 7}]",
-    {ok, AST} = lx_compiler:compile(Source),
+    {ok, AST} = lx_compiler:compile_ast(Source),
     ?assertEqual([
         {list,1,[
             {integer,1,1},
@@ -136,12 +136,12 @@ complex_list_test() ->
 
 %% Test comments
 comments_test() ->
-    {ok, AST} = lx_compiler:compile("# This is a comment\n1\n# Another comment\n2"),
+    {ok, AST} = lx_compiler:compile_ast("# This is a comment\n1\n# Another comment\n2"),
     ?assertEqual([{integer, 2, 1}, {integer, 4, 2}], AST).
 
 %% Test whitespace handling
 whitespace_test() ->
-    {ok, AST} = lx_compiler:compile("  1  \n  2  "),
+    {ok, AST} = lx_compiler:compile_ast("  1  \n  2  "),
     ?assertEqual([{integer, 1, 1}, {integer, 2, 2}], AST).
 
 %% Test error cases
@@ -154,7 +154,7 @@ invalid_syntax_test() ->
 
 %% Test file compilation
 file_compilation_test() ->
-    {ok, AST} = lx_compiler:compile_file("examples/literals.lx"),
+    {ok, AST} = lx_compiler:compile_file_ast("examples/literals.lx"),
     ?assert(is_list(AST)),
     ?assert(length(AST) > 0).
 
@@ -167,6 +167,6 @@ cli_usage_test() ->
 performance_test() ->
     % Create a large source with many literals
     LargeSource = string:join([integer_to_list(I) || I <- lists:seq(1, 1000)], "\n"),
-    {Time, {ok, _AST}} = timer:tc(lx_compiler, compile, [LargeSource]),
+    {Time, {ok, _AST}} = timer:tc(lx_compiler, compile_ast, [LargeSource]),
     % Should compile in less than 1 second
     ?assert(Time < 1000000).

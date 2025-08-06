@@ -1,6 +1,0 @@
-# Debug macro expansion
-defmacro a(body) do
-    {:a, %{}, [body]}
-end
-
-a [1,2,3]

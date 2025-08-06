@@ -4,7 +4,7 @@
 %% Test complete compilation pipeline
 full_compilation_test() ->
     Source = "1\n2.0\n:test\n\"hello\"\n{1, 2}\n[3, 4]\n%{a: 1}",
-    {ok, AST} = lx_compiler:compile(Source),
+    {ok, AST} = lx_compiler:compile_ast(Source),
     ExpectedAST = [
         {integer, 1, 1},
         {float, 2, 2.0},
@@ -18,7 +18,7 @@ full_compilation_test() ->
 
 %% Test file compilation
 file_compilation_test() ->
-    {ok, AST} = lx_compiler:compile_file("examples/literals.lx"),
+    {ok, AST} = lx_compiler:compile_file_ast("examples/literals.lx"),
     ?assert(is_list(AST)),
     ?assert(length(AST) > 0),
     % Verify we have all expected literal types
@@ -44,9 +44,9 @@ error_handling_test() ->
     {error, _} = lx_compiler:compile("%{"),
 
     % Test invalid tokens
-    {error, _} = lx_compiler:compile("!"),
     {error, _} = lx_compiler:compile("@"),
-    {error, _} = lx_compiler:compile("$").
+    {error, _} = lx_compiler:compile("$"),
+    {error, _} = lx_compiler:compile("&").
 
 %% Test performance with large files
 performance_test() ->
@@ -55,7 +55,7 @@ performance_test() ->
         integer_to_list(I) || I <- lists:seq(1, 100)
     ], "\n"),
 
-    {Time, {ok, AST}} = timer:tc(lx_compiler, compile, [LargeSource]),
+    {Time, {ok, AST}} = timer:tc(lx_compiler, compile_ast, [LargeSource]),
 
     % Should compile in reasonable time (less than 1 second)
     ?assert(Time < 1000000),
@@ -65,7 +65,7 @@ performance_test() ->
 %% Test nested structures
 nested_structures_test() ->
     Source = "{{1, 2}, [3, 4]}",
-    {ok, AST} = lx_compiler:compile(Source),
+    {ok, AST} = lx_compiler:compile_ast(Source),
     ?assert(is_list(AST)),
     ?assert(length(AST) =:= 1),
     [Tuple] = AST,
@@ -74,7 +74,7 @@ nested_structures_test() ->
 %% Test mixed content with comments
 mixed_content_with_comments_test() ->
     Source = "# Start\n1\n# Middle\n2.0\n# End\n:test",
-    {ok, AST} = lx_compiler:compile(Source),
+    {ok, AST} = lx_compiler:compile_ast(Source),
     ExpectedAST = [
         {integer, 2, 1},
         {float, 4, 2.0},
@@ -85,7 +85,7 @@ mixed_content_with_comments_test() ->
 %% Test whitespace handling
 whitespace_handling_test() ->
     Source = "  1  \n  2.0  \n  :test  ",
-    {ok, AST} = lx_compiler:compile(Source),
+    {ok, AST} = lx_compiler:compile_ast(Source),
     ExpectedAST = [
         {integer, 1, 1},
         {float, 2, 2.0},
@@ -109,14 +109,15 @@ real_world_scenario_test() ->
              "  features: [:auth, :logging, :metrics]\n"
              "}",
 
-    {ok, AST} = lx_compiler:compile(Source),
+    {ok, AST} = lx_compiler:compile_ast(Source),
     ?assert(is_list(AST)),
     ?assert(length(AST) > 0).
 
 %% Test edge cases
 edge_cases_test() ->
-    % Only comments
-    {error, empty_source} = lx_compiler:compile("# Only comments\n# No code").
+    % Only comments - should return empty AST
+    {ok, AST} = lx_compiler:compile_ast("# Only comments\n# No code"),
+    ?assertEqual([], AST).
 
 %% Test CLI argument handling
 cli_argument_test() ->

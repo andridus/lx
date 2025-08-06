@@ -20,7 +20,7 @@ Terminals
   '{' '}' '[' ']' '(' ')' ',' ':' '%' ';'
   defmacro do end_ infix
   operator
-  integer float atom string ident.
+  integer float atom string.
 
 Rootsymbol program.
 
@@ -33,7 +33,8 @@ expression -> literal : '$1'.
 expression -> tuple : '$1'.
 expression -> list : '$1'.
 expression -> map : '$1'.
-expression -> ident : {ident, line('$1'), element(3, '$1')}.
+expression -> atom do_block : {macro_call, line('$1'), element(3, '$1'), '$2'}.
+expression -> atom list : {macro_call, line('$1'), element(3, '$1'), '$2'}.
 expression -> expression operator expression : {possible_macro_call, line('$2'), element(3, '$2'), ['$1', '$3']}.
 
 literal -> atom : {atom, line('$1'), element(3, '$1')}.
@@ -64,28 +65,29 @@ map_entries -> map_entry ',' map_entries : ['$1' | '$3'].
 map_entry -> expression ':' expression : {map_entry, line('$1'), '$1', '$3'}.
 
 % Macro definitions
-macro_definition -> defmacro ident '(' ')' do macro_body end_ :
+macro_definition -> defmacro atom '(' ')' do macro_body end_ :
     {macro_def, line('$1'), element(3, '$2'), [], '$6'}.
 
-macro_definition -> defmacro ident '(' macro_parameters ')' do macro_body end_ :
+macro_definition -> defmacro atom '(' macro_parameters ')' do macro_body end_ :
     {macro_def, line('$1'), element(3, '$2'), '$4', '$7'}.
 
 macro_definition -> defmacro infix operator '(' macro_parameters ')' do macro_body end_ :
     {macro_def_infix, line('$1'), element(3, '$3'), '$5', '$8'}.
 
-macro_definition -> defmacro infix ident '(' macro_parameters ')' do macro_body end_ :
+macro_definition -> defmacro infix atom '(' macro_parameters ')' do macro_body end_ :
     {macro_def_infix, line('$1'), element(3, '$3'), '$5', '$8'}.
 
 macro_parameters -> macro_parameter : ['$1'].
 macro_parameters -> macro_parameter ',' macro_parameters : ['$1' | '$3'].
 
-macro_parameter -> ident : '$1'.
+macro_parameter -> atom : '$1'.
 
 macro_body -> expression : '$1'.
 macro_body -> do_block : '$1'.
 
 % Do/end blocks
 do_block -> do expression_list end_ : {do_block, line('$1'), '$2'}.
+do_block -> do end_ : {do_block, line('$1'), []}.
 
 expression_list -> expression : ['$1'].
 expression_list -> expression ';' expression_list : ['$1' | '$3'].

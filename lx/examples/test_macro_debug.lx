@@ -1,8 +1,0 @@
-# Teste simples de macro
-
-defmacro a(body) do
-    {:a, %{}, [body]}
-end
-
-# Teste da macro
-a [1,2,3]
