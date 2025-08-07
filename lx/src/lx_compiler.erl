@@ -30,9 +30,11 @@ compile(Source, Options) ->
     % Phase 1: Lexical analysis
     case lexical_analysis(Source) of
         {ok, Tokens} ->
+            io:format("Tokens: ~p~n", [Tokens]),
             % Phase 2: Syntactic analysis
             case syntactic_analysis(Tokens) of
                 {ok, AST} ->
+                    io:format("AST: ~p~n~n", [AST]),
                     % Phase 3: Macro expansion
                     case lx_macros:expand_macros(AST) of
                         {error, {undefined_macro, Line, Name, Arg}} ->
@@ -56,9 +58,11 @@ compile(Source, Options) ->
                             end
                     end;
                 {error, Reason} ->
+                    io:format("Reason: ~p~n", [Reason]),
                     {error, Reason}
             end;
         {error, Reason} ->
+            io:format("Reason: ~p~n", [Reason]),
             {error, Reason}
     end.
 
