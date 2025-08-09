@@ -364,3 +364,272 @@ pub fn new_identifier(id int, name string, pos Position) Node {
 		position: pos
 	}
 }
+
+// ============ Task 11: Control Flow Builders ============
+
+pub fn new_if_expr(id int, condition Node, then_expr Node, else_expr ?Node, pos Position) Node {
+	mut children := [condition, then_expr]
+	if else_node := else_expr {
+		children << else_node
+	}
+	return Node{
+		id:       id
+		kind:     .if_expr
+		children: children
+		position: pos
+	}
+}
+
+pub fn new_with_expr(id int, pattern Node, expr Node, body Node, else_body ?Node, pos Position) Node {
+	mut children := [pattern, expr, body]
+	if else_node := else_body {
+		children << else_node
+	}
+	return Node{
+		id:       id
+		kind:     .with_expr
+		children: children
+		position: pos
+	}
+}
+
+pub fn new_match_expr(id int, pattern Node, expr Node, rescue_body ?Node, pos Position) Node {
+	mut children := [pattern, expr]
+	if rescue_node := rescue_body {
+		children << rescue_node
+	}
+	return Node{
+		id:       id
+		kind:     .match_expr
+		children: children
+		position: pos
+	}
+}
+
+// ============ Task 11: Concurrency Builders ============
+
+pub fn new_spawn_expr(id int, func_expr Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .spawn_expr
+		children: [func_expr]
+		position: pos
+	}
+}
+
+pub fn new_send_expr(id int, target Node, message Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .send_expr
+		children: [target, message]
+		position: pos
+	}
+}
+
+pub fn new_receive_expr(id int, clauses []Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .receive_expr
+		children: clauses
+		position: pos
+	}
+}
+
+pub fn new_supervisor_def(id int, name string, body Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .supervisor_def
+		value:    name
+		children: [body]
+		position: pos
+	}
+}
+
+pub fn new_worker_def(id int, name string, body Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .worker_def
+		value:    name
+		children: [body]
+		position: pos
+	}
+}
+
+// ============ Task 11: Binary Builders ============
+
+pub fn new_binary_literal(id int, segments []Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .binary_literal
+		children: segments
+		position: pos
+	}
+}
+
+pub fn new_binary_pattern(id int, segments []Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .binary_pattern
+		children: segments
+		position: pos
+	}
+}
+
+pub fn new_binary_segment(id int, value Node, size ?Node, options []string, pos Position) Node {
+	mut children := [value]
+	if size_node := size {
+		children << size_node
+	}
+	return Node{
+		id:       id
+		kind:     .binary_segment
+		value:    options.join(',')
+		children: children
+		position: pos
+	}
+}
+
+// ============ Task 11: Custom Types Builders ============
+
+pub fn new_type_def(id int, name string, variants []Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .type_def
+		value:    name
+		children: variants
+		position: pos
+	}
+}
+
+pub fn new_union_type(id int, variants []Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .union_type
+		children: variants
+		position: pos
+	}
+}
+
+pub fn new_generic_type(id int, name string, params []Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .generic_type
+		value:    name
+		children: params
+		position: pos
+	}
+}
+
+pub fn new_opaque_type(id int, name string, base_type Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .opaque_type
+		value:    name
+		children: [base_type]
+		position: pos
+	}
+}
+
+pub fn new_nominal_type(id int, name string, base_type Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .nominal_type
+		value:    name
+		children: [base_type]
+		position: pos
+	}
+}
+
+// ============ Task 11: Module System Builders ============
+
+pub fn new_deps_declaration(id int, deps []Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .deps_declaration
+		children: deps
+		position: pos
+	}
+}
+
+pub fn new_application_config(id int, config []Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .application_config
+		children: config
+		position: pos
+	}
+}
+
+pub fn new_import_statement(id int, module_name string, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .import_statement
+		value:    module_name
+		position: pos
+	}
+}
+
+// ============ Task 11: Advanced Features Builders ============
+
+pub fn new_string_interpolation(id int, segments []Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .string_interpolation
+		children: segments
+		position: pos
+	}
+}
+
+pub fn new_anonymous_function(id int, params []Node, body Node, pos Position) Node {
+	mut children := params.clone()
+	children << body
+	return Node{
+		id:       id
+		kind:     .anonymous_function
+		children: children
+		position: pos
+	}
+}
+
+pub fn new_lambda_call(id int, lambda Node, args []Node, pos Position) Node {
+	mut children := [lambda]
+	children << args
+	return Node{
+		id:       id
+		kind:     .lambda_call
+		children: children
+		position: pos
+	}
+}
+
+pub fn new_list_comprehension(id int, expr Node, generators []Node, filters []Node, pos Position) Node {
+	mut children := [expr]
+	children << generators
+	children << filters
+	return Node{
+		id:       id
+		kind:     .list_comprehension
+		children: children
+		position: pos
+	}
+}
+
+pub fn new_directive(id int, name string, args []Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .directive
+		value:    name
+		children: args
+		position: pos
+	}
+}
+
+pub fn new_test_block(id int, name string, body Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .test_block
+		value:    name
+		children: [body]
+		position: pos
+	}
+}

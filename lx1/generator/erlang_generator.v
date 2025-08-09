@@ -145,6 +145,87 @@ fn (mut g ErlangGenerator) generate_node(node ast.Node) ! {
 		.directive_call {
 			// Do nothing - directives are not generated in output
 		}
+		// Task 11: Control Flow
+		.if_expr {
+			g.generate_if_expr(node)!
+		}
+		.with_expr {
+			g.generate_with_expr(node)!
+		}
+		.match_expr {
+			g.generate_match_expr(node)!
+		}
+		// Task 11: Concurrency
+		.spawn_expr {
+			g.generate_spawn_expr(node)!
+		}
+		.send_expr {
+			g.generate_send_expr(node)!
+		}
+		.receive_expr {
+			g.generate_receive_expr(node)!
+		}
+		.supervisor_def {
+			g.generate_supervisor_def(node)!
+		}
+		.worker_def {
+			g.generate_worker_def(node)!
+		}
+		// Task 11: Binaries
+		.binary_literal {
+			g.generate_binary_literal(node)!
+		}
+		.binary_pattern {
+			g.generate_binary_pattern(node)!
+		}
+		.binary_segment {
+			g.generate_binary_segment(node)!
+		}
+		// Task 11: Custom Types
+		.type_def {
+			g.generate_type_def(node)!
+		}
+		.union_type {
+			g.generate_union_type(node)!
+		}
+		.generic_type {
+			g.generate_generic_type(node)!
+		}
+		.opaque_type {
+			g.generate_opaque_type(node)!
+		}
+		.nominal_type {
+			g.generate_nominal_type(node)!
+		}
+		// Task 11: Module System
+		.deps_declaration {
+			g.generate_deps_declaration(node)!
+		}
+		.application_config {
+			g.generate_application_config(node)!
+		}
+		.import_statement {
+			g.generate_import_statement(node)!
+		}
+		// Task 11: Advanced Features
+		.string_interpolation {
+			g.generate_string_interpolation(node)!
+		}
+		.anonymous_function {
+			g.generate_anonymous_function(node)!
+		}
+		.lambda_call {
+			g.generate_lambda_call(node)!
+		}
+		.list_comprehension {
+			g.generate_list_comprehension(node)!
+		}
+		.directive {
+			g.generate_directive(node)!
+		}
+		.test_block {
+			g.generate_test_block(node)!
+		}
 		else {
 			return error('Unsupported node type: ${node.kind}')
 		}
@@ -1115,14 +1196,36 @@ fn (mut g ErlangGenerator) generate_function_parameter(node ast.Node) ! {
 }
 
 fn (mut g ErlangGenerator) generate_lambda_expression(node ast.Node) ! {
-	if node.children.len < 2 {
-		return error('Lambda expression must have parameters and body')
+	if node.children.len < 1 {
+		return error('Lambda expression must have body')
 	}
 
+	body := node.children[node.children.len - 1]
+
+		// Check if this is a multi-head lambda (body is a block with function heads)
+	if body.kind == .block && body.children.len > 0 && body.children[0].kind == .function {
+		// Multi-head lambda: fun ... end with clauses
+		g.output.write_string('fun\n')
+
+		for i, head in body.children {
+			g.output.write_string('        ')
+			g.generate_function_clause(head)!
+			if i < body.children.len - 1 {
+				g.output.write_string(';\n')
+			} else {
+				g.output.write_string('\n')
+			}
+		}
+
+		g.output.write_string('    end')
+		return
+	}
+
+	// Regular lambda: fun(params) -> body end
 	g.output.write_string('fun(')
 
-	// Generate parameters
-	params := node.children[0..node.children.len - 1]
+	// Generate parameters (all children except the last one, which is the body)
+	params := if node.children.len > 1 { node.children[0..node.children.len - 1] } else { []ast.Node{} }
 	for i, param in params {
 		g.generate_node(param)!
 		if i < params.len - 1 {
@@ -1133,10 +1236,36 @@ fn (mut g ErlangGenerator) generate_lambda_expression(node ast.Node) ! {
 	g.output.write_string(') ->\n        ')
 
 	// Generate body
-	body := node.children[node.children.len - 1]
 	g.generate_node(body)!
 
 	g.output.write_string('\n    end')
+}
+
+fn (mut g ErlangGenerator) generate_function_clause(node ast.Node) ! {
+	// Generate function clause for lambda (without function name)
+	if node.children.len >= 2 {
+		args_block := node.children[0]
+		body := node.children[1]
+
+		// Generate arguments
+		g.output.write_string('(')
+		if args_block.kind == .block {
+			for j, arg in args_block.children {
+				if j > 0 {
+					g.output.write_string(', ')
+				}
+				// Generate argument as pattern
+				g.generate_node(arg)!
+			}
+		} else {
+			// Single argument
+			g.generate_node(args_block)!
+		}
+		g.output.write_string(') ->\n            ')
+
+		// Generate body
+		g.generate_node(body)!
+	}
 }
 
 fn (mut g ErlangGenerator) generate_case_expression(node ast.Node) ! {
@@ -1241,4 +1370,373 @@ fn (mut g ErlangGenerator) generate_type_alias(node ast.Node) ! {
 fn (mut g ErlangGenerator) generate_type_annotation(node ast.Node) ! {
 	// Type annotations are not generated in Erlang output
 	// They are used only for type checking
+}
+
+// ============ Task 11: Control Flow Generation ============
+
+// Generate if expressions
+fn (mut g ErlangGenerator) generate_if_expr(node ast.Node) ! {
+	if node.children.len < 2 {
+		return error('If expression must have at least condition and then branch')
+	}
+
+	g.output.write_string('case ')
+	g.generate_node(node.children[0])! // condition
+	g.output.write_string(' of\n')
+	g.output.write_string('        true -> ')
+	g.generate_node(node.children[1])! // then branch
+
+	if node.children.len > 2 {
+		g.output.write_string(';\n        false -> ')
+		g.generate_node(node.children[2])! // else branch
+	} else {
+		g.output.write_string(';\n        false -> nil')
+	}
+
+	g.output.write_string('\n    end')
+}
+
+// Generate with expressions (simplified as case in Erlang)
+fn (mut g ErlangGenerator) generate_with_expr(node ast.Node) ! {
+	if node.children.len < 3 {
+		return error('With expression must have pattern, expression, and body')
+	}
+
+	g.output.write_string('case ')
+	g.generate_node(node.children[1])! // expression
+	g.output.write_string(' of\n')
+	g.output.write_string('        ')
+	g.generate_node(node.children[0])! // pattern
+	g.output.write_string(' -> ')
+	g.generate_node(node.children[2])! // body
+
+	if node.children.len > 3 {
+		g.output.write_string(';\n        _ -> ')
+		g.generate_node(node.children[3])! // else body
+	} else {
+		g.output.write_string(';\n        _ -> error(no_match)')
+	}
+
+	g.output.write_string('\n    end')
+}
+
+// Generate match expressions (try-catch in Erlang)
+fn (mut g ErlangGenerator) generate_match_expr(node ast.Node) ! {
+	if node.children.len < 2 {
+		return error('Match expression must have pattern and expression')
+	}
+
+	g.output.write_string('try ')
+	g.generate_node(node.children[1])! // expression
+	g.output.write_string(' of\n')
+	g.output.write_string('        ')
+	g.generate_node(node.children[0])! // pattern
+	g.output.write_string(' -> ok\n')
+
+	if node.children.len > 2 {
+		g.output.write_string('    catch\n')
+		g.output.write_string('        Error -> ')
+		g.generate_node(node.children[2])! // rescue body
+	}
+
+	g.output.write_string('\n    end')
+}
+
+// ============ Task 11: Concurrency Generation ============
+
+// Generate spawn expressions
+fn (mut g ErlangGenerator) generate_spawn_expr(node ast.Node) ! {
+	if node.children.len != 1 {
+		return error('Spawn expression must have one argument')
+	}
+
+	g.output.write_string('spawn(')
+	g.generate_node(node.children[0])! // function expression
+	g.output.write_string(')')
+}
+
+// Generate send expressions (handled by function_caller for ! operator)
+fn (mut g ErlangGenerator) generate_send_expr(node ast.Node) ! {
+	if node.children.len != 2 {
+		return error('Send expression must have target and message')
+	}
+
+	g.generate_node(node.children[0])! // target
+	g.output.write_string(' ! ')
+	g.generate_node(node.children[1])! // message
+}
+
+// Generate receive expressions
+fn (mut g ErlangGenerator) generate_receive_expr(node ast.Node) ! {
+	g.output.write_string('receive\n')
+
+	for i, clause in node.children {
+		g.output.write_string('        ')
+		g.generate_case_clause(clause)!
+		if i < node.children.len - 1 {
+			g.output.write_string(';\n')
+		}
+	}
+
+	g.output.write_string('\n    end')
+}
+
+// Generate supervisor definitions (as regular functions with metadata)
+fn (mut g ErlangGenerator) generate_supervisor_def(node ast.Node) ! {
+	if node.children.len != 1 {
+		return error('Supervisor definition must have body')
+	}
+
+	g.output.write_string('supervisor_${node.value}() ->\n')
+	g.output.write_string('    ')
+	g.generate_node(node.children[0])! // body
+	g.output.write_string('.\n\n')
+}
+
+// Generate worker definitions (as regular functions with metadata)
+fn (mut g ErlangGenerator) generate_worker_def(node ast.Node) ! {
+	if node.children.len != 1 {
+		return error('Worker definition must have body')
+	}
+
+	g.output.write_string('worker_${node.value}() ->\n')
+	g.output.write_string('    ')
+	g.generate_node(node.children[0])! // body
+	g.output.write_string('.\n\n')
+}
+
+// ============ Task 11: Binaries Generation ============
+
+// Generate binary literals
+fn (mut g ErlangGenerator) generate_binary_literal(node ast.Node) ! {
+	g.output.write_string('<<')
+
+	for i, segment in node.children {
+		g.generate_node(segment)!
+		if i < node.children.len - 1 {
+			g.output.write_string(', ')
+		}
+	}
+
+	g.output.write_string('>>')
+}
+
+// Generate binary patterns (same as literals)
+fn (mut g ErlangGenerator) generate_binary_pattern(node ast.Node) ! {
+	g.generate_binary_literal(node)!
+}
+
+// Generate binary segments
+fn (mut g ErlangGenerator) generate_binary_segment(node ast.Node) ! {
+	if node.children.len == 0 {
+		return error('Binary segment must have at least a value')
+	}
+
+	g.generate_node(node.children[0])! // value
+
+	// Add size if present
+	if node.children.len > 1 {
+		g.output.write_string(':')
+		g.generate_node(node.children[1])! // size
+	}
+
+	// Add options if present
+	if node.value.len > 0 {
+		options := node.value.split(',')
+		for option in options {
+			if option.len > 0 {
+				g.output.write_string('/${option}')
+			}
+		}
+	}
+}
+
+// ============ Task 11: Custom Types Generation ============
+
+// Generate type definitions (as comments in Erlang)
+fn (mut g ErlangGenerator) generate_type_def(node ast.Node) ! {
+	g.output.write_string('%% Type definition: ${node.value}\n')
+	// Types are primarily for static analysis, not runtime
+}
+
+// Generate union types (as comments)
+fn (mut g ErlangGenerator) generate_union_type(node ast.Node) ! {
+	g.output.write_string('%% Union type: ')
+	for i, variant in node.children {
+		g.generate_node(variant)!
+		if i < node.children.len - 1 {
+			g.output.write_string(' | ')
+		}
+	}
+	g.output.write_string('\n')
+}
+
+// Generate generic types (as comments)
+fn (mut g ErlangGenerator) generate_generic_type(node ast.Node) ! {
+	g.output.write_string('%% Generic type: ${node.value}(')
+	for i, param in node.children {
+		g.generate_node(param)!
+		if i < node.children.len - 1 {
+			g.output.write_string(', ')
+		}
+	}
+	g.output.write_string(')\n')
+}
+
+// Generate opaque types (as comments)
+fn (mut g ErlangGenerator) generate_opaque_type(node ast.Node) ! {
+	g.output.write_string('%% Opaque type: ${node.value} :: ')
+	if node.children.len > 0 {
+		g.generate_node(node.children[0])!
+	}
+	g.output.write_string('\n')
+}
+
+// Generate nominal types (as comments)
+fn (mut g ErlangGenerator) generate_nominal_type(node ast.Node) ! {
+	g.output.write_string('%% Nominal type: ${node.value} :: ')
+	if node.children.len > 0 {
+		g.generate_node(node.children[0])!
+	}
+	g.output.write_string('\n')
+}
+
+// ============ Task 11: Module System Generation ============
+
+// Generate deps declarations (as comments)
+fn (mut g ErlangGenerator) generate_deps_declaration(node ast.Node) ! {
+	g.output.write_string('%% Dependencies: [')
+	for i, dep in node.children {
+		g.generate_node(dep)!
+		if i < node.children.len - 1 {
+			g.output.write_string(', ')
+		}
+	}
+	g.output.write_string(']\n')
+}
+
+// Generate application config (as comments)
+fn (mut g ErlangGenerator) generate_application_config(node ast.Node) ! {
+	g.output.write_string('%% Application config:\n')
+	for config_item in node.children {
+		g.output.write_string('%% ')
+		g.generate_node(config_item)!
+		g.output.write_string('\n')
+	}
+}
+
+// Generate import statements (as comments)
+fn (mut g ErlangGenerator) generate_import_statement(node ast.Node) ! {
+	g.output.write_string('%% Import: ${node.value}\n')
+}
+
+// ============ Task 11: Advanced Features Generation ============
+
+// Generate string interpolation (as binary concatenation)
+fn (mut g ErlangGenerator) generate_string_interpolation(node ast.Node) ! {
+	g.output.write_string('<<')
+
+	for i, segment in node.children {
+		g.generate_node(segment)!
+		if i < node.children.len - 1 {
+			g.output.write_string('/binary, ')
+		} else {
+			g.output.write_string('/binary')
+		}
+	}
+
+	g.output.write_string('>>')
+}
+
+// Generate anonymous functions
+fn (mut g ErlangGenerator) generate_anonymous_function(node ast.Node) ! {
+	if node.children.len == 0 {
+		return error('Anonymous function must have at least a body')
+	}
+
+	g.output.write_string('fun(')
+
+	// Parameters (all children except the last one)
+	for i in 0 .. node.children.len - 1 {
+		g.generate_node(node.children[i])!
+		if i < node.children.len - 2 {
+			g.output.write_string(', ')
+		}
+	}
+
+	g.output.write_string(') -> ')
+
+	// Body (last child)
+	g.generate_node(node.children[node.children.len - 1])!
+
+	g.output.write_string(' end')
+}
+
+// Generate list comprehensions
+fn (mut g ErlangGenerator) generate_list_comprehension(node ast.Node) ! {
+	if node.children.len < 2 {
+		return error('List comprehension must have expression and generator')
+	}
+
+	g.output.write_string('[')
+	g.generate_node(node.children[0])! // expression
+	g.output.write_string(' || ')
+
+	// Generators and filters
+	for i in 1 .. node.children.len {
+		g.generate_node(node.children[i])!
+		if i < node.children.len - 1 {
+			g.output.write_string(', ')
+		}
+	}
+
+	g.output.write_string(']')
+}
+
+// Generate directives (as comments)
+fn (mut g ErlangGenerator) generate_directive(node ast.Node) ! {
+	g.output.write_string('%% @${node.value}')
+	if node.children.len > 0 {
+		g.output.write_string('(')
+		for i, arg in node.children {
+			g.generate_node(arg)!
+			if i < node.children.len - 1 {
+				g.output.write_string(', ')
+			}
+		}
+		g.output.write_string(')')
+	}
+	g.output.write_string('\n')
+}
+
+// Generate test blocks (as functions with test_ prefix)
+fn (mut g ErlangGenerator) generate_test_block(node ast.Node) ! {
+	if node.children.len != 1 {
+		return error('Test block must have body')
+	}
+
+	g.output.write_string('test_${node.value.replace(' ', '_')}() ->\n')
+	g.output.write_string('    ')
+	g.generate_node(node.children[0])! // body
+	g.output.write_string('.\n\n')
+}
+
+fn (mut g ErlangGenerator) generate_lambda_call(node ast.Node) ! {
+	if node.children.len < 1 {
+		return error('Lambda call must have lambda expression')
+	}
+
+	// Generate lambda expression
+	g.generate_node(node.children[0])!
+	g.output.write_string('(')
+
+	// Generate arguments
+	for i in 1..node.children.len {
+		if i > 1 {
+			g.output.write_string(', ')
+		}
+		g.generate_node(node.children[i])!
+	}
+
+	g.output.write_string(')')
 }

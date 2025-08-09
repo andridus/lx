@@ -911,6 +911,30 @@ pub const native_functions = {
 			'erl': 'maps:remove($1, $2)'
 		}]
 	}
+	// Task 11: Send operator (!)
+	'!':          FunctionInfo{
+		precedence:    8
+		associativity: .left
+		fixity:        .infix
+		signatures:    [
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'any'
+					params: []
+				}, ast.Type{
+					name:   'any'
+					params: []
+				}]
+				return_type: ast.Type{
+					name:   'any'
+					params: []
+				}
+			},
+		]
+		gen:           [{
+			'erl': '$1 ! $2'
+		}]
+	}
 }
 
 pub fn get_function_info(function_name string) ?FunctionInfo {

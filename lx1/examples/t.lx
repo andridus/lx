@@ -1,3 +1,5 @@
-def concat_mixed() do
-[1, 2, 3] ++ ["hello", :ok] ++ [3.14, true]
+def process_mixed_args do
+(x :: integer) -> x * 2
+(s :: string) -> s
+(:ok) -> "success"
 end

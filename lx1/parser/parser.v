@@ -84,9 +84,27 @@ fn (mut p Parser) parse_module() !ast.Node {
 		} else if p.current.type_ == .def {
 			func := p.parse_function()!
 			functions << func
+		} else if p.current.type_ == .deps {
+			deps := p.parse_deps_declaration()!
+			records << deps
+		} else if p.current.type_ == .application {
+			app := p.parse_application_config()!
+			records << app
+		} else if p.current.type_ == .import {
+			import_stmt := p.parse_import_statement()!
+			records << import_stmt
+		} else if p.current.type_ == .supervisor {
+			supervisor := p.parse_supervisor_definition()!
+			functions << supervisor
+		} else if p.current.type_ == .worker {
+			worker := p.parse_worker_definition()!
+			functions << worker
+		} else if p.current.type_ == .describe {
+			test_block := p.parse_test_block()!
+			functions << test_block
 		} else {
-			p.error('Expected "def", "record", or "type", got "${p.current.value}"')
-			return error('Expected def, record, or type')
+			p.error('Expected "def", "record", "type", "deps", "application", "import", "supervisor", "worker", or "describe", got "${p.current.value}"')
+			return error('Expected def, record, type, or module system keyword')
 		}
 	}
 
@@ -105,6 +123,7 @@ pub fn (mut p Parser) parse_with_modname(modname string) !ast.Node {
 fn (mut p Parser) parse_module_with_name(modname string) !ast.Node {
 	mut functions := []ast.Node{}
 	mut records := []ast.Node{}
+	mut all_nodes := []ast.Node{}
 	start_pos := p.current.position
 	module_id := p.get_next_id()
 
@@ -125,14 +144,16 @@ fn (mut p Parser) parse_module_with_name(modname string) !ast.Node {
 		} else if p.current.type_ == .def {
 			func := p.parse_function()!
 			functions << func
+		} else if p.current.type_ == .type {
+			type_def := p.parse_type_def()!
+			all_nodes << type_def
 		} else {
-			p.error('Expected "def" or "record", got "${p.current.value}"')
-			return error('Expected def or record')
+			p.error('Expected "def", "record", or "type", got "${p.current.value}"')
+			return error('Expected def, record, or type')
 		}
 	}
 
 	// Combine records and functions
-	mut all_nodes := []ast.Node{}
 	all_nodes << records
 	all_nodes << functions
 
@@ -391,8 +412,40 @@ fn (mut p Parser) parse_function_head() !ast.Node {
 	}
 	p.advance() // Skip '->'
 
-	// Parse body
-	body := p.parse_expression()!
+	// Parse body - check if there's a newline for multi-expression
+	mut body := ast.Node{}
+	if p.current.type_ == .newline {
+		// Multi-expression body
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+
+		// Parse as block until we find next pattern or end
+		mut expressions := []ast.Node{}
+		for p.current.type_ != .lparen && p.current.type_ != .end && p.current.type_ != .eof {
+			// Skip newlines between expressions
+			for p.current.type_ == .newline {
+				p.advance()
+			}
+
+			if p.current.type_ == .lparen || p.current.type_ == .end || p.current.type_ == .eof {
+				break
+			}
+
+			expr := p.parse_expression()!
+			expressions << expr
+		}
+
+		if expressions.len == 0 {
+			return p.error_and_return('Expected at least one expression in function body')
+		}
+
+		// Create block node
+		body = ast.new_block(p.get_next_id(), expressions, pos)
+	} else {
+		// Single expression body
+		body = p.parse_expression()!
+	}
 
 	// Create function with args as children[0] and body as children[1]
 	mut children := []ast.Node{}
@@ -576,8 +629,8 @@ fn (mut p Parser) parse_block() !ast.Node {
 	}
 
 	for {
-		// Stop if we encounter 'end' or other non-expression tokens
-		if p.current.type_ == .end || p.current.type_ == .eof {
+		// Stop if we encounter 'end', 'else' or other non-expression tokens
+		if p.current.type_ == .end || p.current.type_ == .eof || p.current.type_ == .else_ {
 			break
 		}
 
@@ -586,8 +639,8 @@ fn (mut p Parser) parse_block() !ast.Node {
 			p.advance()
 		}
 
-		// Stop if we encounter 'end' after skipping newlines
-		if p.current.type_ == .end || p.current.type_ == .eof {
+		// Stop if we encounter 'end', 'else' after skipping newlines
+		if p.current.type_ == .end || p.current.type_ == .eof || p.current.type_ == .else_ {
 			break
 		}
 
@@ -610,7 +663,7 @@ fn (mut p Parser) parse_block() !ast.Node {
 		} else {
 			// If we reach here, we have a complete expression
 			// Continue to next expression if there are more tokens
-			if p.current.type_ != .end && p.current.type_ != .eof {
+			if p.current.type_ != .end && p.current.type_ != .eof && p.current.type_ != .else_ {
 				continue
 			}
 			break
@@ -665,6 +718,17 @@ fn (mut p Parser) parse_prefix_expression() !ast.Node {
 		.percent { p.parse_map_literal() }
 		.case { p.parse_case_expression() }
 		.fn { p.parse_lambda_expression() }
+		// Task 11: Control Flow
+		.if_ { p.parse_if_expression() }
+		.with { p.parse_with_expression() }
+		.match { p.parse_match_expression() }
+		// Task 11: Concurrency
+		.spawn { p.parse_spawn_expression() }
+		.receive { p.parse_receive_expression() }
+		// Task 11: Binaries
+		.double_lt { p.parse_binary_literal() }
+		// Task 11: Advanced Features
+		.at_sign { p.parse_directive_new() }
 		else { error('Unexpected token: ${p.current.type_}') }
 	}
 }
@@ -1361,6 +1425,11 @@ fn (mut p Parser) parse_record_access(node ast.Node) !ast.Node {
 	}
 	p.advance() // Skip '.'
 
+	// Check if this is a lambda call: fun.(args)
+	if p.current.type_ == .lparen {
+		return p.parse_lambda_call(node)!
+	}
+
 	if p.current.type_ != .identifier {
 		return error('Expected field name after dot')
 	}
@@ -1635,6 +1704,10 @@ fn (mut p Parser) parse_pattern() !ast.Node {
 			// List pattern: [] or [head | tail]
 			return p.parse_list_pattern()
 		}
+		.lbrace {
+			// Tuple pattern: {a, b, c}
+			return p.parse_tuple_pattern()
+		}
 		.identifier {
 			// Variable pattern or atom
 			name := p.current.value
@@ -1692,6 +1765,51 @@ fn (mut p Parser) parse_list_pattern() !ast.Node {
 	return ast.new_list_literal(p.get_next_id(), elements, pos)
 }
 
+fn (mut p Parser) parse_tuple_pattern() !ast.Node {
+	pos := p.current.position
+	p.advance() // Skip '{'
+
+	// Skip newlines after opening brace
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+
+	// Check for empty tuple
+	if p.current.type_ == .rbrace {
+		p.advance() // Skip '}'
+		return ast.new_tuple_literal(p.get_next_id(), [], pos)
+	}
+
+	// Parse first pattern
+	first_pattern := p.parse_pattern()!
+	mut patterns := [first_pattern]
+
+	// Parse remaining patterns
+	for p.current.type_ == .comma {
+		p.advance() // Skip comma
+
+		// Skip newlines after comma
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+
+		pattern := p.parse_pattern()!
+		patterns << pattern
+	}
+
+	// Skip newlines before closing brace
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+
+	if p.current.type_ != .rbrace {
+		return error('Expected closing brace in tuple pattern')
+	}
+	p.advance() // Skip '}'
+
+	return ast.new_tuple_literal(p.get_next_id(), patterns, pos)
+}
+
 fn (mut p Parser) parse_lambda_expression() !ast.Node {
 	if p.current.type_ != .fn {
 		return p.error_and_return('Expected "fn" keyword')
@@ -1699,8 +1817,45 @@ fn (mut p Parser) parse_lambda_expression() !ast.Node {
 	start_pos := p.current.position
 	p.advance() // Skip 'fn'
 
+	// Check if it's a multi-head lambda: fn do ... end
+	if p.current.type_ == .do {
+		p.advance() // Skip 'do'
+
+		// Skip newlines
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+
+		// Parse multiple heads
+		mut heads := []ast.Node{}
+		for p.current.type_ != .end && p.current.type_ != .eof {
+			for p.current.type_ == .newline {
+				p.advance()
+			}
+			if p.current.type_ == .lparen {
+				head := p.parse_function_head()!
+				heads << head
+			} else {
+				break
+			}
+		}
+
+		if heads.len == 0 {
+			return p.error_and_return('Expected at least one function head (pattern) in multi-head lambda')
+		}
+
+		if p.current.type_ != .end {
+			return p.error_and_return('Expected "end" to close multi-head lambda')
+		}
+		p.advance() // Skip 'end'
+
+		body := ast.new_block(p.get_next_id(), heads, heads[0].position)
+		return ast.new_lambda_expression(p.get_next_id(), [], body, start_pos)
+	}
+
+	// Regular lambda with parameters: fn(params) -> expr or fn(params) do ... end
 	if p.current.type_ != .lparen {
-		return p.error_and_return('Expected "(" after fn')
+		return p.error_and_return('Expected "(" after fn or "do" for multi-head lambda')
 	}
 	p.advance() // Skip '('
 
@@ -1714,7 +1869,22 @@ fn (mut p Parser) parse_lambda_expression() !ast.Node {
 			param_pos := p.current.position
 			p.advance()
 
-			params << ast.new_function_parameter(p.get_next_id(), param_name, param_pos)
+			// Parse type annotation if present
+			mut type_annotation := ast.Node{}
+			if p.current.type_ == .double_colon {
+				p.advance() // Skip ::
+				type_annotation = p.parse_type_annotation()!
+			}
+
+			// Create parameter with optional type annotation
+			param := ast.Node{
+				id:       p.get_next_id()
+				kind:     .function_parameter
+				value:    param_name
+				children: if type_annotation.value != '' { [type_annotation] } else { [] }
+				position: param_pos
+			}
+			params << param
 
 			if p.current.type_ == .rparen {
 				break
@@ -1731,10 +1901,30 @@ fn (mut p Parser) parse_lambda_expression() !ast.Node {
 	}
 	p.advance() // Skip ')'
 
-	if p.current.type_ == .arrow {
+		if p.current.type_ == .arrow {
 		p.advance() // Skip '->'
-		body := p.parse_expression()!
-		return ast.new_lambda_expression(p.get_next_id(), params, body, start_pos)
+
+		// Check if there's a newline after arrow - if so, require 'end'
+		if p.current.type_ == .newline {
+			// Skip newlines
+			for p.current.type_ == .newline {
+				p.advance()
+			}
+
+			// Parse body as block and expect 'end'
+			body := p.parse_block()!
+
+			if p.current.type_ != .end {
+				return p.error_and_return('Expected "end" to close lambda body after line break')
+			}
+			p.advance() // Skip 'end'
+
+			return ast.new_lambda_expression(p.get_next_id(), params, body, start_pos)
+		} else {
+			// Single line after arrow - no 'end' needed
+			body := p.parse_expression()!
+			return ast.new_lambda_expression(p.get_next_id(), params, body, start_pos)
+		}
 	} else if p.current.type_ == .do {
 		p.advance() // Skip 'do'
 
@@ -1751,7 +1941,597 @@ fn (mut p Parser) parse_lambda_expression() !ast.Node {
 		p.advance() // Skip 'end'
 
 		return ast.new_lambda_expression(p.get_next_id(), params, body, start_pos)
+	}
+
+	// This should never be reached, but V requires explicit return
+	return p.error_and_return('Expected "->" or "do" after lambda parameters')
+}
+
+// ============ Task 11: Control Flow Parsing ============
+
+// Parse if expressions: if condition do ... else ... end
+fn (mut p Parser) parse_if_expression() !ast.Node {
+	start_pos := p.current.position
+	p.advance() // Skip 'if'
+
+	condition := p.parse_expression()!
+
+	if p.current.type_ != .do {
+		return p.error_and_return('Expected "do" after if condition')
+	}
+	p.advance() // Skip 'do'
+
+	// Skip newlines
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+
+	then_expr := p.parse_block()!
+
+	mut else_expr := ?ast.Node(none)
+	if p.current.type_ == .else_ {
+		p.advance() // Skip 'else'
+
+		// Skip newlines
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+
+		else_expr = p.parse_block()!
+	}
+
+	if p.current.type_ != .end {
+		return p.error_and_return('Expected "end" to close if expression')
+	}
+	p.advance() // Skip 'end'
+
+	return ast.new_if_expr(p.get_next_id(), condition, then_expr, else_expr, start_pos)
+}
+
+// Parse with expressions: with pattern <- expr [, pattern <- expr ...] do ... else ... end
+fn (mut p Parser) parse_with_expression() !ast.Node {
+	start_pos := p.current.position
+	p.advance() // Skip 'with'
+
+	// Parse multiple clauses
+	mut clauses := []ast.Node{}
+
+	for {
+		pattern := p.parse_expression()!
+
+		if p.current.type_ != .left_arrow {
+			return p.error_and_return('Expected "<-" after with pattern')
+		}
+		p.advance() // Skip '<-'
+
+		expr := p.parse_expression()!
+
+		// Create clause node (pattern and expression)
+		clause := ast.Node{
+			id: p.get_next_id()
+			kind: .pattern_match
+			children: [pattern, expr]
+			position: start_pos
+		}
+		clauses << clause
+
+		// Check if there are more clauses
+		if p.current.type_ == .comma {
+			p.advance() // Skip ','
+			// Skip newlines after comma
+			for p.current.type_ == .newline {
+				p.advance()
+			}
+			continue
+		} else {
+			break
+		}
+	}
+
+	if p.current.type_ != .do {
+		return p.error_and_return('Expected "do" after with expression')
+	}
+	p.advance() // Skip 'do'
+
+	// Skip newlines
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+
+	body := p.parse_block()!
+
+	mut else_body := ?ast.Node(none)
+	if p.current.type_ == .else_ {
+		p.advance() // Skip 'else'
+
+		// Skip newlines
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+
+		else_body = p.parse_block()!
+	}
+
+	if p.current.type_ != .end {
+		return p.error_and_return('Expected "end" to close with expression')
+	}
+	p.advance() // Skip 'end'
+
+	// For now, use first clause only (TODO: support multiple clauses in analyzer/generator)
+	first_clause := clauses[0]
+	pattern := first_clause.children[0]
+	expr := first_clause.children[1]
+
+	return ast.new_with_expr(p.get_next_id(), pattern, expr, body, else_body, start_pos)
+}
+
+// Parse match expressions: match pattern <- expr rescue error do ... end
+fn (mut p Parser) parse_match_expression() !ast.Node {
+	start_pos := p.current.position
+	p.advance() // Skip 'match'
+
+	pattern := p.parse_expression()!
+
+	if p.current.type_ != .left_arrow {
+		return p.error_and_return('Expected "<-" after match pattern')
+	}
+	p.advance() // Skip '<-'
+
+	expr := p.parse_expression()!
+
+	mut rescue_body := ?ast.Node(none)
+	if p.current.type_ == .rescue {
+		p.advance() // Skip 'rescue'
+
+		_ := p.parse_expression()! // error pattern (not used in AST for now)
+
+		if p.current.type_ != .do {
+			return p.error_and_return('Expected "do" after rescue pattern')
+		}
+		p.advance() // Skip 'do'
+
+		// Skip newlines
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+
+		rescue_body = p.parse_block()!
+	}
+
+	if p.current.type_ != .end {
+		return p.error_and_return('Expected "end" to close match expression')
+	}
+	p.advance() // Skip 'end'
+
+	return ast.new_match_expr(p.get_next_id(), pattern, expr, rescue_body, start_pos)
+}
+
+// ============ Task 11: Concurrency Parsing ============
+
+// Parse spawn expressions: spawn(fn -> ... end)
+fn (mut p Parser) parse_spawn_expression() !ast.Node {
+	start_pos := p.current.position
+	p.advance() // Skip 'spawn'
+
+	if p.current.type_ != .lparen {
+		return p.error_and_return('Expected "(" after spawn')
+	}
+	p.advance() // Skip '('
+
+	func_expr := p.parse_expression()!
+
+	if p.current.type_ != .rparen {
+		return p.error_and_return('Expected ")" after spawn expression')
+	}
+	p.advance() // Skip ')'
+
+	return ast.new_spawn_expr(p.get_next_id(), func_expr, start_pos)
+}
+
+// Parse receive expressions: receive do pattern -> expr; pattern -> expr end
+fn (mut p Parser) parse_receive_expression() !ast.Node {
+	start_pos := p.current.position
+	p.advance() // Skip 'receive'
+
+	if p.current.type_ != .do {
+		return p.error_and_return('Expected "do" after receive')
+	}
+	p.advance() // Skip 'do'
+
+	// Skip newlines
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+
+	mut clauses := []ast.Node{}
+
+	for p.current.type_ != .end && p.current.type_ != .eof {
+		// Skip newlines between clauses
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+
+		if p.current.type_ == .end {
+			break
+		}
+
+		pattern := p.parse_expression()!
+
+		if p.current.type_ != .arrow {
+			return p.error_and_return('Expected "->" after receive pattern')
+		}
+		p.advance() // Skip '->'
+
+		expr := p.parse_expression()!
+
+		clause := ast.new_case_clause(p.get_next_id(), pattern, expr, start_pos)
+		clauses << clause
+
+		// Skip optional semicolon
+		if p.current.type_ == .semicolon {
+			p.advance()
+		}
+	}
+
+	if p.current.type_ != .end {
+		return p.error_and_return('Expected "end" to close receive expression')
+	}
+	p.advance() // Skip 'end'
+
+	return ast.new_receive_expr(p.get_next_id(), clauses, start_pos)
+}
+
+// ============ Task 11: Binaries Parsing ============
+
+// Parse binary literals: <<1, 2, 3>>, <<"hello">>
+fn (mut p Parser) parse_binary_literal() !ast.Node {
+	start_pos := p.current.position
+	p.advance() // Skip '<<'
+
+	mut segments := []ast.Node{}
+
+	if p.current.type_ != .double_gt {
+		for {
+			segment := p.parse_binary_segment()!
+			segments << segment
+
+			if p.current.type_ == .comma {
+				p.advance() // Skip ','
+			} else {
+				break
+			}
+		}
+	}
+
+	if p.current.type_ != .double_gt {
+		return p.error_and_return('Expected ">>" to close binary literal')
+	}
+	p.advance() // Skip '>>'
+
+	return ast.new_binary_literal(p.get_next_id(), segments, start_pos)
+}
+
+// Parse binary segment: value:size/options
+fn (mut p Parser) parse_binary_segment() !ast.Node {
+	start_pos := p.current.position
+
+	value := p.parse_expression()!
+
+	mut size := ?ast.Node(none)
+	mut options := []string{}
+
+	// Parse size: value:size
+	if p.current.type_ == .colon {
+		p.advance() // Skip ':'
+		size = p.parse_expression()!
+	}
+
+	// Parse options: /integer-big
+	if p.current.type_ == .slash {
+		p.advance() // Skip '/'
+
+		// Parse option string
+		if p.current.type_ == .identifier {
+			options << p.current.value
+			p.advance()
+
+			// Parse additional options with dashes
+			for p.current.type_ == .identifier && p.current.value == '-' {
+				p.advance() // Skip '-'
+				if p.current.type_ == .identifier {
+					options << p.current.value
+					p.advance()
+				}
+			}
+		}
+	}
+
+	return ast.new_binary_segment(p.get_next_id(), value, size, options, start_pos)
+}
+
+// ============ Task 11: Module System Parsing ============
+
+// Parse deps declaration: deps [:cowboy, :jsx]
+fn (mut p Parser) parse_deps_declaration() !ast.Node {
+	start_pos := p.current.position
+	p.advance() // Skip 'deps'
+
+	if p.current.type_ != .lbracket {
+		return p.error_and_return('Expected "[" after deps')
+	}
+
+	deps_list := p.parse_list_expression()!
+
+	return ast.new_deps_declaration(p.get_next_id(), deps_list.children, start_pos)
+}
+
+// Parse application config: application { ... }
+fn (mut p Parser) parse_application_config() !ast.Node {
+	start_pos := p.current.position
+	p.advance() // Skip 'application'
+
+	if p.current.type_ != .lbrace {
+		return p.error_and_return('Expected "{" after application')
+	}
+
+	config_map := p.parse_map_literal()!
+
+	return ast.new_application_config(p.get_next_id(), config_map.children, start_pos)
+}
+
+// Parse import statement: import Module
+fn (mut p Parser) parse_import_statement() !ast.Node {
+	start_pos := p.current.position
+	p.advance() // Skip 'import'
+
+	if p.current.type_ != .identifier && p.current.type_ != .atom {
+		return p.error_and_return('Expected module name after import')
+	}
+
+	module_name := p.current.value
+	p.advance()
+
+	return ast.new_import_statement(p.get_next_id(), module_name, start_pos)
+}
+
+// Parse supervisor definition: supervisor name do ... end
+fn (mut p Parser) parse_supervisor_definition() !ast.Node {
+	start_pos := p.current.position
+	p.advance() // Skip 'supervisor'
+
+	if p.current.type_ != .identifier {
+		return p.error_and_return('Expected supervisor name')
+	}
+
+	name := p.current.value
+	p.advance()
+
+	if p.current.type_ != .do {
+		return p.error_and_return('Expected "do" after supervisor name')
+	}
+	p.advance() // Skip 'do'
+
+	// Skip newlines
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+
+	body := p.parse_block()!
+
+	if p.current.type_ != .end {
+		return p.error_and_return('Expected "end" to close supervisor definition')
+	}
+	p.advance() // Skip 'end'
+
+	return ast.new_supervisor_def(p.get_next_id(), name, body, start_pos)
+}
+
+// Parse worker definition: worker name do ... end
+fn (mut p Parser) parse_worker_definition() !ast.Node {
+	start_pos := p.current.position
+	p.advance() // Skip 'worker'
+
+	if p.current.type_ != .identifier {
+		return p.error_and_return('Expected worker name')
+	}
+
+	name := p.current.value
+	p.advance()
+
+	if p.current.type_ != .do {
+		return p.error_and_return('Expected "do" after worker name')
+	}
+	p.advance() // Skip 'do'
+
+	// Skip newlines
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+
+	body := p.parse_block()!
+
+	if p.current.type_ != .end {
+		return p.error_and_return('Expected "end" to close worker definition')
+	}
+	p.advance() // Skip 'end'
+
+	return ast.new_worker_def(p.get_next_id(), name, body, start_pos)
+}
+
+// ============ Task 11: Advanced Features Parsing ============
+
+// Parse @ directives: @doc, @spec
+fn (mut p Parser) parse_directive_new() !ast.Node {
+	start_pos := p.current.position
+	p.advance() // Skip '@'
+
+	if p.current.type_ != .identifier {
+		return p.error_and_return('Expected directive name after @')
+	}
+
+	name := p.current.value
+	p.advance()
+
+	mut args := []ast.Node{}
+	if p.current.type_ == .lparen {
+		p.advance() // Skip '('
+
+		if p.current.type_ != .rparen {
+			for {
+				arg := p.parse_expression()!
+				args << arg
+
+				if p.current.type_ == .comma {
+					p.advance() // Skip ','
+				} else {
+					break
+				}
+			}
+		}
+
+		if p.current.type_ != .rparen {
+			return p.error_and_return('Expected ")" to close directive arguments')
+		}
+		p.advance() // Skip ')'
+	}
+
+	return ast.new_directive(p.get_next_id(), name, args, start_pos)
+}
+
+// Parse test blocks: describe "name" do ... end
+fn (mut p Parser) parse_test_block() !ast.Node {
+	start_pos := p.current.position
+	p.advance() // Skip 'describe' or 'test'
+
+	if p.current.type_ != .string {
+		return p.error_and_return('Expected test name string')
+	}
+
+	name := p.current.value
+	p.advance()
+
+	if p.current.type_ != .do {
+		return p.error_and_return('Expected "do" after test name')
+	}
+	p.advance() // Skip 'do'
+
+	// Skip newlines
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+
+	body := p.parse_block()!
+
+	if p.current.type_ != .end {
+		return p.error_and_return('Expected "end" to close test block')
+	}
+	p.advance() // Skip 'end'
+
+	return ast.new_test_block(p.get_next_id(), name, body, start_pos)
+}
+
+fn (mut p Parser) parse_lambda_call(lambda ast.Node) !ast.Node {
+	// lambda.(...args...)
+	if p.current.type_ != .lparen {
+		return error('Expected opening parenthesis for lambda call')
+	}
+	pos := p.current.position
+	p.advance() // Skip '('
+
+	mut args := []ast.Node{}
+	if p.current.type_ != .rparen {
+		for {
+			arg := p.parse_expression()!
+			args << arg
+
+			if p.current.type_ == .rparen {
+				break
+			}
+			if p.current.type_ != .comma {
+				return error('Expected comma or closing parenthesis in lambda call arguments')
+			}
+			p.advance() // Skip comma
+		}
+	}
+
+	if p.current.type_ != .rparen {
+		return error('Expected closing parenthesis for lambda call')
+	}
+	p.advance() // Skip ')'
+
+	return ast.new_lambda_call(p.get_next_id(), lambda, args, pos)
+}
+
+// Parse type definitions: type name :: definition
+fn (mut p Parser) parse_type_def() !ast.Node {
+	if p.current.type_ != .type {
+		return p.error_and_return('Expected "type" keyword')
+	}
+	start_pos := p.current.position
+	p.advance() // Skip 'type'
+
+	// Check for opaque/nominal modifiers
+	mut is_opaque := false
+	mut is_nominal := false
+
+	if p.current.type_ == .identifier && p.current.value == 'opaque' {
+		is_opaque = true
+		p.advance()
+	} else if p.current.type_ == .identifier && p.current.value == 'nominal' {
+		is_nominal = true
+		p.advance()
+	}
+
+	if p.current.type_ != .identifier {
+		return p.error_and_return('Expected type name')
+	}
+	type_name := p.current.value
+	p.advance()
+
+	// Parse generic parameters if present: name(T)
+	mut params := []string{}
+	if p.current.type_ == .lparen {
+		p.advance() // Skip '('
+
+		if p.current.type_ != .rparen {
+			for {
+				if p.current.type_ != .identifier {
+					return p.error_and_return('Expected type parameter name')
+				}
+				params << p.current.value
+				p.advance()
+
+				if p.current.type_ == .rparen {
+					break
+				}
+				if p.current.type_ != .comma {
+					return p.error_and_return('Expected comma or closing parenthesis')
+				}
+				p.advance() // Skip comma
+			}
+		}
+
+		if p.current.type_ != .rparen {
+			return p.error_and_return('Expected closing parenthesis')
+		}
+		p.advance() // Skip ')'
+	}
+
+	if p.current.type_ != .double_colon {
+		return p.error_and_return('Expected "::" after type name')
+	}
+	p.advance() // Skip '::'
+
+	type_def := p.parse_type_expression()!
+
+	// Create appropriate type node based on modifiers
+	if is_opaque {
+		return ast.new_opaque_type(p.get_next_id(), type_name, type_def, start_pos)
+	} else if is_nominal {
+		return ast.new_nominal_type(p.get_next_id(), type_name, type_def, start_pos)
 	} else {
-		return p.error_and_return('Expected "->" or "do" after lambda parameters')
+		// For regular types, convert single type_def to variants array
+		variants := [type_def]
+		return ast.new_type_def(p.get_next_id(), type_name, variants, start_pos)
 	}
 }

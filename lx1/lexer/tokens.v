@@ -15,6 +15,29 @@ pub enum TokenType {
 	fn
 	type
 
+	// Task 11: Control Flow Keywords
+	if_
+	else_
+	with
+	match
+	rescue
+
+	// Task 11: Concurrency Keywords
+	spawn
+	receive
+	supervisor
+	worker
+
+	// Task 11: Module System Keywords
+	deps
+	application
+	import
+
+	// Task 11: Advanced Keywords
+	describe
+	test
+	assert
+
 	// Function tokens
 	arrow // ->
 
@@ -40,6 +63,18 @@ pub enum TokenType {
 	colon        // :
 	dot          // .
 	double_colon // ::
+
+	// Task 11: New operators and delimiters
+	left_arrow   // <-
+	exclamation  // !
+	double_pipe  // ||
+	hash         // #
+	at_sign      // @
+	langle       // <
+	rangle       // >
+	double_lt    // <<
+	double_gt    // >>
+	slash        // /
 
 	// Special
 	newline
@@ -78,6 +113,21 @@ pub fn (tt TokenType) str() string {
 		.case { 'case' }
 		.fn { 'fn' }
 		.type { 'type' }
+		.if_ { 'if' }
+		.else_ { 'else' }
+		.with { 'with' }
+		.match { 'match' }
+		.rescue { 'rescue' }
+		.spawn { 'spawn' }
+		.receive { 'receive' }
+		.supervisor { 'supervisor' }
+		.worker { 'worker' }
+		.deps { 'deps' }
+		.application { 'application' }
+		.import { 'import' }
+		.describe { 'describe' }
+		.test { 'test' }
+		.assert { 'assert' }
 		.integer { 'integer' }
 		.float { 'float' }
 		.string { 'string' }
@@ -98,6 +148,16 @@ pub fn (tt TokenType) str() string {
 		.dot { '.' }
 		.double_colon { '::' }
 		.arrow { '->' }
+		.left_arrow { '<-' }
+		.exclamation { '!' }
+		.double_pipe { '||' }
+		.hash { '#' }
+		.at_sign { '@' }
+		.langle { '<' }
+		.rangle { '>' }
+		.double_lt { '<<' }
+		.double_gt { '>>' }
+		.slash { '/' }
 		.newline { 'newline' }
 		.eof { 'eof' }
 		.error { 'error' }

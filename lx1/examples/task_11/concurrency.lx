@@ -1,0 +1,29 @@
+def start_server() do
+    pid = spawn(fn() -> server_loop() end)
+    pid
+end
+
+def server_loop() do
+    receive do
+        {:message, data} ->
+            process_message(data)
+            server_loop()
+        {:stop} ->
+            :ok
+    end
+end
+
+def send_message(pid, msg) do
+    pid ! {:message, msg}
+end
+
+supervisor main_supervisor do
+    strategy = :one_for_one
+    children = [server_worker]
+end
+
+worker server_worker do
+    def start_link(_) do
+        {:ok, spawn_link(fn -> server_loop() end)}
+    end
+end

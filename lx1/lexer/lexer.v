@@ -42,9 +42,15 @@ pub fn (mut l Lexer) next_token() Token {
 		`.` { l.advance_and_return(.dot, '.') }
 		`:` { l.read_colon_or_double_colon() }
 		`-` { l.read_arrow_or_minus() }
+		`<` { l.read_left_angle_operators() }
+		`>` { l.read_right_angle_operators() }
+		`!` { l.advance_and_return(.exclamation, '!') }
+		`#` { l.advance_and_return(.hash, '#') }
+		`@` { l.advance_and_return(.at_sign, '@') }
+		`/` { l.advance_and_return(.slash, '/') }
 		`"` { l.read_string() }
 		`0`...`9` { l.read_number() }
-		`+`, `*`, `/`, `!`, `<`, `>`, `&`, `^`, `|`, `=`, `$`, `a`...`z`, `A`...`Z`, `_` { l.read_identifier() }
+		`+`, `*`, `&`, `^`, `|`, `=`, `$`, `a`...`z`, `A`...`Z`, `_` { l.read_identifier() }
 		`\n` { l.advance_and_return(.newline, '\n') }
 		else { l.make_error('Unexpected character: ${ch.ascii_str()}') }
 	}
@@ -248,6 +254,25 @@ fn (mut l Lexer) read_identifier() Token {
 		'case' { TokenType.case }
 		'fn' { TokenType.fn }
 		'type' { TokenType.type }
+		// Task 11: Control Flow Keywords
+		'if' { TokenType.if_ }
+		'else' { TokenType.else_ }
+		'with' { TokenType.with }
+		'match' { TokenType.match }
+		'rescue' { TokenType.rescue }
+		// Task 11: Concurrency Keywords
+		'spawn' { TokenType.spawn }
+		'receive' { TokenType.receive }
+		'supervisor' { TokenType.supervisor }
+		'worker' { TokenType.worker }
+		// Task 11: Module System Keywords
+		'deps' { TokenType.deps }
+		'application' { TokenType.application }
+		'import' { TokenType.import }
+		// Task 11: Advanced Keywords
+		'describe' { TokenType.describe }
+		'test' { TokenType.test }
+		'assert' { TokenType.assert }
 		else { TokenType.identifier }
 	}
 
@@ -256,7 +281,7 @@ fn (mut l Lexer) read_identifier() Token {
 
 fn (l Lexer) is_operator_char(ch u8) bool {
 	return ch == `+` || ch == `-` || ch == `*` || ch == `/` || ch == `=` || ch == `!` || ch == `<`
-		|| ch == `>` || ch == `&` || ch == `|` || ch == `^`
+		|| ch == `>` || ch == `&` || ch == `|` || ch == `^` || ch == `#` || ch == `@`
 }
 
 fn (mut l Lexer) read_arrow_or_minus() Token {
@@ -269,4 +294,36 @@ fn (mut l Lexer) read_arrow_or_minus() Token {
 	}
 
 	return l.make_token_at(.identifier, '-', start_pos)
+}
+
+// Task 11: Read left angle operators: <, <<, <-
+fn (mut l Lexer) read_left_angle_operators() Token {
+	start_pos := l.current_position()
+	l.advance() // Skip <
+
+	if l.position < l.input.len {
+		next_ch := l.input[l.position]
+		if next_ch == `<` {
+			l.advance() // Skip second <
+			return l.make_token_at(.double_lt, '<<', start_pos)
+		} else if next_ch == `-` {
+			l.advance() // Skip -
+			return l.make_token_at(.left_arrow, '<-', start_pos)
+		}
+	}
+
+	return l.make_token_at(.identifier, '<', start_pos)
+}
+
+// Task 11: Read right angle operators: >, >>
+fn (mut l Lexer) read_right_angle_operators() Token {
+	start_pos := l.current_position()
+	l.advance() // Skip >
+
+	if l.position < l.input.len && l.input[l.position] == `>` {
+		l.advance() // Skip second >
+		return l.make_token_at(.double_gt, '>>', start_pos)
+	}
+
+	return l.make_token_at(.identifier, '>', start_pos)
 }

@@ -198,6 +198,87 @@ fn (mut a Analyzer) analyze_node(node ast.Node) !ast.Node {
 		.type_annotation {
 			a.analyze_type_annotation(node)
 		}
+		// Task 11: Control Flow
+		.if_expr {
+			a.analyze_if_expr(node)
+		}
+		.with_expr {
+			a.analyze_with_expr(node)
+		}
+		.match_expr {
+			a.analyze_match_expr(node)
+		}
+		// Task 11: Concurrency
+		.spawn_expr {
+			a.analyze_spawn_expr(node)
+		}
+		.send_expr {
+			a.analyze_send_expr(node)
+		}
+		.receive_expr {
+			a.analyze_receive_expr(node)
+		}
+		.supervisor_def {
+			a.analyze_supervisor_def(node)
+		}
+		.worker_def {
+			a.analyze_worker_def(node)
+		}
+		// Task 11: Binaries
+		.binary_literal {
+			a.analyze_binary_literal(node)
+		}
+		.binary_pattern {
+			a.analyze_binary_pattern(node)
+		}
+		.binary_segment {
+			a.analyze_binary_segment(node)
+		}
+		// Task 11: Custom Types
+		.type_def {
+			a.analyze_type_def(node)
+		}
+		.union_type {
+			a.analyze_union_type(node)
+		}
+		.generic_type {
+			a.analyze_generic_type(node)
+		}
+		.opaque_type {
+			a.analyze_opaque_type(node)
+		}
+		.nominal_type {
+			a.analyze_nominal_type(node)
+		}
+		// Task 11: Module System
+		.deps_declaration {
+			a.analyze_deps_declaration(node)
+		}
+		.application_config {
+			a.analyze_application_config(node)
+		}
+		.import_statement {
+			a.analyze_import_statement(node)
+		}
+		// Task 11: Advanced Features
+		.string_interpolation {
+			a.analyze_string_interpolation(node)
+		}
+		.anonymous_function {
+			a.analyze_anonymous_function(node)
+		}
+		.lambda_call {
+			a.analyze_lambda_call(node)
+		}
+		.list_comprehension {
+			a.analyze_list_comprehension(node)
+		}
+		.directive {
+			a.analyze_directive(node)
+		}
+		.test_block {
+			a.analyze_test_block(node)
+		}
 		else {
 			a.error('Unsupported node type: ${node.kind}', node.position)
 			return error('Unsupported node type: ${node.kind}')
@@ -2539,18 +2620,23 @@ fn (a Analyzer) unify_types(t1 ast.Type, t2 ast.Type) ast.Type {
 // New analysis functions for additional functionality
 
 fn (mut a Analyzer) analyze_function_parameter(node ast.Node) !ast.Node {
-	// Function parameters are just identifiers, no special analysis needed
-	param_type := ast.Type{
-		name:   'unknown'
+	mut param_type := ast.Type{
+		name:   'any'  // Use 'any' instead of 'unknown' for better compatibility
 		params: []
 	}
+
+	// Check if parameter has type annotation (same logic as normal functions)
+	if node.children.len > 0 {
+		param_type = a.extract_type_from_annotation(node.children[0])!
+	}
+
 	a.type_table.assign_type(node.id, param_type)
 	return node
 }
 
 fn (mut a Analyzer) analyze_lambda_expression(node ast.Node) !ast.Node {
-	if node.children.len < 2 {
-		a.error('Lambda expression must have parameters and body', node.position)
+	if node.children.len < 1 {
+		a.error('Lambda expression must have body', node.position)
 		return error('Invalid lambda expression')
 	}
 
@@ -2558,14 +2644,14 @@ fn (mut a Analyzer) analyze_lambda_expression(node ast.Node) !ast.Node {
 	a.enter_scope('lambda')
 	defer { a.exit_scope() }
 
-	// Analyze parameters
-	params := node.children[0..node.children.len - 1]
+	// Analyze parameters (all children except the last one, which is the body)
+	params := if node.children.len > 1 { node.children[0..node.children.len - 1] } else { []ast.Node{} }
 	mut param_types := []ast.Type{}
 	for param in params {
 		_ := a.analyze_node(param)!
 		param_type := a.type_table.get_type(param.id) or {
 			ast.Type{
-				name:   'unknown'
+				name:   'any'  // Use 'any' for better compatibility
 				params: []
 			}
 		}
@@ -2784,6 +2870,26 @@ fn (mut a Analyzer) analyze_pattern_with_type(node ast.Node, expected_type ast.T
 				children: [analyzed_head, analyzed_tail]
 			}
 		}
+		.tuple_literal {
+			// Tuple pattern - elements should match tuple element types
+			mut analyzed_children := []ast.Node{}
+			for child in node.children {
+				// For simplicity, assume all tuple elements have 'any' type
+				// (proper tuple type inference would be more complex)
+				child_type := ast.Type{
+					name: 'any'
+					params: []
+				}
+				analyzed_child := a.analyze_pattern_with_type(child, child_type)!
+				analyzed_children << analyzed_child
+			}
+
+			a.type_table.assign_type(node.id, expected_type)
+			return ast.Node{
+				...node
+				children: analyzed_children
+			}
+		}
 		else {
 			// Literal patterns
 			return a.analyze_node(node)
@@ -2975,5 +3081,617 @@ fn (mut a Analyzer) register_pattern_variables(pattern ast.Node) {
 		else {
 			// For literals (integers, strings, etc.), no variables to register
 		}
+	}
+}
+
+// ============ Task 11: Control Flow Analysis ============
+
+fn (mut a Analyzer) analyze_if_expr(node ast.Node) !ast.Node {
+	if node.children.len < 2 {
+		a.error('If expression must have at least condition and then branch', node.position)
+		return error('Invalid if expression')
+	}
+
+	// Analyze condition
+	condition := a.analyze_node(node.children[0])!
+
+	// Analyze then branch
+	then_branch := a.analyze_node(node.children[1])!
+	then_type := a.type_table.get_type(then_branch.id) or {
+		ast.Type{name: 'any', params: []}
+	}
+
+	mut result_type := then_type
+	mut analyzed_children := [condition, then_branch]
+
+	// Analyze else branch if present
+	if node.children.len > 2 {
+		else_branch := a.analyze_node(node.children[2])!
+		else_type := a.type_table.get_type(else_branch.id) or {
+			ast.Type{name: 'any', params: []}
+		}
+
+		// Unify then and else types
+		result_type = if then_type.name == else_type.name { then_type } else { ast.Type{name: 'any', params: []} }
+		analyzed_children << else_branch
+	}
+
+	analyzed_node := ast.Node{
+		...node
+		children: analyzed_children
+	}
+
+	a.type_table.assign_type(analyzed_node.id, result_type)
+	return analyzed_node
+}
+
+fn (mut a Analyzer) analyze_with_expr(node ast.Node) !ast.Node {
+	if node.children.len < 3 {
+		a.error('With expression must have pattern, expression, and body', node.position)
+		return error('Invalid with expression')
+	}
+
+	// Analyze expression first
+	expr := a.analyze_node(node.children[1])!
+
+	// Enter scope for pattern binding
+	a.enter_scope('with_scope')
+	defer { a.exit_scope() }
+
+		// Register pattern variables first (from original node)
+	a.register_pattern_variables(node.children[0])
+
+	// Then analyze pattern in pattern context
+	pattern := a.with_context(.pattern, fn [mut a, node] (mut analyzer Analyzer) !ast.Node {
+		return analyzer.analyze_node(node.children[0])
+	})!
+
+	// Analyze body
+	body := a.analyze_node(node.children[2])!
+	body_type := a.type_table.get_type(body.id) or {
+		ast.Type{name: 'any', params: []}
+	}
+
+	mut result_type := body_type
+	mut analyzed_children := [pattern, expr, body]
+
+	// Analyze else body if present
+	if node.children.len > 3 {
+		else_body := a.analyze_node(node.children[3])!
+		else_type := a.type_table.get_type(else_body.id) or {
+			ast.Type{name: 'any', params: []}
+		}
+
+		result_type = if body_type.name == else_type.name { body_type } else { ast.Type{name: 'any', params: []} }
+		analyzed_children << else_body
+	}
+
+	analyzed_node := ast.Node{
+		...node
+		children: analyzed_children
+	}
+
+	a.type_table.assign_type(analyzed_node.id, result_type)
+	return analyzed_node
+}
+
+fn (mut a Analyzer) analyze_match_expr(node ast.Node) !ast.Node {
+	if node.children.len < 2 {
+		a.error('Match expression must have pattern and expression', node.position)
+		return error('Invalid match expression')
+	}
+
+	// Analyze expression
+	expr := a.analyze_node(node.children[1])!
+
+	// Analyze pattern
+	pattern := a.with_context(.pattern, fn [mut a, node] (mut analyzer Analyzer) !ast.Node {
+		return analyzer.analyze_node(node.children[0])
+	})!
+
+	mut analyzed_children := [pattern, expr]
+
+	// Analyze rescue body if present
+	if node.children.len > 2 {
+		rescue_body := a.analyze_node(node.children[2])!
+		analyzed_children << rescue_body
+	}
+
+	analyzed_node := ast.Node{
+		...node
+		children: analyzed_children
+	}
+
+	// Match expressions typically return the matched value type
+	expr_type := a.type_table.get_type(expr.id) or {
+		ast.Type{name: 'any', params: []}
+	}
+	a.type_table.assign_type(analyzed_node.id, expr_type)
+	return analyzed_node
+}
+
+// ============ Task 11: Concurrency Analysis ============
+
+fn (mut a Analyzer) analyze_spawn_expr(node ast.Node) !ast.Node {
+	if node.children.len != 1 {
+		a.error('Spawn expression must have one argument', node.position)
+		return error('Invalid spawn expression')
+	}
+
+	// Analyze function expression
+	func_expr := a.analyze_node(node.children[0])!
+
+	analyzed_node := ast.Node{
+		...node
+		children: [func_expr]
+	}
+
+	// Spawn returns a PID (process identifier)
+	pid_type := ast.Type{
+		name: 'pid'
+		params: []
+	}
+	a.type_table.assign_type(analyzed_node.id, pid_type)
+	return analyzed_node
+}
+
+fn (mut a Analyzer) analyze_send_expr(node ast.Node) !ast.Node {
+	if node.children.len != 2 {
+		a.error('Send expression must have target and message', node.position)
+		return error('Invalid send expression')
+	}
+
+	// Analyze target and message
+	target := a.analyze_node(node.children[0])!
+	message := a.analyze_node(node.children[1])!
+
+	analyzed_node := ast.Node{
+		...node
+		children: [target, message]
+	}
+
+	// Send returns the message that was sent
+	message_type := a.type_table.get_type(message.id) or {
+		ast.Type{name: 'any', params: []}
+	}
+	a.type_table.assign_type(analyzed_node.id, message_type)
+	return analyzed_node
+}
+
+fn (mut a Analyzer) analyze_receive_expr(node ast.Node) !ast.Node {
+	mut analyzed_children := []ast.Node{}
+
+	for child in node.children {
+		analyzed_child := a.analyze_node(child)!
+		analyzed_children << analyzed_child
+	}
+
+	analyzed_node := ast.Node{
+		...node
+		children: analyzed_children
+	}
+
+	// Receive returns any type based on the patterns
+	receive_type := ast.Type{
+		name: 'any'
+		params: []
+	}
+	a.type_table.assign_type(analyzed_node.id, receive_type)
+	return analyzed_node
+}
+
+fn (mut a Analyzer) analyze_supervisor_def(node ast.Node) !ast.Node {
+	if node.children.len != 1 {
+		a.error('Supervisor definition must have body', node.position)
+		return error('Invalid supervisor definition')
+	}
+
+	// Enter scope for supervisor
+	a.enter_scope('supervisor_${node.value}')
+	defer { a.exit_scope() }
+
+	body := a.analyze_node(node.children[0])!
+
+	analyzed_node := ast.Node{
+		...node
+		children: [body]
+	}
+
+	// Supervisors return supervisor specification
+	supervisor_type := ast.Type{
+		name: 'supervisor_spec'
+		params: []
+	}
+	a.type_table.assign_type(analyzed_node.id, supervisor_type)
+	return analyzed_node
+}
+
+fn (mut a Analyzer) analyze_worker_def(node ast.Node) !ast.Node {
+	if node.children.len != 1 {
+		a.error('Worker definition must have body', node.position)
+		return error('Invalid worker definition')
+	}
+
+	// Enter scope for worker
+	a.enter_scope('worker_${node.value}')
+	defer { a.exit_scope() }
+
+	body := a.analyze_node(node.children[0])!
+
+	analyzed_node := ast.Node{
+		...node
+		children: [body]
+	}
+
+	// Workers return worker specification
+	worker_type := ast.Type{
+		name: 'worker_spec'
+		params: []
+	}
+	a.type_table.assign_type(analyzed_node.id, worker_type)
+	return analyzed_node
+}
+
+// ============ Task 11: Binaries Analysis ============
+
+fn (mut a Analyzer) analyze_binary_literal(node ast.Node) !ast.Node {
+	mut analyzed_children := []ast.Node{}
+
+	for child in node.children {
+		analyzed_child := a.analyze_node(child)!
+		analyzed_children << analyzed_child
+	}
+
+	analyzed_node := ast.Node{
+		...node
+		children: analyzed_children
+	}
+
+	// Binary literals are of type binary
+	binary_type := ast.Type{
+		name: 'binary'
+		params: []
+	}
+	a.type_table.assign_type(analyzed_node.id, binary_type)
+	return analyzed_node
+}
+
+fn (mut a Analyzer) analyze_binary_pattern(node ast.Node) !ast.Node {
+	return a.analyze_binary_literal(node) // Same analysis as literal
+}
+
+fn (mut a Analyzer) analyze_binary_segment(node ast.Node) !ast.Node {
+	mut analyzed_children := []ast.Node{}
+
+	for child in node.children {
+		analyzed_child := a.analyze_node(child)!
+		analyzed_children << analyzed_child
+	}
+
+	analyzed_node := ast.Node{
+		...node
+		children: analyzed_children
+	}
+
+	// Binary segments are of type any (can be integers, binaries, etc.)
+	segment_type := ast.Type{
+		name: 'any'
+		params: []
+	}
+	a.type_table.assign_type(analyzed_node.id, segment_type)
+	return analyzed_node
+}
+
+// ============ Task 11: Custom Types Analysis ============
+
+fn (mut a Analyzer) analyze_type_def(node ast.Node) !ast.Node {
+	// Register the type definition
+	mut analyzed_children := []ast.Node{}
+
+	for child in node.children {
+		analyzed_child := a.analyze_node(child)!
+		analyzed_children << analyzed_child
+	}
+
+	analyzed_node := ast.Node{
+		...node
+		children: analyzed_children
+	}
+
+	// Type definitions are metadata - no runtime type
+	type_def_type := ast.Type{
+		name: 'type_definition'
+		params: []
+	}
+	a.type_table.assign_type(analyzed_node.id, type_def_type)
+	return analyzed_node
+}
+
+fn (mut a Analyzer) analyze_union_type(node ast.Node) !ast.Node {
+	mut analyzed_children := []ast.Node{}
+
+	for child in node.children {
+		analyzed_child := a.analyze_node(child)!
+		analyzed_children << analyzed_child
+	}
+
+	analyzed_node := ast.Node{
+		...node
+		children: analyzed_children
+	}
+
+	// Union types represent multiple possible types
+	union_type := ast.Type{
+		name: 'union'
+		params: []
+	}
+	a.type_table.assign_type(analyzed_node.id, union_type)
+	return analyzed_node
+}
+
+fn (mut a Analyzer) analyze_generic_type(node ast.Node) !ast.Node {
+	mut analyzed_children := []ast.Node{}
+
+	for child in node.children {
+		analyzed_child := a.analyze_node(child)!
+		analyzed_children << analyzed_child
+	}
+
+	analyzed_node := ast.Node{
+		...node
+		children: analyzed_children
+	}
+
+	// Generic types
+	generic_type := ast.Type{
+		name: node.value
+		params: analyzed_children.map(a.type_table.get_type(it.id) or { ast.Type{name: 'any', params: []} })
+	}
+	a.type_table.assign_type(analyzed_node.id, generic_type)
+	return analyzed_node
+}
+
+fn (mut a Analyzer) analyze_opaque_type(node ast.Node) !ast.Node {
+	mut analyzed_children := []ast.Node{}
+
+	for child in node.children {
+		analyzed_child := a.analyze_node(child)!
+		analyzed_children << analyzed_child
+	}
+
+	analyzed_node := ast.Node{
+		...node
+		children: analyzed_children
+	}
+
+	// Opaque types hide the underlying type
+	opaque_type := ast.Type{
+		name: node.value
+		params: []
+	}
+	a.type_table.assign_type(analyzed_node.id, opaque_type)
+	return analyzed_node
+}
+
+fn (mut a Analyzer) analyze_nominal_type(node ast.Node) !ast.Node {
+	return a.analyze_opaque_type(node) // Same analysis as opaque
+}
+
+// ============ Task 11: Module System Analysis ============
+
+fn (mut a Analyzer) analyze_deps_declaration(node ast.Node) !ast.Node {
+	mut analyzed_children := []ast.Node{}
+
+	for child in node.children {
+		analyzed_child := a.analyze_node(child)!
+		analyzed_children << analyzed_child
+	}
+
+	analyzed_node := ast.Node{
+		...node
+		children: analyzed_children
+	}
+
+	// Dependencies are metadata
+	deps_type := ast.Type{
+		name: 'dependencies'
+		params: []
+	}
+	a.type_table.assign_type(analyzed_node.id, deps_type)
+	return analyzed_node
+}
+
+fn (mut a Analyzer) analyze_application_config(node ast.Node) !ast.Node {
+	mut analyzed_children := []ast.Node{}
+
+	for child in node.children {
+		analyzed_child := a.analyze_node(child)!
+		analyzed_children << analyzed_child
+	}
+
+	analyzed_node := ast.Node{
+		...node
+		children: analyzed_children
+	}
+
+	// Application config is metadata
+	app_type := ast.Type{
+		name: 'application_config'
+		params: []
+	}
+	a.type_table.assign_type(analyzed_node.id, app_type)
+	return analyzed_node
+}
+
+fn (mut a Analyzer) analyze_import_statement(node ast.Node) !ast.Node {
+	analyzed_node := ast.Node{
+		...node
+		children: []
+	}
+
+	// Import statements are metadata
+	import_type := ast.Type{
+		name: 'import'
+		params: []
+	}
+	a.type_table.assign_type(analyzed_node.id, import_type)
+	return analyzed_node
+}
+
+// ============ Task 11: Advanced Features Analysis ============
+
+fn (mut a Analyzer) analyze_string_interpolation(node ast.Node) !ast.Node {
+	mut analyzed_children := []ast.Node{}
+
+	for child in node.children {
+		analyzed_child := a.analyze_node(child)!
+		analyzed_children << analyzed_child
+	}
+
+	analyzed_node := ast.Node{
+		...node
+		children: analyzed_children
+	}
+
+	// String interpolation results in a binary (string)
+	string_type := ast.Type{
+		name: 'binary'
+		params: []
+	}
+	a.type_table.assign_type(analyzed_node.id, string_type)
+	return analyzed_node
+}
+
+fn (mut a Analyzer) analyze_anonymous_function(node ast.Node) !ast.Node {
+	if node.children.len == 0 {
+		a.error('Anonymous function must have at least a body', node.position)
+		return error('Invalid anonymous function')
+	}
+
+	// Enter scope for anonymous function
+	a.enter_scope('anonymous_function')
+	defer { a.exit_scope() }
+
+	mut analyzed_children := []ast.Node{}
+
+	for child in node.children {
+		analyzed_child := a.analyze_node(child)!
+		analyzed_children << analyzed_child
+	}
+
+	analyzed_node := ast.Node{
+		...node
+		children: analyzed_children
+	}
+
+	// Anonymous functions are of type fun
+	fun_type := ast.Type{
+		name: 'fun'
+		params: []
+	}
+	a.type_table.assign_type(analyzed_node.id, fun_type)
+	return analyzed_node
+}
+
+fn (mut a Analyzer) analyze_list_comprehension(node ast.Node) !ast.Node {
+	if node.children.len < 2 {
+		a.error('List comprehension must have expression and generator', node.position)
+		return error('Invalid list comprehension')
+	}
+
+	mut analyzed_children := []ast.Node{}
+
+	for child in node.children {
+		analyzed_child := a.analyze_node(child)!
+		analyzed_children << analyzed_child
+	}
+
+	analyzed_node := ast.Node{
+		...node
+		children: analyzed_children
+	}
+
+	// List comprehensions return a list
+	list_type := ast.Type{
+		name: 'list'
+		params: [ast.Type{name: 'any', params: []}]
+	}
+	a.type_table.assign_type(analyzed_node.id, list_type)
+	return analyzed_node
+}
+
+fn (mut a Analyzer) analyze_directive(node ast.Node) !ast.Node {
+	mut analyzed_children := []ast.Node{}
+
+	for child in node.children {
+		analyzed_child := a.analyze_node(child)!
+		analyzed_children << analyzed_child
+	}
+
+	analyzed_node := ast.Node{
+		...node
+		children: analyzed_children
+	}
+
+	// Directives are metadata
+	directive_type := ast.Type{
+		name: 'directive'
+		params: []
+	}
+	a.type_table.assign_type(analyzed_node.id, directive_type)
+	return analyzed_node
+}
+
+fn (mut a Analyzer) analyze_test_block(node ast.Node) !ast.Node {
+	if node.children.len != 1 {
+		a.error('Test block must have body', node.position)
+		return error('Invalid test block')
+	}
+
+	// Enter scope for test
+	a.enter_scope('test_${node.value}')
+	defer { a.exit_scope() }
+
+	body := a.analyze_node(node.children[0])!
+
+	analyzed_node := ast.Node{
+		...node
+		children: [body]
+	}
+
+	// Test blocks return test specification
+	test_type := ast.Type{
+		name: 'test_spec'
+		params: []
+	}
+	a.type_table.assign_type(analyzed_node.id, test_type)
+	return analyzed_node
+}
+
+fn (mut a Analyzer) analyze_lambda_call(node ast.Node) !ast.Node {
+	if node.children.len < 1 {
+		a.error('Lambda call must have lambda expression', node.position)
+		return node
+	}
+
+	// Analyze lambda expression
+	lambda := a.analyze_node(node.children[0])!
+	mut analyzed_children := [lambda]
+
+	// Analyze arguments
+	for i in 1..node.children.len {
+		arg := a.analyze_node(node.children[i])!
+		analyzed_children << arg
+	}
+
+	// Set type to any for now (could be refined with more sophisticated type inference)
+	a.type_table.assign_type(node.id, ast.Type{
+		name: 'any'
+		params: []
+	})
+
+	return ast.Node{
+		...node
+		children: analyzed_children
 	}
 }

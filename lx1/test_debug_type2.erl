@@ -1,0 +1,1 @@
+-module(test_debug_type2).

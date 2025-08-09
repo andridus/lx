@@ -1,0 +1,36 @@
+type status :: :ok | :error | :pending
+type result(T) :: {:some, T} | :none
+type opaque user_id :: integer
+type nominal email :: string
+type list(T) :: [] | {T, list(T)}
+
+def process_status(status :: status) do
+    case status do
+        :ok -> "Success"
+        :error -> "Failed"
+        :pending -> "In progress"
+    end
+end
+
+def safe_divide(a, b) :: result(float) do
+    if b == 0 do
+        :none
+    else
+        {:some, a / b}
+    end
+end
+
+def create_user_id(id :: integer) :: user_id do
+    id
+end
+
+def validate_email(email_str :: string) :: email do
+    email_str
+end
+
+def list_head(list :: list(T)) :: result(T) do
+    case list do
+        [] -> :none
+        {head, _tail} -> {:some, head}
+    end
+end

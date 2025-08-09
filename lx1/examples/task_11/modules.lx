@@ -1,0 +1,31 @@
+deps [:cowboy, :jsx]
+
+import :cowboy
+import :jsx
+
+application {
+    description: "My Application",
+    vsn: "1.0.0",
+    applications: [:kernel, :stdlib],
+    registered: [:main_server],
+    env: %{
+        debug: true,
+        port: 8080
+    }
+}
+
+def start_server() do
+    cowboy.start_clear(:http, [
+        {port, 8080}
+    ], %{
+        env: %{dispatch: dispatch()}
+    })
+end
+
+def encode_json(data) do
+    jsx.encode(data)
+end
+
+def decode_json(json_str) do
+    jsx.decode(json_str)
+end
