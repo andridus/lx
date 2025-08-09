@@ -1,6 +1,3 @@
-record Person { name :: string, age :: integer }
-
-def simple_record() do
-    person = Person{name: "João", age: 30}
-    person
+def answer() do
+  _
 end

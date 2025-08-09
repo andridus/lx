@@ -1,0 +1,75 @@
+def complex_function(a, b, c, d, e) do
+    temp1 = a + b
+    temp2 = c * d
+    temp3 = temp1 - temp2
+    temp4 = temp3 / e
+    temp4
+end
+
+def polymorphic_arithmetic(a, b, c) do
+    result1 = a + b
+    result2 = result1 * c
+    result3 = result2 - a
+    result3
+end
+
+def nested_function_calls(f, g, h, x) do
+    temp1 = f(x)
+    temp2 = g(temp1)
+    temp3 = h(temp2)
+    temp3
+end
+
+def conditional_expression(condition, a, b) do
+    case condition do
+        true -> a
+        false -> b
+    end
+end
+
+def list_operations(list1, list2, f) do
+    mapped1 = map(f, list1)
+    mapped2 = map(f, list2)
+    combined = append(mapped1, mapped2)
+    reversed = reverse(combined)
+    reversed
+end
+
+def map_operations(map1, map2, key, value) do
+    updated1 = map_put(key, value, map1)
+    merged = map_merge(updated1, map2)
+    size = map_size(merged)
+    {merged, size}
+end
+
+def tuple_operations(tuple1, tuple2, f) do
+    {a, b} = tuple1
+    {c, d} = tuple2
+    new_a = f(a, c)
+    new_b = f(b, d)
+    {new_a, new_b}
+end
+
+def higher_order_complex(f, g, h, x, y) do
+    composed = compose(f, compose(g, h))
+    result1 = composed(x)
+    result2 = twice(f, y)
+    {result1, result2}
+end
+
+def recursive_polymorphic(list, f, acc) do
+    case list do
+        [] -> acc
+        [head | tail] ->
+            new_acc = f(acc, head)
+            recursive_polymorphic(tail, f, new_acc)
+    end
+end
+
+def type_polymorphism_example(data) do
+    case data do
+        {list: items} -> map(fn(x) -> x * 2 end, items)
+        {map: entries} -> map(fn({k, v}) -> {k, v * 2} end, entries)
+        {tuple: {a, b}} -> {a * 2, b * 2}
+    end
+end

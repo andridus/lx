@@ -1,0 +1,53 @@
+def twice(f, x) do
+    f(f(x))
+end
+
+def thrice(f, x) do
+    f(f(f(x)))
+end
+
+def iterate(f, n, x) do
+    case n do
+        0 -> x
+        _ -> iterate(f, n - 1, f(x))
+    end
+end
+
+def foldl(f, acc, list) do
+    case list do
+        [] -> acc
+        [head | tail] -> foldl(f, f(acc, head), tail)
+    end
+end
+
+def foldr(f, acc, list) do
+    case list do
+        [] -> acc
+        [head | tail] -> f(head, foldr(f, acc, tail))
+    end
+end
+
+def filter(pred, list) do
+    case list do
+        [] -> []
+        [head | tail] ->
+            case pred(head) do
+                true -> [head | filter(pred, tail)]
+                false -> filter(pred, tail)
+            end
+    end
+end
+
+def all(pred, list) do
+    case list do
+        [] -> true
+        [head | tail] -> pred(head) and all(pred, tail)
+    end
+end
+
+def any(pred, list) do
+    case list do
+        [] -> false
+        [head | tail] -> pred(head) or any(pred, tail)
+    end
+end

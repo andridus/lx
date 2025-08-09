@@ -1,0 +1,32 @@
+def identity(x) do
+    x
+end
+
+def map(f, list) do
+    case list do
+        [] -> []
+        [head | tail] -> [f(head) | map(f, tail)]
+    end
+end
+
+def compose(f, g) do
+    fn(x) do
+        f(g(x))
+    end
+end
+
+def apply(f, x) do
+    f(x)
+end
+
+def curry(f, x) do
+    fn(y) do
+        f(x, y)
+    end
+end
+
+def uncurry(f) do
+    fn(x, y) do
+        apply(apply(f, x), y)
+    end
+end

@@ -12,7 +12,7 @@ mut:
 	current_env    int
 }
 
-pub fn (a Analyzer) lookup(name string) ?ast.Type {
+pub fn (a Analyzer) lookup(name string) ?TypeScheme {
 	if a.current_env >= 0 && a.current_env < a.type_envs.len {
 		if env := a.type_envs[a.current_env] {
 			if name in env.bindings {
@@ -23,8 +23,8 @@ pub fn (a Analyzer) lookup(name string) ?ast.Type {
 	return none
 }
 
-pub fn (mut a Analyzer) bind(name string, typ ast.Type) {
-	a.type_envs[a.current_env].bindings[name] = typ
+pub fn (mut a Analyzer) bind(name string, scheme TypeScheme) {
+	a.type_envs[a.current_env].bindings[name] = scheme
 }
 
 pub fn new_analyzer() Analyzer {
@@ -200,7 +200,10 @@ fn (mut a Analyzer) analyze_function(node ast.Node) !ast.Node {
 		parameter_names << arg_name
 
 		// Add argument to the function's environment
-		a.bind(arg_name, arg_type)
+		a.bind(arg_name, TypeScheme{
+			quantified_vars: []
+			body: arg_type
+		})
 	}
 
 	// Register function type in global type table FIRST (only for named functions)
@@ -457,7 +460,10 @@ fn (mut a Analyzer) analyze_function(node ast.Node) !ast.Node {
 										params: []
 									}
 								}
-								a.bind(arg.value, arg_type)
+								a.bind(arg.value, TypeScheme{
+									quantified_vars: []
+									body: arg_type
+								})
 							}
 						}
 					}
@@ -620,7 +626,10 @@ fn (mut a Analyzer) analyze_binding(node ast.Node) !ast.Node {
 	}
 
 	// Bind variable in current function's type environment
-	a.bind(var_name, value_type)
+	a.bind(var_name, TypeScheme{
+		quantified_vars: []
+		body: value_type
+	})
 
 	// Assign type to binding node
 	a.type_table.assign_type(node.id, value_type)
@@ -632,8 +641,8 @@ fn (mut a Analyzer) analyze_variable_ref(node ast.Node) !ast.Node {
 	var_name := node.value
 
 	// Look up variable in current function's type environment
-	if typ := a.lookup(var_name) {
-		a.type_table.assign_type(node.id, typ)
+	if scheme := a.lookup(var_name) {
+		a.type_table.assign_type(node.id, scheme.body)
 		return node
 	} else {
 		a.error('Undefined variable: ${var_name}', node.position)
@@ -646,8 +655,8 @@ fn (mut a Analyzer) analyze_identifier(node ast.Node) !ast.Node {
 	var_name := node.value
 
 	// Look up variable in current function's type environment
-	if typ := a.lookup(var_name) {
-		a.type_table.assign_type(node.id, typ)
+	if scheme := a.lookup(var_name) {
+		a.type_table.assign_type(node.id, scheme.body)
 		return node
 	} else {
 		// If not found, assign a placeholder type
@@ -1619,7 +1628,10 @@ fn (mut a Analyzer) analyze_function_definition(node ast.Node) !ast.Node {
 		parameter_names << param_name
 
 		// Add parameter to the function's environment
-		a.bind(param_name, param_type)
+		a.bind(param_name, TypeScheme{
+			quantified_vars: []
+			body: param_type
+		})
 	}
 
 	// Analyze return type
@@ -1708,15 +1720,24 @@ fn (mut a Analyzer) analyze_function_head(node ast.Node) !ast.Node {
 	// Register pattern variables in the current function's environment BEFORE analyzing body
 	if pattern.kind == .identifier {
 		// Simple variable pattern
-		a.bind(pattern.value, ast.Type{ name: 'any', params: [] })
+		a.bind(pattern.value, TypeScheme{
+			quantified_vars: []
+			body: ast.Type{ name: 'any', params: [] }
+		})
 	} else if pattern.kind == .variable_ref {
 		// Variable reference pattern
-		a.bind(pattern.value, ast.Type{ name: 'any', params: [] })
+		a.bind(pattern.value, TypeScheme{
+			quantified_vars: []
+			body: ast.Type{ name: 'any', params: [] }
+		})
 	} else if pattern.kind == .tuple_literal {
 		// Tuple pattern (multiple arguments)
 		for arg in pattern.children {
 			if arg.kind == .identifier {
-				a.bind(arg.value, ast.Type{ name: 'any', params: [] })
+				a.bind(arg.value, TypeScheme{
+					quantified_vars: []
+					body: ast.Type{ name: 'any', params: [] }
+				})
 			}
 		}
 	}

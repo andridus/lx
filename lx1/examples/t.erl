@@ -1,7 +1,8 @@
 -module(t).
--export([simple_record/0]).
+-export([factorial/1]).
 
--record(person, {name = nil :: binary(), age = nil :: integer()}).-spec simple_record() -> #person{}.
-simple_record() ->
-    PERSON_1 = #person{name = <<"João"/utf8>>, age = 30},
-    PERSON_1.
+-spec factorial(integer()) -> integer().
+factorial(0) ->
+    1;
+factorial(N_1) ->
+    N_1 * factorial(N_1 - 1).

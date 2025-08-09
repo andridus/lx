@@ -1,0 +1,45 @@
+def head(list) do
+    [first | _] = list
+    first
+end
+
+def tail(list) do
+    [_ | rest] = list
+    rest
+end
+
+def pair(a, b) do
+    {a, b}
+end
+
+def first(pair) do
+    {first, _} = pair
+    first
+end
+
+def second(pair) do
+    {_, second} = pair
+    second
+end
+
+def make_list(x) do
+    [x]
+end
+
+def make_tuple(a, b, c) do
+    {a, b, c}
+end
+
+def list_length(list) do
+    case list do
+        [] -> 0
+        [_ | tail] -> 1 + list_length(tail)
+    end
+end
+
+def map_get_default(map, key, default) do
+    case map_get(key, map) do
+        nil -> default
+        value -> value
+    end
+end
