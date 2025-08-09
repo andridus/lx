@@ -27,9 +27,9 @@ pub enum NodeKind {
 	block // do ... end or -> ... end (multiple expressions)
 
 	// Function structure
-	function // def function_name(args) do body end or (args) -> body
+	function           // def function_name(args) do body end or (args) -> body
 	function_parameter // function parameter definition
-	lambda_expression // fn(x) -> body end
+	lambda_expression  // fn(x) -> body end
 
 	// Module structure
 	module
@@ -58,14 +58,14 @@ pub enum NodeKind {
 	record_update     // %{record | campo: valor}
 
 	// Pattern Matching
-	case_expression   // case expr do ... end
-	case_clause      // pattern -> expression
-	pattern_match    // pattern in case clause
-	pattern_binding  // [head | tail] = list
+	case_expression // case expr do ... end
+	case_clause     // pattern -> expression
+	pattern_match   // pattern in case clause
+	pattern_binding // [head | tail] = list
 
 	// Type System
-	type_alias       // type Name = Type
-	type_annotation  // :: Type
+	type_alias      // type Name = Type
+	type_annotation // :: Type
 }
 
 pub struct Position {

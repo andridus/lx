@@ -244,9 +244,9 @@ fn (mut p Parser) parse_arg() !ast.Node {
 
 		// Create parameter with type annotation
 		return ast.Node{
-			id: p.get_next_id()
-			kind: .function_parameter
-			value: arg_name
+			id:       p.get_next_id()
+			kind:     .function_parameter
+			value:    arg_name
 			children: [type_annotation]
 			position: pos
 		}
@@ -1562,9 +1562,9 @@ fn (mut p Parser) parse_type_expression() !ast.Node {
 		p.advance() // Skip ')'
 
 		return ast.Node{
-			id: p.get_next_id()
-			kind: .identifier
-			value: type_name
+			id:       p.get_next_id()
+			kind:     .identifier
+			value:    type_name
 			children: params
 			position: pos
 		}

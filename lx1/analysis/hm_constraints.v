@@ -5,7 +5,7 @@ import errors
 
 pub fn solve_constraints(constraints []Constraint) !Substitution {
 	mut solver := ConstraintSolver{
-		constraints: constraints
+		constraints:    constraints
 		error_reporter: errors.new_error_reporter()
 	}
 
@@ -14,15 +14,15 @@ pub fn solve_constraints(constraints []Constraint) !Substitution {
 
 pub struct ConstraintSolver {
 mut:
-	constraints   []Constraint
-	substitution  Substitution
+	constraints    []Constraint
+	substitution   Substitution
 	error_reporter errors.ErrorReporter
 }
 
 pub fn new_constraint_solver(constraints []Constraint) ConstraintSolver {
 	return ConstraintSolver{
-		constraints: constraints
-		substitution: Substitution{
+		constraints:    constraints
+		substitution:   Substitution{
 			mappings: map[string]ast.Type{}
 		}
 		error_reporter: errors.new_error_reporter()
@@ -67,13 +67,17 @@ fn (mut solver ConstraintSolver) unify_types(t1 ast.Type, t2 ast.Type, pos ast.P
 	if t1.name == t2.name {
 		if t1.params.len == 0 {
 			// Both are ground types with no parameters
-			return Substitution{mappings: map[string]ast.Type{}}
+			return Substitution{
+				mappings: map[string]ast.Type{}
+			}
 		}
 
 		if t1.params.len == t2.params.len {
 			// Unify parameters
-			mut result := Substitution{mappings: map[string]ast.Type{}}
-			for i in 0..t1.params.len {
+			mut result := Substitution{
+				mappings: map[string]ast.Type{}
+			}
+			for i in 0 .. t1.params.len {
 				param_substitution := solver.unify_types(t1.params[i], t2.params[i], pos)!
 				result = compose_substitutions(result, param_substitution)
 			}
@@ -212,7 +216,7 @@ fn (mut collector ConstraintCollector) collect_list_cons(node ast.Node) {
 	head_type := infer_type(head)
 	_ := infer_type(tail)
 	_ := ast.Type{
-		name: 'list'
+		name:   'list'
 		params: [head_type]
 	}
 	collector.add_constraint_nodes(tail, node.children[1], node.position)
@@ -249,8 +253,8 @@ fn (mut collector ConstraintCollector) collect_block(node ast.Node) {
 fn (mut collector ConstraintCollector) add_constraint(left ast.Node, right ast.Type, pos ast.Position) {
 	left_type := infer_type(left)
 	collector.constraints << Constraint{
-		left: left_type
-		right: right
+		left:     left_type
+		right:    right
 		position: pos
 	}
 }
@@ -259,8 +263,8 @@ fn (mut collector ConstraintCollector) add_constraint_nodes(left ast.Node, right
 	left_type := infer_type(left)
 	right_type := infer_type(right)
 	collector.constraints << Constraint{
-		left: left_type
-		right: right_type
+		left:     left_type
+		right:    right_type
 		position: pos
 	}
 }
@@ -268,18 +272,44 @@ fn (mut collector ConstraintCollector) add_constraint_nodes(left ast.Node, right
 // Simplified type inference for constraint collection
 fn infer_type(node ast.Node) ast.Type {
 	return match node.kind {
-		.integer { type_integer() }
-		.float { type_float() }
-		.string { type_string() }
-		.boolean { type_boolean() }
-		.atom { type_atom() }
-		.nil { type_nil() }
-		.variable_ref { ast.Type{name: 'T1', params: []} } // Placeholder
+		.integer {
+			type_integer()
+		}
+		.float {
+			type_float()
+		}
+		.string {
+			type_string()
+		}
+		.boolean {
+			type_boolean()
+		}
+		.atom {
+			type_atom()
+		}
+		.nil {
+			type_nil()
+		}
+		.variable_ref {
+			ast.Type{
+				name:   'T1'
+				params: []
+			}
+		} // Placeholder
 		.list_literal {
 			if node.children.len == 0 {
-				ast.Type{name: 'list', params: [ast.Type{name: 'any', params: []}]}
+				ast.Type{
+					name:   'list'
+					params: [ast.Type{
+						name:   'any'
+						params: []
+					}]
+				}
 			} else {
-				ast.Type{name: 'list', params: [infer_type(node.children[0])]}
+				ast.Type{
+					name:   'list'
+					params: [infer_type(node.children[0])]
+				}
 			}
 		}
 		.tuple_literal {
@@ -287,11 +317,28 @@ fn infer_type(node ast.Node) ast.Type {
 			for child in node.children {
 				params << infer_type(child)
 			}
-			ast.Type{name: 'tuple', params: params}
+			ast.Type{
+				name:   'tuple'
+				params: params
+			}
 		}
 		.map_literal {
-			ast.Type{name: 'map', params: [ast.Type{name: 'any', params: []}, ast.Type{name: 'any', params: []}]}
+			ast.Type{
+				name:   'map'
+				params: [ast.Type{
+					name:   'any'
+					params: []
+				}, ast.Type{
+					name:   'any'
+					params: []
+				}]
+			}
 		}
-		else { ast.Type{name: 'any', params: []} }
+		else {
+			ast.Type{
+				name:   'any'
+				params: []
+			}
+		}
 	}
 }

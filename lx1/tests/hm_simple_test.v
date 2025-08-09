@@ -5,7 +5,10 @@ import analysis
 
 fn test_polymorphic_identity() {
 	// Test identity function type inference
-	arg_types := [ast.Type{name: 'integer', params: []}]
+	arg_types := [ast.Type{
+		name:   'integer'
+		params: []
+	}]
 	result_type := analysis.infer_polymorphic_type('identity', arg_types)
 
 	assert result_type.name == 'function'
@@ -19,12 +22,21 @@ fn test_polymorphic_identity() {
 fn test_polymorphic_map() {
 	// Test map function type inference
 	func_type := ast.Type{
-		name: 'function'
-		params: [ast.Type{name: 'integer', params: []}, ast.Type{name: 'string', params: []}]
+		name:   'function'
+		params: [ast.Type{
+			name:   'integer'
+			params: []
+		}, ast.Type{
+			name:   'string'
+			params: []
+		}]
 	}
 	list_type := ast.Type{
-		name: 'list'
-		params: [ast.Type{name: 'integer', params: []}]
+		name:   'list'
+		params: [ast.Type{
+			name:   'integer'
+			params: []
+		}]
 	}
 	arg_types := [func_type, list_type]
 
@@ -40,8 +52,11 @@ fn test_polymorphic_map() {
 fn test_polymorphic_head() {
 	// Test head function type inference
 	list_type := ast.Type{
-		name: 'list'
-		params: [ast.Type{name: 'string', params: []}]
+		name:   'list'
+		params: [ast.Type{
+			name:   'string'
+			params: []
+		}]
 	}
 	arg_types := [list_type]
 
@@ -55,8 +70,11 @@ fn test_polymorphic_head() {
 fn test_polymorphic_length() {
 	// Test length function type inference
 	list_type := ast.Type{
-		name: 'list'
-		params: [ast.Type{name: 'integer', params: []}]
+		name:   'list'
+		params: [ast.Type{
+			name:   'integer'
+			params: []
+		}]
 	}
 	arg_types := [list_type]
 
@@ -70,12 +88,24 @@ fn test_polymorphic_length() {
 fn test_polymorphic_compose() {
 	// Test compose function type inference
 	func1 := ast.Type{
-		name: 'function'
-		params: [ast.Type{name: 'integer', params: []}, ast.Type{name: 'string', params: []}]
+		name:   'function'
+		params: [ast.Type{
+			name:   'integer'
+			params: []
+		}, ast.Type{
+			name:   'string'
+			params: []
+		}]
 	}
 	func2 := ast.Type{
-		name: 'function'
-		params: [ast.Type{name: 'float', params: []}, ast.Type{name: 'integer', params: []}]
+		name:   'function'
+		params: [ast.Type{
+			name:   'float'
+			params: []
+		}, ast.Type{
+			name:   'integer'
+			params: []
+		}]
 	}
 	arg_types := [func1, func2]
 
@@ -89,16 +119,25 @@ fn test_polymorphic_compose() {
 
 fn test_is_polymorphic_type() {
 	// Test polymorphic type detection
-	simple_type := ast.Type{name: 'integer', params: []}
+	simple_type := ast.Type{
+		name:   'integer'
+		params: []
+	}
 	assert !analysis.is_polymorphic_type(simple_type)
 
 	polymorphic_type := ast.Type{
-		name: 'list'
-		params: [ast.Type{name: 'T1', params: []}]
+		name:   'list'
+		params: [ast.Type{
+			name:   'T1'
+			params: []
+		}]
 	}
 	assert analysis.is_polymorphic_type(polymorphic_type)
 
-	type_var := ast.Type{name: 'T1', params: []}
+	type_var := ast.Type{
+		name:   'T1'
+		params: []
+	}
 	assert analysis.is_polymorphic_type(type_var)
 
 	println('✅ is_polymorphic_type: works correctly')
@@ -107,11 +146,23 @@ fn test_is_polymorphic_type() {
 fn test_get_type_variables() {
 	// Test type variable extraction
 	complex_type := ast.Type{
-		name: 'function'
+		name:   'function'
 		params: [
-			ast.Type{name: 'T1', params: []},
-			ast.Type{name: 'list', params: [ast.Type{name: 'T2', params: []}]},
-			ast.Type{name: 'T3', params: []}
+			ast.Type{
+				name:   'T1'
+				params: []
+			},
+			ast.Type{
+				name:   'list'
+				params: [ast.Type{
+					name:   'T2'
+					params: []
+				}]
+			},
+			ast.Type{
+				name:   'T3'
+				params: []
+			},
 		]
 	}
 
@@ -126,17 +177,32 @@ fn test_get_type_variables() {
 
 fn test_unify_types() {
 	// Test type unification
-	t1 := ast.Type{name: 'integer', params: []}
-	t2 := ast.Type{name: 'integer', params: []}
+	t1 := ast.Type{
+		name:   'integer'
+		params: []
+	}
+	t2 := ast.Type{
+		name:   'integer'
+		params: []
+	}
 	assert analysis.unify_types(t1, t2)
 
-	t3 := ast.Type{name: 'string', params: []}
+	t3 := ast.Type{
+		name:   'string'
+		params: []
+	}
 	assert !analysis.unify_types(t1, t3)
 
-	t4 := ast.Type{name: 'T1', params: []}
+	t4 := ast.Type{
+		name:   'T1'
+		params: []
+	}
 	assert analysis.unify_types(t1, t4) // Type variable can unify with anything
 
-	t5 := ast.Type{name: 'any', params: []}
+	t5 := ast.Type{
+		name:   'any'
+		params: []
+	}
 	assert analysis.unify_types(t1, t5) // any can unify with anything
 
 	println('✅ unify_types: works correctly')
@@ -146,8 +212,14 @@ fn test_generate_polymorphic_spec() {
 	// Test Erlang spec generation
 	func_name := 'identity'
 	func_type := ast.Type{
-		name: 'function'
-		params: [ast.Type{name: 'integer', params: []}, ast.Type{name: 'integer', params: []}]
+		name:   'function'
+		params: [ast.Type{
+			name:   'integer'
+			params: []
+		}, ast.Type{
+			name:   'integer'
+			params: []
+		}]
 	}
 
 	spec := analysis.generate_polymorphic_spec(func_name, func_type)
@@ -161,14 +233,32 @@ fn test_generate_complex_spec() {
 	// Test complex Erlang spec generation
 	func_name := 'map'
 	func_type := ast.Type{
-		name: 'function'
+		name:   'function'
 		params: [
 			ast.Type{
-				name: 'function'
-				params: [ast.Type{name: 'integer', params: []}, ast.Type{name: 'string', params: []}]
+				name:   'function'
+				params: [ast.Type{
+					name:   'integer'
+					params: []
+				}, ast.Type{
+					name:   'string'
+					params: []
+				}]
 			},
-			ast.Type{name: 'list', params: [ast.Type{name: 'integer', params: []}]},
-			ast.Type{name: 'list', params: [ast.Type{name: 'T1', params: []}]}
+			ast.Type{
+				name:   'list'
+				params: [ast.Type{
+					name:   'integer'
+					params: []
+				}]
+			},
+			ast.Type{
+				name:   'list'
+				params: [ast.Type{
+					name:   'T1'
+					params: []
+				}]
+			},
 		]
 	}
 
@@ -179,8 +269,11 @@ fn test_generate_complex_spec() {
 fn test_list_spec_generation() {
 	// Test list type spec generation
 	list_type := ast.Type{
-		name: 'list'
-		params: [ast.Type{name: 'integer', params: []}]
+		name:   'list'
+		params: [ast.Type{
+			name:   'integer'
+			params: []
+		}]
 	}
 
 	spec := analysis.convert_type_to_erlang(list_type)
@@ -192,8 +285,14 @@ fn test_list_spec_generation() {
 fn test_map_spec_generation() {
 	// Test map type spec generation
 	map_type := ast.Type{
-		name: 'map'
-		params: [ast.Type{name: 'string', params: []}, ast.Type{name: 'integer', params: []}]
+		name:   'map'
+		params: [ast.Type{
+			name:   'string'
+			params: []
+		}, ast.Type{
+			name:   'integer'
+			params: []
+		}]
 	}
 
 	spec := analysis.convert_type_to_erlang(map_type)
@@ -205,8 +304,17 @@ fn test_map_spec_generation() {
 fn test_tuple_spec_generation() {
 	// Test tuple type spec generation
 	tuple_type := ast.Type{
-		name: 'tuple'
-		params: [ast.Type{name: 'integer', params: []}, ast.Type{name: 'string', params: []}, ast.Type{name: 'boolean', params: []}]
+		name:   'tuple'
+		params: [ast.Type{
+			name:   'integer'
+			params: []
+		}, ast.Type{
+			name:   'string'
+			params: []
+		}, ast.Type{
+			name:   'boolean'
+			params: []
+		}]
 	}
 
 	spec := analysis.convert_type_to_erlang(tuple_type)
@@ -218,8 +326,17 @@ fn test_tuple_spec_generation() {
 fn test_function_spec_generation() {
 	// Test function type spec generation
 	func_type := ast.Type{
-		name: 'function'
-		params: [ast.Type{name: 'integer', params: []}, ast.Type{name: 'string', params: []}, ast.Type{name: 'boolean', params: []}]
+		name:   'function'
+		params: [ast.Type{
+			name:   'integer'
+			params: []
+		}, ast.Type{
+			name:   'string'
+			params: []
+		}, ast.Type{
+			name:   'boolean'
+			params: []
+		}]
 	}
 
 	spec := analysis.convert_type_to_erlang(func_type)
@@ -230,7 +347,10 @@ fn test_function_spec_generation() {
 
 fn test_type_variable_spec_generation() {
 	// Test type variable spec generation
-	type_var := ast.Type{name: 'T1', params: []}
+	type_var := ast.Type{
+		name:   'T1'
+		params: []
+	}
 
 	spec := analysis.convert_type_to_erlang(type_var)
 	assert spec == 'any()'
@@ -243,15 +363,21 @@ fn test_complex_polymorphic_function() {
 	func_name := 'complex_function'
 
 	// Function type: (A, B, (A -> B)) -> B
-	param_a := ast.Type{name: 'T1', params: []}
-	param_b := ast.Type{name: 'T2', params: []}
+	param_a := ast.Type{
+		name:   'T1'
+		params: []
+	}
+	param_b := ast.Type{
+		name:   'T2'
+		params: []
+	}
 	func_param := ast.Type{
-		name: 'function'
+		name:   'function'
 		params: [param_a, param_b]
 	}
 
 	func_type := ast.Type{
-		name: 'function'
+		name:   'function'
 		params: [param_a, param_b, func_param, param_b]
 	}
 
@@ -283,25 +409,88 @@ fn test_integration_scenario() {
 		'map',
 		'head',
 		'length',
-		'compose'
+		'compose',
 	]
 
 	// 2. Test each function
 	for func_name in functions {
-				// Create some argument types
+		// Create some argument types
 		arg_types := match func_name {
-			'identity' { [ast.Type{name: 'integer', params: []}] }
-			'map' { [
-				ast.Type{name: 'function', params: [ast.Type{name: 'integer', params: []}, ast.Type{name: 'string', params: []}]},
-				ast.Type{name: 'list', params: [ast.Type{name: 'integer', params: []}]}
-			] }
-			'head' { [ast.Type{name: 'list', params: [ast.Type{name: 'string', params: []}]}] }
-			'length' { [ast.Type{name: 'list', params: [ast.Type{name: 'boolean', params: []}]}] }
-			'compose' { [
-				ast.Type{name: 'function', params: [ast.Type{name: 'integer', params: []}, ast.Type{name: 'string', params: []}]},
-				ast.Type{name: 'function', params: [ast.Type{name: 'float', params: []}, ast.Type{name: 'integer', params: []}]}
-			] }
-			else { [ast.Type{name: 'integer', params: []}] }
+			'identity' {
+				[ast.Type{
+					name:   'integer'
+					params: []
+				}]
+			}
+			'map' {
+				[
+					ast.Type{
+						name:   'function'
+						params: [ast.Type{
+							name:   'integer'
+							params: []
+						}, ast.Type{
+							name:   'string'
+							params: []
+						}]
+					},
+					ast.Type{
+						name:   'list'
+						params: [ast.Type{
+							name:   'integer'
+							params: []
+						}]
+					},
+				]
+			}
+			'head' {
+				[ast.Type{
+					name:   'list'
+					params: [ast.Type{
+						name:   'string'
+						params: []
+					}]
+				}]
+			}
+			'length' {
+				[ast.Type{
+					name:   'list'
+					params: [ast.Type{
+						name:   'boolean'
+						params: []
+					}]
+				}]
+			}
+			'compose' {
+				[
+					ast.Type{
+						name:   'function'
+						params: [ast.Type{
+							name:   'integer'
+							params: []
+						}, ast.Type{
+							name:   'string'
+							params: []
+						}]
+					},
+					ast.Type{
+						name:   'function'
+						params: [ast.Type{
+							name:   'float'
+							params: []
+						}, ast.Type{
+							name:   'integer'
+							params: []
+						}]
+					},
+				]
+			}
+			else {
+				[ast.Type{
+					name:   'integer'
+					params: []
+				}]
+			}
 		}
 
 		// Infer type

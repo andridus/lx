@@ -5,17 +5,17 @@ import errors
 
 pub struct HMInferencer {
 mut:
-	type_env     TypeEnv
-	type_table   TypeTable
-	constraints  []Constraint
-	var_counter  int
+	type_env       TypeEnv
+	type_table     TypeTable
+	constraints    []Constraint
+	var_counter    int
 	error_reporter errors.ErrorReporter
 }
 
 pub struct TypeScheme {
 pub:
 	quantified_vars []TypeVar
-	body           ast.Type
+	body            ast.Type
 }
 
 pub struct Substitution {
@@ -25,32 +25,64 @@ mut:
 
 pub fn new_hm_inferencer() HMInferencer {
 	return HMInferencer{
-		type_env: new_type_env('root')
-		type_table: new_type_table()
-		constraints: []
-		var_counter: 0
+		type_env:       new_type_env('root')
+		type_table:     new_type_table()
+		constraints:    []
+		var_counter:    0
 		error_reporter: errors.new_error_reporter()
 	}
 }
 
 pub fn (mut hmi HMInferencer) infer_expression(expr ast.Node) !ast.Type {
 	return match expr.kind {
-		.integer { type_integer() }
-		.float { type_float() }
-		.string { type_string() }
-		.boolean { type_boolean() }
-		.atom { type_atom() }
-		.nil { type_nil() }
-		.variable_ref { hmi.infer_variable_ref(expr) }
-		.variable_binding { hmi.infer_binding(expr) }
-		.function_caller { hmi.infer_function_call(expr) }
-		.parentheses { hmi.infer_parentheses(expr) }
-		.list_literal { hmi.infer_list_literal(expr) }
-		.list_cons { hmi.infer_list_cons(expr) }
-		.tuple_literal { hmi.infer_tuple_literal(expr) }
-		.map_literal { hmi.infer_map_literal(expr) }
-		.map_access { hmi.infer_map_access(expr) }
-		.block { hmi.infer_block(expr) }
+		.integer {
+			type_integer()
+		}
+		.float {
+			type_float()
+		}
+		.string {
+			type_string()
+		}
+		.boolean {
+			type_boolean()
+		}
+		.atom {
+			type_atom()
+		}
+		.nil {
+			type_nil()
+		}
+		.variable_ref {
+			hmi.infer_variable_ref(expr)
+		}
+		.variable_binding {
+			hmi.infer_binding(expr)
+		}
+		.function_caller {
+			hmi.infer_function_call(expr)
+		}
+		.parentheses {
+			hmi.infer_parentheses(expr)
+		}
+		.list_literal {
+			hmi.infer_list_literal(expr)
+		}
+		.list_cons {
+			hmi.infer_list_cons(expr)
+		}
+		.tuple_literal {
+			hmi.infer_tuple_literal(expr)
+		}
+		.map_literal {
+			hmi.infer_map_literal(expr)
+		}
+		.map_access {
+			hmi.infer_map_access(expr)
+		}
+		.block {
+			hmi.infer_block(expr)
+		}
 		else {
 			hmi.error('Unsupported expression type for inference: ${expr.kind}', expr.position)
 			return error('Unsupported expression type')
@@ -79,7 +111,7 @@ fn (mut hmi HMInferencer) infer_binding(node ast.Node) !ast.Type {
 	// Store the type in the environment
 	hmi.type_env.bind(node.value, TypeScheme{
 		quantified_vars: []
-		body: value_type
+		body:            value_type
 	})
 
 	return value_type
@@ -123,8 +155,11 @@ fn (mut hmi HMInferencer) infer_list_literal(node ast.Node) !ast.Type {
 	if node.children.len == 0 {
 		// Empty list - return generic list type
 		return ast.Type{
-			name: 'list'
-			params: [ast.Type{name: 'any', params: []}]
+			name:   'list'
+			params: [ast.Type{
+				name:   'any'
+				params: []
+			}]
 		}
 	}
 
@@ -132,13 +167,13 @@ fn (mut hmi HMInferencer) infer_list_literal(node ast.Node) !ast.Type {
 	first_type := hmi.infer_expression(node.children[0])!
 
 	// Check if all elements have the same type
-	for i in 1..node.children.len {
+	for i in 1 .. node.children.len {
 		elem_type := hmi.infer_expression(node.children[i])!
 		hmi.add_constraint(first_type, elem_type, node.position)
 	}
 
 	return ast.Type{
-		name: 'list'
+		name:   'list'
 		params: [first_type]
 	}
 }
@@ -154,7 +189,7 @@ fn (mut hmi HMInferencer) infer_list_cons(node ast.Node) !ast.Type {
 
 	// Tail should be a list
 	expected_tail_type := ast.Type{
-		name: 'list'
+		name:   'list'
 		params: [head_type]
 	}
 	hmi.add_constraint(tail_type, expected_tail_type, node.position)
@@ -170,7 +205,7 @@ fn (mut hmi HMInferencer) infer_tuple_literal(node ast.Node) !ast.Type {
 	}
 
 	return ast.Type{
-		name: 'tuple'
+		name:   'tuple'
 		params: elem_types
 	}
 }
@@ -179,10 +214,16 @@ fn (mut hmi HMInferencer) infer_map_literal(node ast.Node) !ast.Type {
 	if node.children.len == 0 {
 		// Empty map
 		return ast.Type{
-			name: 'map'
+			name:   'map'
 			params: [
-				ast.Type{name: 'any', params: []},
-				ast.Type{name: 'any', params: []}
+				ast.Type{
+					name:   'any'
+					params: []
+				},
+				ast.Type{
+					name:   'any'
+					params: []
+				},
 			]
 		}
 	}
@@ -190,10 +231,16 @@ fn (mut hmi HMInferencer) infer_map_literal(node ast.Node) !ast.Type {
 	// For now, assume all keys and values have the same type
 	// This will be improved with proper map type inference
 	return ast.Type{
-		name: 'map'
+		name:   'map'
 		params: [
-			ast.Type{name: 'any', params: []},
-			ast.Type{name: 'any', params: []}
+			ast.Type{
+				name:   'any'
+				params: []
+			},
+			ast.Type{
+				name:   'any'
+				params: []
+			},
 		]
 	}
 }
@@ -259,7 +306,16 @@ fn (mut hmi HMInferencer) get_builtin_function_type(func_name string, arg_types 
 		}
 		'map_size' {
 			if arg_types.len == 1 {
-				hmi.add_constraint(arg_types[0], ast.Type{name: 'map', params: [ast.Type{name: 'any', params: []}, ast.Type{name: 'any', params: []}]}, ast.Position{})
+				hmi.add_constraint(arg_types[0], ast.Type{
+					name:   'map'
+					params: [ast.Type{
+						name:   'any'
+						params: []
+					}, ast.Type{
+						name:   'any'
+						params: []
+					}]
+				}, ast.Position{})
 				type_integer()
 			} else {
 				none
@@ -267,33 +323,56 @@ fn (mut hmi HMInferencer) get_builtin_function_type(func_name string, arg_types 
 		}
 		'map_get' {
 			if arg_types.len == 2 {
-				ast.Type{name: 'any', params: []}
+				ast.Type{
+					name:   'any'
+					params: []
+				}
 			} else {
 				none
 			}
 		}
 		'map_put' {
 			if arg_types.len == 3 {
-				ast.Type{name: 'map', params: [ast.Type{name: 'any', params: []}, ast.Type{name: 'any', params: []}]}
+				ast.Type{
+					name:   'map'
+					params: [ast.Type{
+						name:   'any'
+						params: []
+					}, ast.Type{
+						name:   'any'
+						params: []
+					}]
+				}
 			} else {
 				none
 			}
 		}
 		'map_remove' {
 			if arg_types.len == 2 {
-				ast.Type{name: 'map', params: [ast.Type{name: 'any', params: []}, ast.Type{name: 'any', params: []}]}
+				ast.Type{
+					name:   'map'
+					params: [ast.Type{
+						name:   'any'
+						params: []
+					}, ast.Type{
+						name:   'any'
+						params: []
+					}]
+				}
 			} else {
 				none
 			}
 		}
-		else { none }
+		else {
+			none
+		}
 	}
 }
 
 fn (mut hmi HMInferencer) add_constraint(left ast.Type, right ast.Type, pos ast.Position) {
 	hmi.constraints << Constraint{
-		left: left
-		right: right
+		left:     left
+		right:    right
 		position: pos
 	}
 }

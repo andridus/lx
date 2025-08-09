@@ -6,15 +6,15 @@ import kernel
 
 pub struct Analyzer {
 mut:
-	error_reporter errors.ErrorReporter
-	type_table     TypeTable
-	type_envs      []TypeEnv
-	current_env    int
+	error_reporter   errors.ErrorReporter
+	type_table       TypeTable
+	type_envs        []TypeEnv
+	current_env      int
 	analysis_context AnalysisContext
 }
 
 enum AnalysisContext {
-	expression          // Regular expression context
+	expression         // Regular expression context
 	pattern            // Pattern matching context
 	function_parameter // Function parameter context
 	record_field       // Record field definition context
@@ -57,26 +57,35 @@ fn (mut a Analyzer) with_context(ctx AnalysisContext, f fn (mut Analyzer) !ast.N
 fn (mut a Analyzer) extract_type_from_annotation(node ast.Node) !ast.Type {
 	// Se o nó é um identifier simples (tipo básico), retorna diretamente
 	if node.kind == .identifier {
-		return ast.Type{name: node.value, params: []}
+		return ast.Type{
+			name:   node.value
+			params: []
+		}
 	}
 
 	// Se o nó não é uma anotação de tipo válida, retorna 'any'
 	if node.kind != .type_annotation {
-		return ast.Type{name: 'any', params: []}
+		return ast.Type{
+			name:   'any'
+			params: []
+		}
 	}
 
 	// Caso contrário, analisa como type_annotation
 	analyzed := a.analyze_type_annotation(node)!
 	return a.type_table.get_type(analyzed.id) or {
-		ast.Type{name: node.value, params: []}
+		ast.Type{
+			name:   node.value
+			params: []
+		}
 	}
 }
 
 pub fn new_analyzer() Analyzer {
 	return Analyzer{
-		type_table:     new_type_table()
-		type_envs:      [new_type_env('root')]
-		error_reporter: errors.new_error_reporter()
+		type_table:       new_type_table()
+		type_envs:        [new_type_env('root')]
+		error_reporter:   errors.new_error_reporter()
 		analysis_context: .expression
 	}
 }
@@ -233,7 +242,7 @@ fn (mut a Analyzer) analyze_function(node ast.Node) !ast.Node {
 		return error('Function definitions are only allowed in global scope, not inside functions')
 	}
 
-		function_name := node.value
+	function_name := node.value
 
 	// For function heads (function_name == ''), register pattern variables immediately
 	if function_name == '' && node.children.len >= 2 {
@@ -294,7 +303,7 @@ fn (mut a Analyzer) analyze_function(node ast.Node) !ast.Node {
 		// Add argument to the function's environment
 		a.bind(arg_name, TypeScheme{
 			quantified_vars: []
-			body: arg_type
+			body:            arg_type
 		})
 
 		// Restore context
@@ -405,18 +414,51 @@ fn (mut a Analyzer) analyze_function(node ast.Node) !ast.Node {
 													&& elem.children[0].kind == .identifier {
 													// Element has type annotation
 													elem_type := a.extract_type_from_annotation(elem.children[0]) or {
-														ast.Type{name: 'any', params: []}
+														ast.Type{
+															name:   'any'
+															params: []
+														}
 													}
 													element_types << elem_type
 												} else {
 													// No annotation, infer from element kind
 													elem_type := match elem.kind {
-														.integer { ast.Type{name: 'integer', params: []} }
-														.float { ast.Type{name: 'float', params: []} }
-														.string { ast.Type{name: 'string', params: []} }
-														.atom { ast.Type{name: 'atom', params: []} }
-														.boolean { ast.Type{name: 'boolean', params: []} }
-														else { ast.Type{name: 'any', params: []} }
+														.integer {
+															ast.Type{
+																name:   'integer'
+																params: []
+															}
+														}
+														.float {
+															ast.Type{
+																name:   'float'
+																params: []
+															}
+														}
+														.string {
+															ast.Type{
+																name:   'string'
+																params: []
+															}
+														}
+														.atom {
+															ast.Type{
+																name:   'atom'
+																params: []
+															}
+														}
+														.boolean {
+															ast.Type{
+																name:   'boolean'
+																params: []
+															}
+														}
+														else {
+															ast.Type{
+																name:   'any'
+																params: []
+															}
+														}
 													}
 													element_types << elem_type
 												}
@@ -425,7 +467,10 @@ fn (mut a Analyzer) analyze_function(node ast.Node) !ast.Node {
 											elem_type := if element_types.len > 0 {
 												element_types[0]
 											} else {
-												ast.Type{name: 'any', params: []}
+												ast.Type{
+													name:   'any'
+													params: []
+												}
 											}
 											ast.Type{
 												name:   'list'
@@ -433,25 +478,62 @@ fn (mut a Analyzer) analyze_function(node ast.Node) !ast.Node {
 											}
 										}
 										.list_cons {
-																						// For list cons [head | tail], analyze head element
-											mut elem_type := ast.Type{name: 'any', params: []}
+											// For list cons [head | tail], analyze head element
+											mut elem_type := ast.Type{
+												name:   'any'
+												params: []
+											}
 											if actual_arg.children.len > 0 {
 												list_head := actual_arg.children[0]
-												if list_head.kind == .identifier && list_head.children.len > 0
+												if list_head.kind == .identifier
+													&& list_head.children.len > 0
 													&& list_head.children[0].kind == .identifier {
 													// Head has type annotation
 													elem_type = a.extract_type_from_annotation(list_head.children[0]) or {
-														ast.Type{name: 'any', params: []}
+														ast.Type{
+															name:   'any'
+															params: []
+														}
 													}
 												} else {
 													// No annotation, infer from head kind
 													elem_type = match list_head.kind {
-														.integer { ast.Type{name: 'integer', params: []} }
-														.float { ast.Type{name: 'float', params: []} }
-														.string { ast.Type{name: 'string', params: []} }
-														.atom { ast.Type{name: 'atom', params: []} }
-														.boolean { ast.Type{name: 'boolean', params: []} }
-														else { ast.Type{name: 'any', params: []} }
+														.integer {
+															ast.Type{
+																name:   'integer'
+																params: []
+															}
+														}
+														.float {
+															ast.Type{
+																name:   'float'
+																params: []
+															}
+														}
+														.string {
+															ast.Type{
+																name:   'string'
+																params: []
+															}
+														}
+														.atom {
+															ast.Type{
+																name:   'atom'
+																params: []
+															}
+														}
+														.boolean {
+															ast.Type{
+																name:   'boolean'
+																params: []
+															}
+														}
+														else {
+															ast.Type{
+																name:   'any'
+																params: []
+															}
+														}
 													}
 												}
 											}
@@ -551,22 +633,56 @@ fn (mut a Analyzer) analyze_function(node ast.Node) !ast.Node {
 													// Analyze elements to infer list element type
 													mut element_types := []ast.Type{}
 													for elem in arg.children {
-														if elem.kind == .identifier && elem.children.len > 0
+														if elem.kind == .identifier
+															&& elem.children.len > 0
 															&& elem.children[0].kind == .identifier {
 															// Element has type annotation
 															elem_type := a.extract_type_from_annotation(elem.children[0]) or {
-																ast.Type{name: 'any', params: []}
+																ast.Type{
+																	name:   'any'
+																	params: []
+																}
 															}
 															element_types << elem_type
 														} else {
 															// No annotation, infer from element kind
 															elem_type := match elem.kind {
-																.integer { ast.Type{name: 'integer', params: []} }
-																.float { ast.Type{name: 'float', params: []} }
-																.string { ast.Type{name: 'string', params: []} }
-																.atom { ast.Type{name: 'atom', params: []} }
-																.boolean { ast.Type{name: 'boolean', params: []} }
-																else { ast.Type{name: 'any', params: []} }
+																.integer {
+																	ast.Type{
+																		name:   'integer'
+																		params: []
+																	}
+																}
+																.float {
+																	ast.Type{
+																		name:   'float'
+																		params: []
+																	}
+																}
+																.string {
+																	ast.Type{
+																		name:   'string'
+																		params: []
+																	}
+																}
+																.atom {
+																	ast.Type{
+																		name:   'atom'
+																		params: []
+																	}
+																}
+																.boolean {
+																	ast.Type{
+																		name:   'boolean'
+																		params: []
+																	}
+																}
+																else {
+																	ast.Type{
+																		name:   'any'
+																		params: []
+																	}
+																}
 															}
 															element_types << elem_type
 														}
@@ -575,7 +691,10 @@ fn (mut a Analyzer) analyze_function(node ast.Node) !ast.Node {
 													elem_type := if element_types.len > 0 {
 														element_types[0]
 													} else {
-														ast.Type{name: 'any', params: []}
+														ast.Type{
+															name:   'any'
+															params: []
+														}
 													}
 													ast.Type{
 														name:   'list'
@@ -583,25 +702,62 @@ fn (mut a Analyzer) analyze_function(node ast.Node) !ast.Node {
 													}
 												}
 												.list_cons {
-																										// For list cons [head | tail], analyze head element
-													mut elem_type := ast.Type{name: 'any', params: []}
+													// For list cons [head | tail], analyze head element
+													mut elem_type := ast.Type{
+														name:   'any'
+														params: []
+													}
 													if arg.children.len > 0 {
 														list_head := arg.children[0]
-														if list_head.kind == .identifier && list_head.children.len > 0
+														if list_head.kind == .identifier
+															&& list_head.children.len > 0
 															&& list_head.children[0].kind == .identifier {
 															// Head has type annotation
 															elem_type = a.extract_type_from_annotation(list_head.children[0]) or {
-																ast.Type{name: 'any', params: []}
+																ast.Type{
+																	name:   'any'
+																	params: []
+																}
 															}
 														} else {
 															// No annotation, infer from head kind
 															elem_type = match list_head.kind {
-																.integer { ast.Type{name: 'integer', params: []} }
-																.float { ast.Type{name: 'float', params: []} }
-																.string { ast.Type{name: 'string', params: []} }
-																.atom { ast.Type{name: 'atom', params: []} }
-																.boolean { ast.Type{name: 'boolean', params: []} }
-																else { ast.Type{name: 'any', params: []} }
+																.integer {
+																	ast.Type{
+																		name:   'integer'
+																		params: []
+																	}
+																}
+																.float {
+																	ast.Type{
+																		name:   'float'
+																		params: []
+																	}
+																}
+																.string {
+																	ast.Type{
+																		name:   'string'
+																		params: []
+																	}
+																}
+																.atom {
+																	ast.Type{
+																		name:   'atom'
+																		params: []
+																	}
+																}
+																.boolean {
+																	ast.Type{
+																		name:   'boolean'
+																		params: []
+																	}
+																}
+																else {
+																	ast.Type{
+																		name:   'any'
+																		params: []
+																	}
+																}
 															}
 														}
 													}
@@ -851,7 +1007,7 @@ fn (mut a Analyzer) analyze_binding(node ast.Node) !ast.Node {
 	// Bind variable in current function's type environment
 	a.bind(var_name, TypeScheme{
 		quantified_vars: []
-		body: value_type
+		body:            value_type
 	})
 
 	// Assign type to binding node
@@ -875,8 +1031,10 @@ fn (mut a Analyzer) analyze_variable_ref(node ast.Node) !ast.Node {
 
 fn (mut a Analyzer) analyze_identifier(node ast.Node) !ast.Node {
 	// Check for invalid type annotations in expression context
-	if node.children.len > 0 && node.children[0].kind == .identifier && a.analysis_context == .expression {
-		a.error('Type annotations with :: are not allowed in expression context. Use :: only in function parameters, pattern matching, or record field definitions', node.position)
+	if node.children.len > 0 && node.children[0].kind == .identifier
+		&& a.analysis_context == .expression {
+		a.error('Type annotations with :: are not allowed in expression context. Use :: only in function parameters, pattern matching, or record field definitions',
+			node.position)
 		return error('Invalid type annotation in expression context')
 	}
 
@@ -945,7 +1103,7 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 				}
 
 				// For function variables, assign a generic return type
-				a.type_table.assign_type(node.id, ast.Type{name: 'any', params: []})
+				a.type_table.assign_type(node.id, ast.Type{ name: 'any', params: [] })
 
 				return ast.Node{
 					id:       node.id
@@ -1052,14 +1210,19 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 			if function_name in ['+', '-', '*', '/', '<', '>', '<=', '>=', '==', '!='] {
 				// If both are 'any', assume integer
 				if left_type.name == 'any' && right_type.name == 'any' {
-					effective_left_type = ast.Type{name: 'integer', params: []}
-					effective_right_type = ast.Type{name: 'integer', params: []}
+					effective_left_type = ast.Type{
+						name:   'integer'
+						params: []
+					}
+					effective_right_type = ast.Type{
+						name:   'integer'
+						params: []
+					}
 				}
 				// If one is 'any' and the other is numeric, use the numeric type for both
 				else if left_type.name == 'any' && right_type.name in ['integer', 'float'] {
 					effective_left_type = right_type
-				}
-				else if right_type.name == 'any' && left_type.name in ['integer', 'float'] {
+				} else if right_type.name == 'any' && left_type.name in ['integer', 'float'] {
 					effective_right_type = left_type
 				}
 			}
@@ -1068,21 +1231,32 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 			if function_name == '++' {
 				// If both are 'any', assume list
 				if left_type.name == 'any' && right_type.name == 'any' {
-					effective_left_type = ast.Type{name: 'list', params: [ast.Type{name: 'any', params: []}]}
-					effective_right_type = ast.Type{name: 'list', params: [ast.Type{name: 'any', params: []}]}
+					effective_left_type = ast.Type{
+						name:   'list'
+						params: [ast.Type{
+							name:   'any'
+							params: []
+						}]
+					}
+					effective_right_type = ast.Type{
+						name:   'list'
+						params: [ast.Type{
+							name:   'any'
+							params: []
+						}]
+					}
 				}
 				// If one is 'any' and the other is list, use list for both
 				else if left_type.name == 'any' && right_type.name == 'list' {
 					effective_left_type = right_type
-				}
-				else if right_type.name == 'any' && left_type.name == 'list' {
+				} else if right_type.name == 'any' && left_type.name == 'list' {
 					effective_right_type = left_type
 				}
 			}
 
 			// Tenta encontrar uma assinatura válida
-			if return_type := a.check_function_signatures(function_name, effective_left_type, effective_right_type,
-				function_info.signatures)
+			if return_type := a.check_function_signatures(function_name, effective_left_type,
+				effective_right_type, function_info.signatures)
 			{
 				// Special handling for list concatenation operator
 				mut final_return_type := return_type
@@ -1920,7 +2094,7 @@ fn (mut a Analyzer) analyze_function_definition(node ast.Node) !ast.Node {
 		// Add parameter to the function's environment
 		a.bind(param_name, TypeScheme{
 			quantified_vars: []
-			body: param_type
+			body:            param_type
 		})
 	}
 
@@ -2012,13 +2186,19 @@ fn (mut a Analyzer) analyze_function_head(node ast.Node) !ast.Node {
 		// Simple variable pattern
 		a.bind(pattern.value, TypeScheme{
 			quantified_vars: []
-			body: ast.Type{ name: 'any', params: [] }
+			body:            ast.Type{
+				name:   'any'
+				params: []
+			}
 		})
 	} else if pattern.kind == .variable_ref {
 		// Variable reference pattern
 		a.bind(pattern.value, TypeScheme{
 			quantified_vars: []
-			body: ast.Type{ name: 'any', params: [] }
+			body:            ast.Type{
+				name:   'any'
+				params: []
+			}
 		})
 	} else if pattern.kind == .tuple_literal {
 		// Tuple pattern (multiple arguments)
@@ -2026,7 +2206,10 @@ fn (mut a Analyzer) analyze_function_head(node ast.Node) !ast.Node {
 			if arg.kind == .identifier {
 				a.bind(arg.value, TypeScheme{
 					quantified_vars: []
-					body: ast.Type{ name: 'any', params: [] }
+					body:            ast.Type{
+						name:   'any'
+						params: []
+					}
 				})
 			}
 		}
@@ -2084,18 +2267,19 @@ fn (mut a Analyzer) analyze_function_call(node ast.Node) !ast.Node {
 		if scheme.body.name == 'function' || scheme.body.name == 'any' {
 			// Create a generic function type for variables of function type
 			function_type = FunctionType{
-				name: function_name
-				parameters: []ast.Type{} // Will be inferred
-				return_type: ast.Type{name: 'any', params: []}
-				heads: []
+				name:        function_name
+				parameters:  []ast.Type{} // Will be inferred
+				return_type: ast.Type{
+					name:   'any'
+					params: []
+				}
+				heads:       []
 			}
 		} else {
 			a.error('Variable ${function_name} is not a function', node.position)
 			return error('Variable ${function_name} is not a function')
 		}
 	} else {
-
-
 		// Try as named function
 		function_type = a.type_table.get_function_type(function_name) or {
 			a.error('Unknown function: ${function_name}', node.position)
@@ -2262,17 +2446,17 @@ fn (a Analyzer) unify_types(t1 ast.Type, t2 ast.Type) ast.Type {
 
 		// If one element type is 'any' and the other is specific, use the specific one
 		if elem1.name == 'any' && elem2.name != 'any' {
-			return t2  // Return list with specific element type
+			return t2 // Return list with specific element type
 		}
 		if elem2.name == 'any' && elem1.name != 'any' {
-			return t1  // Return list with specific element type
+			return t1 // Return list with specific element type
 		}
 
 		// If both have specific element types, unify them
 		if elem1.name != 'any' && elem2.name != 'any' {
 			unified_elem := a.unify_types(elem1, elem2)
 			return ast.Type{
-				name: 'list'
+				name:   'list'
 				params: [unified_elem]
 			}
 		}
@@ -2288,7 +2472,8 @@ fn (a Analyzer) unify_types(t1 ast.Type, t2 ast.Type) ast.Type {
 
 	// Special case: if we have string and integer, create a union type
 	// This is common in pattern matching functions
-	if (t1.name == 'string' && t2.name == 'integer') || (t1.name == 'integer' && t2.name == 'string') {
+	if (t1.name == 'string' && t2.name == 'integer')
+		|| (t1.name == 'integer' && t2.name == 'string') {
 		return ast.Type{
 			name:   'union'
 			params: [t1, t2]
@@ -2356,7 +2541,7 @@ fn (a Analyzer) unify_types(t1 ast.Type, t2 ast.Type) ast.Type {
 fn (mut a Analyzer) analyze_function_parameter(node ast.Node) !ast.Node {
 	// Function parameters are just identifiers, no special analysis needed
 	param_type := ast.Type{
-		name: 'unknown'
+		name:   'unknown'
 		params: []
 	}
 	a.type_table.assign_type(node.id, param_type)
@@ -2374,35 +2559,41 @@ fn (mut a Analyzer) analyze_lambda_expression(node ast.Node) !ast.Node {
 	defer { a.exit_scope() }
 
 	// Analyze parameters
-	params := node.children[0..node.children.len-1]
+	params := node.children[0..node.children.len - 1]
 	mut param_types := []ast.Type{}
 	for param in params {
 		_ := a.analyze_node(param)!
 		param_type := a.type_table.get_type(param.id) or {
-			ast.Type{name: 'unknown', params: []}
+			ast.Type{
+				name:   'unknown'
+				params: []
+			}
 		}
 		param_types << param_type
 
 		// Bind parameter in environment
-		        scheme := TypeScheme{
-            quantified_vars: []
-            body: param_type
-        }
+		scheme := TypeScheme{
+			quantified_vars: []
+			body:            param_type
+		}
 		a.bind(param.value, scheme)
 	}
 
 	// Analyze body
-	body := node.children[node.children.len-1]
+	body := node.children[node.children.len - 1]
 	analyzed_body := a.analyze_node(body)!
 	body_type := a.type_table.get_type(body.id) or {
-		ast.Type{name: 'unknown', params: []}
+		ast.Type{
+			name:   'unknown'
+			params: []
+		}
 	}
 
 	// Lambda type is function type: (param_types...) -> body_type
 	mut all_params := param_types.clone()
 	all_params << body_type
 	lambda_type := ast.Type{
-		name: 'function'
+		name:   'function'
 		params: all_params
 	}
 	a.type_table.assign_type(node.id, lambda_type)
@@ -2429,7 +2620,10 @@ fn (mut a Analyzer) analyze_case_expression(node ast.Node) !ast.Node {
 	expr := node.children[0]
 	analyzed_expr := a.analyze_node(expr)!
 	expr_type := a.type_table.get_type(expr.id) or {
-		ast.Type{name: 'unknown', params: []}
+		ast.Type{
+			name:   'unknown'
+			params: []
+		}
 	}
 
 	// Analyze all clauses
@@ -2442,14 +2636,24 @@ fn (mut a Analyzer) analyze_case_expression(node ast.Node) !ast.Node {
 		analyzed_clauses << analyzed_clause
 
 		clause_type := a.type_table.get_type(clause.id) or {
-			ast.Type{name: 'unknown', params: []}
+			ast.Type{
+				name:   'unknown'
+				params: []
+			}
 		}
 		result_types << clause_type
 	}
 
 	// Unify all clause result types
-	mut case_type := if result_types.len > 0 { result_types[0] } else { ast.Type{name: 'any', params: []} }
-	for i in 1..result_types.len {
+	mut case_type := if result_types.len > 0 {
+		result_types[0]
+	} else {
+		ast.Type{
+			name:   'any'
+			params: []
+		}
+	}
+	for i in 1 .. result_types.len {
 		case_type = a.unify_types(case_type, result_types[i])
 	}
 
@@ -2466,7 +2670,7 @@ fn (mut a Analyzer) analyze_case_expression(node ast.Node) !ast.Node {
 }
 
 fn (mut a Analyzer) analyze_case_clause(node ast.Node) !ast.Node {
-	return a.analyze_case_clause_with_type(node, ast.Type{name: 'unknown', params: []})
+	return a.analyze_case_clause_with_type(node, ast.Type{ name: 'unknown', params: [] })
 }
 
 fn (mut a Analyzer) analyze_case_clause_with_type(node ast.Node, match_type ast.Type) !ast.Node {
@@ -2487,7 +2691,10 @@ fn (mut a Analyzer) analyze_case_clause_with_type(node ast.Node, match_type ast.
 	body := node.children[1]
 	analyzed_body := a.analyze_node(body)!
 	body_type := a.type_table.get_type(body.id) or {
-		ast.Type{name: 'unknown', params: []}
+		ast.Type{
+			name:   'unknown'
+			params: []
+		}
 	}
 
 	a.type_table.assign_type(node.id, body_type)
@@ -2507,7 +2714,10 @@ fn (mut a Analyzer) analyze_pattern_match(node ast.Node) !ast.Node {
 	pattern := node.children[0]
 	analyzed_pattern := a.analyze_node(pattern)!
 	pattern_type := a.type_table.get_type(pattern.id) or {
-		ast.Type{name: 'unknown', params: []}
+		ast.Type{
+			name:   'unknown'
+			params: []
+		}
 	}
 
 	a.type_table.assign_type(node.id, pattern_type)
@@ -2523,16 +2733,19 @@ fn (mut a Analyzer) analyze_pattern_with_type(node ast.Node, expected_type ast.T
 		.identifier, .variable_ref {
 			// Variable pattern - bind to environment
 			scheme := TypeScheme{
-                quantified_vars: []
-                body: expected_type
-            }
+				quantified_vars: []
+				body:            expected_type
+			}
 			a.bind(node.value, scheme)
 			a.type_table.assign_type(node.id, expected_type)
 			return node
 		}
 		.list_literal {
 			// List pattern - elements should match list element type
-			mut element_type := ast.Type{name: 'any', params: []}
+			mut element_type := ast.Type{
+				name:   'any'
+				params: []
+			}
 			if expected_type.name == 'list' && expected_type.params.len > 0 {
 				element_type = expected_type.params[0]
 			}
@@ -2551,7 +2764,10 @@ fn (mut a Analyzer) analyze_pattern_with_type(node ast.Node, expected_type ast.T
 		}
 		.list_cons {
 			// List cons pattern [head | tail]
-			mut element_type := ast.Type{name: 'any', params: []}
+			mut element_type := ast.Type{
+				name:   'any'
+				params: []
+			}
 			if expected_type.name == 'list' && expected_type.params.len > 0 {
 				element_type = expected_type.params[0]
 			}
@@ -2585,7 +2801,10 @@ fn (mut a Analyzer) analyze_pattern_binding(node ast.Node) !ast.Node {
 	expr := node.children[1]
 	analyzed_expr := a.analyze_node(expr)!
 	expr_type := a.type_table.get_type(expr.id) or {
-		ast.Type{name: 'unknown', params: []}
+		ast.Type{
+			name:   'unknown'
+			params: []
+		}
 	}
 
 	// Analyze pattern with expression type
@@ -2612,13 +2831,16 @@ fn (mut a Analyzer) analyze_type_alias(node ast.Node) !ast.Node {
 
 	// Register type alias in environment
 	alias_type := a.type_table.get_type(type_def.id) or {
-		ast.Type{name: type_def.value, params: []}
+		ast.Type{
+			name:   type_def.value
+			params: []
+		}
 	}
 
-	    scheme := TypeScheme{
-        quantified_vars: []
-        body: alias_type
-    }
+	scheme := TypeScheme{
+		quantified_vars: []
+		body:            alias_type
+	}
 	a.bind(node.value, scheme)
 
 	a.type_table.assign_type(node.id, alias_type)
@@ -2639,7 +2861,10 @@ fn (mut a Analyzer) analyze_type_annotation(node ast.Node) !ast.Node {
 	analyzed_type_node := a.analyze_node(type_node)!
 
 	type_info := a.type_table.get_type(type_node.id) or {
-		ast.Type{name: type_node.value, params: []}
+		ast.Type{
+			name:   type_node.value
+			params: []
+		}
 	}
 
 	a.type_table.assign_type(node.id, type_info)
@@ -2659,18 +2884,23 @@ fn (mut a Analyzer) register_pattern_variables(pattern ast.Node) {
 	match pattern.kind {
 		.identifier, .variable_ref {
 			// Simple variable pattern - in pattern context, both identifier and variable_ref represent variable binding
-			arg_type := if pattern.children.len > 0
-				&& pattern.children[0].kind == .identifier {
+			arg_type := if pattern.children.len > 0 && pattern.children[0].kind == .identifier {
 				a.extract_type_from_annotation(pattern.children[0]) or {
-					ast.Type{name: 'any', params: []}
+					ast.Type{
+						name:   'any'
+						params: []
+					}
 				}
 			} else {
-				ast.Type{name: 'any', params: []}
+				ast.Type{
+					name:   'any'
+					params: []
+				}
 			}
 
 			a.bind(pattern.value, TypeScheme{
 				quantified_vars: []
-				body: arg_type
+				body:            arg_type
 			})
 		}
 		.list_cons {
@@ -2681,35 +2911,51 @@ fn (mut a Analyzer) register_pattern_variables(pattern ast.Node) {
 
 				// Register head variable (infer type from context or annotation)
 				if head.kind == .identifier || head.kind == .variable_ref {
-					head_type := if head.children.len > 0
-						&& head.children[0].kind == .identifier {
+					head_type := if head.children.len > 0 && head.children[0].kind == .identifier {
 						a.extract_type_from_annotation(head.children[0]) or {
-							ast.Type{name: 'any', params: []}
+							ast.Type{
+								name:   'any'
+								params: []
+							}
 						}
 					} else {
-						ast.Type{name: 'any', params: []}
+						ast.Type{
+							name:   'any'
+							params: []
+						}
 					}
 
 					a.bind(head.value, TypeScheme{
 						quantified_vars: []
-						body: head_type
+						body:            head_type
 					})
 				}
 
 				// Register tail variable (should be a list)
 				if tail.kind == .identifier || tail.kind == .variable_ref {
-					tail_type := if tail.children.len > 0
-						&& tail.children[0].kind == .identifier {
+					tail_type := if tail.children.len > 0 && tail.children[0].kind == .identifier {
 						a.extract_type_from_annotation(tail.children[0]) or {
-							ast.Type{name: 'list', params: [ast.Type{name: 'any', params: []}]}
+							ast.Type{
+								name:   'list'
+								params: [ast.Type{
+									name:   'any'
+									params: []
+								}]
+							}
 						}
 					} else {
-						ast.Type{name: 'list', params: [ast.Type{name: 'any', params: []}]}
+						ast.Type{
+							name:   'list'
+							params: [ast.Type{
+								name:   'any'
+								params: []
+							}]
+						}
 					}
 
 					a.bind(tail.value, TypeScheme{
 						quantified_vars: []
-						body: tail_type
+						body:            tail_type
 					})
 				}
 			}

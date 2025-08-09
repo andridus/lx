@@ -261,9 +261,9 @@ pub fn new_record_update(id int, record_name string, record_expr Node, field_nam
 pub fn new_function_with_params(id int, name string, params []Node, body Node, pos Position) Node {
 	// Create args block
 	args_block := Node{
-		id: -1
-		kind: .block
-		value: 'args'
+		id:       -1
+		kind:     .block
+		value:    'args'
 		children: params
 		position: pos
 	}

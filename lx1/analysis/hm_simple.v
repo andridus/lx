@@ -34,8 +34,11 @@ pub fn infer_polymorphic_type(func_name string, arg_types []ast.Type) ast.Type {
 				if list_type.name == 'list' && list_type.params.len == 1 {
 					// Create a fresh type variable for the result
 					result_type := ast.Type{
-						name: 'list'
-						params: [ast.Type{name: 'T1', params: []}]
+						name:   'list'
+						params: [ast.Type{
+							name:   'T1'
+							params: []
+						}]
 					}
 					type_function(arg_types, result_type)
 				} else {
@@ -73,8 +76,14 @@ pub fn infer_polymorphic_type(func_name string, arg_types []ast.Type) ast.Type {
 				func2 := arg_types[1]
 				if func1.name == 'function' && func2.name == 'function' {
 					// Create a new function type
-					param_type := ast.Type{name: 'T1', params: []}
-					return_type := ast.Type{name: 'T2', params: []}
+					param_type := ast.Type{
+						name:   'T1'
+						params: []
+					}
+					return_type := ast.Type{
+						name:   'T2'
+						params: []
+					}
 					type_function([param_type], return_type)
 				} else {
 					type_function(arg_types, type_integer())
@@ -147,7 +156,7 @@ pub fn unify_types(t1 ast.Type, t2 ast.Type) bool {
 		return false
 	}
 
-	for i in 0..t1.params.len {
+	for i in 0 .. t1.params.len {
 		if !unify_types(t1.params[i], t2.params[i]) {
 			return false
 		}
@@ -155,8 +164,6 @@ pub fn unify_types(t1 ast.Type, t2 ast.Type) bool {
 
 	return true
 }
-
-
 
 // Generate Erlang spec for a polymorphic type
 pub fn generate_polymorphic_spec(func_name string, typ ast.Type) string {
@@ -189,12 +196,24 @@ pub fn generate_polymorphic_spec(func_name string, typ ast.Type) string {
 
 pub fn convert_type_to_erlang(typ ast.Type) string {
 	return match typ.name {
-		'integer' { 'integer()' }
-		'float' { 'float()' }
-		'string' { 'binary()' }
-		'boolean' { 'boolean()' }
-		'atom' { 'atom()' }
-		'nil' { 'nil' }
+		'integer' {
+			'integer()'
+		}
+		'float' {
+			'float()'
+		}
+		'string' {
+			'binary()'
+		}
+		'boolean' {
+			'boolean()'
+		}
+		'atom' {
+			'atom()'
+		}
+		'nil' {
+			'nil'
+		}
 		'list' {
 			if typ.params.len == 1 {
 				'[${convert_type_to_erlang(typ.params[0])}]'

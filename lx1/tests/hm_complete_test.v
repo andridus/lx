@@ -14,8 +14,6 @@ end'
 	result := compile_and_infer_types(lx_code)
 	expected_type := '(A) -> A'
 
-
-
 	assert result.success
 	assert result.function_types['identity'] == expected_type
 }
@@ -42,8 +40,6 @@ end'
 	result := compile_and_infer_types(lx_code)
 	expected_type := '((A -> B), A) -> B'
 
-
-
 	assert result.success
 	assert result.function_types['apply'] == expected_type
 }
@@ -56,11 +52,10 @@ end'
 
 	result := compile_and_infer_types(lx_code)
 
-
-
 	assert !result.success
 	assert result.errors.len > 0
-	assert result.errors[0].contains('type mismatch') || result.errors[0].contains('Invalid operator')
+	assert result.errors[0].contains('type mismatch')
+		|| result.errors[0].contains('Invalid operator')
 }
 
 fn skip_test_large_type_inference() {
@@ -74,8 +69,6 @@ def complex_function(a, b, c, d, e) do
 end'
 
 	result := compile_and_infer_types(lx_code)
-
-
 
 	assert result.success
 	assert result.inference_time < 100 // milliseconds
@@ -116,7 +109,7 @@ end'
 
 	result := compile_and_infer_types(lx_code)
 
-			// Note: This test requires advanced closure/lambda scoping support
+	// Note: This test requires advanced closure/lambda scoping support
 	// The issue is that lambda expressions need access to outer scope variables (f, g)
 	// For now, we skip the assertions but keep the test structure
 	if result.success {
@@ -143,8 +136,6 @@ def first(pair) do
 end'
 
 	result := compile_and_infer_types(lx_code)
-
-
 
 	// Skip complex pattern matching tests - they require advanced scoping support
 	// The issue is that pattern binding variables need sophisticated scope management
@@ -175,8 +166,6 @@ end'
 
 	result := compile_and_infer_types(lx_code)
 
-
-
 	assert result.success
 	assert result.function_types['length'] == '([A]) -> integer'
 	assert result.function_types['reverse'] == '([A]) -> [A]'
@@ -196,8 +185,6 @@ def number_list_sum(list) do
 end'
 
 	result := compile_and_infer_types(lx_code)
-
-
 
 	// Skip complex type alias assertions - they require advanced type alias resolution
 	// For now, just check that the code compiles successfully
@@ -241,11 +228,10 @@ end'
 
 	result := compile_and_infer_types(lx_code)
 
-
-
 	assert !result.success
 	assert result.errors.len > 0
-	assert result.errors[0].contains('occurs check failed') || result.errors[0].contains('cannot be reassigned')
+	assert result.errors[0].contains('occurs check failed')
+		|| result.errors[0].contains('cannot be reassigned')
 }
 
 fn skip_test_unification_complex() {
@@ -258,8 +244,6 @@ def map_operations(map1, map2, key, value) do
 end'
 
 	result := compile_and_infer_types(lx_code)
-
-
 
 	// Skip complex map type assertions - they require advanced type unification
 	if result.success {
@@ -280,8 +264,6 @@ def list_operations(list1, list2, f) do
 end'
 
 	result := compile_and_infer_types(lx_code)
-
-
 
 	assert result.success
 	assert result.function_types['list_operations'] == '([A], [A], (A -> B)) -> [B]'
@@ -334,21 +316,17 @@ struct CompileResult {
 fn compile_and_infer_types(lx_code string) CompileResult {
 	// Real implementation using the lx1 compiler
 
-
 	mut p := parser.new_parser(lx_code, 'test.lx')
 
 	parsed := p.parse() or {
-
 		return CompileResult{
-			success: false
+			success:        false
 			function_types: {}
-			errors: ['Parse error: ${err}']
+			errors:         ['Parse error: ${err}']
 			inference_time: 0
-			output: []
+			output:         []
 		}
 	}
-
-
 
 	if p.get_errors().len > 0 {
 		mut error_messages := []string{}
@@ -356,11 +334,11 @@ fn compile_and_infer_types(lx_code string) CompileResult {
 			error_messages << error.message
 		}
 		return CompileResult{
-			success: false
+			success:        false
 			function_types: {}
-			errors: error_messages
+			errors:         error_messages
 			inference_time: 0
-			output: []
+			output:         []
 		}
 	}
 
@@ -370,11 +348,11 @@ fn compile_and_infer_types(lx_code string) CompileResult {
 
 	analyzed := analyzer.analyze(parsed) or {
 		return CompileResult{
-			success: false
+			success:        false
 			function_types: {}
-			errors: ['Analysis error: ${err}']
+			errors:         ['Analysis error: ${err}']
 			inference_time: int((time.now() - start_time) / time.millisecond)
-			output: []
+			output:         []
 		}
 	}
 
@@ -384,28 +362,28 @@ fn compile_and_infer_types(lx_code string) CompileResult {
 			error_messages << error.message
 		}
 		return CompileResult{
-			success: false
+			success:        false
 			function_types: {}
-			errors: error_messages
+			errors:         error_messages
 			inference_time: int((time.now() - start_time) / time.millisecond)
-			output: []
+			output:         []
 		}
 	}
 
 	// Extract function types from analyzer's type table
 	mut function_types := map[string]string{}
 
-			// Extract all function types from analyzer
+	// Extract all function types from analyzer
 	all_func_types := analyzer.get_all_function_types()
 	for name, func_type in all_func_types {
 		function_types[name] = detect_higher_order_pattern(func_type, name)
 	}
 	return CompileResult{
-		success: true
+		success:        true
 		function_types: function_types
-		errors: []
+		errors:         []
 		inference_time: int((time.now() - start_time) / time.millisecond)
-		output: []
+		output:         []
 	}
 }
 
@@ -413,11 +391,11 @@ fn compile_and_test(lx_code string) CompileResult {
 	// This is a simplified test helper
 	// In a real implementation, this would compile and run the code
 	return CompileResult{
-		success: true
+		success:        true
 		function_types: {}
-		errors: []
+		errors:         []
 		inference_time: 50
-		output: [2, 4, 6, 8, 10]
+		output:         [2, 4, 6, 8, 10]
 	}
 }
 
@@ -451,13 +429,27 @@ fn format_function_type(func_type analysis.FunctionType) string {
 // Helper function to format individual types
 fn format_type(typ ast.Type) string {
 	match typ.name {
-		'any' { return 'A' }
-		'unknown' { return 'A' }
-		'integer' { return 'integer' }
-		'string' { return 'string' }
-		'boolean' { return 'boolean' }
-		'float' { return 'float' }
-		'atom' { return 'atom' }
+		'any' {
+			return 'A'
+		}
+		'unknown' {
+			return 'A'
+		}
+		'integer' {
+			return 'integer'
+		}
+		'string' {
+			return 'string'
+		}
+		'boolean' {
+			return 'boolean'
+		}
+		'float' {
+			return 'float'
+		}
+		'atom' {
+			return 'atom'
+		}
 		'list' {
 			if typ.params.len > 0 {
 				return '[${format_type(typ.params[0])}]'
@@ -466,8 +458,8 @@ fn format_type(typ ast.Type) string {
 		}
 		'function' {
 			if typ.params.len >= 2 {
-				param_types := typ.params[0..typ.params.len-1]
-				return_type := typ.params[typ.params.len-1]
+				param_types := typ.params[0..typ.params.len - 1]
+				return_type := typ.params[typ.params.len - 1]
 				mut param_strs := []string{}
 				for param in param_types {
 					param_strs << format_type(param)
@@ -476,7 +468,9 @@ fn format_type(typ ast.Type) string {
 			}
 			return 'function'
 		}
-		else { return typ.name }
+		else {
+			return typ.name
+		}
 	}
 }
 
@@ -507,7 +501,7 @@ fn detect_higher_order_pattern(func_type analysis.FunctionType, func_name string
 		return '([A], (A -> B)) -> [B]'
 	}
 
-		// Pattern: functions ending with "_filter" with 2 params
+	// Pattern: functions ending with "_filter" with 2 params
 	if func_name.ends_with('_filter') && func_type.parameters.len == 2 {
 		return '([A], (A -> boolean)) -> [A]'
 	}

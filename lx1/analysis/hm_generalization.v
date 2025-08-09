@@ -8,7 +8,7 @@ pub fn generalize(type_info ast.Type, env TypeEnv) TypeScheme {
 
 	return TypeScheme{
 		quantified_vars: free_vars
-		body: type_info
+		body:            type_info
 	}
 }
 
@@ -37,7 +37,7 @@ fn collect_free_variables(typ ast.Type, bound_vars []string, mut free_vars []Typ
 			}
 			// Add to free variables
 			free_vars << TypeVar{
-				id: 0 // Will be set properly later
+				id:   0 // Will be set properly later
 				name: typ.name
 			}
 		}

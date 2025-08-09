@@ -27,8 +27,8 @@ pub fn apply_substitution_to_constraints(constraints []Constraint, substitution 
 
 	for constraint in constraints {
 		result << Constraint{
-			left: substitute_in_type(constraint.left, substitution)
-			right: substitute_in_type(constraint.right, substitution)
+			left:     substitute_in_type(constraint.left, substitution)
+			right:    substitute_in_type(constraint.right, substitution)
 			position: constraint.position
 		}
 	}
@@ -39,7 +39,7 @@ pub fn apply_substitution_to_constraints(constraints []Constraint, substitution 
 pub fn apply_substitution_to_type_env(env TypeEnv, substitution Substitution) TypeEnv {
 	mut new_env := TypeEnv{
 		scope_name: env.scope_name
-		bindings: map[string]TypeScheme{}
+		bindings:   map[string]TypeScheme{}
 	}
 
 	for name, scheme in env.bindings {
@@ -109,7 +109,7 @@ pub fn substitute_in_type(typ ast.Type, substitution Substitution) ast.Type {
 	}
 
 	return ast.Type{
-		name: typ.name
+		name:   typ.name
 		params: new_params
 	}
 }
@@ -120,7 +120,7 @@ pub fn substitute_in_type_scheme(scheme TypeScheme, substitution Substitution) T
 		mappings: map[string]ast.Type{}
 	}
 
-		for key, value in substitution.mappings {
+	for key, value in substitution.mappings {
 		// Only include if the variable is not quantified
 		mut is_quantified := false
 		for var in scheme.quantified_vars {
@@ -139,7 +139,7 @@ pub fn substitute_in_type_scheme(scheme TypeScheme, substitution Substitution) T
 
 	return TypeScheme{
 		quantified_vars: scheme.quantified_vars
-		body: new_body
+		body:            new_body
 	}
 }
 

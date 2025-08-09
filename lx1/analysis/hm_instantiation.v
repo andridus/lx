@@ -13,7 +13,7 @@ pub fn instantiate(type_scheme TypeScheme, var_counter int) (ast.Type, int) {
 		fresh_var := new_type_var(counter)
 		counter++
 		substitution.mappings[var.name] = ast.Type{
-			name: fresh_var.name
+			name:   fresh_var.name
 			params: []
 		}
 	}
@@ -39,7 +39,7 @@ pub fn instantiate_partial(type_scheme TypeScheme, partial_substitution Substitu
 			fresh_var := new_type_var(counter)
 			counter++
 			full_substitution.mappings[var.name] = ast.Type{
-				name: fresh_var.name
+				name:   fresh_var.name
 				params: []
 			}
 		}
@@ -58,7 +58,7 @@ pub fn instantiate_function_type(param_types []ast.Type, return_type ast.Type, v
 			fresh_var := new_type_var(counter)
 			counter++
 			fresh_param_types << ast.Type{
-				name: fresh_var.name
+				name:   fresh_var.name
 				params: []
 			}
 		} else {
@@ -71,7 +71,7 @@ pub fn instantiate_function_type(param_types []ast.Type, return_type ast.Type, v
 		fresh_var := new_type_var(counter)
 		counter++
 		fresh_return_type = ast.Type{
-			name: fresh_var.name
+			name:   fresh_var.name
 			params: []
 		}
 	}
@@ -85,16 +85,16 @@ pub fn instantiate_list_type(element_type ast.Type, var_counter int) (ast.Type, 
 		fresh_var := new_type_var(counter)
 		counter++
 		return ast.Type{
-			name: 'list'
+			name:   'list'
 			params: [ast.Type{
-				name: fresh_var.name
+				name:   fresh_var.name
 				params: []
 			}]
 		}, counter
 	}
 
 	return ast.Type{
-		name: 'list'
+		name:   'list'
 		params: [element_type]
 	}, counter
 }
@@ -108,7 +108,7 @@ pub fn instantiate_map_type(key_type ast.Type, value_type ast.Type, var_counter 
 		fresh_var := new_type_var(counter)
 		counter++
 		fresh_key_type = ast.Type{
-			name: fresh_var.name
+			name:   fresh_var.name
 			params: []
 		}
 	}
@@ -117,13 +117,13 @@ pub fn instantiate_map_type(key_type ast.Type, value_type ast.Type, var_counter 
 		fresh_var := new_type_var(counter)
 		counter++
 		fresh_value_type = ast.Type{
-			name: fresh_var.name
+			name:   fresh_var.name
 			params: []
 		}
 	}
 
 	return ast.Type{
-		name: 'map'
+		name:   'map'
 		params: [fresh_key_type, fresh_value_type]
 	}, counter
 }
@@ -137,7 +137,7 @@ pub fn instantiate_tuple_type(element_types []ast.Type, var_counter int) (ast.Ty
 			fresh_var := new_type_var(counter)
 			counter++
 			fresh_element_types << ast.Type{
-				name: fresh_var.name
+				name:   fresh_var.name
 				params: []
 			}
 		} else {
@@ -146,7 +146,7 @@ pub fn instantiate_tuple_type(element_types []ast.Type, var_counter int) (ast.Ty
 	}
 
 	return ast.Type{
-		name: 'tuple'
+		name:   'tuple'
 		params: fresh_element_types
 	}, counter
 }
@@ -155,11 +155,11 @@ pub fn create_fresh_type_variables(count int, var_counter int) ([]ast.Type, int)
 	mut fresh_vars := []ast.Type{}
 	mut counter := var_counter
 
-	for _ in 0..count {
+	for _ in 0 .. count {
 		fresh_var := new_type_var(counter)
 		counter++
 		fresh_vars << ast.Type{
-			name: fresh_var.name
+			name:   fresh_var.name
 			params: []
 		}
 	}

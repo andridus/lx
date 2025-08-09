@@ -32,13 +32,17 @@ fn (mut u Unifier) unify_types(t1 ast.Type, t2 ast.Type, pos ast.Position) !Subs
 	if t1.name == t2.name {
 		if t1.params.len == 0 {
 			// Both are ground types with no parameters
-			return Substitution{mappings: map[string]ast.Type{}}
+			return Substitution{
+				mappings: map[string]ast.Type{}
+			}
 		}
 
 		if t1.params.len == t2.params.len {
 			// Unify parameters
-			mut result := Substitution{mappings: map[string]ast.Type{}}
-			for i in 0..t1.params.len {
+			mut result := Substitution{
+				mappings: map[string]ast.Type{}
+			}
+			for i in 0 .. t1.params.len {
 				param_substitution := u.unify_types(t1.params[i], t2.params[i], pos)!
 				result = compose_substitutions(result, param_substitution)
 			}
@@ -129,10 +133,12 @@ fn (mut u Unifier) unify_tuple_types(t1 ast.Type, t2 ast.Type, pos ast.Position)
 		return error('Tuple type mismatch')
 	}
 
-	mut result := Substitution{mappings: map[string]ast.Type{}}
+	mut result := Substitution{
+		mappings: map[string]ast.Type{}
+	}
 
 	// Unify each element
-	for i in 0..t1.params.len {
+	for i in 0 .. t1.params.len {
 		element_substitution := u.unify_types(t1.params[i], t2.params[i], pos)!
 		result = compose_substitutions(result, element_substitution)
 	}
@@ -142,7 +148,8 @@ fn (mut u Unifier) unify_tuple_types(t1 ast.Type, t2 ast.Type, pos ast.Position)
 
 fn (mut u Unifier) unify_function_types(t1 ast.Type, t2 ast.Type, pos ast.Position) !Substitution {
 	if t1.params.len < 1 || t2.params.len < 1 {
-		u.error('Invalid function type: expected at least 1 parameter (return type)', pos)
+		u.error('Invalid function type: expected at least 1 parameter (return type)',
+			pos)
 		return error('Invalid function type')
 	}
 
@@ -154,10 +161,12 @@ fn (mut u Unifier) unify_function_types(t1 ast.Type, t2 ast.Type, pos ast.Positi
 		return error('Function type mismatch')
 	}
 
-	mut result := Substitution{mappings: map[string]ast.Type{}}
+	mut result := Substitution{
+		mappings: map[string]ast.Type{}
+	}
 
 	// Unify all parameters (including return type)
-	for i in 0..t1.params.len {
+	for i in 0 .. t1.params.len {
 		param_substitution := u.unify_types(t1.params[i], t2.params[i], pos)!
 		result = compose_substitutions(result, param_substitution)
 	}
@@ -191,10 +200,6 @@ pub fn unify_ground_types(t1 ast.Type, t2 ast.Type) bool {
 	return t1.name == t2.name && t1.params.len == t2.params.len
 }
 
-
-
-
-
 // Unification with occurs check
 pub fn unify_with_occurs_check(t1 ast.Type, t2 ast.Type) !Substitution {
 	mut unifier := new_unifier()
@@ -205,7 +210,7 @@ pub fn unify_with_occurs_check(t1 ast.Type, t2 ast.Type) !Substitution {
 pub fn unify_polymorphic_types(t1 ast.Type, t2 ast.Type, quantified_vars []string) !Substitution {
 	mut unifier := new_unifier()
 
-		// Apply unification
+	// Apply unification
 	mut result := unifier.unify(t1, t2, ast.Position{})!
 
 	// Remove substitutions for quantified variables

@@ -1122,7 +1122,7 @@ fn (mut g ErlangGenerator) generate_lambda_expression(node ast.Node) ! {
 	g.output.write_string('fun(')
 
 	// Generate parameters
-	params := node.children[0..node.children.len-1]
+	params := node.children[0..node.children.len - 1]
 	for i, param in params {
 		g.generate_node(param)!
 		if i < params.len - 1 {
@@ -1133,7 +1133,7 @@ fn (mut g ErlangGenerator) generate_lambda_expression(node ast.Node) ! {
 	g.output.write_string(') ->\n        ')
 
 	// Generate body
-	body := node.children[node.children.len-1]
+	body := node.children[node.children.len - 1]
 	g.generate_node(body)!
 
 	g.output.write_string('\n    end')
