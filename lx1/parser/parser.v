@@ -78,12 +78,15 @@ fn (mut p Parser) parse_module() !ast.Node {
 		if p.current.type_ == .record {
 			record := p.parse_record_definition()!
 			records << record
+		} else if p.current.type_ == .type {
+			type_alias := p.parse_type_alias()!
+			records << type_alias
 		} else if p.current.type_ == .def {
 			func := p.parse_function()!
 			functions << func
 		} else {
-			p.error('Expected "def" or "record", got "${p.current.value}"')
-			return error('Expected def or record')
+			p.error('Expected "def", "record", or "type", got "${p.current.value}"')
+			return error('Expected def, record, or type')
 		}
 	}
 
@@ -176,10 +179,10 @@ fn (mut p Parser) parse_function() !ast.Node {
 		p.advance() // Skip ')'
 	}
 
-	mut return_type_annotation := ast.Node{}
+	// Skip return type annotation for now
 	if p.current.type_ == .double_colon {
 		p.advance() // Skip ::
-		return_type_annotation = p.parse_type_annotation()!
+		p.parse_type_annotation()! // Parse but ignore for now
 	}
 
 	if p.current.type_ != .do {
@@ -222,22 +225,7 @@ fn (mut p Parser) parse_function() !ast.Node {
 	}
 	p.advance()
 
-	mut children := []ast.Node{}
-	children << ast.new_block(p.get_next_id(), args, start_pos) // args block
-	children << body // function body
-
-	// Add return type annotation if present
-	if return_type_annotation.value != '' {
-		children << return_type_annotation
-	}
-
-	return ast.Node{
-		id:       func_id
-		kind:     .function
-		value:    func_name
-		children: children
-		position: start_pos
-	}
+	return ast.new_function_with_params(func_id, func_name, args, body, start_pos)
 }
 
 fn (mut p Parser) parse_arg() !ast.Node {
@@ -250,19 +238,21 @@ fn (mut p Parser) parse_arg() !ast.Node {
 	p.advance()
 
 	// Parse type annotation
-	mut type_annotation := ast.Node{}
 	if p.current.type_ == .double_colon {
 		p.advance() // Skip ::
-		type_annotation = p.parse_type_annotation()!
+		type_annotation := p.parse_type_annotation()!
+
+		// Create parameter with type annotation
+		return ast.Node{
+			id: p.get_next_id()
+			kind: .function_parameter
+			value: arg_name
+			children: [type_annotation]
+			position: pos
+		}
 	}
 
-	return ast.Node{
-		id:       p.get_next_id()
-		kind:     .identifier
-		value:    arg_name
-		children: if type_annotation.value != '' { [type_annotation] } else { [] }
-		position: pos
-	}
+	return ast.new_function_parameter(p.get_next_id(), arg_name, pos)
 }
 
 fn (mut p Parser) parse_type_annotation() !ast.Node {
@@ -673,6 +663,8 @@ fn (mut p Parser) parse_prefix_expression() !ast.Node {
 		.lbracket { p.parse_list_expression() }
 		.lbrace { p.parse_tuple_expression() }
 		.percent { p.parse_map_literal() }
+		.case { p.parse_case_expression() }
+		.fn { p.parse_lambda_expression() }
 		else { error('Unexpected token: ${p.current.type_}') }
 	}
 }
@@ -917,6 +909,16 @@ fn (mut p Parser) parse_list_expression() !ast.Node {
 		}
 		p.advance() // Skip ']'
 
+		// Check if this is a pattern binding (cons pattern followed by =)
+		if p.current.type_ == .bind {
+			p.advance() // Skip '='
+			expr := p.parse_expression()!
+
+			// Create the pattern node from the cons
+			pattern := ast.new_list_cons(p.get_next_id(), first_element, tail, pos)
+			return ast.new_pattern_binding(p.get_next_id(), pattern, expr, pos)
+		}
+
 		return ast.new_list_cons(p.get_next_id(), first_element, tail, pos)
 	}
 
@@ -945,6 +947,16 @@ fn (mut p Parser) parse_list_expression() !ast.Node {
 		return error('Expected closing bracket')
 	}
 	p.advance() // Skip ']'
+
+	// Check if this is a pattern binding (list pattern followed by =)
+	if p.current.type_ == .bind {
+		p.advance() // Skip '='
+		expr := p.parse_expression()!
+
+		// Create the pattern node from the list
+		pattern := ast.new_list_literal(p.get_next_id(), elements, pos)
+		return ast.new_pattern_binding(p.get_next_id(), pattern, expr, pos)
+	}
 
 	return ast.new_list_literal(p.get_next_id(), elements, pos)
 }
@@ -992,6 +1004,16 @@ fn (mut p Parser) parse_tuple_expression() !ast.Node {
 		return error('Expected closing brace')
 	}
 	p.advance() // Skip '}'
+
+	// Check if this is a pattern binding (tuple pattern followed by =)
+	if p.current.type_ == .bind {
+		p.advance() // Skip '='
+		expr := p.parse_expression()!
+
+		// Create the pattern node from the tuple
+		pattern := ast.new_tuple_literal(p.get_next_id(), elements, pos)
+		return ast.new_pattern_binding(p.get_next_id(), pattern, expr, pos)
+	}
 
 	return ast.new_tuple_literal(p.get_next_id(), elements, pos)
 }
@@ -1477,4 +1499,259 @@ fn (mut p Parser) parse_record_update_with_name() !ast.Node {
 	first_field := field_updates[0]
 	return ast.new_record_update(p.get_next_id(), record_name, record_expr, first_field.value,
 		first_field.children[0], pos)
+}
+
+// New parsing functions for additional functionality
+
+fn (mut p Parser) parse_type_alias() !ast.Node {
+	if p.current.type_ != .type {
+		return p.error_and_return('Expected "type" keyword')
+	}
+	start_pos := p.current.position
+	p.advance() // Skip 'type'
+
+	if p.current.type_ != .identifier {
+		return p.error_and_return('Expected type alias name')
+	}
+	type_name := p.current.value
+	p.advance()
+
+	if p.current.type_ != .bind {
+		return p.error_and_return('Expected "=" after type alias name')
+	}
+	p.advance() // Skip '='
+
+	type_def := p.parse_type_expression()!
+
+	return ast.new_type_alias(p.get_next_id(), type_name, type_def, start_pos)
+}
+
+fn (mut p Parser) parse_type_expression() !ast.Node {
+	pos := p.current.position
+
+	if p.current.type_ != .identifier {
+		return p.error_and_return('Expected type name')
+	}
+
+	type_name := p.current.value
+	p.advance()
+
+	// Handle parameterized types like list(integer)
+	if p.current.type_ == .lparen {
+		p.advance() // Skip '('
+		mut params := []ast.Node{}
+
+		if p.current.type_ != .rparen {
+			for {
+				param := p.parse_type_expression()!
+				params << param
+
+				if p.current.type_ == .rparen {
+					break
+				}
+				if p.current.type_ != .comma {
+					return p.error_and_return('Expected comma or closing parenthesis in type parameters')
+				}
+				p.advance() // Skip comma
+			}
+		}
+
+		if p.current.type_ != .rparen {
+			return p.error_and_return('Expected closing parenthesis in type expression')
+		}
+		p.advance() // Skip ')'
+
+		return ast.Node{
+			id: p.get_next_id()
+			kind: .identifier
+			value: type_name
+			children: params
+			position: pos
+		}
+	}
+
+	return ast.new_identifier(p.get_next_id(), type_name, pos)
+}
+
+fn (mut p Parser) parse_case_expression() !ast.Node {
+	if p.current.type_ != .case {
+		return p.error_and_return('Expected "case" keyword')
+	}
+	start_pos := p.current.position
+	p.advance() // Skip 'case'
+
+	expr := p.parse_expression()!
+
+	if p.current.type_ != .do {
+		return p.error_and_return('Expected "do" after case expression')
+	}
+	p.advance() // Skip 'do'
+
+	// Skip newlines
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+
+	mut clauses := []ast.Node{}
+	for p.current.type_ != .end && p.current.type_ != .eof {
+		if p.current.type_ == .newline {
+			p.advance()
+			continue
+		}
+
+		clause := p.parse_case_clause()!
+		clauses << clause
+	}
+
+	if p.current.type_ != .end {
+		return p.error_and_return('Expected "end" to close case expression')
+	}
+	p.advance() // Skip 'end'
+
+	return ast.new_case_expression(p.get_next_id(), expr, clauses, start_pos)
+}
+
+fn (mut p Parser) parse_case_clause() !ast.Node {
+	start_pos := p.current.position
+
+	// Parse pattern
+	pattern := p.parse_pattern()!
+
+	if p.current.type_ != .arrow {
+		return p.error_and_return('Expected "->" after case pattern')
+	}
+	p.advance() // Skip '->'
+
+	body := p.parse_expression()!
+
+	return ast.new_case_clause(p.get_next_id(), pattern, body, start_pos)
+}
+
+fn (mut p Parser) parse_pattern() !ast.Node {
+	pos := p.current.position
+
+	match p.current.type_ {
+		.lbracket {
+			// List pattern: [] or [head | tail]
+			return p.parse_list_pattern()
+		}
+		.identifier {
+			// Variable pattern or atom
+			name := p.current.value
+			p.advance()
+			return ast.new_identifier(p.get_next_id(), name, pos)
+		}
+		.integer, .float, .string, .true_, .false_, .nil_, .atom {
+			// Literal patterns
+			return p.parse_literal()
+		}
+		else {
+			return p.error_and_return('Invalid pattern')
+		}
+	}
+}
+
+fn (mut p Parser) parse_list_pattern() !ast.Node {
+	pos := p.current.position
+	p.advance() // Skip '['
+
+	if p.current.type_ == .rbracket {
+		p.advance() // Skip ']'
+		return ast.new_list_literal(p.get_next_id(), [], pos)
+	}
+
+	first_element := p.parse_pattern()!
+
+	if p.current.type_ == .pipe {
+		// List cons pattern: [head | tail]
+		p.advance() // Skip '|'
+		tail := p.parse_pattern()!
+
+		if p.current.type_ != .rbracket {
+			return p.error_and_return('Expected "]" after list cons pattern')
+		}
+		p.advance() // Skip ']'
+
+		return ast.new_list_cons(p.get_next_id(), first_element, tail, pos)
+	}
+
+	// Regular list pattern: [elem1, elem2, ...]
+	mut elements := [first_element]
+
+	for p.current.type_ == .comma {
+		p.advance() // Skip ','
+		element := p.parse_pattern()!
+		elements << element
+	}
+
+	if p.current.type_ != .rbracket {
+		return p.error_and_return('Expected "]" to close list pattern')
+	}
+	p.advance() // Skip ']'
+
+	return ast.new_list_literal(p.get_next_id(), elements, pos)
+}
+
+fn (mut p Parser) parse_lambda_expression() !ast.Node {
+	if p.current.type_ != .fn {
+		return p.error_and_return('Expected "fn" keyword')
+	}
+	start_pos := p.current.position
+	p.advance() // Skip 'fn'
+
+	if p.current.type_ != .lparen {
+		return p.error_and_return('Expected "(" after fn')
+	}
+	p.advance() // Skip '('
+
+	mut params := []ast.Node{}
+	if p.current.type_ != .rparen {
+		for {
+			if p.current.type_ != .identifier {
+				return p.error_and_return('Expected parameter name in lambda')
+			}
+			param_name := p.current.value
+			param_pos := p.current.position
+			p.advance()
+
+			params << ast.new_function_parameter(p.get_next_id(), param_name, param_pos)
+
+			if p.current.type_ == .rparen {
+				break
+			}
+			if p.current.type_ != .comma {
+				return p.error_and_return('Expected comma or closing parenthesis in lambda parameters')
+			}
+			p.advance() // Skip comma
+		}
+	}
+
+	if p.current.type_ != .rparen {
+		return p.error_and_return('Expected closing parenthesis in lambda parameters')
+	}
+	p.advance() // Skip ')'
+
+	if p.current.type_ == .arrow {
+		p.advance() // Skip '->'
+		body := p.parse_expression()!
+		return ast.new_lambda_expression(p.get_next_id(), params, body, start_pos)
+	} else if p.current.type_ == .do {
+		p.advance() // Skip 'do'
+
+		// Skip newlines
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+
+		body := p.parse_block()!
+
+		if p.current.type_ != .end {
+			return p.error_and_return('Expected "end" to close lambda body')
+		}
+		p.advance() // Skip 'end'
+
+		return ast.new_lambda_expression(p.get_next_id(), params, body, start_pos)
+	} else {
+		return p.error_and_return('Expected "->" or "do" after lambda parameters')
+	}
 }

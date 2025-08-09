@@ -1,7 +1,5 @@
 module analysis
 
-import ast
-
 @[heap]
 pub struct TypeEnv {
 	scope_name string

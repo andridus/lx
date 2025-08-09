@@ -29,7 +29,7 @@ pub fn infer_polymorphic_type(func_name string, arg_types []ast.Type) ast.Type {
 		'map' {
 			if arg_types.len == 2 {
 				// map: ((A -> B), [A]) -> [B]
-				func_type := arg_types[0]
+				// func_type := arg_types[0]
 				list_type := arg_types[1]
 				if list_type.name == 'list' && list_type.params.len == 1 {
 					// Create a fresh type variable for the result

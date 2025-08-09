@@ -1,3 +1,3 @@
-def answer() do
-  _
+def concat_mixed() do
+[1, 2, 3] ++ ["hello", :ok] ++ [3.14, true]
 end

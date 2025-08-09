@@ -117,6 +117,34 @@ fn (mut g ErlangGenerator) generate_node(node ast.Node) ! {
 		.record_update {
 			g.generate_record_update(node)!
 		}
+		.function_parameter {
+			g.generate_function_parameter(node)!
+		}
+		.lambda_expression {
+			g.generate_lambda_expression(node)!
+		}
+		.case_expression {
+			g.generate_case_expression(node)!
+		}
+		.case_clause {
+			g.generate_case_clause(node)!
+		}
+		.pattern_match {
+			g.generate_pattern_match(node)!
+		}
+		.pattern_binding {
+			g.generate_pattern_binding(node)!
+		}
+		.type_alias {
+			g.generate_type_alias(node)!
+		}
+		.type_annotation {
+			g.generate_type_annotation(node)!
+		}
+		// Skip directive_call nodes (they are filtered out during analysis)
+		.directive_call {
+			// Do nothing - directives are not generated in output
+		}
 		else {
 			return error('Unsupported node type: ${node.kind}')
 		}
@@ -1076,4 +1104,141 @@ fn (g ErlangGenerator) needs_parentheses(node ast.Node) bool {
 			return true
 		}
 	}
+}
+
+// New generation functions for additional functionality
+
+fn (mut g ErlangGenerator) generate_function_parameter(node ast.Node) ! {
+	// Function parameters are just identifiers, generate as variable name
+	unique_name := g.get_unique_var_name(node.value)
+	g.output.write_string(unique_name)
+}
+
+fn (mut g ErlangGenerator) generate_lambda_expression(node ast.Node) ! {
+	if node.children.len < 2 {
+		return error('Lambda expression must have parameters and body')
+	}
+
+	g.output.write_string('fun(')
+
+	// Generate parameters
+	params := node.children[0..node.children.len-1]
+	for i, param in params {
+		g.generate_node(param)!
+		if i < params.len - 1 {
+			g.output.write_string(', ')
+		}
+	}
+
+	g.output.write_string(') ->\n        ')
+
+	// Generate body
+	body := node.children[node.children.len-1]
+	g.generate_node(body)!
+
+	g.output.write_string('\n    end')
+}
+
+fn (mut g ErlangGenerator) generate_case_expression(node ast.Node) ! {
+	if node.children.len < 2 {
+		return error('Case expression must have expression and clauses')
+	}
+
+	g.output.write_string('case ')
+
+	// Generate expression to match
+	expr := node.children[0]
+	g.generate_node(expr)!
+
+	g.output.write_string(' of\n')
+
+	// Generate clauses
+	clauses := node.children[1..]
+	for clause in clauses {
+		g.output.write_string('        ')
+		g.generate_node(clause)!
+		g.output.write_string('\n')
+	}
+
+	g.output.write_string('    end')
+}
+
+fn (mut g ErlangGenerator) generate_case_clause(node ast.Node) ! {
+	if node.children.len != 2 {
+		return error('Case clause must have pattern and body')
+	}
+
+	pattern := node.children[0]
+	body := node.children[1]
+
+	// Generate pattern
+	g.generate_pattern(pattern)!
+	g.output.write_string(' ->\n            ')
+
+	// Generate body
+	g.generate_node(body)!
+	g.output.write_string(';')
+}
+
+fn (mut g ErlangGenerator) generate_pattern(node ast.Node) ! {
+	match node.kind {
+		.identifier {
+			// Variable pattern
+			unique_name := g.get_unique_var_name(node.value)
+			g.output.write_string(unique_name)
+		}
+		.list_literal {
+			// List pattern
+			g.output.write_string('[')
+			for i, child in node.children {
+				g.generate_pattern(child)!
+				if i < node.children.len - 1 {
+					g.output.write_string(', ')
+				}
+			}
+			g.output.write_string(']')
+		}
+		.list_cons {
+			// List cons pattern [head | tail]
+			if node.children.len == 2 {
+				g.output.write_string('[')
+				g.generate_pattern(node.children[0])!
+				g.output.write_string(' | ')
+				g.generate_pattern(node.children[1])!
+				g.output.write_string(']')
+			}
+		}
+		else {
+			// Literal patterns
+			g.generate_node(node)!
+		}
+	}
+}
+
+fn (mut g ErlangGenerator) generate_pattern_match(node ast.Node) ! {
+	if node.children.len == 1 {
+		g.generate_pattern(node.children[0])!
+	}
+}
+
+fn (mut g ErlangGenerator) generate_pattern_binding(node ast.Node) ! {
+	if node.children.len == 2 {
+		pattern := node.children[0]
+		expr := node.children[1]
+
+		// Generate pattern binding: Pattern = Expression
+		g.generate_pattern(pattern)!
+		g.output.write_string(' = ')
+		g.generate_node(expr)!
+	}
+}
+
+fn (mut g ErlangGenerator) generate_type_alias(node ast.Node) ! {
+	// Type aliases are not generated in Erlang output
+	// They are used only for type checking
+}
+
+fn (mut g ErlangGenerator) generate_type_annotation(node ast.Node) ! {
+	// Type annotations are not generated in Erlang output
+	// They are used only for type checking
 }

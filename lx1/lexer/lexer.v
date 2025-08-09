@@ -245,6 +245,9 @@ fn (mut l Lexer) read_identifier() Token {
 		'false' { TokenType.false_ }
 		'nil' { TokenType.nil_ }
 		'record' { TokenType.record }
+		'case' { TokenType.case }
+		'fn' { TokenType.fn }
+		'type' { TokenType.type }
 		else { TokenType.identifier }
 	}
 

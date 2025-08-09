@@ -255,3 +255,112 @@ pub fn new_record_update(id int, record_name string, record_expr Node, field_nam
 		position: pos
 	}
 }
+
+// New builders for additional functionality
+
+pub fn new_function_with_params(id int, name string, params []Node, body Node, pos Position) Node {
+	// Create args block
+	args_block := Node{
+		id: -1
+		kind: .block
+		value: 'args'
+		children: params
+		position: pos
+	}
+
+	return Node{
+		id:       id
+		kind:     .function
+		value:    name
+		children: [args_block, body]
+		position: pos
+	}
+}
+
+pub fn new_function_parameter(id int, name string, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .function_parameter
+		value:    name
+		position: pos
+	}
+}
+
+pub fn new_lambda_expression(id int, params []Node, body Node, pos Position) Node {
+	mut children := []Node{}
+	children << params
+	children << body
+	return Node{
+		id:       id
+		kind:     .lambda_expression
+		children: children
+		position: pos
+	}
+}
+
+pub fn new_case_expression(id int, expr Node, clauses []Node, pos Position) Node {
+	mut children := []Node{}
+	children << expr
+	children << clauses
+	return Node{
+		id:       id
+		kind:     .case_expression
+		children: children
+		position: pos
+	}
+}
+
+pub fn new_case_clause(id int, pattern Node, body Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .case_clause
+		children: [pattern, body]
+		position: pos
+	}
+}
+
+pub fn new_pattern_match(id int, pattern Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .pattern_match
+		children: [pattern]
+		position: pos
+	}
+}
+
+pub fn new_pattern_binding(id int, pattern Node, expr Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .pattern_binding
+		children: [pattern, expr]
+		position: pos
+	}
+}
+
+pub fn new_type_alias(id int, name string, type_def Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .type_alias
+		value:    name
+		children: [type_def]
+		position: pos
+	}
+}
+
+pub fn new_type_annotation(id int, type_node Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .type_annotation
+		children: [type_node]
+		position: pos
+	}
+}
+
+pub fn new_identifier(id int, name string, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .identifier
+		value:    name
+		position: pos
+	}
+}

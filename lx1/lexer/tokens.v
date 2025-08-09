@@ -11,6 +11,9 @@ pub enum TokenType {
 	false_
 	nil_
 	record
+	case
+	fn
+	type
 
 	// Function tokens
 	arrow // ->
@@ -72,6 +75,9 @@ pub fn (tt TokenType) str() string {
 		.false_ { 'false' }
 		.nil_ { 'nil' }
 		.record { 'record' }
+		.case { 'case' }
+		.fn { 'fn' }
+		.type { 'type' }
 		.integer { 'integer' }
 		.float { 'float' }
 		.string { 'string' }

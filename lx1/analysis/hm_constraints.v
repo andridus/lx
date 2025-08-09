@@ -210,8 +210,8 @@ fn (mut collector ConstraintCollector) collect_list_cons(node ast.Node) {
 
 	// Add constraint: tail should be a list of head's type
 	head_type := infer_type(head)
-	tail_type := infer_type(tail)
-	expected_tail_type := ast.Type{
+	_ := infer_type(tail)
+	_ := ast.Type{
 		name: 'list'
 		params: [head_type]
 	}
@@ -232,7 +232,7 @@ fn (mut collector ConstraintCollector) collect_map_access(node ast.Node) {
 
 	// Add constraint: map should have type map(K, V) where K matches key type
 	map_type := infer_type(map_expr)
-	key_type := infer_type(key_expr)
+	_ := infer_type(key_expr)
 
 	if map_type.name == 'map' && map_type.params.len == 2 {
 		collector.add_constraint_nodes(key_expr, node.children[0], node.position)

@@ -28,6 +28,8 @@ pub enum NodeKind {
 
 	// Function structure
 	function // def function_name(args) do body end or (args) -> body
+	function_parameter // function parameter definition
+	lambda_expression // fn(x) -> body end
 
 	// Module structure
 	module
@@ -54,6 +56,16 @@ pub enum NodeKind {
 	record_literal    // Person{name: "João", age: 30}
 	record_access     // user.name
 	record_update     // %{record | campo: valor}
+
+	// Pattern Matching
+	case_expression   // case expr do ... end
+	case_clause      // pattern -> expression
+	pattern_match    // pattern in case clause
+	pattern_binding  // [head | tail] = list
+
+	// Type System
+	type_alias       // type Name = Type
+	type_annotation  // :: Type
 }
 
 pub struct Position {
