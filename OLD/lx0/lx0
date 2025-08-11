@@ -1,0 +1,4 @@
+#!/bin/bash
+PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$PROJECT_DIR"
+rebar3 run -- lx0_cli:main(init:get_plain_arguments())

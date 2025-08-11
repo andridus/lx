@@ -1,0 +1,18 @@
+# Simple LX example
+
+record User {
+    name :: string,
+    age :: integer
+}
+
+def create_user(name :: string, age :: integer) do
+    User{name: name, age: age}
+end
+
+def get_user_info(user) do
+    "User #{user.name} is #{user.age} years old"
+end
+
+def calculate_age(birth_year) do
+    2024 - birth_year
+end

@@ -1,0 +1,12 @@
+defmacro add(a, b) do
+    a + b
+end
+
+defmacro greet(name) do
+    "Hello, " ++ name
+end
+
+x = 10
+y = 20
+result = add(x, y)
+message = greet("LX")

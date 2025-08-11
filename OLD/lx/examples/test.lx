@@ -1,0 +1,4 @@
+case 1 do
+  1 -> false
+  2 -> true
+end

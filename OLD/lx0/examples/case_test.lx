@@ -1,0 +1,38 @@
+# Test case expression syntax
+
+def test_case_simple() do
+  case 1 do
+    1 -> "one"
+    2 -> "two"
+    _ -> "other"
+  end
+end
+
+def test_case_with_guards() do
+  case 5 do
+    n when n > 0 -> "positive"
+    n when n < 0 -> "negative"
+    _ -> "zero"
+  end
+end
+
+def test_case_pattern_matching() do
+  case {:ok, "success"} do
+    {:ok, value} -> value
+    {:error, reason} -> "error: #{reason}"
+    _ -> "unknown"
+  end
+end
+
+def test_case_with_records() do
+  user = User{name: "John", age: 25}
+  case user do
+    User{name: name, age: age} when age >= 18 -> "#{name} is adult"
+    User{name: name} -> "#{name} is minor"
+  end
+end
+
+record User {
+  name :: string,
+  age :: integer
+}

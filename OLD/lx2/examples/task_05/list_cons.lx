@@ -1,0 +1,17 @@
+def simple_cons() do
+    [1 | [2, 3, 4]]
+end
+
+def nested_cons() do
+    [1 | [2 | [3 | []]]]
+end
+
+def pattern_matching() do
+    [head | tail] = [1, 2, 3, 4]
+    {head, tail}
+end
+
+def multiple_heads() do
+    [first, second | rest] = [1, 2, 3, 4, 5]
+    {first, second, rest}
+end

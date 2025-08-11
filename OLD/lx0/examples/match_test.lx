@@ -1,0 +1,47 @@
+# Test match expression syntax
+
+def test_match_simple() do
+  match {:ok, value} <- get_value()
+  {:ok, value}
+end
+
+def test_match_multiple() do
+  match {:ok, user} <- get_user()
+  match {:ok, profile} <- get_profile(user)
+  match {:ok, settings} <- get_settings(profile)
+  {:ok, {user, profile, settings}}
+end
+
+def test_match_rescue() do
+  match {:ok, value} <- get_value() rescue error do {:error, error} end
+  match {:ok, result} <- process_value(value) rescue error do {:error, error} end
+  {:ok, result}
+end
+
+def test_match_with_rescue_multiple() do
+  match {:ok, user} <- get_user() rescue error do {:error, error} end
+  match {:ok, profile} <- get_profile(user) rescue error do {:error, error} end
+  match {:ok, settings} <- get_settings(profile) rescue error do {:error, error} end
+  {:ok, {user, profile, settings}}
+end
+
+# Mock functions for testing
+def get_value() do
+  {:ok, 42}
+end
+
+def process_value(value) do
+  {:ok, value * 2}
+end
+
+def get_user() do
+  {:ok, "user123"}
+end
+
+def get_profile(user) do
+  {:ok, "profile"}
+end
+
+def get_settings(profile) do
+  {:ok, "settings"}
+end

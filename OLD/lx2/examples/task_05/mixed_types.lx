@@ -1,0 +1,24 @@
+def nested_lists() do
+    matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+    first_row = [1, 2, 3]
+    first_row in matrix
+end
+
+def list_of_tuples() do
+    points = [{1, 2}, {3, 4}, {5, 6}]
+    length(points)
+end
+
+def list_of_maps() do
+    users = [%{name: "Alice", age: 30}, %{name: "Bob", age: 25}]
+    length(users)
+end
+
+def complex_nested() do
+    data = [
+        {name: "Alice", scores: [85, 90, 92]},
+        {name: "Bob", scores: [78, 85, 88]},
+        {name: "Charlie", scores: [92, 95, 89]}
+    ]
+    length(data)
+end

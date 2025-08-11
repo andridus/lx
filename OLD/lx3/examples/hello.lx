@@ -1,0 +1,7 @@
+defmacro hello() do
+    "Hello, LX World!"
+end
+
+x = 42
+y = "test"
+hello()

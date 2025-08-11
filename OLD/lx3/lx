@@ -1,0 +1,163 @@
+#!/usr/bin/env escript
+%% -*- erlang -*-
+%%! -smp enable -sname lx_compiler -setcookie lx
+
+%% LX Compiler and Runtime
+%% Usage: ./lx <file.lx> [args...]
+
+main([]) ->
+    io:format("LX Compiler and Runtime~n"),
+    io:format("Usage: ~s <file.lx> [args...]~n", [escript:script_name()]),
+    halt(1);
+
+main([Filename | Args]) ->
+    case filename:extension(Filename) of
+        ".lx" ->
+            compile_and_run(Filename, Args);
+        _ ->
+            io:format("Error: File must have .lx extension~n"),
+            halt(1)
+    end.
+
+compile_and_run(Filename, Args) ->
+    try
+        %% Read source file
+        {ok, Source} = file:read_file(Filename),
+        SourceStr = unicode:characters_to_list(Source),
+
+        %% Compile the source
+        io:format("Compiling ~s...~n", [Filename]),
+        case lx:compile(SourceStr) of
+            {ok, AST, Specs} ->
+                io:format("Compilation successful!~n"),
+                io:format("AST: ~p~n", [AST]),
+                io:format("Macro specs: ~p~n", [Specs]),
+
+                %% Execute the compiled AST
+                io:format("~nExecuting...~n"),
+                Result = execute_ast(AST, Args),
+                io:format("Result: ~p~n", [Result]);
+
+            {error, Error} ->
+                io:format("Compilation error: ~p~n", [Error]),
+                halt(1)
+        end
+
+    catch
+        E:R:S ->
+            io:format("Error: ~p:~p~n~p~n", [E, R, S]),
+            halt(1)
+    end.
+
+%% Simple AST execution
+execute_ast(AST, _Args) ->
+    execute_statements(AST, []).
+
+execute_statements([], Env) ->
+    {ok, Env};
+execute_statements([Statement | Rest], Env) ->
+    case execute_statement(Statement, Env) of
+        {ok, NewEnv} ->
+            execute_statements(Rest, NewEnv);
+        {return, Value} ->
+            {return, Value};
+        {error, Error} ->
+            {error, Error}
+    end;
+execute_statements(SingleStatement, Env) ->
+    % Handle single statement (from parser minimal)
+    execute_statement(SingleStatement, Env).
+
+execute_statement({bind, _Meta, [Var, Expr]}, Env) ->
+    Value = evaluate_expression(Expr, Env),
+    NewEnv = [{Var, Value} | Env],
+    {ok, NewEnv};
+
+execute_statement({defmacro, Meta, [Name, Args, Body]}, Env) ->
+    %% Register macro definition
+    MacroDef = {Name, Args, Body, Meta},
+    NewEnv = [{{macro, Name}, MacroDef} | Env],
+    {ok, NewEnv};
+
+execute_statement({call, _Meta, [Name | Args]}, Env) ->
+    %% Handle macro calls
+    case proplists:get_value({macro, Name}, Env) of
+        {_Name, MacroArgs, Body, _Meta} ->
+            %% Simple macro expansion (basic implementation)
+            io:format("Executing macro ~s~n", [Name]),
+            {ok, Env};
+        undefined ->
+            %% Try to evaluate as expression
+            Value = evaluate_expression({call, {1, 1, undefined}, [Name | Args]}, Env),
+            {ok, Env}
+    end;
+
+execute_statement(Other, Env) ->
+    %% Try to evaluate as expression
+    Value = evaluate_expression(Other, Env),
+    {ok, Env}.
+
+evaluate_expression({integer, _Meta, Value}, _Env) ->
+    Value;
+evaluate_expression({float, _Meta, Value}, _Env) ->
+    Value;
+evaluate_expression({string, _Meta, Value}, _Env) ->
+    Value;
+evaluate_expression({boolean, _Meta, Value}, _Env) ->
+    Value;
+evaluate_expression({atom, _Meta, Value}, _Env) ->
+    Value;
+evaluate_expression({nil, _Meta}, _Env) ->
+    nil;
+evaluate_expression({ident, _Meta, Name}, Env) ->
+    case lists:keyfind(Name, 1, Env) of
+        {Value, _} -> Value;
+        false -> {error, {undefined_variable, Name}}
+    end;
+evaluate_expression({integer, _Line, _Col, Value}, _Env) ->
+    % Handle parser minimal structure {Type, Line, Col, Value}
+    Value;
+evaluate_expression({float, _Line, _Col, Value}, _Env) ->
+    % Handle parser minimal structure {Type, Line, Col, Value}
+    Value;
+evaluate_expression({string, _Line, _Col, Value}, _Env) ->
+    % Handle parser minimal structure {Type, Line, Col, Value}
+    Value;
+evaluate_expression({boolean, _Line, _Col, Value}, _Env) ->
+    % Handle parser minimal structure {Type, Line, Col, Value}
+    Value;
+evaluate_expression({atom, _Line, _Col, Value}, _Env) ->
+    % Handle parser minimal structure {Type, Line, Col, Value}
+    Value;
+evaluate_expression({nil, _Line, _Col}, _Env) ->
+    % Handle parser minimal structure {Type, Line, Col, Value}
+    nil;
+evaluate_expression({ident, _Line, _Col, Name}, Env) ->
+    % Handle parser minimal structure {Type, Line, Col, Value}
+    case lists:keyfind(Name, 1, Env) of
+        {Value, _} -> Value;
+        false -> {error, {undefined_variable, Name}}
+    end;
+evaluate_expression({tuple, Elements}, _Env) ->
+    % Handle tuple evaluation
+    [evaluate_expression(Elem, []) || Elem <- Elements];
+evaluate_expression({list, Elements}, _Env) ->
+    % Handle list evaluation
+    [evaluate_expression(Elem, []) || Elem <- Elements];
+evaluate_expression({macro_call, _Meta, [Op, [Left, Right]]}, Env) ->
+    LeftVal = evaluate_expression(Left, Env),
+    RightVal = evaluate_expression(Right, Env),
+    case {Op, LeftVal, RightVal} of
+        {'+', L, R} when is_number(L), is_number(R) -> L + R;
+        {'-', L, R} when is_number(L), is_number(R) -> L - R;
+        {'*', L, R} when is_number(L), is_number(R) -> L * R;
+        {'/', L, R} when is_number(L), is_number(R) -> L / R;
+        {'++', L, R} when is_list(L), is_list(R) -> L ++ R;
+        _ -> {error, {unsupported_operation, Op, LeftVal, RightVal}}
+    end;
+evaluate_expression({call, _Meta, [Name | Args]}, Env) ->
+    %% For now, just return a placeholder for function calls
+    io:format("Function call: ~s(~p)~n", [Name, Args]),
+    {function_call, Name, Args};
+evaluate_expression(Other, _Env) ->
+    {error, {unsupported_expression, Other}}.

@@ -1,0 +1,6 @@
+def uuid() do
+  <<a:32, b:16, c:16, d:16, e:48>> = :crypto.strong_rand_bytes(16)
+  c2 = (c &&& 0x0FFF) ||| 0x4000  # versão 4
+  d2 = (d &&& 0x3FFF) ||| 0x8000  # variante 1
+  :io_lib.format("~8.16.0b-~4.16.0b-~4.16.0b-~4.16.0b-~12.16.0b", [a, b, c2, d2, e])
+end

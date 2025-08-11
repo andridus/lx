@@ -1,0 +1,19 @@
+def empty_list() do
+    []
+end
+
+def number_list() do
+    [1, 2, 3, 4, 5]
+end
+
+def string_list() do
+    ["hello", "world", "lx"]
+end
+
+def mixed_list() do
+    [1, "hello", :ok, true, 3.14]
+end
+
+def nested_list() do
+    [[1, 2], [3, 4], [5, 6]]
+end

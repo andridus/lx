@@ -816,6 +816,19 @@ end
 
 ```lx
 def processar_dados(dados) do
+  case validar(dados) do
+    {:ok, validados} ->
+      {:ok, salvos}
+    {:error, motivo} ->
+      {:error, motivo}
+  end
+end
+```
+
+### With Expression
+
+```lx
+def processar_dados(dados) do
   with {:ok, validados} <- validar(dados),
        {:ok, processados} <- processar(validados),
        {:ok, salvos} <- salvar(processados) do
@@ -855,12 +868,6 @@ end
 @doc "Calcula a soma de dois números"
 def calcular(a, b) do
   a + b
-end
-
-# Reflexão
-@reflection
-def info_funcao() do
-  # Informações sobre a função em tempo de execução
 end
 ```
 

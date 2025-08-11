@@ -1,0 +1,8 @@
+{application, test, [
+    {description, "Key Token Test"},
+    {vsn, "1.0.0"},
+    {modules, []},
+    {applications, [kernel, stdlib]},
+    {env, [{port, "3000"}, {debug, "false"}]},
+    {mod, {main, []}}
+]}.

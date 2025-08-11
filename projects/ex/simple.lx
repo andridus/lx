@@ -1,0 +1,3 @@
+def parse_header(packet :: binary) do
+  errado
+end

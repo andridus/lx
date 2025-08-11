@@ -1,0 +1,57 @@
+# Test with expression syntax
+
+def test_with_simple() do
+  with {:ok, value} <- get_value(),
+       {:ok, result} <- process_value(value) do
+    {:ok, result}
+  else
+    {:error, reason} -> {:error, reason}
+  end
+end
+
+def test_with_multiple_clauses() do
+  with {:ok, user} <- get_user(),
+       {:ok, profile} <- get_profile(user),
+       {:ok, settings} <- get_settings(profile) do
+    {:ok, {user, profile, settings}}
+  else
+    {:error, :not_found} -> {:error, "not found"}
+    {:error, reason} -> {:error, reason}
+  end
+end
+
+def test_with_nested_patterns() do
+  with {:ok, {id, data}} <- get_data(),
+       {:ok, processed} <- process_data(data) do
+    {:ok, {id, processed}}
+  end
+end
+
+# Mock functions for testing
+def get_value() do
+  {:ok, 42}
+end
+
+def process_value(value) do
+  {:ok, value * 2}
+end
+
+def get_user() do
+  {:ok, "user123"}
+end
+
+def get_profile(user) do
+  {:ok, "profile"}
+end
+
+def get_settings(profile) do
+  {:ok, "settings"}
+end
+
+def get_data() do
+  {:ok, {1, "data"}}
+end
+
+def process_data(data) do
+  {:ok, "processed"}
+end

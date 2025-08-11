@@ -1,0 +1,32 @@
+# Definindo macros infix
+defmacro infix +(left, right) do
+    {binary_op, {1, 1, any}, ['+', left, right]}
+end
+
+defmacro infix -(left, right) do
+    {binary_op, {1, 1, any}, ['-', left, right]}
+end
+
+defmacro infix *(left, right) do
+    {binary_op, {1, 1, any}, ['*', left, right]}
+end
+
+defmacro infix /(left, right) do
+    {binary_op, {1, 1, any}, ['/', left, right]}
+end
+
+defmacro infix ++(left, right) do
+    {binary_op, {1, 1, any}, ['++', left, right]}
+end
+
+# Usando os operadores infix
+x = 10
+y = 5
+sum = x + y
+product = x * y
+difference = x - y
+quotient = x / y
+
+first = "Hello"
+second = " World"
+greeting = first ++ second
