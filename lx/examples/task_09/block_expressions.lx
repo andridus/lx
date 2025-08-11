@@ -10,3 +10,6 @@ def nested_blocks do
     result2 = outer + inner
     result2
 end
+def main() do
+    complex_function()
+end

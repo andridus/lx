@@ -8,3 +8,6 @@ def error_examples() do
     # Erro: parênteses obrigatórios para diretivas
     $print x
 end
+def main() do
+    error_examples()
+end

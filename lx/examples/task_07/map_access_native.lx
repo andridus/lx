@@ -16,3 +16,6 @@ def map_access_native() do
 
     {name, age, email, magic, value1, value2}
 end
+def main() do
+    map_access_native()
+end

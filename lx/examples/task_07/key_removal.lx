@@ -5,3 +5,6 @@ def key_removal_example() do
     cleaned3 = maps_remove(42, cleaned2)
     cleaned3
 end
+def main() do
+    key_removal_example()
+end

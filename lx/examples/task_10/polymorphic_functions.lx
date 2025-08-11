@@ -30,3 +30,6 @@ def uncurry(f) do
         apply(apply(f, x), y)
     end
 end
+def main() do
+    identity()
+end

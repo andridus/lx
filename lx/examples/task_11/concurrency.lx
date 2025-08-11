@@ -27,3 +27,6 @@ worker server_worker do
         {:ok, spawn_link(fn -> server_loop() end)}
     end
 end
+def main() do
+    start_server()
+end

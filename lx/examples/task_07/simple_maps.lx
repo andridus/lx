@@ -4,3 +4,6 @@ def simple_maps() do
     mixed = %{name: "Ana", "key": "value", 42: "answer", true: "boolean"}
     {empty, user, mixed}
 end
+def main() do
+    simple_maps()
+end

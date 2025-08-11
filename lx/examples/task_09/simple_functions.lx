@@ -9,3 +9,7 @@ end
 def calculate(x, y, z) do
     x * y + z
 end
+
+def main() do
+    add(5, 3)
+end

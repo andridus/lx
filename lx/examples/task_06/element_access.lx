@@ -6,3 +6,7 @@ def element_access_example() do
     fourth = element(4, tuple)
     {first, second, third, fourth}
 end
+
+def main() do
+    element_access_example()
+end

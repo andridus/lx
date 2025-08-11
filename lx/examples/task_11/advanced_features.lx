@@ -1,5 +1,4 @@
 @doc "This function greets a user"
-@spec greet(string) :: string
 def greet(name) do
     "Hello, #{name}!"
 end
@@ -22,7 +21,7 @@ def test_multihead_lambdas() do
         (_) -> "unknown"
     end
 
-    // Lambda calls with dot syntax
+    # Lambda calls with dot syntax
     result1 = pattern_matcher.(:ok)
     result2 = pattern_matcher.(:error)
     [result1, result2]
@@ -48,4 +47,7 @@ end
 
 def map(func, list) do
     [func(x) || x <- list]
+end
+def main() do
+    greet()
 end

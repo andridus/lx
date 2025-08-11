@@ -65,3 +65,7 @@ def complete_maps_demo() do
     # Resultado final
     {empty_map, simple_map, mixed_map, nested_map, name1, age1, email1, magic1, name2, age2, email2, magic2, size1, size2, size3, updated1, updated2, updated3, cleaned1, cleaned2, cleaned3, value1, value2, user_name, user_age, user_email, user_magic, db_host, api_key, clean_user2}
 end
+
+def main() do
+    complete_maps_demo()
+end

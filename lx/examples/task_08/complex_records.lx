@@ -25,3 +25,6 @@ def complex_record_operations() do
 
     {rect, updated_rect, updated_point, width, height, color}
 end
+def main() do
+    complex_record_operations()
+end

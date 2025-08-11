@@ -4,3 +4,6 @@ def simple_lists() do
     mixed = [1, "hello", :atom, 3.14, true]
     {empty, numbers, mixed}
 end
+def main() do
+    simple_lists()
+end

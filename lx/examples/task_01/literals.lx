@@ -73,3 +73,6 @@ end
 def nothing() do
     nil
 end
+def main() do
+    small_number()
+end

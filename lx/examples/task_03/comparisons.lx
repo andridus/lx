@@ -22,3 +22,7 @@ def range_check() do
     max = 20
     (value >= min) and (value <= max)
 end
+
+def main() do
+    comparison_example()
+end

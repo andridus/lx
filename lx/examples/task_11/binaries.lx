@@ -26,3 +26,7 @@ end
 def create_string_binary() do
     <<"hello world">>
 end
+
+def main() do
+    create_simple_binary()
+end

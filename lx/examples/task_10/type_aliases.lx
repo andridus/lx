@@ -1,4 +1,4 @@
-// Type aliases for common types
+# Type aliases for common types
 type StringList = list(string)
 type NumberList = list(integer)
 type StringMap = map(string, string)
@@ -20,7 +20,7 @@ def number_map_values(map) do
     map_values(map)
 end
 
-// Generic type aliases
+# Generic type aliases
 type Option(T) = {some: T} | {none: nil}
 type Result(T, E) = {ok: T} | {error: E}
 type Either(L, R) = {left: L} | {right: R}
@@ -58,4 +58,7 @@ def either_map_right(f, either) do
         {left: value} -> {left: value}
         {right: value} -> {right: f(value)}
     end
+end
+def main() do
+    string_list_length()
 end

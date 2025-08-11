@@ -46,3 +46,6 @@ def tree_fold(f, acc, tree) do
             foldl(fn(acc, child) -> tree_fold(f, acc, child) end, new_acc, children)
     end
 end
+def main() do
+    length()
+end

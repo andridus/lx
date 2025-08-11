@@ -15,3 +15,6 @@ def complex_expression() do
     # Should evaluate as ((a + b) * c) - 2 = ((10 + 5) * 3) - 2 = 43
     (a + b) * c - 2
 end
+def main() do
+    precedence_example()
+end

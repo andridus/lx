@@ -28,3 +28,7 @@ def safe_operation() do
         error_handler(error)
     end
 end
+
+def main() do
+    categorize_age(20)
+end

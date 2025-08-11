@@ -29,3 +29,6 @@ end
 def empty() do
     nil
 end
+def main() do
+    answer()
+end

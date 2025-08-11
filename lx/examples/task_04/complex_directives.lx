@@ -24,3 +24,6 @@ def nested_directives() do
 
     x + y  # Esta é a única expressão que aparece no código final
 end
+def main() do
+    complex_directives()
+end

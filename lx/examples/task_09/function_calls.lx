@@ -11,3 +11,6 @@ def calculate(a, b, c) do
     temp2 = multiply(temp1, c)
     temp2
 end
+def main() do
+    add()
+end

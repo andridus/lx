@@ -6,3 +6,6 @@ def key_access_example() do
     answer = map_get(42, map)
     {name, age, value, answer}
 end
+def main() do
+    key_access_example()
+end

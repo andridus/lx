@@ -11,3 +11,6 @@ def complex_list_operations() do
 
     {extended, combined, matrix}
 end
+def main() do
+    complex_list_operations()
+end

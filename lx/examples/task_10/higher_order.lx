@@ -51,3 +51,6 @@ def any(pred, list) do
         [head | tail] -> pred(head) or any(pred, tail)
     end
 end
+def main() do
+    twice()
+end

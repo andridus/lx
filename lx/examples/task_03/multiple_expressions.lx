@@ -1,4 +1,4 @@
-def test() do
+def test_multiple_expression() do
     a = 10
     b = 5
     a == b
@@ -7,4 +7,7 @@ def test() do
     a <= b
     a > b
     a >= b
+end
+def main() do
+    test_multiple_expression()
 end

@@ -23,3 +23,6 @@ def final_test() do
     # Resultado
     {person, updated_person, updated_person2, name, age, street, city, country, active}
 end
+def main() do
+    final_test()
+end

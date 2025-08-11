@@ -1,0 +1,12 @@
+# This example is expected to fail due to variable reassignment
+# It should be treated as a successful test when it fails
+
+def fail_variable_reuse() do
+    x = 10
+    x = 20  # This should fail - variables are immutable
+    x
+end
+
+def main() do
+    fail_variable_reuse()
+end

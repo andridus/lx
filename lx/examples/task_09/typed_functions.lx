@@ -9,3 +9,6 @@ end
 def typed_calculate(x :: float, y :: float) :: float do
     x * y
 end
+def main() do
+    typed_add()
+end

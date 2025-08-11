@@ -5,3 +5,6 @@ def list_operations_example() do
     has_six = 6 in list
     {len, has_three, has_six}
 end
+def main() do
+    list_operations_example()
+end

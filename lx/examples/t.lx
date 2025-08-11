@@ -4,3 +4,6 @@
 def test_directive() do
     :ok
 end
+def main() do
+    test_directive()
+end

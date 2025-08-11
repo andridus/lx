@@ -5,3 +5,6 @@ def test_operations() do
     has_six = 6 in list
     len
 end
+def main() do
+    test_operations()
+end

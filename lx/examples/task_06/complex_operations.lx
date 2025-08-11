@@ -17,3 +17,6 @@ def complex_tuple_operations() do
 
     {point, rectangle, updated_user}
 end
+def main() do
+    complex_tuple_operations()
+end

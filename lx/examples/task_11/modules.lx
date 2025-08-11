@@ -1,8 +1,5 @@
 deps [:cowboy, :jsx]
 
-import :cowboy
-import :jsx
-
 application {
     description: "My Application",
     vsn: "1.0.0",
@@ -28,4 +25,7 @@ end
 
 def decode_json(json_str) do
     jsx.decode(json_str)
+end
+def main() do
+    start_server()
 end

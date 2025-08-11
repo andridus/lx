@@ -9,3 +9,6 @@ def sum do
     (x, y) -> x + y
     (x, y, z) -> x + y + z
 end
+def main() do
+    factorial do()
+end

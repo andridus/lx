@@ -2,3 +2,6 @@ def map_size_example() do
     map = %{name: "Ana", age: 25, city: "SP", active: true}
     map_size(map)
 end
+def main() do
+    map_size_example()
+end

@@ -3,3 +3,6 @@ def set_element_example() do
     modified = setelement(2, tuple, "changed")
     modified
 end
+def main() do
+    set_element_example()
+end

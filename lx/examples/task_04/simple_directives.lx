@@ -3,3 +3,6 @@ def test() do
     $unknown(x)
     x
 end
+def main() do
+    test()
+end

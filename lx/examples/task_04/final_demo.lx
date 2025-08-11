@@ -21,3 +21,6 @@ def demo_directives() do
     # Apenas esta expressão aparece no código final
     (x + y) * 2
 end
+def main() do
+    demo_directives()
+end

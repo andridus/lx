@@ -73,3 +73,6 @@ def type_polymorphism_example(data) do
         {tuple: {a, b}} -> {a * 2, b * 2}
     end
 end
+def main() do
+    complex_function()
+end

@@ -43,3 +43,6 @@ def map_get_default(map, key, default) do
         value -> value
     end
 end
+def main() do
+    head()
+end

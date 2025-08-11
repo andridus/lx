@@ -25,3 +25,6 @@ def shift_right() do
     a = 20  # 10100 in binary
     a >>> 2  # Should be 5 (101 in binary)
 end
+def main() do
+    bitwise_and()
+end

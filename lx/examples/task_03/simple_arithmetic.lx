@@ -16,6 +16,14 @@ def subtraction() do
     10 - 3
 end
 
-def test() do
+def sum() do
     10 + 5
+end
+
+def main() do
+    simple_arithmetic()
+    multiplication()
+    division()
+    subtraction()
+    sum()
 end

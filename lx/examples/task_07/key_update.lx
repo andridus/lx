@@ -4,3 +4,6 @@ def key_update_example() do
     updated2 = map_put("key", "new", updated1)
     updated2
 end
+def main() do
+    key_update_example()
+end

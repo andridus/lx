@@ -2,3 +2,6 @@ def nested_maps_example() do
     user = %{id: 1, profile: %{name: "Ana", age: 25}, settings: %{theme: "dark"}}
     user
 end
+def main() do
+    nested_maps_example()
+end
