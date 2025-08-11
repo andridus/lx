@@ -1967,20 +1967,44 @@ fn (mut p Parser) parse_binary_pattern() !ast.Node {
 	start_pos := p.current.position
 	p.advance() // Skip '<<'
 
+	// Skip newlines after opening <<
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+
 	mut segments := []ast.Node{}
 
 	// Parse segments
 	if p.current.type_ != .double_gt {
 		for {
+			// Skip newlines before segment
+			for p.current.type_ == .newline {
+				p.advance()
+			}
+
 			segment := p.parse_binary_segment_pattern()!
 			segments << segment
 
+			// Skip newlines after segment
+			for p.current.type_ == .newline {
+				p.advance()
+			}
+
 			if p.current.type_ == .comma {
 				p.advance() // Skip ','
+				// Skip newlines after comma
+				for p.current.type_ == .newline {
+					p.advance()
+				}
 			} else {
 				break
 			}
 		}
+	}
+
+	// Skip newlines before closing >>
+	for p.current.type_ == .newline {
+		p.advance()
 	}
 
 	if p.current.type_ != .double_gt {
@@ -2866,19 +2890,43 @@ fn (mut p Parser) parse_binary_literal() !ast.Node {
 	start_pos := p.current.position
 	p.advance() // Skip '<<'
 
+	// Skip newlines after opening <<
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+
 	mut segments := []ast.Node{}
 
 	if p.current.type_ != .double_gt {
 		for {
+			// Skip newlines before segment
+			for p.current.type_ == .newline {
+				p.advance()
+			}
+
 			segment := p.parse_binary_segment()!
 			segments << segment
 
+			// Skip newlines after segment
+			for p.current.type_ == .newline {
+				p.advance()
+			}
+
 			if p.current.type_ == .comma {
 				p.advance() // Skip ','
+				// Skip newlines after comma
+				for p.current.type_ == .newline {
+					p.advance()
+				}
 			} else {
 				break
 			}
 		}
+	}
+
+	// Skip newlines before closing >>
+	for p.current.type_ == .newline {
+		p.advance()
 	}
 
 	if p.current.type_ != .double_gt {
@@ -2965,7 +3013,7 @@ fn (mut p Parser) parse_binary_segment() !ast.Node {
 
 					options << next_option
 				} else {
-					return p.error_and_return('Invalid binary segment option after -')
+					return p.error_and_return('Invalid binary pattern option after -')
 				}
 			} else {
 				dash = false

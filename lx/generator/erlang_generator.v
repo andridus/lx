@@ -293,26 +293,46 @@ fn (mut g ErlangGenerator) generate_module(node ast.Node) ! {
 		if child.kind == .function {
 			// Calculate arity from args block or from heads
 			mut arity := 0
+			mut arities := []int{}
+
 			if child.children.len > 0 {
 				args_block := child.children[0]
 				if args_block.children.len > 0 {
 					// Function has arguments in definition
 					arity = args_block.children.len
+					arities << arity
 				} else if child.children.len > 1 {
 					// Check if this has multiple heads
 					body := child.children[1]
 					if body.kind == .block && body.children.len > 0
 						&& body.children[0].kind == .function {
-						// Multiple heads - get arity from first head
-						first_head := body.children[0]
-						if first_head.children.len > 0 {
-							head_args := first_head.children[0]
-							arity = head_args.children.len
+						// Multiple heads - collect all arities
+						for head in body.children {
+							if head.kind == .function && head.children.len > 0 {
+								head_args := head.children[0]
+								mut head_arity := 0
+								if head_args.kind == .block {
+									head_arity = head_args.children.len
+								} else {
+									head_arity = 1
+								}
+								if head_arity !in arities {
+									arities << head_arity
+								}
+							}
 						}
 					}
 				}
 			}
-			exports << '${child.value}/${arity}'
+
+			// Export all arities
+			if arities.len > 0 {
+				for arity_val in arities {
+					exports << '${child.value}/${arity_val}'
+				}
+			} else {
+				exports << '${child.value}/${arity}'
+			}
 		}
 	}
 
@@ -370,14 +390,48 @@ fn (mut g ErlangGenerator) generate_module(node ast.Node) ! {
 fn (mut g ErlangGenerator) generate_function(node ast.Node) ! {
 	function_name := node.value
 
-	// Calculate function key (name/arity)
+	// Check if this is a multi-head function
+	mut has_function_heads := false
+	mut arities := []int{}
+
+	if node.children.len >= 2 {
+		body := node.children[1]
+		has_function_heads = body.kind == .block && body.children.len > 0
+			&& body.children[0].kind == .function
+
+		if has_function_heads {
+			// Collect all arities from heads
+			for head in body.children {
+				if head.kind == .function && head.children.len > 0 {
+					head_args := head.children[0]
+					mut arity := 0
+					if head_args.kind == .block {
+						arity = head_args.children.len
+					} else {
+						arity = 1
+					}
+					if arity !in arities {
+						arities << arity
+					}
+				}
+			}
+		}
+	}
+
+	// Calculate function key (name/arity) for single function
 	mut arity := 0
-	if node.children.len > 0 {
+	if !has_function_heads && node.children.len > 0 {
 		args_block := node.children[0]
 		if args_block.kind == .block {
 			arity = args_block.children.len
 		}
 	}
+
+	// For multi-head functions, use the first arity for the main function key
+	if has_function_heads && arities.len > 0 {
+		arity = arities[0]
+	}
+
 	function_key := '${function_name}/${arity}'
 
 	// Get and generate directives for this function
@@ -386,18 +440,37 @@ fn (mut g ErlangGenerator) generate_function(node ast.Node) ! {
 		g.output.write_string('-doc "${directive.value}".\n')
 	}
 
-	// Get function type for spec generation
-	if function_type := g.type_table.get_function_type(function_name) {
-		g.output.write_string('-spec ${function_name}(')
-		if function_type.parameters.len > 0 {
-			for i, param in function_type.parameters {
-				if i > 0 {
-					g.output.write_string(', ')
+	// Generate specs for multi-head functions with different arities
+	if has_function_heads && arities.len > 1 {
+		// Don't generate specs here - they will be generated with each function
+	} else if has_function_heads {
+		// Single arity multi-head - generate spec with union types if needed
+		if function_type := g.type_table.get_function_type(function_name) {
+			g.output.write_string('-spec ${function_name}(')
+			if function_type.parameters.len > 0 {
+				for i, param in function_type.parameters {
+					if i > 0 {
+						g.output.write_string(', ')
+					}
+					g.output.write_string(type_to_erlang_spec(param))
 				}
-				g.output.write_string(type_to_erlang_spec(param))
 			}
+			g.output.write_string(') -> ${type_to_erlang_spec(function_type.return_type)}.\n')
 		}
-		g.output.write_string(') -> ${type_to_erlang_spec(function_type.return_type)}.\n')
+	} else {
+		// Single function - generate normal spec
+		if function_type := g.type_table.get_function_type(function_name) {
+			g.output.write_string('-spec ${function_name}(')
+			if function_type.parameters.len > 0 {
+				for i, param in function_type.parameters {
+					if i > 0 {
+						g.output.write_string(', ')
+					}
+					g.output.write_string(type_to_erlang_spec(param))
+				}
+			}
+			g.output.write_string(') -> ${type_to_erlang_spec(function_type.return_type)}.\n')
+		}
 	}
 
 	// Generate function body
@@ -405,51 +478,129 @@ fn (mut g ErlangGenerator) generate_function(node ast.Node) ! {
 		args_block := node.children[0]
 		body := node.children[1]
 
-		// Check if this is a multi-head function
-		has_function_heads := body.kind == .block && body.children.len > 0
-			&& body.children[0].kind == .function
-
 		if has_function_heads {
-			// Multi-head function - generate each head
-			for i, head in body.children {
-				if head.kind == .function {
-					// Generate head arguments
-					if head.children.len > 0 {
-						head_args := head.children[0]
-						g.output.write_string('${function_name}(')
-						if head_args.kind == .block {
-							for j, arg in head_args.children {
-								if j > 0 {
-									g.output.write_string(', ')
+			// Multi-head function - generate each head with proper pattern matching
+			// Group heads by arity first
+			mut heads_by_arity := map[int][]ast.Node{}
+
+			for head in body.children {
+				if head.kind == .function && head.children.len > 0 {
+					head_args := head.children[0]
+					mut head_arity := 0
+					if head_args.kind == .block {
+						head_arity = head_args.children.len
+					} else {
+						head_arity = 1
+					}
+
+					if head_arity !in heads_by_arity {
+						heads_by_arity[head_arity] = []
+					}
+					heads_by_arity[head_arity] << head
+				}
+			}
+
+			// Check if we have multiple arities (different arities = separate functions)
+			if arities.len > 1 {
+				// Generate separate function for each arity with its spec
+				for arity_val, heads in heads_by_arity {
+					// Generate spec for this specific arity
+					g.output.write_string('-spec ${function_name}(')
+					for i in 0 .. arity_val {
+						if i > 0 {
+							g.output.write_string(', ')
+						}
+						g.output.write_string('any()')
+					}
+					g.output.write_string(') -> any().\n')
+
+					// Generate function definition for this arity
+					for i, head in heads {
+						if head.kind == .function {
+							// Generate head arguments
+							if head.children.len > 0 {
+								head_args := head.children[0]
+								g.output.write_string('${function_name}(')
+								if head_args.kind == .block {
+									for j, arg in head_args.children {
+										if j > 0 {
+											g.output.write_string(', ')
+										}
+										// Generate argument as variable with unique hash
+										if arg.kind == .identifier {
+											unique_name := g.get_unique_var_name(arg.value)
+											g.output.write_string(unique_name)
+										} else {
+											g.generate_node(arg)!
+										}
+									}
+								} else {
+									// Single argument
+									if head_args.kind == .identifier {
+										unique_name := g.get_unique_var_name(head_args.value)
+										g.output.write_string(unique_name)
+									} else {
+										g.generate_node(head_args)!
+									}
 								}
-								// Generate argument as variable with unique hash
-								if arg.kind == .identifier {
-									unique_name := g.get_unique_var_name(arg.value)
+								g.output.write_string(') ->\n    ')
+
+								// Generate head body
+								if head.children.len > 1 {
+									g.generate_node(head.children[1])!
+								}
+
+								if i < heads.len - 1 {
+									g.output.write_string(';\n')
+								} else {
+									g.output.write_string('.\n')
+								}
+							}
+						}
+					}
+				}
+			} else {
+				// Single arity with multiple heads - generate one function with pattern matching
+				for i, head in body.children {
+					if head.kind == .function {
+						// Generate head arguments
+						if head.children.len > 0 {
+							head_args := head.children[0]
+							g.output.write_string('${function_name}(')
+							if head_args.kind == .block {
+								for j, arg in head_args.children {
+									if j > 0 {
+										g.output.write_string(', ')
+									}
+									// Generate argument as variable with unique hash
+									if arg.kind == .identifier {
+										unique_name := g.get_unique_var_name(arg.value)
+										g.output.write_string(unique_name)
+									} else {
+										g.generate_node(arg)!
+									}
+								}
+							} else {
+								// Single argument
+								if head_args.kind == .identifier {
+									unique_name := g.get_unique_var_name(head_args.value)
 									g.output.write_string(unique_name)
 								} else {
-									g.generate_node(arg)!
+									g.generate_node(head_args)!
 								}
 							}
-						} else {
-							// Single argument
-							if head_args.kind == .identifier {
-								unique_name := g.get_unique_var_name(head_args.value)
-								g.output.write_string(unique_name)
-							} else {
-								g.generate_node(head_args)!
+							g.output.write_string(') ->\n    ')
+
+							// Generate head body
+							if head.children.len > 1 {
+								g.generate_node(head.children[1])!
 							}
-						}
-						g.output.write_string(') ->\n    ')
 
-						// Generate head body
-						if head.children.len > 1 {
-							g.generate_node(head.children[1])!
-						}
-
-						if i < body.children.len - 1 {
-							g.output.write_string(';\n')
-						} else {
-							g.output.write_string('.\n')
+							if i < body.children.len - 1 {
+								g.output.write_string(';\n')
+							} else {
+								g.output.write_string('.\n')
+							}
 						}
 					}
 				}
