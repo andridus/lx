@@ -38,6 +38,8 @@ pub enum TokenType {
 	describe
 	test
 	assert
+	for_
+	in
 
 	// Function tokens
 	arrow // ->
@@ -132,6 +134,8 @@ pub fn (tt TokenType) str() string {
 		.describe { 'describe' }
 		.test { 'test' }
 		.assert { 'assert' }
+		.for_ { 'for' }
+		.in { 'in' }
 		.integer { 'integer' }
 		.float { 'float' }
 		.string { 'string' }

@@ -693,6 +693,13 @@ fn (mut p Parser) parse_block() !ast.Node {
 			break
 		}
 
+						// Special handling for match expressions - they consume all remaining expressions
+		if p.current.type_ == .match {
+			match_expr := p.parse_match_with_continuation()!
+			expressions << match_expr
+			break // Match consumes all remaining expressions
+		}
+
 		expr := p.parse_expression()!
 		expressions << expr
 
@@ -731,12 +738,14 @@ fn (mut p Parser) parse_expression_with_precedence(precedence int) !ast.Node {
 	for {
 		// Check for infix operators
 		if (p.current.type_ == .identifier && p.is_infix_function(p.current.value))
-			|| p.current.type_ == .exclamation || p.current.type_ == .slash {
+			|| p.current.type_ == .exclamation || p.current.type_ == .slash || p.current.type_ == .in {
 			// Normalize operator token to a name understood by kernel
 			op_name := if p.current.type_ == .exclamation {
 				'!'
 			} else if p.current.type_ == .slash {
 				'/'
+			} else if p.current.type_ == .in {
+				'in'
 			} else {
 				p.current.value
 			}
@@ -798,6 +807,7 @@ fn (mut p Parser) parse_prefix_expression() !ast.Node {
 		.double_lt { p.parse_binary_literal() }
 		// Task 11: Advanced Features
 		.at_sign { p.parse_directive_new() }
+		.for_ { p.parse_list_comprehension() }
 		else { error('Unexpected token: ${p.current.type_}') }
 	}
 }
@@ -2465,7 +2475,202 @@ fn (mut p Parser) parse_case_clauses_as_block() !ast.Node {
 	return ast.new_case_expression(p.get_next_id(), dummy_expr, clauses, start_pos)
 }
 
+// Parse match expressions with continuation (collects all remaining expressions)
+fn (mut p Parser) parse_match_with_continuation() !ast.Node {
+	start_pos := p.current.position
+
+
+	p.advance() // Skip 'match'
+
+	pattern := p.parse_expression()!
+
+
+	if p.current.type_ != .left_arrow {
+		return p.error_and_return('Expected "<-" after match pattern')
+	}
+	p.advance() // Skip '<-'
+
+	expr := p.parse_expression()!
+
+	// Check for rescue clause
+	mut rescue_body := ast.Node{}
+
+		if p.current.type_ == .rescue {
+
+		p.advance() // Skip 'rescue'
+
+		error_pattern := p.parse_expression()! // error pattern - should be a variable
+
+		// Store the error pattern for the analyzer to register
+		// We'll add it to the rescue body as context
+
+		if p.current.type_ != .do {
+			return p.error_and_return('Expected "do" after rescue pattern')
+		}
+		p.advance() // Skip 'do'
+
+		// Skip newlines
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+
+		rescue_body_expr := p.parse_expression()!
+
+		// Create a rescue block that includes both the error pattern and the body
+		rescue_body = ast.Node{
+			id:       p.get_next_id()
+			kind:     .block
+			children: [error_pattern, rescue_body_expr]
+			position: start_pos
+		}
+
+		// Skip newlines after rescue body
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+
+		if p.current.type_ != .end {
+			return p.error_and_return('Expected "end" to close match rescue expression, got ${p.current.type_}')
+		}
+		p.advance() // Skip 'end'
+
+		// After rescue, continue parsing for continuation expressions
+		// Skip separators
+		if p.current.type_ == .semicolon {
+			p.advance()
+		}
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+
+		// Collect continuation expressions after rescue
+		mut continuation_exprs := []ast.Node{}
+		for {
+			// Stop if we encounter 'end', 'else' or other non-expression tokens
+			if p.current.type_ == .end || p.current.type_ == .eof || p.current.type_ == .else_ {
+				break
+			}
+
+			// Skip newlines before expression
+			for p.current.type_ == .newline {
+				p.advance()
+			}
+
+			// Stop if we encounter 'end', 'else' after skipping newlines
+			if p.current.type_ == .end || p.current.type_ == .eof || p.current.type_ == .else_ {
+				break
+			}
+
+			expr_cont := p.parse_expression()!
+			continuation_exprs << expr_cont
+
+			// Check for separators
+			if p.current.type_ == .semicolon {
+				p.advance()
+				for p.current.type_ == .newline {
+					p.advance()
+				}
+			} else if p.current.type_ == .newline {
+				p.advance()
+				for p.current.type_ == .newline {
+					p.advance()
+				}
+			} else {
+				// Continue if there are more tokens
+				if p.current.type_ != .end && p.current.type_ != .eof && p.current.type_ != .else_ {
+					continue
+				}
+				break
+			}
+		}
+
+		// If there are continuation expressions, wrap them in a block and create match with continuation
+		if continuation_exprs.len > 0 {
+			continuation_block := ast.new_block(p.get_next_id(), continuation_exprs, start_pos)
+			// Create match expr manually with both rescue and continuation
+			mut children := [pattern, expr, rescue_body, continuation_block]
+			return ast.Node{
+				id:       p.get_next_id()
+				kind:     .match_expr
+				children: children
+				position: start_pos
+			}
+		} else {
+			return ast.new_match_expr(p.get_next_id(), pattern, expr, rescue_body, start_pos)
+		}
+	}
+
+	// Skip separators
+	if p.current.type_ == .semicolon {
+		p.advance()
+	}
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+
+	// Collect all remaining expressions as continuation
+	mut continuation_exprs := []ast.Node{}
+	for {
+		// Stop if we encounter 'end', 'else' or other non-expression tokens
+		if p.current.type_ == .end || p.current.type_ == .eof || p.current.type_ == .else_ {
+			break
+		}
+
+		// Skip newlines before expression
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+
+		// Stop if we encounter 'end', 'else' after skipping newlines
+		if p.current.type_ == .end || p.current.type_ == .eof || p.current.type_ == .else_ {
+			break
+		}
+
+		// Handle nested matches recursively
+		if p.current.type_ == .match {
+			nested_match := p.parse_match_with_continuation()!
+			continuation_exprs << nested_match
+			break // Nested match consumes all remaining expressions
+		}
+
+		expr_cont := p.parse_expression()!
+		continuation_exprs << expr_cont
+
+		// Check for separators
+		if p.current.type_ == .semicolon {
+			p.advance()
+			for p.current.type_ == .newline {
+				p.advance()
+			}
+		} else if p.current.type_ == .newline {
+			p.advance()
+			for p.current.type_ == .newline {
+				p.advance()
+			}
+		} else {
+			// Continue if there are more tokens
+			if p.current.type_ != .end && p.current.type_ != .eof && p.current.type_ != .else_ {
+				continue
+			}
+			break
+		}
+	}
+
+	// Create a match expression with continuation as a nested block
+	if continuation_exprs.len > 0 {
+		continuation_block := ast.new_block(p.get_next_id(), continuation_exprs, start_pos)
+		// Simple match (no rescue) with continuation
+
+		return ast.new_match_expr(p.get_next_id(), pattern, expr, continuation_block, start_pos)
+	} else {
+		// Simple match (no rescue) without continuation
+
+		return ast.new_match_expr(p.get_next_id(), pattern, expr, none, start_pos)
+	}
+}
+
 // Parse match expressions: match pattern <- expr rescue error do ... end
+// or simple match: match pattern <- expr (fail fast)
 fn (mut p Parser) parse_match_expression() !ast.Node {
 	start_pos := p.current.position
 	p.advance() // Skip 'match'
@@ -2479,24 +2684,28 @@ fn (mut p Parser) parse_match_expression() !ast.Node {
 
 	expr := p.parse_expression()!
 
-	mut rescue_body := ?ast.Node(none)
-	if p.current.type_ == .rescue {
-		p.advance() // Skip 'rescue'
-
-		_ := p.parse_expression()! // error pattern (not used in AST for now)
-
-		if p.current.type_ != .do {
-			return p.error_and_return('Expected "do" after rescue pattern')
-		}
-		p.advance() // Skip 'do'
-
-		// Skip newlines
-		for p.current.type_ == .newline {
-			p.advance()
-		}
-
-		rescue_body = p.parse_block()!
+	// Check if this is a simple match (no rescue clause)
+	if p.current.type_ != .rescue {
+		// Simple match: match pattern <- expr (fail fast)
+		return ast.new_match_expr(p.get_next_id(), pattern, expr, none, start_pos)
 	}
+
+	// Full match with rescue: match pattern <- expr rescue error do ... end
+	p.advance() // Skip 'rescue'
+
+	_ := p.parse_expression()! // error pattern (not used in AST for now)
+
+	if p.current.type_ != .do {
+		return p.error_and_return('Expected "do" after rescue pattern')
+	}
+	p.advance() // Skip 'do'
+
+	// Skip newlines
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+
+	rescue_body := p.parse_block()!
 
 	if p.current.type_ != .end {
 		return p.error_and_return('Expected "end" to close match expression')
@@ -2504,6 +2713,75 @@ fn (mut p Parser) parse_match_expression() !ast.Node {
 	p.advance() // Skip 'end'
 
 	return ast.new_match_expr(p.get_next_id(), pattern, expr, rescue_body, start_pos)
+}
+
+// Parse list comprehensions: for x in list when condition do expr end
+fn (mut p Parser) parse_list_comprehension() !ast.Node {
+	start_pos := p.current.position
+	p.advance() // Skip 'for'
+
+	// Parse variable
+	if p.current.type_ != .identifier {
+		return p.error_and_return('Expected variable name after "for"')
+	}
+	var_name := p.current.value
+	var_pos := p.current.position
+	p.advance()
+
+	// Parse 'in'
+	if p.current.type_ != .in {
+		return p.error_and_return('Expected "in" after variable name')
+	}
+	p.advance()
+
+	// Parse list expression
+	list_expr := p.parse_expression()!
+
+	mut condition_expr := ast.Node{}
+	mut has_condition := false
+
+	// Parse optional 'when' condition
+	if p.current.type_ == .when {
+		p.advance() // Skip 'when'
+		condition_expr = p.parse_expression()!
+		has_condition = true
+	}
+
+	// Parse 'do'
+	if p.current.type_ != .do {
+		return p.error_and_return('Expected "do" after list expression')
+	}
+	p.advance()
+
+	// Skip newlines
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+
+	// Parse body expression
+	body_expr := p.parse_expression()!
+
+	// Skip newlines
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+
+	// Parse 'end'
+	if p.current.type_ != .end {
+		return p.error_and_return('Expected "end" to close list comprehension')
+	}
+	p.advance()
+
+	// Create variable node
+	var_node := ast.new_variable_ref(p.get_next_id(), var_name, var_pos)
+
+	// Build children: [variable, list, body, condition?]
+	mut children := [var_node, list_expr, body_expr]
+	if has_condition {
+		children << condition_expr
+	}
+
+	return ast.new_list_comprehension(p.get_next_id(), children, start_pos)
 }
 
 // ============ Task 11: Concurrency Parsing ============

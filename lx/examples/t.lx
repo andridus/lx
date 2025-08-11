@@ -1,9 +1,7 @@
-@moduledoc "Something"
-
-@doc "Test function"
-def test_directive() do
-    :ok
+def test_list_comprehensions() do
+numbers = [1, 2, 3, 4, 5]
+squares = for x in numbers do
+    x*x
 end
-def main() do
-    test_directive()
+squares
 end

@@ -464,3 +464,191 @@ test_multiple(X_1) ->
 	result := compile_lx(lx_code)
 	assert result == expected
 }
+
+// ============ Match Expression Tests ============
+
+// Test simple match expression
+fn test_match_simple() {
+	lx_code := 'def test_simple_match() do
+    data = {:ok, "success"}
+    match {:ok, result} <- data
+    result
+end'
+
+	expected := '-module(test).
+-export([test_simple_match/0]).
+
+-spec test_simple_match() -> any().
+test_simple_match() ->
+    DATA_1 = {ok, <<"success"/utf8>>},
+    case DATA_1 of
+        {ok, RESULT_2} ->
+            RESULT_2;
+        Otherwise ->
+            Otherwise
+    end.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+// Test match with single variable
+fn test_match_single_variable() {
+	lx_code := 'def test_single_variable() do
+    data = "hello"
+    match value <- data
+    value
+end'
+
+	expected := '-module(test).
+-export([test_single_variable/0]).
+
+-spec test_single_variable() -> any().
+test_single_variable() ->
+    DATA_1 = <<"hello"/utf8>>,
+    case DATA_1 of
+        VALUE_2 ->
+            VALUE_2;
+        Otherwise ->
+            Otherwise
+    end.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+// Test nested match expressions
+fn test_match_nested() {
+	lx_code := 'def test_complex_match(value) do
+    match {:ok, value1} <- value
+    match {:ok, value2} <- value1
+    :done
+end'
+
+	expected := '-module(test).
+-export([test_complex_match/1]).
+
+-spec test_complex_match(any()) -> atom().
+test_complex_match(VALUE_1) ->
+    case VALUE_1 of
+        {ok, VALUE1_2} ->
+            case VALUE1_2 of
+        {ok, VALUE2_3} ->
+            done;
+        Otherwise ->
+            Otherwise
+    end;
+        Otherwise ->
+            Otherwise
+    end.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+// Test match with list pattern
+fn test_match_list_pattern() {
+	lx_code := 'def test_list_match() do
+    data = [1, 2, 3]
+    match [head | tail] <- data
+    {head, tail}
+end'
+
+	expected := '-module(test).
+-export([test_list_match/0]).
+
+-spec test_list_match() -> {any(), [any()]}.
+test_list_match() ->
+    DATA_1 = [1, 2, 3],
+    case DATA_1 of
+        [HEAD_2 | TAIL_3] ->
+            {HEAD_2, TAIL_3};
+        Otherwise ->
+            Otherwise
+    end.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+// Test match with tuple destructuring
+fn test_match_tuple_destructuring() {
+	lx_code := 'def test_tuple_match() do
+    data = {1, "hello", :atom}
+    match {num, str, atom_val} <- data
+    {atom_val, str, num}
+end'
+
+	expected := '-module(test).
+-export([test_tuple_match/0]).
+
+-spec test_tuple_match() -> {any(), any(), any()}.
+test_tuple_match() ->
+    DATA_1 = {1, <<"hello"/utf8>>, atom},
+    case DATA_1 of
+        {NUM_2, STR_3, ATOM_VAL_4} ->
+            {ATOM_VAL_4, STR_3, NUM_2};
+        Otherwise ->
+            Otherwise
+    end.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+// Test match with rescue clause
+fn test_match_with_rescue() {
+	lx_code := 'def test_match_rescue() do
+    data = {:error, "failed"}
+    match {:ok, result} <- data rescue error do
+        {:failed, error}
+    end
+    :done
+end'
+
+	expected := '-module(test).
+-export([test_match_rescue/0]).
+
+-spec test_match_rescue() -> {atom(), any()}.
+test_match_rescue() ->
+    DATA_1 = {error, <<"failed"/utf8>>},
+    case DATA_1 of
+        {ok, RESULT_2} ->
+            done;
+        ERROR_3 ->
+            {failed, ERROR_3}
+    end.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+// Test match with atom patterns
+fn test_match_atom_patterns() {
+	lx_code := 'def test_atom_match(status) do
+    match :ok <- status
+    "success"
+end'
+
+	expected := '-module(test).
+-export([test_atom_match/1]).
+
+-spec test_atom_match(any()) -> binary().
+test_atom_match(STATUS_1) ->
+    case STATUS_1 of
+        ok ->
+            <<"success"/utf8>>;
+        Otherwise ->
+            Otherwise
+    end.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}

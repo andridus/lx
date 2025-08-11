@@ -1189,6 +1189,19 @@ fn (mut a Analyzer) node_has_lambda_self_call(node ast.Node, var_name string) bo
 fn (mut a Analyzer) analyze_variable_ref(node ast.Node) !ast.Node {
 	var_name := node.value
 
+	if a.analysis_context == .pattern {
+		if scheme := a.lookup(var_name) {
+			a.type_table.assign_type(node.id, scheme.body)
+			return node
+		} else {
+			a.type_table.assign_type(node.id, ast.Type{
+				name:   'any'
+				params: []
+			})
+			return node
+		}
+	}
+
 	// Look up variable in current function's type environment
 	if scheme := a.lookup(var_name) {
 		a.type_table.assign_type(node.id, scheme.body)
@@ -3260,7 +3273,7 @@ fn (mut a Analyzer) register_pattern_variables(pattern ast.Node) {
 		}
 		.tuple_literal {
 			// Tuple pattern {x, y, z}
-			for elem in pattern.children {
+			for _, elem in pattern.children {
 				a.register_pattern_variables(elem)
 			}
 		}
@@ -3498,17 +3511,47 @@ fn (mut a Analyzer) analyze_match_expr(node ast.Node) !ast.Node {
 	// Analyze expression
 	expr := a.analyze_node(node.children[1])!
 
-	// Analyze pattern
+	// Enter scope for pattern binding and continuation
+	a.enter_scope('match_scope')
+	defer { a.exit_scope() }
+
+	// Register pattern variables first (from original node)
+	a.register_pattern_variables(node.children[0])
+
+	// Analyze pattern in pattern context
 	pattern := a.with_context(.pattern, fn [mut a, node] (mut analyzer Analyzer) !ast.Node {
 		return analyzer.analyze_node(node.children[0])
 	})!
 
 	mut analyzed_children := [pattern, expr]
 
-	// Analyze rescue body if present
-	if node.children.len > 2 {
+	// Analyze rescue body if present (child 2)
+	if node.children.len > 2 && node.children[2].kind != .block {
 		rescue_body := a.analyze_node(node.children[2])!
 		analyzed_children << rescue_body
+	} else if node.children.len > 2 && node.children[2].kind == .block {
+		// This is a rescue block with error pattern and body
+		rescue_block := node.children[2]
+		if rescue_block.children.len >= 2 {
+			// First child is error pattern, register it as a variable
+			error_pattern := rescue_block.children[0]
+			a.register_pattern_variables(error_pattern)
+
+			// Analyze the rescue block normally
+			rescue_body := a.analyze_node(rescue_block)!
+			analyzed_children << rescue_body
+		}
+	}
+
+	// Analyze continuation body if present (child 2 or 3 depending on rescue)
+	mut continuation_index := 2
+	if node.children.len > 2 && node.children[2].kind != .block {
+		continuation_index = 3
+	}
+
+	if node.children.len > continuation_index {
+		continuation_body := a.analyze_node(node.children[continuation_index])!
+		analyzed_children << continuation_body
 	}
 
 	analyzed_node := ast.Node{
@@ -3516,16 +3559,36 @@ fn (mut a Analyzer) analyze_match_expr(node ast.Node) !ast.Node {
 		children: analyzed_children
 	}
 
-	// Match expressions typically return the matched value type
-	expr_type := a.type_table.get_type(expr.id) or {
-		ast.Type{
-			name:   'any'
-			params: []
+	// Match expressions return the type of the continuation or the matched value
+	mut result_type := ast.Type{
+		name:   'any'
+		params: []
+	}
+
+	if continuation_index < analyzed_children.len {
+		// Has continuation - return continuation type
+		continuation := analyzed_children[continuation_index]
+		result_type = a.type_table.get_type(continuation.id) or {
+			ast.Type{
+				name:   'any'
+				params: []
+			}
+		}
+	} else {
+		// No continuation - return matched value type
+		result_type = a.type_table.get_type(expr.id) or {
+			ast.Type{
+				name:   'any'
+				params: []
+			}
 		}
 	}
-	a.type_table.assign_type(analyzed_node.id, expr_type)
+
+	a.type_table.assign_type(analyzed_node.id, result_type)
 	return analyzed_node
 }
+
+
 
 // ============ Task 11: Concurrency Analysis ============
 
@@ -4061,16 +4124,60 @@ fn (mut a Analyzer) analyze_anonymous_function(node ast.Node) !ast.Node {
 }
 
 fn (mut a Analyzer) analyze_list_comprehension(node ast.Node) !ast.Node {
-	if node.children.len < 2 {
-		a.error('List comprehension must have expression and generator', node.position)
+	if node.children.len < 3 {
+		a.error('List comprehension must have variable, list, and body', node.position)
 		return error('Invalid list comprehension')
 	}
 
-	mut analyzed_children := []ast.Node{}
+	// Children: [variable, list, body, condition?]
+	var_node := node.children[0]
+	list_node := node.children[1]
+	body_node := node.children[2]
 
-	for child in node.children {
-		analyzed_child := a.analyze_node(child)!
-		analyzed_children << analyzed_child
+	// Analyze list expression first
+	analyzed_list := a.analyze_node(list_node)!
+
+	// Enter new scope for comprehension variable
+	a.enter_scope('list_comprehension')
+	defer { a.exit_scope() }
+
+	// Bind comprehension variable with element type from list
+	list_type := a.type_table.get_type(analyzed_list.id) or {
+		ast.Type{
+			name:   'list'
+			params: [ast.Type{ name: 'any', params: [] }]
+		}
+	}
+
+	element_type := if list_type.name == 'list' && list_type.params.len > 0 {
+		list_type.params[0]
+	} else {
+		ast.Type{ name: 'any', params: [] }
+	}
+
+	a.bind(var_node.value, TypeScheme{
+		quantified_vars: []
+		body: element_type
+	})
+
+	// Analyze variable node
+	analyzed_var := a.analyze_node(var_node)!
+
+	// Analyze condition if present
+	mut analyzed_condition := ast.Node{}
+	mut has_condition := false
+	if node.children.len > 3 {
+		analyzed_condition = a.analyze_node(node.children[3])!
+		has_condition = true
+	}
+
+	// Analyze body expression
+	analyzed_body := a.analyze_node(body_node)!
+
+	// Build analyzed children
+	mut analyzed_children := [analyzed_var, analyzed_list, analyzed_body]
+	if has_condition {
+		analyzed_children << analyzed_condition
 	}
 
 	analyzed_node := ast.Node{
@@ -4078,15 +4185,16 @@ fn (mut a Analyzer) analyze_list_comprehension(node ast.Node) !ast.Node {
 		children: analyzed_children
 	}
 
-	// List comprehensions return a list
-	list_type := ast.Type{
-		name:   'list'
-		params: [ast.Type{
-			name:   'any'
-			params: []
-		}]
+	// List comprehensions return a list of the body expression type
+	body_type := a.type_table.get_type(analyzed_body.id) or {
+		ast.Type{ name: 'any', params: [] }
 	}
-	a.type_table.assign_type(analyzed_node.id, list_type)
+
+	list_result_type := ast.Type{
+		name:   'list'
+		params: [body_type]
+	}
+	a.type_table.assign_type(analyzed_node.id, list_result_type)
 	return analyzed_node
 }
 

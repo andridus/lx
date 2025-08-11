@@ -8,7 +8,7 @@ def test_interpolation(name, age) do
 end
 
 def test_anonymous_functions() do
-    double = fn(x) -> x * 2 end
+    double = fn(x) -> x * 2
     numbers = [1, 2, 3, 4, 5]
     doubled = map(double, numbers)
     doubled
@@ -29,7 +29,9 @@ end
 
 def test_list_comprehensions() do
     numbers = [1, 2, 3, 4, 5]
-    squares = [x * x || x <- numbers, x > 2]
+    squares = for x in numbers when x > 2 do
+        x*x
+    end
     squares
 end
 

@@ -435,6 +435,10 @@ pub fn new_match_expr(id int, pattern Node, expr Node, rescue_body ?Node, pos Po
 	}
 }
 
+
+
+
+
 // ============ Task 11: Concurrency Builders ============
 
 pub fn new_spawn_expr(id int, func_expr Node, pos Position) Node {
@@ -631,17 +635,7 @@ pub fn new_lambda_call(id int, lambda Node, args []Node, pos Position) Node {
 	}
 }
 
-pub fn new_list_comprehension(id int, expr Node, generators []Node, filters []Node, pos Position) Node {
-	mut children := [expr]
-	children << generators
-	children << filters
-	return Node{
-		id:       id
-		kind:     .list_comprehension
-		children: children
-		position: pos
-	}
-}
+
 
 pub fn new_directive(id int, name string, args []Node, pos Position) Node {
 	return Node{
@@ -659,6 +653,15 @@ pub fn new_test_block(id int, name string, body Node, pos Position) Node {
 		kind:     .test_block
 		value:    name
 		children: [body]
+		position: pos
+	}
+}
+
+pub fn new_list_comprehension(id int, children []Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .list_comprehension
+		children: children
 		position: pos
 	}
 }

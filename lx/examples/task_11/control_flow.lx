@@ -19,8 +19,12 @@ def get_user_info(id) do
     with {:ok, user} <- result do
         {:ok, {user, "profile"}}
     else
-        {:error, "not found"}
+       _ -> {:error, "not found"}
     end
+end
+
+def risky_operation() do
+    {:error, false}
 end
 
 def safe_operation() do
@@ -29,6 +33,9 @@ def safe_operation() do
     end
 end
 
+def error_handler(error) do
+    error
+end
 def main() do
     categorize_age(20)
 end

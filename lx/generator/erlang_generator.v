@@ -1758,21 +1758,60 @@ fn (mut g ErlangGenerator) generate_match_expr(node ast.Node) ! {
 		return error('Match expression must have pattern and expression')
 	}
 
-	g.output.write_string('try ')
+	// Generate case expression
+	g.output.write_string('case ')
 	g.generate_node(node.children[1])! // expression
-	g.output.write_string(' of\n')
-	g.output.write_string('        ')
-	g.generate_node(node.children[0])! // pattern
-	g.output.write_string(' -> ok\n')
+	g.output.write_string(' of\n        ')
+	g.generate_pattern(node.children[0])! // pattern
+	g.output.write_string(' ->\n            ')
 
-	if node.children.len > 2 {
-		g.output.write_string('    catch\n')
-		g.output.write_string('        Error -> ')
-		g.generate_node(node.children[2])! // rescue body
+	// Determine structure: [pattern, expr, rescue_block?, continuation?]
+	mut has_rescue := false
+	mut continuation_index := 2
+
+	if node.children.len > 2 && node.children[2].kind == .block {
+		rescue_block := node.children[2]
+		if rescue_block.children.len == 2 && rescue_block.children[0].kind == .variable_ref {
+			has_rescue = true
+			continuation_index = 3
+		}
+	}
+
+	if node.children.len > continuation_index {
+		g.generate_node(node.children[continuation_index])! // continuation
+	} else if !has_rescue {
+		g.output.write_string('ok') // fallback
+	} else {
+		g.output.write_string('ok')
+	}
+
+	g.output.write_string(';\n        ')
+
+	// Generate rescue body or default error handling
+	if has_rescue && node.children.len > 2 {
+		rescue_block := node.children[2]
+		if rescue_block.kind == .block && rescue_block.children.len >= 2 {
+			// Use the error pattern variable as the match pattern
+			error_pattern := rescue_block.children[0]
+			g.generate_pattern(error_pattern)! // generates ERROR_3
+			g.output.write_string(' ->\n            ')
+
+			// Generate the rescue body
+			rescue_body := rescue_block.children[1]
+			g.generate_node(rescue_body)!
+		} else {
+			g.output.write_string('Otherwise ->\n            ')
+			g.generate_node(node.children[2])! // fallback: generate the whole rescue node
+		}
+	} else {
+		g.output.write_string('Otherwise ->\n            ')
+		g.output.write_string('Otherwise') // default: return the unmatched value
 	}
 
 	g.output.write_string('\n    end')
 }
+
+
 
 // ============ Task 11: Concurrency Generation ============
 
@@ -2026,20 +2065,28 @@ fn (mut g ErlangGenerator) generate_anonymous_function(node ast.Node) ! {
 
 // Generate list comprehensions
 fn (mut g ErlangGenerator) generate_list_comprehension(node ast.Node) ! {
-	if node.children.len < 2 {
-		return error('List comprehension must have expression and generator')
+	if node.children.len < 3 {
+		return error('List comprehension must have variable, list, and body')
 	}
 
+	// Children: [variable, list, body, condition?]
+	var_node := node.children[0]
+	list_node := node.children[1]
+	body_node := node.children[2]
+
 	g.output.write_string('[')
-	g.generate_node(node.children[0])! // expression
+	g.generate_node(body_node)! // body expression
 	g.output.write_string(' || ')
 
-	// Generators and filters
-	for i in 1 .. node.children.len {
-		g.generate_node(node.children[i])!
-		if i < node.children.len - 1 {
-			g.output.write_string(', ')
-		}
+	// Generate variable <- list
+	g.generate_node(var_node)! // variable
+	g.output.write_string(' <- ')
+	g.generate_node(list_node)! // list
+
+	// Generate condition if present
+	if node.children.len > 3 {
+		g.output.write_string(', ')
+		g.generate_node(node.children[3])! // condition
 	}
 
 	g.output.write_string(']')

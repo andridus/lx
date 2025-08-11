@@ -71,7 +71,7 @@ pub enum NodeKind {
 	if_expr     // if condition do ... else ... end
 	with_expr   // with pattern <- expr do ... else ... end
 	clause_list // list of with clauses
-	match_expr  // match pattern <- expr rescue error do ... end
+	match_expr      // match pattern <- expr [rescue error do ... end] [continuation]
 
 	// Task 11: Concurrency and Processes
 	spawn_expr     // spawn(fn -> ... end)
@@ -102,7 +102,7 @@ pub enum NodeKind {
 	string_interpolation // "Hello, #{name}!"
 	anonymous_function   // fn(x) -> x * 2 end
 	lambda_call          // fun.(args)
-	list_comprehension   // [x * 2 || x <- list]
+	list_comprehension   // for x in list when condition do expr end
 	directive            // @doc, @spec
 	test_block           // describe, test, assert
 }

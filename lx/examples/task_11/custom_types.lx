@@ -35,5 +35,4 @@ def list_head(list :: list(T)) :: result(T) do
     end
 end
 def main() do
-    process_status()
 end

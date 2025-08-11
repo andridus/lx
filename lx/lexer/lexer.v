@@ -363,6 +363,8 @@ fn (mut l Lexer) read_identifier() Token {
 		'describe' { TokenType.describe }
 		'test' { TokenType.test }
 		'assert' { TokenType.assert }
+		'for' { TokenType.for_ }
+		'in' { TokenType.in }
 		else { TokenType.identifier }
 	}
 

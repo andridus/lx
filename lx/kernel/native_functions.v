@@ -496,6 +496,32 @@ pub const native_functions = {
 			'erl': '$1 >= $2'
 		}]
 	}
+	'in':         FunctionInfo{
+		precedence:    3
+		associativity: .left
+		fixity:        .infix
+		signatures:    [
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'any'
+					params: []
+				}, ast.Type{
+					name:   'list'
+					params: [ast.Type{
+						name:   'any'
+						params: []
+					}]
+				}]
+				return_type: ast.Type{
+					name:   'boolean'
+					params: []
+				}
+			},
+		]
+		gen:           [{
+			'erl': 'lists:member($1, $2)'
+		}]
+	}
 	// Logical operators (infix)
 	'and':        FunctionInfo{
 		precedence:    4
@@ -758,33 +784,6 @@ pub const native_functions = {
 		]
 		gen:           [{
 			'erl': 'length($1)'
-		}]
-	}
-	// List membership operator
-	'in':         FunctionInfo{
-		precedence:    3
-		associativity: .left
-		fixity:        .infix
-		signatures:    [
-			TypeSignature{
-				parameters:  [ast.Type{
-					name:   'any'
-					params: []
-				}, ast.Type{
-					name:   'list'
-					params: [ast.Type{
-						name:   'any'
-						params: []
-					}]
-				}]
-				return_type: ast.Type{
-					name:   'boolean'
-					params: []
-				}
-			},
-		]
-		gen:           [{
-			'erl': 'lists:member($1, $2)'
 		}]
 	}
 	// Tuple size function
