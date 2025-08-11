@@ -233,6 +233,45 @@ pub const native_functions = {
 					params: []
 				}
 			},
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'any'
+					params: []
+				}, ast.Type{
+					name:   'nil'
+					params: []
+				}]
+				return_type: ast.Type{
+					name:   'boolean'
+					params: []
+				}
+			},
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'nil'
+					params: []
+				}, ast.Type{
+					name:   'any'
+					params: []
+				}]
+				return_type: ast.Type{
+					name:   'boolean'
+					params: []
+				}
+			},
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'any'
+					params: []
+				}, ast.Type{
+					name:   'any'
+					params: []
+				}]
+				return_type: ast.Type{
+					name:   'boolean'
+					params: []
+				}
+			},
 		]
 		gen:           [{
 			'erl': '$1 == $2'
@@ -269,9 +308,48 @@ pub const native_functions = {
 					params: []
 				}
 			},
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'any'
+					params: []
+				}, ast.Type{
+					name:   'nil'
+					params: []
+				}]
+				return_type: ast.Type{
+					name:   'boolean'
+					params: []
+				}
+			},
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'nil'
+					params: []
+				}, ast.Type{
+					name:   'any'
+					params: []
+				}]
+				return_type: ast.Type{
+					name:   'boolean'
+					params: []
+				}
+			},
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'any'
+					params: []
+				}, ast.Type{
+					name:   'any'
+					params: []
+				}]
+				return_type: ast.Type{
+					name:   'boolean'
+					params: []
+				}
+			},
 		]
 		gen:           [{
-			'erl': '$1 != $2'
+			'erl': '$1 /= $2'
 		}]
 	}
 	'<':          FunctionInfo{
@@ -343,7 +421,7 @@ pub const native_functions = {
 			},
 		]
 		gen:           [{
-			'erl': '$1 <= $2'
+			'erl': '$1 =< $2'
 		}]
 	}
 	'>':          FunctionInfo{
@@ -735,6 +813,29 @@ pub const native_functions = {
 			'erl': 'tuple_size($1)'
 		}]
 	}
+	// Binary size function
+	'byte_size':  FunctionInfo{
+		precedence:    0
+		associativity: .left
+		fixity:        .prefix
+		signatures:    [
+			TypeSignature{
+				parameters:  [
+					ast.Type{
+						name:   'binary'
+						params: []
+					},
+				]
+				return_type: ast.Type{
+					name:   'integer'
+					params: []
+				}
+			},
+		]
+		gen:           [{
+			'erl': 'byte_size($1)'
+		}]
+	}
 	// Element access function
 	'element':    FunctionInfo{
 		precedence:    0
@@ -933,6 +1034,27 @@ pub const native_functions = {
 		]
 		gen:           [{
 			'erl': '$1 ! $2'
+		}]
+	}
+	// Type checking functions
+	'is_nil':     FunctionInfo{
+		precedence:    0
+		associativity: .left
+		fixity:        .prefix
+		signatures:    [
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'any'
+					params: []
+				}]
+				return_type: ast.Type{
+					name:   'boolean'
+					params: []
+				}
+			},
+		]
+		gen:           [{
+			'erl': '$1 =:= nil'
 		}]
 	}
 }

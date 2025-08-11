@@ -316,7 +316,7 @@ struct CompileResult {
 fn compile_and_infer_types(lx_code string) CompileResult {
 	// Real implementation using the lx1 compiler
 
-	mut p := parser.new_parser(lx_code, 'test.lx')
+	mut p := parser.new_parser(lx_code, 'test.lx', parser.new_directives_table())
 
 	parsed := p.parse() or {
 		return CompileResult{

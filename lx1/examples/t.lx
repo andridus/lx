@@ -1,5 +1,6 @@
-def process_mixed_args do
-(x :: integer) -> x * 2
-(s :: string) -> s
-(:ok) -> "success"
+@moduledoc "Something"
+
+@doc "Test function"
+def test_directive() do
+    :ok
 end

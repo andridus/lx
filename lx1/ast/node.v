@@ -68,39 +68,40 @@ pub enum NodeKind {
 	type_annotation // :: Type
 
 	// Task 11: Control Flow
-	if_expr         // if condition do ... else ... end
-	with_expr       // with pattern <- expr do ... else ... end
-	match_expr      // match pattern <- expr rescue error do ... end
+	if_expr     // if condition do ... else ... end
+	with_expr   // with pattern <- expr do ... else ... end
+	clause_list // list of with clauses
+	match_expr  // match pattern <- expr rescue error do ... end
 
 	// Task 11: Concurrency and Processes
-	spawn_expr      // spawn(fn -> ... end)
-	send_expr       // pid ! message
-	receive_expr    // receive do pattern -> expr; pattern -> expr end
-	supervisor_def  // supervisor name do ... end
-	worker_def      // worker name do ... end
+	spawn_expr     // spawn(fn -> ... end)
+	send_expr      // pid ! message
+	receive_expr   // receive do pattern -> expr; pattern -> expr end
+	supervisor_def // supervisor name do ... end
+	worker_def     // worker name do ... end
 
 	// Task 11: Binaries and Bitstrings
-	binary_literal  // <<1, 2, 3>>, <<"hello">>
-	binary_pattern  // <<version:8, data:32/binary>>
-	binary_segment  // segment within binary
+	binary_literal // <<1, 2, 3>>, <<"hello">>
+	binary_pattern // <<version:8, data:32/binary>>
+	binary_segment // segment within binary
 
 	// Task 11: Custom Types
-	type_def        // type status :: :ok | :error | :pending
-	union_type      // :ok | :error | :pending
-	generic_type    // result(T)
-	opaque_type     // opaque user_id :: integer
-	nominal_type    // nominal email :: string
-	recursive_type  // type list(T) :: [] | {T, list(T)}
+	type_def       // type status :: :ok | :error | :pending
+	union_type     // :ok | :error | :pending
+	generic_type   // result(T)
+	opaque_type    // opaque user_id :: integer
+	nominal_type   // nominal email :: string
+	recursive_type // type list(T) :: [] | {T, list(T)}
 
 	// Task 11: Module System
-	deps_declaration // deps [:cowboy, :outro_modulo]
+	deps_declaration   // deps [:cowboy, :outro_modulo]
 	application_config // application { ... }
-	import_statement // import Module
+	import_statement   // import Module
 
 	// Task 11: Advanced Features
 	string_interpolation // "Hello, #{name}!"
 	anonymous_function   // fn(x) -> x * 2 end
-	lambda_call         // fun.(args)
+	lambda_call          // fun.(args)
 	list_comprehension   // [x * 2 || x <- list]
 	directive            // @doc, @spec
 	test_block           // describe, test, assert

@@ -465,7 +465,7 @@ end'
 comparison_list() ->
     A_1 = 5,
     B_2 = 3,
-    [A_1 > B_2, A_1 == B_2, A_1 != B_2].
+    [A_1 > B_2, A_1 == B_2, A_1 /= B_2].
 '
 
 	result := compile_lx(lx_code)

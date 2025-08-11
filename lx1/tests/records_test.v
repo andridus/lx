@@ -227,7 +227,7 @@ record_with_comparisons() ->
     AGE2_4 = PERSON2_2#person.age,
     OLDER_5 = AGE1_3 > AGE2_4,
     SAME_AGE_6 = AGE1_3 == AGE2_4,
-    DIFFERENT_AGE_7 = AGE1_3 != AGE2_4,
+    DIFFERENT_AGE_7 = AGE1_3 /= AGE2_4,
     {OLDER_5, SAME_AGE_6, DIFFERENT_AGE_7}.
 '
 

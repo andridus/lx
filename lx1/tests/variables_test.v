@@ -1,15 +1,15 @@
 module main
 
 fn test_simple_binding() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
         x = 42
         x
     end'
 	expected := '-module(test).
--export([test/0]).
+-export([test_function/0]).
 
--spec test() -> integer().
-test() ->
+-spec test_function() -> integer().
+test_function() ->
     X_1 = 42,
     X_1.
 '
@@ -18,17 +18,17 @@ test() ->
 }
 
 fn test_multiple_bindings() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
         a = 10
         b = 20
         a
     end'
 	result := compile_lx(lx_code)
 	expected := '-module(test).
--export([test/0]).
+-export([test_function/0]).
 
--spec test() -> integer().
-test() ->
+-spec test_function() -> integer().
+test_function() ->
     A_1 = 10,
     B_2 = 20,
     A_1.
@@ -37,16 +37,16 @@ test() ->
 }
 
 fn test_explicit_separators() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
         a = 1; b = 2; c = 3
         a
     end'
 	result := compile_lx(lx_code)
 	expected := '-module(test).
--export([test/0]).
+-export([test_function/0]).
 
--spec test() -> integer().
-test() ->
+-spec test_function() -> integer().
+test_function() ->
     A_1 = 1,
     B_2 = 2,
     C_3 = 3,
@@ -56,7 +56,7 @@ test() ->
 }
 
 fn test_different_types() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
         number = 42
         text = "Hello"
         flag = true
@@ -64,10 +64,10 @@ fn test_different_types() {
     end'
 	result := compile_lx(lx_code)
 	expected := '-module(test).
--export([test/0]).
+-export([test_function/0]).
 
--spec test() -> integer().
-test() ->
+-spec test_function() -> integer().
+test_function() ->
     NUMBER_1 = 42,
     TEXT_2 = <<"Hello"/utf8>>,
     FLAG_3 = true,
@@ -103,16 +103,15 @@ func2() ->
 }
 
 fn test_undefined_variable() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
         x
     end'
 	result := compile_lx_with_error(lx_code)
-	println('result: ${result}')
 	assert result.contains('Undefined variable: x')
 }
 
 fn test_variable_reuse_error() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
         x = 5
         x = 10
         x

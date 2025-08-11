@@ -1,14 +1,14 @@
 module main
 
 fn test_simple_arithmetic() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
         10 + 5
     end'
 	expected := '-module(test).
--export([test/0]).
+-export([test_function/0]).
 
--spec test() -> integer().
-test() ->
+-spec test_function() -> integer().
+test_function() ->
     10 + 5.
 '
 	result := compile_lx(lx_code)
@@ -16,14 +16,14 @@ test() ->
 }
 
 fn test_arithmetic_precedence() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
         2 + 3 * 4
     end'
 	expected := '-module(test).
--export([test/0]).
+-export([test_function/0]).
 
--spec test() -> integer().
-test() ->
+-spec test_function() -> integer().
+test_function() ->
     2 + 3 * 4.
 '
 	result := compile_lx(lx_code)
@@ -31,14 +31,14 @@ test() ->
 }
 
 fn test_parentheses() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
         (2 + 3) * 4
     end'
 	expected := '-module(test).
--export([test/0]).
+-export([test_function/0]).
 
--spec test() -> integer().
-test() ->
+-spec test_function() -> integer().
+test_function() ->
     (2 + 3) * 4.
 '
 	result := compile_lx(lx_code)
@@ -46,14 +46,14 @@ test() ->
 }
 
 fn test_comparison_operators() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
         10 > 5
     end'
 	expected := '-module(test).
--export([test/0]).
+-export([test_function/0]).
 
--spec test() -> boolean().
-test() ->
+-spec test_function() -> boolean().
+test_function() ->
     10 > 5.
 '
 	result := compile_lx(lx_code)
@@ -61,16 +61,16 @@ test() ->
 }
 
 fn test_bitwise_operators() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
         a = 5
         b = 3
         a &&& b
     end'
 	expected := '-module(test).
--export([test/0]).
+-export([test_function/0]).
 
--spec test() -> integer().
-test() ->
+-spec test_function() -> integer().
+test_function() ->
     A_1 = 5,
     B_2 = 3,
     A_1 band B_2.
@@ -80,17 +80,17 @@ test() ->
 }
 
 fn test_complex_expression() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
         a = 10
         b = 5
         c = 3
         (a + b) * c - 2
     end'
 	expected := '-module(test).
--export([test/0]).
+-export([test_function/0]).
 
--spec test() -> integer().
-test() ->
+-spec test_function() -> integer().
+test_function() ->
     A_1 = 10,
     B_2 = 5,
     C_3 = 3,
@@ -101,7 +101,7 @@ test() ->
 }
 
 fn test_type_mismatch_error() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
         42 + "hello"
     end'
 	result := compile_lx_with_error(lx_code)
@@ -109,7 +109,7 @@ fn test_type_mismatch_error() {
 }
 
 fn test_incompatible_numeric_types() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
         a = 10
         b = 3.14
         a + b
@@ -119,7 +119,7 @@ fn test_incompatible_numeric_types() {
 }
 
 fn test_bitwise_with_non_integer() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
         a = 5
         b = 3.14
         a &&& b
@@ -129,16 +129,16 @@ fn test_bitwise_with_non_integer() {
 }
 
 fn test_multiple_operators() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
         a = true
         b = false
         a and b
     end'
 	expected := '-module(test).
--export([test/0]).
+-export([test_function/0]).
 
--spec test() -> boolean().
-test() ->
+-spec test_function() -> boolean().
+test_function() ->
     A_1 = true,
     B_2 = false,
     A_1 andalso B_2.
@@ -148,16 +148,16 @@ test() ->
 }
 
 fn test_float_arithmetic() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
         a = 3.14
         b = 2.86
         a + b
     end'
 	expected := '-module(test).
--export([test/0]).
+-export([test_function/0]).
 
--spec test() -> float().
-test() ->
+-spec test_function() -> float().
+test_function() ->
     A_1 = 3.14,
     B_2 = 2.86,
     A_1 + B_2.
@@ -167,16 +167,16 @@ test() ->
 }
 
 fn test_float_comparison() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
         a = 3.14
         b = 2.86
         a > b
     end'
 	expected := '-module(test).
--export([test/0]).
+-export([test_function/0]).
 
--spec test() -> boolean().
-test() ->
+-spec test_function() -> boolean().
+test_function() ->
     A_1 = 3.14,
     B_2 = 2.86,
     A_1 > B_2.
@@ -186,7 +186,7 @@ test() ->
 }
 
 fn test_all_bitwise_operators() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
         a = 5
         b = 3
         a &&& b
@@ -196,10 +196,10 @@ fn test_all_bitwise_operators() {
         a >>> 1
     end'
 	expected := '-module(test).
--export([test/0]).
+-export([test_function/0]).
 
--spec test() -> integer().
-test() ->
+-spec test_function() -> integer().
+test_function() ->
     A_1 = 5,
     B_2 = 3,
     A_1 band B_2,
@@ -213,7 +213,7 @@ test() ->
 }
 
 fn test_all_comparison_operators() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
         a = 10
         b = 5
         a == b
@@ -224,16 +224,16 @@ fn test_all_comparison_operators() {
         a >= b
     end'
 	expected := '-module(test).
--export([test/0]).
+-export([test_function/0]).
 
--spec test() -> boolean().
-test() ->
+-spec test_function() -> boolean().
+test_function() ->
     A_1 = 10,
     B_2 = 5,
     A_1 == B_2,
-    A_1 != B_2,
+    A_1 /= B_2,
     A_1 < B_2,
-    A_1 <= B_2,
+    A_1 =< B_2,
     A_1 > B_2,
     A_1 >= B_2.
 '

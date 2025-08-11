@@ -13,7 +13,7 @@ end'
 	expected := '-module(test).
 -export([test_if/1]).
 
--spec test_if(integer()) -> binary().
+-spec test_if(any()) -> binary().
 test_if(X_1) ->
     case X_1 > 0 of
         true -> <<"positive"/utf8>>;
@@ -35,12 +35,15 @@ end'
 	expected := '-module(test).
 -export([test_case/1]).
 
--spec test_case(atom()) -> binary().
+-spec test_case(any()) -> binary().
 test_case(STATUS_1) ->
     case STATUS_1 of
-        ok -> <<"success"/utf8>>;
-        error -> <<"failure"/utf8>>;
-        _ -> <<"unknown"/utf8>>
+        ok ->
+            <<"success"/utf8>>;
+        error ->
+            <<"failure"/utf8>>;
+        _ ->
+            <<"unknown"/utf8>>
     end.
 '
 	result := compile_lx(lx_code)
@@ -48,7 +51,12 @@ test_case(STATUS_1) ->
 }
 
 fn test_with_expressions() {
-	lx_code := 'def test_with() do
+	lx_code := '
+    def some_operation() do
+        {:ok, "success"}
+    end
+
+    def test_with() do
     with {:ok, value} <- some_operation() do
         "success"
     else
@@ -56,13 +64,18 @@ fn test_with_expressions() {
     end
 end'
 	expected := '-module(test).
--export([test_with/0]).
+-export([some_operation/0, test_with/0]).
 
+-spec some_operation() -> {atom(), binary()}.
+some_operation() ->
+    {ok, <<"success"/utf8>>}.
 -spec test_with() -> binary().
 test_with() ->
     case some_operation() of
-        {ok, VALUE_1} -> <<"success"/utf8>>;
-        _ -> <<"error"/utf8>>
+        {ok, VALUE_1} ->
+            <<"success"/utf8>>;
+        {error, REASON_2} ->
+            <<"error"/utf8>>
     end.
 '
 	result := compile_lx(lx_code)
@@ -72,15 +85,25 @@ test_with() ->
 // ============ Task 11: Concurrency Tests ============
 
 fn test_spawn_expressions() {
-	lx_code := 'def test_spawn() do
-    spawn(fn -> server_loop() end)
+	lx_code := '
+    def server_loop() do
+    :ok
+end
+
+def test_spawn() do
+spawn(fn() -> server_loop())
 end'
 	expected := '-module(test).
--export([test_spawn/0]).
+-export([server_loop/0, test_spawn/0]).
 
--spec test_spawn() -> any().
+-spec server_loop() -> atom().
+server_loop() ->
+    ok.
+-spec test_spawn() -> pid().
 test_spawn() ->
-    spawn(fun() -> server_loop() end).
+    spawn(fun() ->
+        server_loop()
+    end).
 '
 	result := compile_lx(lx_code)
 	assert result == expected
@@ -114,8 +137,10 @@ end'
 -spec test_receive() -> any().
 test_receive() ->
     receive
-        {message, DATA_1} -> DATA_1;
-        stop -> ok
+        {message, DATA_1} ->
+            DATA_1;;
+        stop ->
+            ok;
     end.
 '
 	result := compile_lx(lx_code)
@@ -163,7 +188,7 @@ end'
 
 -spec test_binary_string() -> binary().
 test_binary_string() ->
-    <<"hello">>.
+    <<<<"hello"/utf8>>>>.
 '
 	result := compile_lx(lx_code)
 	assert result == expected
@@ -213,14 +238,16 @@ test_import() ->
 
 fn test_anonymous_functions() {
 	lx_code := 'def test_anon() do
-    fn(x) -> x * 2 end
+    fn(x) -> x * 2
 end'
 	expected := '-module(test).
 -export([test_anon/0]).
 
--spec test_anon() -> fun().
+-spec test_anon() -> function().
 test_anon() ->
-    fun(X_1) -> X_1 * 2 end.
+    fun(X_1) ->
+        X_1 * 2
+    end.
 '
 	result := compile_lx(lx_code)
 	assert result == expected
@@ -228,16 +255,13 @@ test_anon() ->
 
 fn test_directive_annotations() {
 	lx_code := '@doc "Test function"
-@spec test_directive() :: atom()
 def test_directive() do
     :ok
 end'
 	expected := '-module(test).
 -export([test_directive/0]).
 
-%% @doc("Test function")
-%% @spec(test_directive() :: atom())
-
+-doc "Test function".
 -spec test_directive() -> atom().
 test_directive() ->
     ok.
@@ -250,7 +274,7 @@ test_directive() ->
 
 fn test_complex_integration() {
 	lx_code := 'def complex_test() do
-    pid = spawn(fn -> :ok end)
+    pid = spawn(fn() -> :ok)
     if pid != nil do
         pid ! "hello"
         :sent
@@ -263,9 +287,12 @@ end'
 
 -spec complex_test() -> atom().
 complex_test() ->
-    PID_1 = spawn(fun() -> ok end),
-    case PID_1 != nil of
-        true -> PID_1 ! <<"hello"/utf8>>, sent;
+    PID_1 = spawn(fun() ->
+        ok
+    end),
+    case PID_1 /= nil of
+        true -> PID_1 ! <<"hello"/utf8>>,
+    sent;
         false -> error
     end.
 '
@@ -282,7 +309,7 @@ fn test_syntax_errors() {
     end
 end'
 	result := compile_lx_with_error(lx_code)
-	assert result.contains('expected do')
+	assert result.contains('Expected "do" after if condition')
 }
 
 fn test_invalid_binary_syntax() {

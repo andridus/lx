@@ -426,62 +426,79 @@ fn test_integration_scenario() {
 				[
 					ast.Type{
 						name:   'function'
-						params: [ast.Type{
-							name:   'integer'
-							params: []
-						}, ast.Type{
-							name:   'string'
-							params: []
-						}]
+						params: [
+							ast.Type{
+								name:   'integer'
+								params: []
+							},
+							ast.Type{
+								name:   'string'
+								params: []
+							},
+						]
 					},
 					ast.Type{
 						name:   'list'
+						params: [
+							ast.Type{
+								name:   'integer'
+								params: []
+							},
+						]
+					},
+				]
+			}
+			'head' {
+				[
+					ast.Type{
+						name:   'list'
 						params: [ast.Type{
-							name:   'integer'
+							name:   'string'
 							params: []
 						}]
 					},
 				]
 			}
-			'head' {
-				[ast.Type{
-					name:   'list'
-					params: [ast.Type{
-						name:   'string'
-						params: []
-					}]
-				}]
-			}
 			'length' {
-				[ast.Type{
-					name:   'list'
-					params: [ast.Type{
-						name:   'boolean'
-						params: []
-					}]
-				}]
+				[
+					ast.Type{
+						name:   'list'
+						params: [
+							ast.Type{
+								name:   'boolean'
+								params: []
+							},
+						]
+					},
+				]
 			}
 			'compose' {
 				[
 					ast.Type{
 						name:   'function'
-						params: [ast.Type{
-							name:   'integer'
-							params: []
-						}, ast.Type{
-							name:   'string'
-							params: []
-						}]
+						params: [
+							ast.Type{
+								name:   'integer'
+								params: []
+							},
+							ast.Type{
+								name:   'string'
+								params: []
+							},
+						]
 					},
 					ast.Type{
 						name:   'function'
-						params: [ast.Type{
-							name:   'float'
-							params: []
-						}, ast.Type{
-							name:   'integer'
-							params: []
-						}]
+						params: [
+							ast.Type{
+								name:   'float'
+								params: []
+							},
+							ast.Type{
+								name:   'integer'
+								params: []
+							},
+						]
 					},
 				]
 			}

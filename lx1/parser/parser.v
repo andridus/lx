@@ -6,19 +6,23 @@ import errors
 import kernel
 
 pub struct Parser {
+	directives_table &DirectivesTable
 mut:
 	lexer          lexer.Lexer
 	current        lexer.Token
 	next           lexer.Token
 	error_reporter errors.ErrorReporter
-	next_ast_id    int = 1
+	next_ast_id    int  = 1
+	at_line_start  bool = true // Track if we're at the start of a new line
+	temp_doc_node  ?ast.Node
 }
 
-pub fn new_parser(code string, file_path string) Parser {
+pub fn new_parser(code string, file_path string, directives_table &DirectivesTable) Parser {
 	mut l := lexer.new_lexer(code, file_path)
 	mut p := Parser{
-		lexer:          l
-		error_reporter: errors.new_error_reporter()
+		lexer:            l
+		error_reporter:   errors.new_error_reporter()
+		directives_table: directives_table
 	}
 	p.current = p.lexer.next_token()
 	p.next = p.lexer.next_token()
@@ -40,6 +44,14 @@ pub fn (mut p Parser) get_next_id() int {
 }
 
 fn (mut p Parser) advance() {
+	// Track if current token is newline to set line start flag
+	if p.current.type_ == .newline {
+		p.at_line_start = true
+	} else if p.current.type_ != .newline {
+		// Only reset at_line_start when we encounter a non-newline token
+		p.at_line_start = false
+	}
+
 	p.current = p.next
 	p.next = p.lexer.next_token()
 }
@@ -61,9 +73,9 @@ fn (mut p Parser) error_and_return_with_suggestion(msg string, suggestion string
 fn (mut p Parser) parse_module() !ast.Node {
 	mut functions := []ast.Node{}
 	mut records := []ast.Node{}
+	mut all_nodes := []ast.Node{}
 	start_pos := p.current.position
 	module_id := p.get_next_id()
-
 	for p.current.type_ != .eof {
 		if p.current.type_ == .newline {
 			p.advance()
@@ -78,38 +90,38 @@ fn (mut p Parser) parse_module() !ast.Node {
 		if p.current.type_ == .record {
 			record := p.parse_record_definition()!
 			records << record
-		} else if p.current.type_ == .type {
-			type_alias := p.parse_type_alias()!
-			records << type_alias
 		} else if p.current.type_ == .def {
 			func := p.parse_function()!
 			functions << func
+		} else if p.current.type_ == .type {
+			type_def := p.parse_type_def()!
+			all_nodes << type_def
 		} else if p.current.type_ == .deps {
 			deps := p.parse_deps_declaration()!
-			records << deps
+			all_nodes << deps
 		} else if p.current.type_ == .application {
 			app := p.parse_application_config()!
-			records << app
+			all_nodes << app
 		} else if p.current.type_ == .import {
-			import_stmt := p.parse_import_statement()!
-			records << import_stmt
+			imp := p.parse_import_statement()!
+			all_nodes << imp
 		} else if p.current.type_ == .supervisor {
-			supervisor := p.parse_supervisor_definition()!
-			functions << supervisor
+			sup := p.parse_supervisor_definition()!
+			functions << sup
 		} else if p.current.type_ == .worker {
-			worker := p.parse_worker_definition()!
-			functions << worker
-		} else if p.current.type_ == .describe {
+			wrk := p.parse_worker_definition()!
+			functions << wrk
+		} else if p.current.type_ == .describe || p.current.type_ == .test {
 			test_block := p.parse_test_block()!
 			functions << test_block
 		} else {
-			p.error('Expected "def", "record", "type", "deps", "application", "import", "supervisor", "worker", or "describe", got "${p.current.value}"')
-			return error('Expected def, record, type, or module system keyword')
+			p.error('Expected top-level construct, got "${p.current.value}"')
+			return error('Expected top-level construct')
 		}
 	}
 
 	// Combine records and functions
-	mut all_nodes := []ast.Node{}
+
 	all_nodes << records
 	all_nodes << functions
 
@@ -138,18 +150,51 @@ fn (mut p Parser) parse_module_with_name(modname string) !ast.Node {
 			return error('Lexical error')
 		}
 
-		if p.current.type_ == .record {
-			record := p.parse_record_definition()!
-			records << record
-		} else if p.current.type_ == .def {
-			func := p.parse_function()!
-			functions << func
-		} else if p.current.type_ == .type {
-			type_def := p.parse_type_def()!
-			all_nodes << type_def
-		} else {
-			p.error('Expected "def", "record", or "type", got "${p.current.value}"')
-			return error('Expected def, record, or type')
+		match p.current.type_ {
+			.at_sign {
+				directive := p.parse_directive_new()!
+				all_nodes << directive
+			}
+			.record {
+				record := p.parse_record_definition()!
+				records << record
+			}
+			.def {
+				func := p.parse_function()!
+				functions << func
+			}
+			.type {
+				type_def := p.parse_type_def()!
+				all_nodes << type_def
+			}
+			.deps {
+				deps := p.parse_deps_declaration()!
+				all_nodes << deps
+			}
+			.application {
+				app := p.parse_application_config()!
+				all_nodes << app
+			}
+			.import {
+				imp := p.parse_import_statement()!
+				all_nodes << imp
+			}
+			.supervisor {
+				sup := p.parse_supervisor_definition()!
+				functions << sup
+			}
+			.worker {
+				wrk := p.parse_worker_definition()!
+				functions << wrk
+			}
+			.describe, .test {
+				test_block := p.parse_test_block()!
+				functions << test_block
+			}
+			else {
+				p.error('Expected top-level construct, got "${p.current.value}"')
+				return error('Expected top-level construct')
+			}
 		}
 	}
 
@@ -245,6 +290,10 @@ fn (mut p Parser) parse_function() !ast.Node {
 		return p.error_and_return('Expected end keyword')
 	}
 	p.advance()
+
+	if node := p.temp_doc_node {
+		p.directives_table.add_doc('${func_name}/${args.len}', node)
+	}
 
 	return ast.new_function_with_params(func_id, func_name, args, body, start_pos)
 }
@@ -681,12 +730,21 @@ fn (mut p Parser) parse_expression_with_precedence(precedence int) !ast.Node {
 
 	for {
 		// Check for infix operators
-		if p.current.type_ == .identifier && p.is_infix_function(p.current.value) {
-			function_info := kernel.get_function_info(p.current.value) or { break }
+		if (p.current.type_ == .identifier && p.is_infix_function(p.current.value))
+			|| p.current.type_ == .exclamation || p.current.type_ == .slash {
+			// Normalize operator token to a name understood by kernel
+			op_name := if p.current.type_ == .exclamation {
+				'!'
+			} else if p.current.type_ == .slash {
+				'/'
+			} else {
+				p.current.value
+			}
+			function_info := kernel.get_function_info(op_name) or { break }
 			if function_info.precedence < precedence {
 				break
 			}
-			left = p.parse_infix_expression(left)!
+			left = p.parse_infix_expression_with_name(left, op_name)!
 			continue
 		}
 
@@ -706,6 +764,17 @@ fn (mut p Parser) parse_expression_with_precedence(precedence int) !ast.Node {
 	}
 
 	return left
+}
+
+fn (mut p Parser) parse_infix_expression_with_name(left ast.Node, name string) !ast.Node {
+	pos := p.current.position
+	// advance current token (already captured name)
+	p.advance()
+
+	function_info := kernel.get_function_info(name) or { return error('Unknown function: ${name}') }
+
+	right := p.parse_expression_with_precedence(function_info.precedence)!
+	return ast.new_function_caller(p.get_next_id(), name, [left, right], pos)
 }
 
 fn (mut p Parser) parse_prefix_expression() !ast.Node {
@@ -1209,6 +1278,11 @@ fn (mut p Parser) parse_record_definition() !ast.Node {
 	}
 	p.advance() // Skip '{'
 
+	// Skip whitespace and newlines after opening brace
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+
 	mut fields := []ast.Node{}
 
 	if p.current.type_ != .rbrace {
@@ -1277,22 +1351,35 @@ fn (mut p Parser) parse_record_definition() !ast.Node {
 			}
 			fields << field_node
 
+			// Allow newline-separated or comma-separated fields
+			for p.current.type_ == .newline {
+				p.advance()
+			}
+
 			if p.current.type_ == .rbrace {
 				break
 			}
 
-			if p.current.type_ != .comma {
-				return p.error_and_return('Expected comma or closing brace')
+			if p.current.type_ == .comma {
+				p.advance() // Skip comma and continue
+				continue
 			}
 
-			p.advance() // Skip comma
+			// If not comma or closing brace, expect next identifier (next field) or end
+			if p.current.type_ != .identifier {
+				return p.error_and_return('Expected comma or closing brace')
+			}
 		}
+	}
+
+	// Skip newlines before closing brace
+	for p.current.type_ == .newline {
+		p.advance()
 	}
 
 	if p.current.type_ != .rbrace {
 		return p.error_and_return('Expected closing brace')
 	}
-
 	p.advance() // Skip '}'
 
 	return ast.new_record_definition(p.get_next_id(), record_name, fields, pos)
@@ -1686,19 +1773,126 @@ fn (mut p Parser) parse_case_clause() !ast.Node {
 	// Parse pattern
 	pattern := p.parse_pattern()!
 
+	// Parse optional guard
+	mut guard := ast.Node{}
+	if p.current.type_ == .when {
+		p.advance() // Skip 'when'
+		guard = p.parse_expression()!
+	}
+
 	if p.current.type_ != .arrow {
 		return p.error_and_return('Expected "->" after case pattern')
 	}
 	p.advance() // Skip '->'
 
-	body := p.parse_expression()!
+	// Skip newlines after '->'
+	for p.current.type_ == .newline {
+		p.advance()
+	}
 
-	return ast.new_case_clause(p.get_next_id(), pattern, body, start_pos)
+	// Parse the body as a block instead of a single expression
+	// This allows complex expressions like 'with', 'if', etc. inside case clauses
+	body := p.parse_case_clause_body()!
+
+	// Se há guard, inclui como terceiro child, senão usa apenas pattern e body
+	if guard.id != 0 {
+		return ast.new_case_clause_with_guard(p.get_next_id(), pattern, guard, body, start_pos)
+	} else {
+		return ast.new_case_clause(p.get_next_id(), pattern, body, start_pos)
+	}
+}
+
+// Parse the body of a case clause, which can contain multiple expressions
+// similar to how LX5 handles it
+fn (mut p Parser) parse_case_clause_body() !ast.Node {
+	mut expressions := []ast.Node{}
+	start_pos := p.current.position
+
+	for {
+		// Stop if we encounter patterns that indicate next case clause or end
+		if p.current.type_ == .end || p.current.type_ == .eof {
+			break
+		}
+
+		// Check if this looks like a new case pattern
+		if p.looks_like_case_pattern() {
+			break
+		}
+
+		// Skip newlines
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+
+		// Stop again after skipping newlines
+		if p.current.type_ == .end || p.current.type_ == .eof {
+			break
+		}
+
+		if p.looks_like_case_pattern() {
+			break
+		}
+
+		expr := p.parse_expression()!
+		expressions << expr
+
+		// Handle separators
+		if p.current.type_ == .semicolon {
+			p.advance()
+		} else if p.current.type_ == .newline {
+			p.advance()
+		} else {
+			// If no separator and not at end, continue
+			if p.current.type_ != .end && p.current.type_ != .eof && !p.looks_like_case_pattern() {
+				continue
+			}
+			break
+		}
+	}
+
+	// If we only have one expression, return it directly
+	if expressions.len == 1 {
+		return expressions[0]
+	}
+
+	// If we have multiple expressions, create a block
+	return ast.new_block(p.get_next_id(), expressions, start_pos)
+}
+
+// Check if current position looks like a case pattern
+fn (mut p Parser) looks_like_case_pattern() bool {
+	// A case pattern can ONLY start at the beginning of a new line
+	// This is the key rule mentioned by the user
+	if !p.at_line_start {
+		return false
+	}
+
+	// First, check for obvious non-patterns
+	if p.current.type_ == .end || p.current.type_ == .eof || p.current.type_ == .else_
+		|| p.current.type_ == .if_ || p.current.type_ == .with || p.current.type_ == .case
+		|| p.current.type_ == .fn || p.current.type_ == .spawn || p.current.type_ == .receive
+		|| p.current.type_ == .do || p.current.type_ == .rescue {
+		return false
+	}
+
+	// For patterns that are followed immediately by -> or when, we're confident
+	if p.next.type_ == .arrow || p.next.type_ == .when {
+		return true
+	}
+
+	// For tokens that could reasonably start a pattern at line beginning,
+	// assume they are patterns (since we're at line start in case context)
+	if p.current.type_ == .lbrace || p.current.type_ == .lbracket || p.current.type_ == .identifier
+		|| p.current.type_ == .integer || p.current.type_ == .string || p.current.type_ == .atom
+		|| p.current.type_ == .true_ || p.current.type_ == .false_ || p.current.type_ == .nil_ {
+		return true
+	}
+
+	// For everything else, be conservative
+	return false
 }
 
 fn (mut p Parser) parse_pattern() !ast.Node {
-	pos := p.current.position
-
 	match p.current.type_ {
 		.lbracket {
 			// List pattern: [] or [head | tail]
@@ -1708,11 +1902,45 @@ fn (mut p Parser) parse_pattern() !ast.Node {
 			// Tuple pattern: {a, b, c}
 			return p.parse_tuple_pattern()
 		}
+		.double_lt {
+			// Binary pattern: <<version:8, size:16, rest/binary>>
+			return p.parse_binary_pattern()
+		}
 		.identifier {
-			// Variable pattern or atom
+			// Variable pattern, atom, or record pattern
 			name := p.current.value
+			identifier_pos := p.current.position
 			p.advance()
-			return ast.new_identifier(p.get_next_id(), name, pos)
+
+			// Check if this is a record pattern
+			if p.current.type_ == .lbrace {
+				// This is a record pattern, not a variable
+				record_node := ast.Node{
+					id:       p.get_next_id()
+					kind:     .identifier
+					value:    name
+					children: []
+					position: identifier_pos
+				}
+				return p.parse_record_literal_with_name(record_node)
+			}
+
+			// Check for type annotation
+			if p.current.type_ == .double_colon {
+				p.advance() // Skip ::
+				type_annotation := p.parse_type_expression()!
+
+				// Create identifier with type annotation
+				return ast.Node{
+					id:       p.get_next_id()
+					kind:     .identifier
+					value:    name
+					children: [type_annotation]
+					position: identifier_pos
+				}
+			}
+
+			return ast.new_identifier(p.get_next_id(), name, identifier_pos)
 		}
 		.integer, .float, .string, .true_, .false_, .nil_, .atom {
 			// Literal patterns
@@ -1721,6 +1949,142 @@ fn (mut p Parser) parse_pattern() !ast.Node {
 		else {
 			return p.error_and_return('Invalid pattern')
 		}
+	}
+}
+
+// Parse binary pattern: <<version:8, size:16, rest/binary>>
+fn (mut p Parser) parse_binary_pattern() !ast.Node {
+	start_pos := p.current.position
+	p.advance() // Skip '<<'
+
+	mut segments := []ast.Node{}
+
+	// Parse segments
+	if p.current.type_ != .double_gt {
+		for {
+			segment := p.parse_binary_segment_pattern()!
+			segments << segment
+
+			if p.current.type_ == .comma {
+				p.advance() // Skip ','
+			} else {
+				break
+			}
+		}
+	}
+
+	if p.current.type_ != .double_gt {
+		return p.error_and_return('Expected ">>" to close binary pattern')
+	}
+	p.advance() // Skip '>>'
+
+	return ast.new_binary_pattern(p.get_next_id(), segments, start_pos)
+}
+
+// Parse binary segment pattern: version:8 or rest/binary
+fn (mut p Parser) parse_binary_segment_pattern() !ast.Node {
+	start_pos := p.current.position
+
+	// Parse variable name
+	if p.current.type_ != .identifier {
+		return p.error_and_return('Expected variable name in binary pattern')
+	}
+
+	variable := p.parse_binary_expression()!
+
+	mut size := ?ast.Node(none)
+	mut options := []string{}
+
+	// Parse size: variable:size
+	if p.current.type_ == .colon {
+		p.advance() // Skip ':'
+		size = p.parse_binary_expression()!
+	}
+
+	// Parse options: /binary, /integer, etc.
+	if p.current.type_ == .slash {
+		p.advance() // Skip '/'
+
+		// Parse option string
+		if p.current.type_ != .identifier {
+			return p.error_and_return('Invalid binary pattern option: expected identifier after /')
+		}
+
+		mut option_str := p.current.value
+		p.advance()
+
+		// Check for unit:N format
+		if p.current.type_ == .colon && option_str == 'unit' {
+			p.advance() // Skip ':'
+			if p.current.type_ == .integer {
+				option_str += ':' + p.current.value
+				p.advance()
+			} else {
+				return p.error_and_return('Expected integer after unit:')
+			}
+		}
+
+		options << option_str
+
+		// Parse additional options with dashes
+		mut dash := true
+		for dash {
+			if p.current.type_ == .identifier && p.current.value == '-' {
+				p.advance() // Skip '-'
+				if p.current.type_ == .identifier {
+					mut next_option := p.current.value
+					p.advance()
+
+					// Check for unit:N format in chained options
+					if p.current.type_ == .colon && next_option == 'unit' {
+						p.advance() // Skip ':'
+						if p.current.type_ == .integer {
+							next_option += ':' + p.current.value
+							p.advance()
+						} else {
+							return p.error_and_return('Expected integer after unit:')
+						}
+					}
+
+					options << next_option
+				} else {
+					return p.error_and_return('Invalid binary pattern option after -')
+				}
+			} else {
+				dash = false
+			}
+		}
+	}
+
+	return ast.new_binary_segment(p.get_next_id(), variable, size, options, start_pos)
+}
+
+// Parse binary or pattern - decides if it's <<...>> = expr or just <<...>>
+fn (mut p Parser) parse_binary_or_pattern() !ast.Node {
+	// Parse as binary pattern first
+	binary_pattern := p.parse_binary_pattern()!
+
+	// Check if there's a = after the pattern (pattern matching)
+	if p.current.type_ == .bind {
+		p.advance() // Skip '='
+		expr := p.parse_expression()!
+		return ast.new_pattern_binding(p.get_next_id(), binary_pattern, expr, binary_pattern.position)
+	} else {
+		// No =, so this is a binary literal (but we parsed it as pattern)
+		// We need to convert the pattern back to a literal
+		return p.convert_pattern_to_literal(binary_pattern)
+	}
+}
+
+// Convert a binary pattern to a binary literal
+fn (mut p Parser) convert_pattern_to_literal(pattern ast.Node) !ast.Node {
+	// Convert binary_pattern to binary_literal
+	return ast.Node{
+		id:       pattern.id
+		kind:     .binary_literal
+		value:    pattern.value
+		children: pattern.children
+		position: pattern.position
 	}
 }
 
@@ -1901,7 +2265,7 @@ fn (mut p Parser) parse_lambda_expression() !ast.Node {
 	}
 	p.advance() // Skip ')'
 
-		if p.current.type_ == .arrow {
+	if p.current.type_ == .arrow {
 		p.advance() // Skip '->'
 
 		// Check if there's a newline after arrow - if so, require 'end'
@@ -2008,8 +2372,8 @@ fn (mut p Parser) parse_with_expression() !ast.Node {
 
 		// Create clause node (pattern and expression)
 		clause := ast.Node{
-			id: p.get_next_id()
-			kind: .pattern_match
+			id:       p.get_next_id()
+			kind:     .pattern_match
 			children: [pattern, expr]
 			position: start_pos
 		}
@@ -2049,7 +2413,12 @@ fn (mut p Parser) parse_with_expression() !ast.Node {
 			p.advance()
 		}
 
-		else_body = p.parse_block()!
+		// Check if this is case-style else (pattern -> expr) or block-style else
+		if p.looks_like_case_clause() {
+			else_body = p.parse_case_clauses_as_block()!
+		} else {
+			else_body = p.parse_block()!
+		}
 	}
 
 	if p.current.type_ != .end {
@@ -2057,12 +2426,43 @@ fn (mut p Parser) parse_with_expression() !ast.Node {
 	}
 	p.advance() // Skip 'end'
 
-	// For now, use first clause only (TODO: support multiple clauses in analyzer/generator)
-	first_clause := clauses[0]
-	pattern := first_clause.children[0]
-	expr := first_clause.children[1]
+	// Support multiple clauses
+	return ast.new_with_expr_multi(p.get_next_id(), clauses, body, else_body, start_pos)
+}
 
-	return ast.new_with_expr(p.get_next_id(), pattern, expr, body, else_body, start_pos)
+// Check if current position looks like a case clause (pattern -> expr)
+fn (mut p Parser) looks_like_case_clause() bool {
+	// Simple heuristic: if current token could start a pattern and we're not at 'end'
+	// then assume it's a case-style else
+	return p.current.type_ != .end && (p.current.type_ == .identifier
+		|| p.current.type_ == .lbrace || p.current.type_ == .lbracket
+		|| p.current.type_ == .integer || p.current.type_ == .string
+		|| p.current.type_ == .atom)
+}
+
+// Parse case-style clauses as a case expression block
+fn (mut p Parser) parse_case_clauses_as_block() !ast.Node {
+	start_pos := p.current.position
+	mut clauses := []ast.Node{}
+
+	for p.current.type_ != .end && p.current.type_ != .eof {
+		if p.current.type_ == .newline {
+			p.advance()
+			continue
+		}
+
+		clause := p.parse_case_clause()!
+		clauses << clause
+
+		// Skip optional newlines after clause
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+	}
+
+	// Create a dummy case expression for the else clauses
+	dummy_expr := ast.new_identifier(p.get_next_id(), 'Error', start_pos)
+	return ast.new_case_expression(p.get_next_id(), dummy_expr, clauses, start_pos)
 }
 
 // Parse match expressions: match pattern <- expr rescue error do ... end
@@ -2208,6 +2608,15 @@ fn (mut p Parser) parse_binary_literal() !ast.Node {
 	}
 	p.advance() // Skip '>>'
 
+	// Check if this is a pattern match (binary pattern followed by =)
+	if p.current.type_ == .bind {
+		// Convert to binary pattern and create pattern binding
+		binary_pattern := ast.new_binary_pattern(p.get_next_id(), segments, start_pos)
+		p.advance() // Skip '='
+		expr := p.parse_expression()!
+		return ast.new_pattern_binding(p.get_next_id(), binary_pattern, expr, start_pos)
+	}
+
 	return ast.new_binary_literal(p.get_next_id(), segments, start_pos)
 }
 
@@ -2215,7 +2624,8 @@ fn (mut p Parser) parse_binary_literal() !ast.Node {
 fn (mut p Parser) parse_binary_segment() !ast.Node {
 	start_pos := p.current.position
 
-	value := p.parse_expression()!
+	// Parse value within binary context (/ is not division here)
+	value := p.parse_binary_expression()!
 
 	mut size := ?ast.Node(none)
 	mut options := []string{}
@@ -2223,30 +2633,116 @@ fn (mut p Parser) parse_binary_segment() !ast.Node {
 	// Parse size: value:size
 	if p.current.type_ == .colon {
 		p.advance() // Skip ':'
-		size = p.parse_expression()!
+		size = p.parse_binary_expression()!
+	} else if p.current.type_ == .atom {
+		// Handle case where lexer tokenized :identifier as atom (consuming the colon)
+		// In this case, the atom represents the size parameter
+		size = p.parse_binary_expression()!
 	}
 
-	// Parse options: /integer-big
+	// Parse options: /integer-big or /unit:8
 	if p.current.type_ == .slash {
 		p.advance() // Skip '/'
 
 		// Parse option string
-		if p.current.type_ == .identifier {
-			options << p.current.value
-			p.advance()
+		if p.current.type_ != .identifier {
+			return p.error_and_return('Invalid binary segment option: expected identifier after /')
+		}
 
-			// Parse additional options with dashes
-			for p.current.type_ == .identifier && p.current.value == '-' {
+		mut option_str := p.current.value
+		p.advance()
+
+		// Check for unit:N format
+		if p.current.type_ == .colon && option_str == 'unit' {
+			p.advance() // Skip ':'
+			if p.current.type_ == .integer {
+				option_str += ':' + p.current.value
+				p.advance()
+			} else {
+				return p.error_and_return('Expected integer after unit:')
+			}
+		}
+
+		options << option_str
+
+		// Parse additional options with dashes
+		mut dash := true
+		for dash {
+			if p.current.type_ == .identifier && p.current.value == '-' {
 				p.advance() // Skip '-'
 				if p.current.type_ == .identifier {
-					options << p.current.value
+					mut next_option := p.current.value
 					p.advance()
+
+					// Check for unit:N format in chained options
+					if p.current.type_ == .colon && next_option == 'unit' {
+						p.advance() // Skip ':'
+						if p.current.type_ == .integer {
+							next_option += ':' + p.current.value
+							p.advance()
+						} else {
+							return p.error_and_return('Expected integer after unit:')
+						}
+					}
+
+					options << next_option
+				} else {
+					return p.error_and_return('Invalid binary segment option after -')
 				}
+			} else {
+				dash = false
 			}
 		}
 	}
 
 	return ast.new_binary_segment(p.get_next_id(), value, size, options, start_pos)
+}
+
+// Parse expression within binary context where / is not division
+fn (mut p Parser) parse_binary_expression() !ast.Node {
+	// In binary context, we only parse atoms, literals, identifiers, and function calls
+	// We stop at :, /, ,, and >>
+	return match p.current.type_ {
+		.integer, .float, .string, .true_, .false_, .nil_ {
+			p.parse_literal()
+		}
+		.atom {
+			// In binary context, treat atoms as identifiers (variable references)
+			// This happens because lexer tokenizes :identifier as atom instead of : + identifier
+			atom_value := p.current.value
+			pos := p.current.position
+			p.advance()
+
+			// Convert atom to identifier for use as variable reference in binary context
+			ast.new_identifier(p.get_next_id(), atom_value, pos)
+		}
+		.identifier {
+			// Simple identifier or function call in binary context
+			identifier := p.current.value
+			pos := p.current.position
+			p.advance()
+
+			// Check if this is a function call
+			if p.current.type_ == .lparen {
+				return p.parse_function_call(identifier, pos)
+			}
+
+			// Otherwise, it's just a simple identifier (variable reference)
+			return ast.new_identifier(p.get_next_id(), identifier, pos)
+		}
+		.lparen {
+			p.advance() // Skip '('
+			expr := p.parse_expression()!
+			if p.current.type_ != .rparen {
+				return p.error_and_return('Expected ")" after expression')
+			}
+			p.advance() // Skip ')'
+			expr
+		}
+		else {
+			p.error_and_return('Invalid expression in binary segment')
+		}
+	}
 }
 
 // ============ Task 11: Module System Parsing ============
@@ -2360,7 +2856,7 @@ fn (mut p Parser) parse_worker_definition() !ast.Node {
 
 // ============ Task 11: Advanced Features Parsing ============
 
-// Parse @ directives: @doc, @spec
+// Parse @ directives: @doc, @spec, @moduledoc
 fn (mut p Parser) parse_directive_new() !ast.Node {
 	start_pos := p.current.position
 	p.advance() // Skip '@'
@@ -2373,6 +2869,8 @@ fn (mut p Parser) parse_directive_new() !ast.Node {
 	p.advance()
 
 	mut args := []ast.Node{}
+
+	// Check for parentheses format: @doc("text")
 	if p.current.type_ == .lparen {
 		p.advance() // Skip '('
 
@@ -2393,8 +2891,20 @@ fn (mut p Parser) parse_directive_new() !ast.Node {
 			return p.error_and_return('Expected ")" to close directive arguments')
 		}
 		p.advance() // Skip ')'
+	} else if p.current.type_ == .string {
+		// Direct string format: @doc "text"
+		arg := p.parse_expression()!
+		args << arg
 	}
-
+	match name {
+		'moduledoc' {
+			p.directives_table.update_moduledoc(args[0].value)
+		}
+		'doc' {
+			p.temp_doc_node = args[0]
+		}
+		else {}
+	}
 	return ast.new_directive(p.get_next_id(), name, args, start_pos)
 }
 

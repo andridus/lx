@@ -30,6 +30,7 @@ pub mut:
 	next_id        int = 1
 	record_types   map[string]RecordType   // record_name -> RecordType
 	function_types map[string]FunctionType // function_name -> FunctionType
+	custom_types   map[string]ast.Type     // type_name -> Type definition
 }
 
 pub fn new_type_table() TypeTable {
@@ -38,6 +39,7 @@ pub fn new_type_table() TypeTable {
 		next_id:        1
 		record_types:   map[string]RecordType{}
 		function_types: map[string]FunctionType{}
+		custom_types:   map[string]ast.Type{}
 	}
 }
 
@@ -89,4 +91,13 @@ pub fn (mut tt TypeTable) register_function_type(name string, parameters []ast.T
 
 pub fn (tt TypeTable) get_function_type(name string) ?FunctionType {
 	return tt.function_types[name] or { return none }
+}
+
+// Custom type management
+pub fn (mut tt TypeTable) register_custom_type(name string, type_def ast.Type) {
+	tt.custom_types[name] = type_def
+}
+
+pub fn (tt TypeTable) get_custom_type(name string) ?ast.Type {
+	return tt.custom_types[name] or { return none }
 }

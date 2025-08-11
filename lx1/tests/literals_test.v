@@ -104,3 +104,33 @@ nil_lit() ->
 	result := compile_lx(lx_code)
 	assert result == expected
 }
+
+fn test_hexadecimal_literal() {
+	lx_code := 'def hex_lit() do
+        0x1234
+    end'
+	expected := '-module(test).
+-export([hex_lit/0]).
+
+-spec hex_lit() -> integer().
+hex_lit() ->
+    4660.
+'
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+fn test_hexadecimal_mixed_case() {
+	lx_code := 'def hex_mixed() do
+        0xAbCdEf
+    end'
+	expected := '-module(test).
+-export([hex_mixed/0]).
+
+-spec hex_mixed() -> integer().
+hex_mixed() ->
+    11259375.
+'
+	result := compile_lx(lx_code)
+	assert result == expected
+}

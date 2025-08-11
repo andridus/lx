@@ -333,7 +333,7 @@ end'
 comparison_map() ->
     A_1 = 5,
     B_2 = 3,
-    #{greater => A_1 > B_2, equal => A_1 == B_2, not_equal => A_1 != B_2}.
+    #{greater => A_1 > B_2, equal => A_1 == B_2, not_equal => A_1 /= B_2}.
 '
 
 	result := compile_lx(lx_code)

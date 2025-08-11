@@ -12,6 +12,7 @@ pub enum TokenType {
 	nil_
 	record
 	case
+	when
 	fn
 	type
 
@@ -65,16 +66,18 @@ pub enum TokenType {
 	double_colon // ::
 
 	// Task 11: New operators and delimiters
-	left_arrow   // <-
-	exclamation  // !
-	double_pipe  // ||
-	hash         // #
-	at_sign      // @
-	langle       // <
-	rangle       // >
-	double_lt    // <<
-	double_gt    // >>
-	slash        // /
+	left_arrow  // <-
+	exclamation // !
+	double_pipe // ||
+	hash        // #
+	at_sign     // @
+	langle      // <
+	rangle      // >
+	double_lt   // <<
+	double_gt   // >>
+	triple_lt   // <<<
+	triple_gt   // >>>
+	slash       // /
 
 	// Special
 	newline
@@ -111,6 +114,7 @@ pub fn (tt TokenType) str() string {
 		.nil_ { 'nil' }
 		.record { 'record' }
 		.case { 'case' }
+		.when { 'when' }
 		.fn { 'fn' }
 		.type { 'type' }
 		.if_ { 'if' }
@@ -157,6 +161,8 @@ pub fn (tt TokenType) str() string {
 		.rangle { '>' }
 		.double_lt { '<<' }
 		.double_gt { '>>' }
+		.triple_lt { '<<<' }
+		.triple_gt { '>>>' }
 		.slash { '/' }
 		.newline { 'newline' }
 		.eof { 'eof' }

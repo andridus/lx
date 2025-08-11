@@ -14,7 +14,7 @@ end'
 	expected := '-module(test).
 -export([test_if/1]).
 
--spec test_if(any()) -> any().
+-spec test_if(any()) -> binary().
 test_if(X_1) ->
     case X_1 > 0 of
         true -> <<"positive"/utf8>>;
@@ -32,10 +32,18 @@ fn test_if_without_else() {
         "positive"
     end
 end'
+	expected := '-module(test).
+-export([test_if/1]).
+
+-spec test_if(any()) -> binary().
+test_if(X_1) ->
+    case X_1 > 0 of
+        true -> <<"positive"/utf8>>;
+        false -> nil
+    end.
+'
 	result := compile_lx(lx_code)
-	assert result.contains('case X_1 > 0 of')
-	assert result.contains('true -> <<"positive"/utf8>>')
-	assert result.contains('false -> undefined')
+	assert result == expected
 }
 
 // Test nested if expressions
@@ -51,9 +59,21 @@ fn test_if_nested() {
         "x not positive"
     end
 end'
+	expected := '-module(test).
+-export([test_nested/2]).
+
+-spec test_nested(any(), any()) -> binary().
+test_nested(X_1, Y_2) ->
+    case X_1 > 0 of
+        true -> case Y_2 > 0 of
+        true -> <<"both positive"/utf8>>;
+        false -> <<"x positive, y not"/utf8>>
+    end;
+        false -> <<"x not positive"/utf8>>
+    end.
+'
 	result := compile_lx(lx_code)
-	assert result.contains('case X_1 > 0 of')
-	assert result.contains('case Y_2 > 0 of')
+	assert result == expected
 }
 
 // Test basic case expressions
@@ -65,26 +85,49 @@ fn test_case_basic() {
         _ -> "other"
     end
 end'
+	expected := '-module(test).
+-export([test_case/1]).
+
+-spec test_case(any()) -> binary().
+test_case(X_1) ->
+    case X_1 of
+        1 ->
+            <<"one"/utf8>>;
+        2 ->
+            <<"two"/utf8>>;
+        _ ->
+            <<"other"/utf8>>
+    end.
+'
 	result := compile_lx(lx_code)
-	assert result.contains('case X_1 of')
-	assert result.contains('1 -> <<"one"/utf8>>')
-	assert result.contains('2 -> <<"two"/utf8>>')
-	assert result.contains('_ -> <<"other"/utf8>>')
+	assert result == expected
 }
 
 // Test case with tuple patterns
 fn test_case_tuple_patterns() {
 	lx_code := 'def test_case(result) do
     case result do
-        {success, data} -> data
-        {error, reason} -> reason
+        {:success, data} -> data
+        {:error, reason} -> reason
         _ -> "unknown"
     end
 end'
+	expected := '-module(test).
+-export([test_case/1]).
+
+-spec test_case(any()) -> any().
+test_case(RESULT_1) ->
+    case RESULT_1 of
+        {success, DATA_2} ->
+            DATA_2;
+        {error, REASON_3} ->
+            REASON_3;
+        _ ->
+            <<"unknown"/utf8>>
+    end.
+'
 	result := compile_lx(lx_code)
-	assert result.contains('case RESULT_1 of')
-	assert result.contains('{success, DATA_2} -> DATA_2')
-	assert result.contains('{error, REASON_3} -> REASON_3')
+	assert result == expected
 }
 
 // Test case with guards (if supported)
@@ -96,8 +139,22 @@ fn test_case_with_guards() {
         _ -> "zero"
     end
 end'
+	expected := '-module(test).
+-export([test_case/1]).
+
+-spec test_case(any()) -> binary().
+test_case(X_1) ->
+    case X_1 of
+        N_2 when N_2 > 0 ->
+            <<"positive"/utf8>>;
+        N_2 when N_2 < 0 ->
+            <<"negative"/utf8>>;
+        _ ->
+            <<"zero"/utf8>>
+    end.
+'
 	result := compile_lx(lx_code)
-	assert result.contains('case X_1 of') || result.contains('falha')
+	assert result == expected
 }
 
 // Test case with list patterns
@@ -109,10 +166,22 @@ fn test_case_list_patterns() {
         [h | t] -> h
     end
 end'
+	expected := '-module(test).
+-export([test_case/1]).
+
+-spec test_case(any()) -> any().
+test_case(LIST_1) ->
+    case LIST_1 of
+        [] ->
+            <<"empty"/utf8>>;
+        [H_2] ->
+            H_2;
+        [H_2 | T_3] ->
+            H_2
+    end.
+'
 	result := compile_lx(lx_code)
-	assert result.contains('[] -> <<"empty"/utf8>>')
-	assert result.contains('[H_2] -> H_2')
-	assert result.contains('[H_3 | T_4] -> H_3')
+	assert result == expected
 }
 
 // Test nested case expressions
@@ -128,50 +197,108 @@ fn test_case_nested() {
         _ -> "other"
     end
 end'
+	expected := '-module(test).
+-export([test_nested/2]).
+
+-spec test_nested(any(), any()) -> binary().
+test_nested(X_1, Y_2) ->
+    case X_1 of
+        1 ->
+            case Y_2 of
+        A_3 ->
+            <<"1a"/utf8>>;
+        B_4 ->
+            <<"1b"/utf8>>;
+        _ ->
+            <<"1other"/utf8>>
+    end;
+        2 ->
+            <<"two"/utf8>>;
+        _ ->
+            <<"other"/utf8>>
+    end.
+'
 	result := compile_lx(lx_code)
-	assert result.contains('case X_1 of')
-	assert result.contains('case Y_2 of')
+	assert result == expected
 }
 
 // Test basic with expressions
 fn test_with_basic() {
 	lx_code := 'def test_with() do
-    result = {success, "data"}
-    with {success, data} <- result do
+    result = {:success, "data"}
+    with {:success, data} <- result do
         data
     end
 end'
+	expected := '-module(test).
+-export([test_with/0]).
+
+-spec test_with() -> any().
+test_with() ->
+    RESULT_1 = {success, <<"data"/utf8>>},
+    case RESULT_1 of
+        {success, DATA_2} ->
+            DATA_2;
+        Error -> Error
+    end.
+'
 	result := compile_lx(lx_code)
-	assert result.contains('RESULT_1 = {success, <<"data"/utf8>>}')
-	assert result.contains('{success, DATA_2} = RESULT_1')
+	assert result == expected
 }
 
 // Test with multiple clauses
 fn test_with_multiple_clauses() {
 	lx_code := 'def test_with() do
-    result1 = {success, 10}
-    result2 = {success, 20}
-    with {success, x} <- result1, {success, y} <- result2 do
+    result1 = {:success, 10}
+    result2 = {:success, 20}
+    with {:success, x} <- result1, {:success, y} <- result2 do
         x + y
     end
 end'
+	expected := '-module(test).
+-export([test_with/0]).
+
+-spec test_with() -> integer().
+test_with() ->
+    RESULT1_1 = {success, 10},
+    RESULT2_2 = {success, 20},
+    case RESULT1_1 of
+        {success, X_3} ->
+            case RESULT2_2 of
+        {success, Y_4} ->
+            X_3 + Y_4;
+        Error -> Error
+    end;
+        Error -> Error
+    end.
+'
 	result := compile_lx(lx_code)
-	assert result.contains('{success, X_3} = RESULT1_1')
-	assert result.contains('{success, Y_4} = RESULT2_2')
-	assert result.contains('X_3 + Y_4')
+	assert result == expected
 }
 
 // Test with expression with else clause
 fn test_with_else() {
 	lx_code := 'def test_with(maybe_data) do
-    with {success, data} <- maybe_data do
+    with {:success, data} <- maybe_data do
         data
     else
         _ -> "failed"
     end
 end'
+	expected := '-module(test).
+-export([test_with/1]).
+
+-spec test_with(any()) -> any().
+test_with(MAYBE_DATA_1) ->
+    case MAYBE_DATA_1 of
+        {success, DATA_2} ->
+            DATA_2;
+        _ ->
+            <<"failed"/utf8>>
+    end.
+'
 	result := compile_lx(lx_code)
-	assert result.contains('with') || result.contains('case') || result.contains('falha')
+	assert result == expected
 }
 
 // Test complex control flow combinations
@@ -189,9 +316,27 @@ fn test_complex_control_flow() {
         "nil input"
     end
 end'
+	expected := '-module(test).
+-export([process_data/1]).
+
+-spec process_data(any()) -> any().
+process_data(INPUT_1) ->
+    case INPUT_1 /= nil of
+        true -> case INPUT_1 of
+        {DATA_2, _} ->
+            case DATA_2 of
+        {SUCCESS_3, RESULT_4} ->
+            RESULT_4;
+        Error -> Error
+    end;
+        _ ->
+            <<"invalid"/utf8>>
+    end;
+        false -> <<"nil input"/utf8>>
+    end.
+'
 	result := compile_lx(lx_code)
-	assert result.contains('process_data')
-	assert result.contains('case INPUT_1 != nil of')
+	assert result == expected
 }
 
 // Test control flow with records
@@ -210,52 +355,81 @@ def process_user(u) do
         _ -> "invalid user"
     end
 end'
+	expected := '-module(test).
+-export([process_user/1]).
+
+-record(user, {name = nil :: binary(), age = nil :: integer()}).
+-spec process_user(any()) -> binary().
+process_user(U_1) ->
+    case U_1 of
+        #user{name = NAME_2, age = AGE_3} when AGE_3 > 18 ->
+            case NAME_2 /= <<""/utf8>> of
+        true -> <<"adult user"/utf8>>;
+        false -> <<"unnamed adult"/utf8>>
+    end;
+        #user{age = AGE_3} when AGE_3 =< 18 ->
+            <<"minor"/utf8>>;
+        _ ->
+            <<"invalid user"/utf8>>
+    end.
+'
 	result := compile_lx(lx_code)
-	assert result.contains('process_user') || result.contains('falha')
+	assert result == expected
 }
 
 // Test control flow error cases
 fn test_if_syntax_error() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
     if x > 0
         "positive"
     end
 end'
+
 	result := compile_lx_with_error(lx_code)
-	assert result.contains('Expected "do"') || result.contains('falha') || result.contains('error')
+	assert result.contains('Expected "do" after if condition')
 }
 
 fn test_case_syntax_error() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
     case x
         1 -> "one"
     end
 end'
 	result := compile_lx_with_error(lx_code)
-	assert result.contains('Expected "do"') || result.contains('falha') || result.contains('error')
+	assert result.contains('Expected "do" after case expression')
 }
 
 fn test_with_syntax_error() {
-	lx_code := 'def test() do
+	lx_code := 'def test_function() do
     with pattern result do
         "ok"
     end
 end'
 	result := compile_lx_with_error(lx_code)
-	assert result.contains('Expected "<-"') || result.contains('falha') || result.contains('error')
+	assert result.contains('Expected "<-" after with pattern')
 }
 
 // Test if with complex conditions
 fn test_if_complex_conditions() {
 	lx_code := 'def test_complex(x, y, z) do
-    if x > 0 && y < 10 || z == 0 do
+    if (x > 0) and (y < 10) or (z == 0) do
         "complex condition true"
     else
         "complex condition false"
     end
 end'
+	expected := '-module(test).
+-export([test_complex/3]).
+
+-spec test_complex(any(), any(), any()) -> binary().
+test_complex(X_1, Y_2, Z_3) ->
+    case (X_1 > 0) andalso (Y_2 < 10) orelse (Z_3 == 0) of
+        true -> <<"complex condition true"/utf8>>;
+        false -> <<"complex condition false"/utf8>>
+    end.
+'
 	result := compile_lx(lx_code)
-	assert result.contains('X_1 > 0 andalso Y_2 < 10 orelse Z_3 == 0')
+	assert result == expected
 }
 
 // Test case with multiple patterns per clause
@@ -269,7 +443,24 @@ fn test_case_multiple_patterns() {
         _ -> "other"
     end
 end'
+	expected := '-module(test).
+-export([test_multiple/1]).
+
+-spec test_multiple(any()) -> binary().
+test_multiple(X_1) ->
+    case X_1 of
+        1 ->
+            <<"one"/utf8>>;
+        2 ->
+            <<"two"/utf8>>;
+        3 ->
+            <<"three"/utf8>>;
+        N_2 when N_2 > 10 ->
+            <<"big"/utf8>>;
+        _ ->
+            <<"other"/utf8>>
+    end.
+'
 	result := compile_lx(lx_code)
-	assert result.contains('1 -> <<"one"/utf8>>') || result.contains('falha')
-	assert result.contains('2 -> <<"two"/utf8>>') || result.contains('falha')
+	assert result == expected
 }

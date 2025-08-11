@@ -43,7 +43,8 @@ pub fn compile_string(code string, file_path string) !string {
 }
 
 pub fn compile_string_with_modname(code string, file_path string, module_name string) !string {
-	mut p := parser.new_parser(code, file_path)
+	mut directives_table := parser.new_directives_table()
+	mut p := parser.new_parser(code, file_path, directives_table)
 	ast_node := p.parse_with_modname(module_name) or {
 		parser_errors := p.get_errors()
 		if parser_errors.len > 0 {
@@ -92,7 +93,7 @@ pub fn compile_string_with_modname(code string, file_path string, module_name st
 		}
 		return error(error_msg)
 	}
-	mut gen := generator.new_generator()
+	mut gen := generator.new_generator(directives_table)
 	erlang_code := gen.generate_with_types(analyzed_ast, analyzer.get_type_table()) or {
 		errs := gen.get_errors()
 		if errs.len > 0 {

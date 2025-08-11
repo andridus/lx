@@ -21,11 +21,10 @@ enum AnalysisContext {
 }
 
 pub fn (a Analyzer) lookup(name string) ?TypeScheme {
-	if a.current_env >= 0 && a.current_env < a.type_envs.len {
-		if env := a.type_envs[a.current_env] {
-			if name in env.bindings {
-				return env.bindings[name]
-			}
+	// Search from current scope back to root, so inner scopes see outer bindings (e.g., function params inside case clauses)
+	for i := a.current_env; i >= 0; i-- {
+		if name in a.type_envs[i].bindings {
+			return a.type_envs[i].bindings[name]
 		}
 	}
 	return none
@@ -78,6 +77,59 @@ fn (mut a Analyzer) extract_type_from_annotation(node ast.Node) !ast.Type {
 			name:   node.value
 			params: []
 		}
+	}
+}
+
+// Convert an AST node representing a type expression into an ast.Type recursively
+fn (mut a Analyzer) type_node_to_type(node ast.Node) ast.Type {
+	// Identifier represents either a basic/custom type, a generic, a record, or an atom literal
+	if node.kind == .identifier {
+		// Handle parameterized types: name(T1, T2, ...)
+		if node.children.len > 0 {
+			mut param_types := []ast.Type{}
+			for child in node.children {
+				param_types << a.type_node_to_type(child)
+			}
+			return ast.Type{
+				name:   node.value
+				params: param_types
+			}
+		}
+
+		// No params: check for built-ins first
+		match node.value {
+			'integer', 'float', 'string', 'boolean', 'atom', 'any', 'term', 'module', 'nil',
+			'list', 'tuple', 'map' {
+				return ast.Type{
+					name:   node.value
+					params: []
+				}
+			}
+			else {}
+		}
+
+		// Records start with capital letter; keep the name as-is
+		if node.value.len > 0 && node.value[0].is_capital() {
+			return ast.Type{
+				name:   node.value
+				params: []
+			}
+		}
+
+		// Otherwise, treat as atom literal type (e.g., active)
+		return ast.Type{
+			name:   'atom_literal'
+			params: [ast.Type{
+				name:   node.value
+				params: []
+			}]
+		}
+	}
+
+	// Fallback for unexpected nodes: treat as 'any'
+	return ast.Type{
+		name:   'any'
+		params: []
 	}
 }
 
@@ -1069,14 +1121,24 @@ fn (mut a Analyzer) analyze_binding(node ast.Node) !ast.Node {
 
 	var_name := node.value
 
-	// Check for rebind in current scope
-	if _ := a.lookup(var_name) {
+	// Check for rebind only in the current scope. Shadowing in inner scopes is allowed.
+	if var_name in a.type_envs[a.current_env].bindings {
 		a.error('Variable "${var_name}" cannot be reassigned. Variables in LX are immutable.',
 			node.position)
 		return error('Variable "${var_name}" cannot be reassigned')
 	}
 
-	value_node := a.analyze_node(node.children[0])!
+	// Pre-check raw value for anonymous recursion before deep analysis
+	raw_value := node.children[0]
+	if raw_value.kind == .lambda_expression {
+		if a.lambda_has_self_call(raw_value, var_name) {
+			a.error('Anonymous functions cannot be recursive (self-call of "${var_name}")',
+				raw_value.position)
+			return error('Anonymous functions cannot be recursive')
+		}
+	}
+
+	value_node := a.analyze_node(raw_value)!
 
 	value_type := a.type_table.get_type(value_node.id) or {
 		ast.Type{
@@ -1085,7 +1147,7 @@ fn (mut a Analyzer) analyze_binding(node ast.Node) !ast.Node {
 		}
 	}
 
-	// Bind variable in current function's type environment
+	// Bind variable in current function/block scope
 	a.bind(var_name, TypeScheme{
 		quantified_vars: []
 		body:            value_type
@@ -1095,6 +1157,33 @@ fn (mut a Analyzer) analyze_binding(node ast.Node) !ast.Node {
 	a.type_table.assign_type(node.id, value_type)
 
 	return node
+}
+
+// Recursively checks if a lambda body performs a lambda call on the same variable name
+fn (mut a Analyzer) lambda_has_self_call(lambda_node ast.Node, var_name string) bool {
+	// The lambda body is the last child of the lambda expression
+	if lambda_node.children.len == 0 {
+		return false
+	}
+	body := lambda_node.children[lambda_node.children.len - 1]
+	return a.node_has_lambda_self_call(body, var_name)
+}
+
+fn (mut a Analyzer) node_has_lambda_self_call(node ast.Node, var_name string) bool {
+	// Detect pattern: lambda_call where first child is a variable_ref with same name
+	if node.kind == .lambda_call && node.children.len > 0 {
+		callee := node.children[0]
+		if (callee.kind == .variable_ref || callee.kind == .identifier) && callee.value == var_name {
+			return true
+		}
+	}
+	// Recurse children
+	for child in node.children {
+		if a.node_has_lambda_self_call(child, var_name) {
+			return true
+		}
+	}
+	return false
 }
 
 fn (mut a Analyzer) analyze_variable_ref(node ast.Node) !ast.Node {
@@ -1137,6 +1226,11 @@ fn (mut a Analyzer) analyze_identifier(node ast.Node) !ast.Node {
 }
 
 fn (mut a Analyzer) analyze_block(node ast.Node) !ast.Node {
+	// Enter a new scope for this block so that variables declared inside
+	// do not conflict with variables from outer scopes or sibling blocks
+	a.enter_scope('block')
+	defer { a.exit_scope() }
+
 	mut analyzed_exprs := []ast.Node{}
 
 	for expr in node.children {
@@ -1166,10 +1260,6 @@ pub fn (a &Analyzer) get_type_table() &TypeTable {
 }
 
 fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
-	if node.children.len < 1 {
-		return error('Function call must have at least one argument')
-	}
-
 	function_name := node.value // Nome da função (ex: '+', '*', '>')
 
 	function_info := kernel.get_function_info(function_name) or {
@@ -1183,8 +1273,17 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 					analyzed_args << a.analyze_node(arg)!
 				}
 
-				// For function variables, assign a generic return type
-				a.type_table.assign_type(node.id, ast.Type{ name: 'any', params: [] })
+				// Try to infer return type from function type
+				mut return_type := ast.Type{
+					name:   'any'
+					params: []
+				}
+				if scheme.body.name == 'function' && scheme.body.params.len > 0 {
+					// Extract return type (last parameter in function type)
+					return_type = scheme.body.params[scheme.body.params.len - 1]
+				}
+
+				a.type_table.assign_type(node.id, return_type)
 
 				return ast.Node{
 					id:       node.id
@@ -2621,7 +2720,7 @@ fn (a Analyzer) unify_types(t1 ast.Type, t2 ast.Type) ast.Type {
 
 fn (mut a Analyzer) analyze_function_parameter(node ast.Node) !ast.Node {
 	mut param_type := ast.Type{
-		name:   'any'  // Use 'any' instead of 'unknown' for better compatibility
+		name:   'any' // Use 'any' instead of 'unknown' for better compatibility
 		params: []
 	}
 
@@ -2644,14 +2743,21 @@ fn (mut a Analyzer) analyze_lambda_expression(node ast.Node) !ast.Node {
 	a.enter_scope('lambda')
 	defer { a.exit_scope() }
 
+	// Check for self-references in lambda body (recursion not allowed in anonymous functions)
+	a.check_lambda_recursion(node)
+
 	// Analyze parameters (all children except the last one, which is the body)
-	params := if node.children.len > 1 { node.children[0..node.children.len - 1] } else { []ast.Node{} }
+	params := if node.children.len > 1 {
+		node.children[0..node.children.len - 1]
+	} else {
+		[]ast.Node{}
+	}
 	mut param_types := []ast.Type{}
 	for param in params {
 		_ := a.analyze_node(param)!
 		param_type := a.type_table.get_type(param.id) or {
 			ast.Type{
-				name:   'any'  // Use 'any' for better compatibility
+				name:   'any' // Use 'any' for better compatibility
 				params: []
 			}
 		}
@@ -2693,6 +2799,37 @@ fn (mut a Analyzer) analyze_lambda_expression(node ast.Node) !ast.Node {
 	return ast.Node{
 		...node
 		children: analyzed_children
+	}
+}
+
+// Check for self-references in lambda expressions (recursion not allowed)
+fn (mut a Analyzer) check_lambda_recursion(lambda_node ast.Node) {
+	// Get the body of the lambda (last child)
+	if lambda_node.children.len == 0 {
+		return
+	}
+
+	body := lambda_node.children[lambda_node.children.len - 1]
+	mut visited := map[string]bool{}
+	a.check_node_for_recursion(body, mut visited)
+}
+
+// Recursively check a node for self-references
+fn (mut a Analyzer) check_node_for_recursion(node ast.Node, mut visited map[string]bool) {
+	// Check if this node is a function call to a variable
+	if node.kind == .function_caller && node.value in visited {
+		a.error('Recursion not allowed in anonymous functions: ${node.value}', node.position)
+		return
+	}
+
+	// Mark this node as visited if it's a variable reference
+	if node.kind == .identifier {
+		visited[node.value] = true
+	}
+
+	// Recursively check all children
+	for child in node.children {
+		a.check_node_for_recursion(child, mut visited)
 	}
 }
 
@@ -2760,8 +2897,8 @@ fn (mut a Analyzer) analyze_case_clause(node ast.Node) !ast.Node {
 }
 
 fn (mut a Analyzer) analyze_case_clause_with_type(node ast.Node, match_type ast.Type) !ast.Node {
-	if node.children.len != 2 {
-		a.error('Case clause must have pattern and body', node.position)
+	if node.children.len < 2 || node.children.len > 3 {
+		a.error('Case clause must have pattern and body, optionally with guard', node.position)
 		return error('Invalid case clause')
 	}
 
@@ -2785,9 +2922,19 @@ fn (mut a Analyzer) analyze_case_clause_with_type(node ast.Node, match_type ast.
 
 	a.type_table.assign_type(node.id, body_type)
 
+	mut children := [analyzed_pattern, analyzed_body]
+
+	// If there's a guard (3rd child), analyze it
+	if node.children.len == 3 {
+		guard := node.children[2]
+		analyzed_guard := a.analyze_node(guard)!
+		// Store guard as third child
+		children << analyzed_guard
+	}
+
 	return ast.Node{
 		...node
-		children: [analyzed_pattern, analyzed_body]
+		children: children
 	}
 }
 
@@ -2877,7 +3024,7 @@ fn (mut a Analyzer) analyze_pattern_with_type(node ast.Node, expected_type ast.T
 				// For simplicity, assume all tuple elements have 'any' type
 				// (proper tuple type inference would be more complex)
 				child_type := ast.Type{
-					name: 'any'
+					name:   'any'
 					params: []
 				}
 				analyzed_child := a.analyze_pattern_with_type(child, child_type)!
@@ -2885,6 +3032,42 @@ fn (mut a Analyzer) analyze_pattern_with_type(node ast.Node, expected_type ast.T
 			}
 
 			a.type_table.assign_type(node.id, expected_type)
+			return ast.Node{
+				...node
+				children: analyzed_children
+			}
+		}
+		.record_literal {
+			// Record pattern - analyze field patterns
+			mut analyzed_children := []ast.Node{}
+			for child in node.children {
+				analyzed_child := a.analyze_pattern_with_type(child, ast.Type{
+					name:   'any'
+					params: []
+				})!
+				analyzed_children << analyzed_child
+			}
+
+			a.type_table.assign_type(node.id, expected_type)
+			return ast.Node{
+				...node
+				children: analyzed_children
+			}
+		}
+		.binary_pattern {
+			// Binary pattern - analyze segments in pattern context
+			mut analyzed_children := []ast.Node{}
+			for child in node.children {
+				analyzed_child := a.analyze_binary_segment_pattern(child)!
+				analyzed_children << analyzed_child
+			}
+
+			// Binary patterns should match binary type
+			binary_type := ast.Type{
+				name:   'binary'
+				params: []
+			}
+			a.type_table.assign_type(node.id, binary_type)
 			return ast.Node{
 				...node
 				children: analyzed_children
@@ -2933,23 +3116,24 @@ fn (mut a Analyzer) analyze_type_alias(node ast.Node) !ast.Node {
 	}
 
 	type_def := node.children[0]
-	analyzed_type_def := a.analyze_node(type_def)!
+	// Build the alias type directly from the type expression node
+	alias_type := a.type_node_to_type(type_def)
 
-	// Register type alias in environment
-	alias_type := a.type_table.get_type(type_def.id) or {
-		ast.Type{
-			name:   type_def.value
-			params: []
-		}
-	}
+	// Register the custom type in the type table
+	a.type_table.register_custom_type(node.value, alias_type)
 
+	// Bind alias in the environment for later use
 	scheme := TypeScheme{
 		quantified_vars: []
 		body:            alias_type
 	}
 	a.bind(node.value, scheme)
 
+	// Assign type to the alias node for reference
 	a.type_table.assign_type(node.id, alias_type)
+
+	// Still analyze the child for consistency in traversal
+	analyzed_type_def := a.analyze_node(type_def)!
 
 	return ast.Node{
 		...node
@@ -2964,16 +3148,14 @@ fn (mut a Analyzer) analyze_type_annotation(node ast.Node) !ast.Node {
 	}
 
 	type_node := node.children[0]
-	analyzed_type_node := a.analyze_node(type_node)!
-
-	type_info := a.type_table.get_type(type_node.id) or {
-		ast.Type{
-			name:   type_node.value
-			params: []
-		}
-	}
-
+	// Convert the type expression to a concrete type and assign it
+	type_info := a.type_node_to_type(type_node)
+	// Store on both the child and the annotation node ids
+	a.type_table.assign_type(type_node.id, type_info)
 	a.type_table.assign_type(node.id, type_info)
+
+	// Analyze child for traversal consistency
+	analyzed_type_node := a.analyze_node(type_node)!
 
 	return ast.Node{
 		...node
@@ -3043,19 +3225,23 @@ fn (mut a Analyzer) register_pattern_variables(pattern ast.Node) {
 						a.extract_type_from_annotation(tail.children[0]) or {
 							ast.Type{
 								name:   'list'
-								params: [ast.Type{
-									name:   'any'
-									params: []
-								}]
+								params: [
+									ast.Type{
+										name:   'any'
+										params: []
+									},
+								]
 							}
 						}
 					} else {
 						ast.Type{
 							name:   'list'
-							params: [ast.Type{
-								name:   'any'
-								params: []
-							}]
+							params: [
+								ast.Type{
+									name:   'any'
+									params: []
+								},
+							]
 						}
 					}
 
@@ -3098,7 +3284,10 @@ fn (mut a Analyzer) analyze_if_expr(node ast.Node) !ast.Node {
 	// Analyze then branch
 	then_branch := a.analyze_node(node.children[1])!
 	then_type := a.type_table.get_type(then_branch.id) or {
-		ast.Type{name: 'any', params: []}
+		ast.Type{
+			name:   'any'
+			params: []
+		}
 	}
 
 	mut result_type := then_type
@@ -3108,11 +3297,21 @@ fn (mut a Analyzer) analyze_if_expr(node ast.Node) !ast.Node {
 	if node.children.len > 2 {
 		else_branch := a.analyze_node(node.children[2])!
 		else_type := a.type_table.get_type(else_branch.id) or {
-			ast.Type{name: 'any', params: []}
+			ast.Type{
+				name:   'any'
+				params: []
+			}
 		}
 
 		// Unify then and else types
-		result_type = if then_type.name == else_type.name { then_type } else { ast.Type{name: 'any', params: []} }
+		result_type = if then_type.name == else_type.name {
+			then_type
+		} else {
+			ast.Type{
+				name:   'any'
+				params: []
+			}
+		}
 		analyzed_children << else_branch
 	}
 
@@ -3126,11 +3325,22 @@ fn (mut a Analyzer) analyze_if_expr(node ast.Node) !ast.Node {
 }
 
 fn (mut a Analyzer) analyze_with_expr(node ast.Node) !ast.Node {
-	if node.children.len < 3 {
-		a.error('With expression must have pattern, expression, and body', node.position)
+	if node.children.len < 2 {
+		a.error('With expression must have at least one clause and body', node.position)
 		return error('Invalid with expression')
 	}
 
+	// Check if this is old format (3 children: pattern, expr, body) or new format (multiple clauses + body)
+	if node.children.len == 3 && node.children[0].kind != .pattern_match {
+		// Old format: single pattern, expr, body
+		return a.analyze_with_expr_single(node)
+	}
+
+	// New format: multiple clauses + body (+ optional else)
+	return a.analyze_with_expr_multi(node)
+}
+
+fn (mut a Analyzer) analyze_with_expr_single(node ast.Node) !ast.Node {
 	// Analyze expression first
 	expr := a.analyze_node(node.children[1])!
 
@@ -3138,7 +3348,7 @@ fn (mut a Analyzer) analyze_with_expr(node ast.Node) !ast.Node {
 	a.enter_scope('with_scope')
 	defer { a.exit_scope() }
 
-		// Register pattern variables first (from original node)
+	// Register pattern variables first (from original node)
 	a.register_pattern_variables(node.children[0])
 
 	// Then analyze pattern in pattern context
@@ -3149,7 +3359,10 @@ fn (mut a Analyzer) analyze_with_expr(node ast.Node) !ast.Node {
 	// Analyze body
 	body := a.analyze_node(node.children[2])!
 	body_type := a.type_table.get_type(body.id) or {
-		ast.Type{name: 'any', params: []}
+		ast.Type{
+			name:   'any'
+			params: []
+		}
 	}
 
 	mut result_type := body_type
@@ -3159,10 +3372,111 @@ fn (mut a Analyzer) analyze_with_expr(node ast.Node) !ast.Node {
 	if node.children.len > 3 {
 		else_body := a.analyze_node(node.children[3])!
 		else_type := a.type_table.get_type(else_body.id) or {
-			ast.Type{name: 'any', params: []}
+			ast.Type{
+				name:   'any'
+				params: []
+			}
 		}
 
-		result_type = if body_type.name == else_type.name { body_type } else { ast.Type{name: 'any', params: []} }
+		result_type = if body_type.name == else_type.name {
+			body_type
+		} else {
+			ast.Type{
+				name:   'any'
+				params: []
+			}
+		}
+		analyzed_children << else_body
+	}
+
+	analyzed_node := ast.Node{
+		...node
+		children: analyzed_children
+	}
+
+	a.type_table.assign_type(analyzed_node.id, result_type)
+	return analyzed_node
+}
+
+fn (mut a Analyzer) analyze_with_expr_multi(node ast.Node) !ast.Node {
+	// Find where body starts (after all pattern_match clauses)
+	mut body_index := 0
+	for i, child in node.children {
+		if child.kind != .pattern_match {
+			body_index = i
+			break
+		}
+	}
+
+	if body_index == 0 {
+		a.error('With expression must have at least one clause', node.position)
+		return error('Invalid with expression')
+	}
+
+	// Enter scope for all pattern bindings
+	a.enter_scope('with_scope')
+	defer { a.exit_scope() }
+
+	// Register variables from all clauses first
+	for i in 0 .. body_index {
+		clause := node.children[i]
+		if clause.kind == .pattern_match && clause.children.len >= 1 {
+			a.register_pattern_variables(clause.children[0])
+		}
+	}
+
+	// Analyze all clauses
+	mut analyzed_clauses := []ast.Node{}
+	for i in 0 .. body_index {
+		clause := node.children[i]
+		if clause.kind == .pattern_match && clause.children.len >= 2 {
+			// Analyze expression
+			analyzed_expr := a.analyze_node(clause.children[1])!
+
+			// Analyze pattern
+			analyzed_pattern := a.with_context(.pattern, fn [mut a, clause] (mut analyzer Analyzer) !ast.Node {
+				return analyzer.analyze_node(clause.children[0])
+			})!
+
+			analyzed_clause := ast.Node{
+				...clause
+				children: [analyzed_pattern, analyzed_expr]
+			}
+			analyzed_clauses << analyzed_clause
+		}
+	}
+
+	// Analyze body
+	body := a.analyze_node(node.children[body_index])!
+	body_type := a.type_table.get_type(body.id) or {
+		ast.Type{
+			name:   'any'
+			params: []
+		}
+	}
+
+	mut result_type := body_type
+	mut analyzed_children := analyzed_clauses.clone()
+	analyzed_children << body
+
+	// Analyze else body if present
+	if node.children.len > body_index + 1 {
+		else_body := a.analyze_node(node.children[body_index + 1])!
+		else_type := a.type_table.get_type(else_body.id) or {
+			ast.Type{
+				name:   'any'
+				params: []
+			}
+		}
+
+		result_type = if body_type.name == else_type.name {
+			body_type
+		} else {
+			ast.Type{
+				name:   'any'
+				params: []
+			}
+		}
 		analyzed_children << else_body
 	}
 
@@ -3204,7 +3518,10 @@ fn (mut a Analyzer) analyze_match_expr(node ast.Node) !ast.Node {
 
 	// Match expressions typically return the matched value type
 	expr_type := a.type_table.get_type(expr.id) or {
-		ast.Type{name: 'any', params: []}
+		ast.Type{
+			name:   'any'
+			params: []
+		}
 	}
 	a.type_table.assign_type(analyzed_node.id, expr_type)
 	return analyzed_node
@@ -3228,7 +3545,7 @@ fn (mut a Analyzer) analyze_spawn_expr(node ast.Node) !ast.Node {
 
 	// Spawn returns a PID (process identifier)
 	pid_type := ast.Type{
-		name: 'pid'
+		name:   'pid'
 		params: []
 	}
 	a.type_table.assign_type(analyzed_node.id, pid_type)
@@ -3252,7 +3569,10 @@ fn (mut a Analyzer) analyze_send_expr(node ast.Node) !ast.Node {
 
 	// Send returns the message that was sent
 	message_type := a.type_table.get_type(message.id) or {
-		ast.Type{name: 'any', params: []}
+		ast.Type{
+			name:   'any'
+			params: []
+		}
 	}
 	a.type_table.assign_type(analyzed_node.id, message_type)
 	return analyzed_node
@@ -3273,7 +3593,7 @@ fn (mut a Analyzer) analyze_receive_expr(node ast.Node) !ast.Node {
 
 	// Receive returns any type based on the patterns
 	receive_type := ast.Type{
-		name: 'any'
+		name:   'any'
 		params: []
 	}
 	a.type_table.assign_type(analyzed_node.id, receive_type)
@@ -3299,7 +3619,7 @@ fn (mut a Analyzer) analyze_supervisor_def(node ast.Node) !ast.Node {
 
 	// Supervisors return supervisor specification
 	supervisor_type := ast.Type{
-		name: 'supervisor_spec'
+		name:   'supervisor_spec'
 		params: []
 	}
 	a.type_table.assign_type(analyzed_node.id, supervisor_type)
@@ -3325,7 +3645,7 @@ fn (mut a Analyzer) analyze_worker_def(node ast.Node) !ast.Node {
 
 	// Workers return worker specification
 	worker_type := ast.Type{
-		name: 'worker_spec'
+		name:   'worker_spec'
 		params: []
 	}
 	a.type_table.assign_type(analyzed_node.id, worker_type)
@@ -3349,7 +3669,7 @@ fn (mut a Analyzer) analyze_binary_literal(node ast.Node) !ast.Node {
 
 	// Binary literals are of type binary
 	binary_type := ast.Type{
-		name: 'binary'
+		name:   'binary'
 		params: []
 	}
 	a.type_table.assign_type(analyzed_node.id, binary_type)
@@ -3360,12 +3680,54 @@ fn (mut a Analyzer) analyze_binary_pattern(node ast.Node) !ast.Node {
 	return a.analyze_binary_literal(node) // Same analysis as literal
 }
 
-fn (mut a Analyzer) analyze_binary_segment(node ast.Node) !ast.Node {
+// Analyze binary segment in pattern context - variables are declarations, not references
+fn (mut a Analyzer) analyze_binary_segment_pattern(node ast.Node) !ast.Node {
+	if node.kind != .binary_segment {
+		return a.analyze_pattern_with_type(node, ast.Type{ name: 'any', params: [] })
+	}
+
 	mut analyzed_children := []ast.Node{}
 
-	for child in node.children {
-		analyzed_child := a.analyze_node(child)!
-		analyzed_children << analyzed_child
+	// The first child is the variable being declared
+	if node.children.len > 0 {
+		variable := node.children[0]
+		if variable.kind == .identifier {
+			// This is a new variable declaration in the pattern
+			scheme := TypeScheme{
+				quantified_vars: []
+				body:            ast.Type{
+					name:   'any'
+					params: []
+				}
+			}
+			a.bind(variable.value, scheme)
+			a.type_table.assign_type(variable.id, ast.Type{ name: 'any', params: [] })
+			analyzed_children << variable
+		} else {
+			// Not an identifier, analyze normally
+			analyzed_child := a.analyze_pattern_with_type(variable, ast.Type{
+				name:   'any'
+				params: []
+			})!
+			analyzed_children << analyzed_child
+		}
+	}
+
+	// Analyze size expression if present (second child)
+	if node.children.len > 1 {
+		size_child := a.analyze_node(node.children[1])!
+		analyzed_children << size_child
+	}
+
+	// Validate binary segment modifiers (same as before)
+	if node.value.len > 0 {
+		options := node.value.split(',')
+		for option in options {
+			if !is_valid_binary_modifier(option.trim_space()) {
+				a.error('Invalid binary segment modifier: ${option}', node.position)
+				return node
+			}
+		}
 	}
 
 	analyzed_node := ast.Node{
@@ -3375,11 +3737,72 @@ fn (mut a Analyzer) analyze_binary_segment(node ast.Node) !ast.Node {
 
 	// Binary segments are of type any (can be integers, binaries, etc.)
 	segment_type := ast.Type{
-		name: 'any'
+		name:   'any'
 		params: []
 	}
 	a.type_table.assign_type(analyzed_node.id, segment_type)
 	return analyzed_node
+}
+
+fn (mut a Analyzer) analyze_binary_segment(node ast.Node) !ast.Node {
+	mut analyzed_children := []ast.Node{}
+
+	for child in node.children {
+		analyzed_child := a.analyze_node(child)!
+		analyzed_children << analyzed_child
+	}
+
+	// Validate binary segment modifiers
+	if node.value.len > 0 {
+		options := node.value.split(',')
+		for option in options {
+			if !is_valid_binary_modifier(option.trim_space()) {
+				a.error('Invalid binary segment modifier: ${option}', node.position)
+				return node
+			}
+		}
+	}
+
+	analyzed_node := ast.Node{
+		...node
+		children: analyzed_children
+	}
+
+	// Binary segments are of type any (can be integers, binaries, etc.)
+	segment_type := ast.Type{
+		name:   'any'
+		params: []
+	}
+	a.type_table.assign_type(analyzed_node.id, segment_type)
+	return analyzed_node
+}
+
+// Validate binary segment modifiers according to Erlang specification
+fn is_valid_binary_modifier(modifier string) bool {
+	// Type modifiers
+	type_modifiers := ['integer', 'float', 'binary', 'bytes', 'bitstring', 'bits']
+
+	// Endianness modifiers
+	endianness_modifiers := ['big', 'little', 'native']
+
+	// Sign modifiers
+	sign_modifiers := ['signed', 'unsigned']
+
+	// Unit modifier (format: unit:N where N is 1-256)
+	if modifier.starts_with('unit:') {
+		unit_part := modifier[5..]
+		unit_val := unit_part.int()
+		return unit_val >= 1 && unit_val <= 256
+	}
+
+	// Size modifier (just numbers, handled separately)
+	if modifier.bytes().all(it.is_digit()) {
+		return true
+	}
+
+	// Check against known modifier lists
+	return modifier in type_modifiers || modifier in endianness_modifiers
+		|| modifier in sign_modifiers
 }
 
 // ============ Task 11: Custom Types Analysis ============
@@ -3398,9 +3821,17 @@ fn (mut a Analyzer) analyze_type_def(node ast.Node) !ast.Node {
 		children: analyzed_children
 	}
 
+	// Get the type definition from the first child (the type expression)
+	if analyzed_children.len > 0 {
+		// Convert the original (pre-analyzed) child node into a type
+		base_type := a.type_node_to_type(node.children[0])
+		// Register the custom type in the type table
+		a.type_table.register_custom_type(node.value, base_type)
+	}
+
 	// Type definitions are metadata - no runtime type
 	type_def_type := ast.Type{
-		name: 'type_definition'
+		name:   'type_definition'
 		params: []
 	}
 	a.type_table.assign_type(analyzed_node.id, type_def_type)
@@ -3422,7 +3853,7 @@ fn (mut a Analyzer) analyze_union_type(node ast.Node) !ast.Node {
 
 	// Union types represent multiple possible types
 	union_type := ast.Type{
-		name: 'union'
+		name:   'union'
 		params: []
 	}
 	a.type_table.assign_type(analyzed_node.id, union_type)
@@ -3444,8 +3875,10 @@ fn (mut a Analyzer) analyze_generic_type(node ast.Node) !ast.Node {
 
 	// Generic types
 	generic_type := ast.Type{
-		name: node.value
-		params: analyzed_children.map(a.type_table.get_type(it.id) or { ast.Type{name: 'any', params: []} })
+		name:   node.value
+		params: analyzed_children.map(a.type_table.get_type(it.id) or {
+			ast.Type{ name: 'any', params: [] }
+		})
 	}
 	a.type_table.assign_type(analyzed_node.id, generic_type)
 	return analyzed_node
@@ -3464,9 +3897,17 @@ fn (mut a Analyzer) analyze_opaque_type(node ast.Node) !ast.Node {
 		children: analyzed_children
 	}
 
+	// Get the base type definition from the first child (the type expression)
+	if analyzed_children.len > 0 {
+		// Convert the original (pre-analyzed) child node into a type
+		base_type := a.type_node_to_type(node.children[0])
+		// Register the custom type in the type table
+		a.type_table.register_custom_type(node.value, base_type)
+	}
+
 	// Opaque types hide the underlying type
 	opaque_type := ast.Type{
-		name: node.value
+		name:   node.value
 		params: []
 	}
 	a.type_table.assign_type(analyzed_node.id, opaque_type)
@@ -3474,7 +3915,33 @@ fn (mut a Analyzer) analyze_opaque_type(node ast.Node) !ast.Node {
 }
 
 fn (mut a Analyzer) analyze_nominal_type(node ast.Node) !ast.Node {
-	return a.analyze_opaque_type(node) // Same analysis as opaque
+	mut analyzed_children := []ast.Node{}
+
+	for child in node.children {
+		analyzed_child := a.analyze_node(child)!
+		analyzed_children << analyzed_child
+	}
+
+	analyzed_node := ast.Node{
+		...node
+		children: analyzed_children
+	}
+
+	// Get the base type definition from the first child (the type expression)
+	if analyzed_children.len > 0 {
+		// Convert the original (pre-analyzed) child node into a type
+		base_type := a.type_node_to_type(node.children[0])
+		// Register the custom type in the type table
+		a.type_table.register_custom_type(node.value, base_type)
+	}
+
+	// Nominal types are distinct from their underlying type
+	nominal_type := ast.Type{
+		name:   node.value
+		params: []
+	}
+	a.type_table.assign_type(analyzed_node.id, nominal_type)
+	return analyzed_node
 }
 
 // ============ Task 11: Module System Analysis ============
@@ -3494,7 +3961,7 @@ fn (mut a Analyzer) analyze_deps_declaration(node ast.Node) !ast.Node {
 
 	// Dependencies are metadata
 	deps_type := ast.Type{
-		name: 'dependencies'
+		name:   'dependencies'
 		params: []
 	}
 	a.type_table.assign_type(analyzed_node.id, deps_type)
@@ -3516,7 +3983,7 @@ fn (mut a Analyzer) analyze_application_config(node ast.Node) !ast.Node {
 
 	// Application config is metadata
 	app_type := ast.Type{
-		name: 'application_config'
+		name:   'application_config'
 		params: []
 	}
 	a.type_table.assign_type(analyzed_node.id, app_type)
@@ -3531,7 +3998,7 @@ fn (mut a Analyzer) analyze_import_statement(node ast.Node) !ast.Node {
 
 	// Import statements are metadata
 	import_type := ast.Type{
-		name: 'import'
+		name:   'import'
 		params: []
 	}
 	a.type_table.assign_type(analyzed_node.id, import_type)
@@ -3555,7 +4022,7 @@ fn (mut a Analyzer) analyze_string_interpolation(node ast.Node) !ast.Node {
 
 	// String interpolation results in a binary (string)
 	string_type := ast.Type{
-		name: 'binary'
+		name:   'binary'
 		params: []
 	}
 	a.type_table.assign_type(analyzed_node.id, string_type)
@@ -3586,7 +4053,7 @@ fn (mut a Analyzer) analyze_anonymous_function(node ast.Node) !ast.Node {
 
 	// Anonymous functions are of type fun
 	fun_type := ast.Type{
-		name: 'fun'
+		name:   'fun'
 		params: []
 	}
 	a.type_table.assign_type(analyzed_node.id, fun_type)
@@ -3613,8 +4080,11 @@ fn (mut a Analyzer) analyze_list_comprehension(node ast.Node) !ast.Node {
 
 	// List comprehensions return a list
 	list_type := ast.Type{
-		name: 'list'
-		params: [ast.Type{name: 'any', params: []}]
+		name:   'list'
+		params: [ast.Type{
+			name:   'any'
+			params: []
+		}]
 	}
 	a.type_table.assign_type(analyzed_node.id, list_type)
 	return analyzed_node
@@ -3635,7 +4105,7 @@ fn (mut a Analyzer) analyze_directive(node ast.Node) !ast.Node {
 
 	// Directives are metadata
 	directive_type := ast.Type{
-		name: 'directive'
+		name:   'directive'
 		params: []
 	}
 	a.type_table.assign_type(analyzed_node.id, directive_type)
@@ -3661,7 +4131,7 @@ fn (mut a Analyzer) analyze_test_block(node ast.Node) !ast.Node {
 
 	// Test blocks return test specification
 	test_type := ast.Type{
-		name: 'test_spec'
+		name:   'test_spec'
 		params: []
 	}
 	a.type_table.assign_type(analyzed_node.id, test_type)
@@ -3679,16 +4149,30 @@ fn (mut a Analyzer) analyze_lambda_call(node ast.Node) !ast.Node {
 	mut analyzed_children := [lambda]
 
 	// Analyze arguments
-	for i in 1..node.children.len {
+	for i in 1 .. node.children.len {
 		arg := a.analyze_node(node.children[i])!
 		analyzed_children << arg
 	}
 
-	// Set type to any for now (could be refined with more sophisticated type inference)
-	a.type_table.assign_type(node.id, ast.Type{
-		name: 'any'
-		params: []
-	})
+	// Try to infer return type from lambda expression
+	lambda_type := a.type_table.get_type(lambda.id) or {
+		ast.Type{
+			name:   'any'
+			params: []
+		}
+	}
+
+	// If lambda is a function type, extract return type (last parameter)
+	return_type := if lambda_type.name == 'function' && lambda_type.params.len > 0 {
+		lambda_type.params[lambda_type.params.len - 1]
+	} else {
+		ast.Type{
+			name:   'any'
+			params: []
+		}
+	}
+
+	a.type_table.assign_type(node.id, return_type)
 
 	return ast.Node{
 		...node

@@ -10,7 +10,7 @@ end'
 	expected := '-module(test).
 -export([test_lambda/0]).
 
--spec test_lambda() -> any().
+-spec test_lambda() -> integer().
 test_lambda() ->
     LAMBDA_1 = fun(X_2, Y_3) ->
         X_2 + Y_3
@@ -32,7 +32,7 @@ end'
 	expected := '-module(test).
 -export([test_lambda_multiline/0]).
 
--spec test_lambda_multiline() -> any().
+-spec test_lambda_multiline() -> integer().
 test_lambda_multiline() ->
     LAMBDA_1 = fun(X_2, Y_3) ->
         RESULT_4 = X_2 + Y_3,
@@ -55,7 +55,7 @@ end'
 	expected := '-module(test).
 -export([test_lambda_do/0]).
 
--spec test_lambda_do() -> any().
+-spec test_lambda_do() -> integer().
 test_lambda_do() ->
     LAMBDA_1 = fun(X_2) ->
         DOUBLED_3 = X_2 * 2,
@@ -86,7 +86,7 @@ test_lambda_multihead() ->
             <<"success"/utf8>>;
         (error) ->
             <<"failure"/utf8>>;
-        (__2) ->
+        (_) ->
             <<"unknown"/utf8>>
     end,
     LAMBDA_1(ok).
@@ -103,7 +103,7 @@ end'
 	expected := '-module(test).
 -export([test_simple_lambda/0]).
 
--spec test_simple_lambda() -> any().
+-spec test_simple_lambda() -> integer().
 test_simple_lambda() ->
     LAMBDA_1 = fun(X_2, Y_3) ->
         X_2 + Y_3
@@ -122,7 +122,7 @@ end'
 	expected := '-module(test).
 -export([test_no_params/0]).
 
--spec test_no_params() -> any().
+-spec test_no_params() -> integer().
 test_no_params() ->
     LAMBDA_1 = fun() ->
         42
@@ -141,7 +141,7 @@ end'
 	expected := '-module(test).
 -export([test_single_param/0]).
 
--spec test_single_param() -> any().
+-spec test_single_param() -> binary().
 test_single_param() ->
     LAMBDA_1 = fun(X_2) ->
         X_2
@@ -190,16 +190,16 @@ end'
 	expected := '-module(test).
 -export([test_nested/0]).
 
--spec test_nested() -> any().
+-spec test_nested() -> integer().
 test_nested() ->
     ADD_1 = fun(X_2, Y_3) ->
         X_2 + Y_3
     end,
-    MULTIPLY_4 = fun(X_5, Y_6) ->
-        X_5 * Y_6
+    MULTIPLY_4 = fun(X_2, Y_3) ->
+        X_2 * Y_3
     end,
-    RESULT_7 = MULTIPLY_4(ADD_1(2, 3), 4),
-    RESULT_7.
+    RESULT_5 = MULTIPLY_4(ADD_1(2, 3), 4),
+    RESULT_5.
 '
 	result := compile_lx(lx_code)
 	assert result == expected
@@ -224,7 +224,7 @@ test_mixed_types() ->
             X_2 * 2;
         (S_3) ->
             S_3;
-        (__4) ->
+        (_) ->
             unknown
     end,
     PROCESSOR_1(42).
@@ -242,7 +242,7 @@ fn test_lambda_error_missing_end() {
     lambda.(5)
 end'
 	result := compile_lx_with_error(lx_code)
-	assert result.contains('Expected "end" to close lambda body after line break')
+	assert result.contains('Expected end keyword')
 }
 
 fn test_lambda_error_invalid_syntax() {
@@ -279,9 +279,8 @@ end'
 	expected := '-module(test).
 -export([test_lambda_records/0]).
 
--record(person, {name, age}).
-
--spec test_lambda_records() -> any().
+-record(person, {name = nil :: binary(), age = nil :: integer()}).
+-spec test_lambda_records() -> binary().
 test_lambda_records() ->
     CREATOR_1 = fun(NAME_2, AGE_3) ->
         #person{name = NAME_2, age = AGE_3}
@@ -304,22 +303,6 @@ fn test_lambda_with_lists() {
     double = fn(x) -> x * 2
     mapper.(double, [1, 2, 3])
 end'
-	expected := '-module(test).
--export([test_lambda_lists/0]).
-
--spec test_lambda_lists() -> any().
-test_lambda_lists() ->
-    MAPPER_1 = fun(F_2, LIST_3) ->
-        case LIST_3 of
-            [] -> [];
-            [H_4 | T_5] -> [F_2(H_4) | MAPPER_1(F_2, T_5)]
-        end
-    end,
-    DOUBLE_6 = fun(X_7) ->
-        X_7 * 2
-    end,
-    MAPPER_1(DOUBLE_6, [1, 2, 3]).
-'
-	result := compile_lx(lx_code)
-	assert result == expected
+	result := compile_lx_with_error(lx_code)
+	assert result.contains('Anonymous functions cannot be recursive (self-call of "mapper")')
 }

@@ -319,6 +319,15 @@ pub fn new_case_clause(id int, pattern Node, body Node, pos Position) Node {
 	}
 }
 
+pub fn new_case_clause_with_guard(id int, pattern Node, guard Node, body Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .case_clause
+		children: [pattern, body, guard]
+		position: pos
+	}
+}
+
 pub fn new_pattern_match(id int, pattern Node, pos Position) Node {
 	return Node{
 		id:       id
@@ -382,6 +391,26 @@ pub fn new_if_expr(id int, condition Node, then_expr Node, else_expr ?Node, pos 
 
 pub fn new_with_expr(id int, pattern Node, expr Node, body Node, else_body ?Node, pos Position) Node {
 	mut children := [pattern, expr, body]
+	if else_node := else_body {
+		children << else_node
+	}
+	return Node{
+		id:       id
+		kind:     .with_expr
+		children: children
+		position: pos
+	}
+}
+
+pub fn new_with_expr_multi(id int, clauses []Node, body Node, else_body ?Node, pos Position) Node {
+	mut children := []Node{}
+	// Add all clauses first
+	for clause in clauses {
+		children << clause
+	}
+	// Add body
+	children << body
+	// Add else body if present
 	if else_node := else_body {
 		children << else_node
 	}
