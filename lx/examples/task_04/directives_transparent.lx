@@ -1,9 +1,9 @@
 def fun(a) do
     a
-    $print(a)  // Esta diretiva é executada durante compilação mas não aparece no código final
+    $print(a) # Esta diretiva é executada durante compilação mas não aparece no código final
 end
 
 def main() do
     x = 42
-    fun(x)  // Resultado: apenas retorna x, $print(a) não aparece no código gerado
+    fun(x)  # Resultado: apenas retorna x, $print(a) não aparece no código gerado
 end

@@ -10,5 +10,5 @@ def sum do
     (x, y, z) -> x + y + z
 end
 def main() do
-    factorial do()
+    factorial(5)
 end

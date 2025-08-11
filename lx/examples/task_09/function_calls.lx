@@ -12,5 +12,5 @@ def calculate(a, b, c) do
     temp2
 end
 def main() do
-    add()
+    add(1, 2)
 end

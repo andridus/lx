@@ -3,12 +3,12 @@ def typed_add(a :: integer, b :: integer) :: integer do
 end
 
 def typed_greet(name :: string) :: string do
-    "Hello, " + name
+    name
 end
 
 def typed_calculate(x :: float, y :: float) :: float do
     x * y
 end
 def main() do
-    typed_add()
+    typed_add(5, 2)
 end

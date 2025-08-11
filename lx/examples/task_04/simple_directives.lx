@@ -1,6 +1,6 @@
 def test() do
     x = 42
-    $unknown(x)
+    $print(x)
     x
 end
 def main() do

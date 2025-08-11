@@ -3,7 +3,7 @@ def add(a, b) do
 end
 
 def greet(name) do
-    "Hello, " + name
+    name
 end
 
 def calculate(x, y, z) do

@@ -74,5 +74,5 @@ def type_polymorphism_example(data) do
     end
 end
 def main() do
-    complex_function()
+    complex_function(1, 2, 3, 4, 5)
 end

@@ -1,8 +1,8 @@
 def key_removal_example() do
     map = %{name: "Ana", age: 25, temp: "value", "key": "data", 42: "number"}
-    cleaned1 = maps_remove(:temp, map)
-    cleaned2 = maps_remove("key", cleaned1)
-    cleaned3 = maps_remove(42, cleaned2)
+    cleaned1 = map_remove(:temp, map)
+    cleaned2 = map_remove("key", cleaned1)
+    cleaned3 = map_remove(42, cleaned2)
     cleaned3
 end
 def main() do

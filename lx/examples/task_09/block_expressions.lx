@@ -5,11 +5,11 @@ def complex_function(a, b) do
     result1
 end
 
-def nested_blocks do
+def nested_blocks() do
     outer = 10; inner = 20
     result2 = outer + inner
     result2
 end
 def main() do
-    complex_function()
+    complex_function(1, 2)
 end
