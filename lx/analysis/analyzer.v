@@ -395,6 +395,7 @@ fn (mut a Analyzer) analyze_module(node ast.Node) !ast.Node {
 
 	mut function_names := map[string]bool{}
 
+	// First pass: pre-register all function signatures for forward references
 	for child in node.children {
 		if child.kind == .function {
 			func_name := child.value
@@ -402,8 +403,14 @@ fn (mut a Analyzer) analyze_module(node ast.Node) !ast.Node {
 				a.error('Duplicate function name: ${func_name}', child.position)
 			}
 			function_names[func_name] = true
-		}
 
+			// Pre-register function with basic signature
+			a.preregister_function(child)!
+		}
+	}
+
+	// Second pass: analyze all nodes with function signatures already available
+	for child in node.children {
 		analyzed_child := a.analyze_node(child)!
 		analyzed_children << analyzed_child
 	}
@@ -417,6 +424,69 @@ fn (mut a Analyzer) analyze_module(node ast.Node) !ast.Node {
 		...node
 		children: analyzed_children
 	}
+}
+
+// Pre-register function signature for forward reference resolution
+fn (mut a Analyzer) preregister_function(node ast.Node) ! {
+	if node.kind != .function {
+		return
+	}
+
+	function_name := node.value
+	if function_name == '' {
+		return // Skip anonymous function heads
+	}
+
+	if node.children.len < 2 {
+		return // Need at least parameters and body
+	}
+
+	parameters_node := node.children[0]
+	mut parameters := []ast.Type{}
+
+	// Extract parameter types (use 'any' as default)
+	for param in parameters_node.children {
+		param_type := if param.children.len > 0 {
+			a.extract_type_from_annotation(param.children[0]) or {
+				ast.Type{
+					name:   'any'
+					params: []
+				}
+			}
+		} else {
+			ast.Type{
+				name:   'any'
+				params: []
+			}
+		}
+		parameters << param_type
+	}
+
+	// Extract return type (use 'any' as default if not specified)
+	return_type := if node.children.len > 2 {
+		return_type_node := node.children[2]
+		if return_type_node.children.len > 0 {
+			a.extract_type_from_annotation(return_type_node) or {
+				ast.Type{
+					name:   'any'
+					params: []
+				}
+			}
+		} else {
+			ast.Type{
+				name:   'any'
+				params: []
+			}
+		}
+	} else {
+		ast.Type{
+			name:   'any'
+			params: []
+		}
+	}
+
+	// Register function type in global type table for forward references
+	a.type_table.register_function_type(function_name, parameters, return_type)
 }
 
 fn (mut a Analyzer) analyze_function(node ast.Node) !ast.Node {

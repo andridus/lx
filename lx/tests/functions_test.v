@@ -602,3 +602,152 @@ main() ->
 	result := compile_lx(lx_code)
 	assert result == expected
 }
+
+// Forward References Tests
+fn test_forward_reference_simple() {
+	lx_code := 'def a() do
+  b()
+end
+
+def b() do
+  1
+end'
+
+	expected := '-module(test).
+-export([a/0, b/0]).
+
+-spec a() -> any().
+a() ->
+    b().
+-spec b() -> integer().
+b() ->
+    1.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+fn test_forward_reference_multiple_functions() {
+	lx_code := 'def main() do
+  a()
+end
+
+def a() do
+  b()
+end
+
+def b() do
+  1
+end
+
+def c() do
+  2
+end'
+
+	expected := '-module(test).
+-export([main/0, a/0, b/0, c/0]).
+
+-spec main() -> any().
+main() ->
+    a().
+-spec a() -> any().
+a() ->
+    b().
+-spec b() -> integer().
+b() ->
+    1.
+-spec c() -> integer().
+c() ->
+    2.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+fn test_forward_reference_with_type_annotations() {
+	lx_code := 'def process() do
+  calculate()
+end
+
+def calculate() do
+  42
+end'
+
+	expected := '-module(test).
+-export([process/0, calculate/0]).
+
+-spec process() -> any().
+process() ->
+    calculate().
+-spec calculate() -> integer().
+calculate() ->
+    42.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+fn test_forward_reference_in_nested_calls() {
+	lx_code := 'def entry() do
+  step1()
+end
+
+def step1() do
+  step2()
+end
+
+def step2() do
+  step3()
+end
+
+def step3() do
+  "done"
+end'
+
+	expected := '-module(test).
+-export([entry/0, step1/0, step2/0, step3/0]).
+
+-spec entry() -> any().
+entry() ->
+    step1().
+-spec step1() -> any().
+step1() ->
+    step2().
+-spec step2() -> any().
+step2() ->
+    step3().
+-spec step3() -> binary().
+step3() ->
+    <<"done"/utf8>>.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+fn test_forward_reference_with_parameters() {
+	lx_code := 'def start(x :: integer) do
+  process(x)
+end
+
+def process(n :: integer) do
+  n * 2
+end'
+
+	expected := '-module(test).
+-export([start/1, process/1]).
+
+-spec start(integer()) -> any().
+start(X_1) ->
+    process(X_1).
+-spec process(integer()) -> integer().
+process(N_2) ->
+    N_2 * 2.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
