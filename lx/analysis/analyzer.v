@@ -11,6 +11,7 @@ mut:
 	type_envs        []TypeEnv
 	current_env      int
 	analysis_context AnalysisContext
+	otp_contexts     []OtpContextInfo
 }
 
 enum AnalysisContext {
@@ -18,6 +19,11 @@ enum AnalysisContext {
 	pattern            // Pattern matching context
 	function_parameter // Function parameter context
 	record_field       // Record field definition context
+}
+
+struct OtpContextInfo {
+	name            string
+	local_functions map[string]bool
 }
 
 pub fn (a Analyzer) lookup(name string) ?TypeScheme {
@@ -244,6 +250,9 @@ fn (mut a Analyzer) analyze_node(node ast.Node) !ast.Node {
 		}
 		.function_caller {
 			a.analyze_function_caller(node)
+		}
+		.external_function_call {
+			return a.analyze_external_function_call(node)
 		}
 		.parentheses {
 			a.analyze_parentheses(node)
@@ -1458,7 +1467,16 @@ pub fn (a &Analyzer) get_type_table() &TypeTable {
 fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 	function_name := node.value // Nome da função (ex: '+', '*', '>')
 
+	// Try kernel first
 	function_info := kernel.get_function_info(function_name) or {
+		// In OTP submodule contexts (worker/supervisor), require external qualifier unless the function is local
+		if a.otp_contexts.len > 0 {
+			if function_name !in a.otp_contexts[a.otp_contexts.len - 1].local_functions {
+				a.error('Undefined local function "${function_name}" in OTP context. Use _:${function_name}(...) or {module}:${function_name}(...).', node.position)
+				return error('Undefined local function in OTP context')
+			}
+		}
+
 		// First check if it's a variable in scope (e.g., function parameter)
 		if scheme := a.lookup(function_name) {
 			// It's a variable, check if it's a function type
@@ -1528,6 +1546,14 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 	mut analyzed_args := []ast.Node{}
 	for arg in node.children {
 		analyzed_args << a.analyze_node(arg)!
+	}
+
+	// Special-case list concatenation to compute precise union of element types
+	if function_name == '++' {
+		element_types := collect_list_types_rec(node, &a.type_table)
+		common_type := a.infer_common_type(element_types) or { ast.Type{ name: 'any', params: [] } }
+		a.type_table.assign_type(node.id, ast.Type{ name: 'list', params: [common_type] })
+		return ast.Node{ ...node, children: analyzed_args }
 	}
 
 	// Para todas as funções do kernel, usa a primeira assinatura válida
@@ -1671,9 +1697,9 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 		if function_info.fixity == .prefix && analyzed_args.len == 1 {
 			sig := function_info.signatures[0]
 			a.type_table.assign_type(node.id, sig.return_type)
-			return ast.Node{
-				...node
-				children: analyzed_args
+		return ast.Node{
+			...node
+			children: analyzed_args
 			}
 		}
 	}
@@ -1682,6 +1708,36 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 		...node
 		children: analyzed_args
 	}
+}
+
+fn (mut a Analyzer) analyze_external_function_call(node ast.Node) !ast.Node {
+	// Parse module:function from the value field
+	parts := node.value.split(':')
+	if parts.len != 2 {
+		a.error('Invalid external function call format: ${node.value}', node.position)
+		return error('Invalid external function call format')
+	}
+
+	_ := parts[0]
+	function_name := parts[1]
+
+	// Analyze all arguments first
+	mut analyzed_args := []ast.Node{}
+	for arg in node.children {
+		analyzed_arg := a.analyze_node(arg)!
+		analyzed_args << analyzed_arg
+	}
+
+	// Try to use known function type if available (e.g., calls to root module functions)
+	if function_type := a.type_table.get_function_type(function_name) {
+		// Optional: could validate arity here if needed
+		a.type_table.assign_type(node.id, function_type.return_type)
+		return ast.Node{ ...node, children: analyzed_args }
+	}
+
+	// Fallback: generic external function result when we don't know the type
+	a.type_table.assign_type(node.id, ast.Type{ name: 'external_function_result', params: [] })
+	return ast.Node{ ...node, children: analyzed_args }
 }
 
 fn (mut a Analyzer) check_function_signatures(function_name string, left_type ast.Type, right_type ast.Type, signatures []kernel.TypeSignature) !ast.Type {
@@ -3871,9 +3927,13 @@ fn (mut a Analyzer) analyze_supervisor_def(node ast.Node) !ast.Node {
 		return error('Invalid supervisor definition')
 	}
 
-	// Enter scope for supervisor
-	a.enter_scope('supervisor_${node.value}')
+	// Enter scope for supervisor and prepare OTP context function set
+	ctx_name := 'supervisor_${node.value}'
+	a.enter_scope(ctx_name)
 	defer { a.exit_scope() }
+	local_funcs := a.collect_local_function_names(node.children[0])
+	a.otp_contexts << OtpContextInfo{ name: ctx_name, local_functions: local_funcs }
+	defer { if a.otp_contexts.len > 0 { a.otp_contexts = a.otp_contexts[..a.otp_contexts.len-1] } }
 
 	body := a.analyze_node(node.children[0])!
 
@@ -3897,9 +3957,13 @@ fn (mut a Analyzer) analyze_worker_def(node ast.Node) !ast.Node {
 		return error('Invalid worker definition')
 	}
 
-	// Enter scope for worker
-	a.enter_scope('worker_${node.value}')
+	// Enter scope for worker and prepare OTP context function set
+	ctx_name := 'worker_${node.value}'
+	a.enter_scope(ctx_name)
 	defer { a.exit_scope() }
+	local_funcs := a.collect_local_function_names(node.children[0])
+	a.otp_contexts << OtpContextInfo{ name: ctx_name, local_functions: local_funcs }
+	defer { if a.otp_contexts.len > 0 { a.otp_contexts = a.otp_contexts[..a.otp_contexts.len-1] } }
 
 	body := a.analyze_node(node.children[0])!
 
@@ -4540,4 +4604,14 @@ fn (mut a Analyzer) analyze_lambda_call(node ast.Node) !ast.Node {
 		...node
 		children: analyzed_children
 	}
+}
+
+fn (a Analyzer) collect_local_function_names(body ast.Node) map[string]bool {
+	mut m := map[string]bool{}
+	for child in body.children {
+		if child.kind == .function && child.value != '' {
+			m[child.value] = true
+		}
+	}
+	return m
 }

@@ -93,6 +93,9 @@ fn (mut g ErlangGenerator) generate_node(node ast.Node) ! {
 		.function_caller {
 			g.generate_function_caller(node)!
 		}
+		.external_function_call {
+			g.generate_external_function_call(node)!
+		}
 		.parentheses {
 			g.generate_parentheses(node)!
 		}
@@ -285,6 +288,18 @@ fn (mut g ErlangGenerator) generate_module(node ast.Node) ! {
 	moduledoc := g.directives_table.get_moduledoc()
 	if moduledoc.len > 0 {
 		g.output.write_string('-moduledoc "${moduledoc}" .\n')
+	}
+
+	// If this module wraps a supervisor or worker definition, delegate and return
+	for child in node.children {
+		if child.kind == .supervisor_def {
+			g.generate_supervisor_def(child)!
+			return
+		}
+		if child.kind == .worker_def {
+			g.generate_worker_def(child)!
+			return
+		}
 	}
 
 	// Collect function exports
@@ -994,6 +1009,9 @@ fn (mut g ErlangGenerator) generate_node_to_string(node ast.Node) !string {
 		.function_caller {
 			return g.generate_function_caller_to_string(node)
 		}
+		.external_function_call {
+			return g.generate_external_function_call_to_string(node)
+		}
 		.parentheses {
 			return g.generate_parentheses_to_string(node)
 		}
@@ -1052,10 +1070,6 @@ fn (mut g ErlangGenerator) generate_identifier_to_string(node ast.Node) !string 
 }
 
 fn (mut g ErlangGenerator) generate_function_caller_to_string(node ast.Node) !string {
-	if node.children.len < 1 {
-		return error('Invalid function call node')
-	}
-
 	function_name := node.value
 
 	// First, try to get function type from type table (user-defined functions)
@@ -1155,6 +1169,31 @@ fn (mut g ErlangGenerator) generate_function_caller_to_string(node ast.Node) !st
 
 	// Finally, if not found anywhere
 	return error('Unknown function: ${function_name}')
+}
+
+fn (mut g ErlangGenerator) generate_external_function_call_to_string(node ast.Node) !string {
+	// Parse module:function from the value field
+	parts := node.value.split(':')
+	if parts.len != 2 {
+		return error('Invalid external function call format: ${node.value}')
+	}
+
+	module_name := parts[0]
+	function_name := parts[1]
+
+	// Generate Erlang code: Module:Function(Args)
+	mut result := '${module_name}:${function_name}('
+
+	for i, arg in node.children {
+		if i > 0 {
+			result += ', '
+		}
+		arg_code := g.generate_node_to_string(arg)!
+		result += arg_code
+	}
+
+	result += ')'
+	return result
 }
 
 fn (mut g ErlangGenerator) generate_parentheses_to_string(node ast.Node) !string {
@@ -2625,4 +2664,27 @@ fn parse_binary_to_decimal(binary_str string) !int {
 		}
 	}
 	return result
+}
+
+fn (mut g ErlangGenerator) generate_external_function_call(node ast.Node) ! {
+	// Parse module:function from the value field
+	parts := node.value.split(':')
+	if parts.len != 2 {
+		return error('Invalid external function call format: ${node.value}')
+	}
+
+	module_name := parts[0]
+	function_name := parts[1]
+
+	// Generate Erlang code: Module:Function(Args)
+	g.output.write_string('${module_name}:${function_name}(')
+
+	for i, arg in node.children {
+		if i > 0 {
+			g.output.write_string(', ')
+		}
+		g.generate_node(arg)!
+	}
+
+	g.output.write_string(')')
 }

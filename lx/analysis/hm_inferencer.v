@@ -62,6 +62,9 @@ pub fn (mut hmi HMInferencer) infer_expression(expr ast.Node) !ast.Type {
 		.function_caller {
 			hmi.infer_function_call(expr)
 		}
+		.external_function_call {
+			hmi.infer_external_function_call(expr)
+		}
 		.parentheses {
 			hmi.infer_parentheses(expr)
 		}
@@ -140,6 +143,29 @@ fn (mut hmi HMInferencer) infer_function_call(node ast.Node) !ast.Type {
 
 	// For now, return a generic function type
 	// This will be extended with proper function type inference
+	return type_function(arg_types, type_integer())
+}
+
+fn (mut hmi HMInferencer) infer_external_function_call(node ast.Node) !ast.Type {
+	// Parse module:function from the value field
+	parts := node.value.split(':')
+	if parts.len != 2 {
+		hmi.error('Invalid external function call format: ${node.value}', node.position)
+		return error('Invalid external function call format')
+	}
+
+	_ := parts[0] // module_name
+	_ := parts[1] // function_name
+
+	// Infer argument types
+	mut arg_types := []ast.Type{}
+	for arg in node.children {
+		arg_type := hmi.infer_expression(arg)!
+		arg_types << arg_type
+	}
+
+	// For external function calls, we return a generic type
+	// In a real implementation, you might want to check against module specifications
 	return type_function(arg_types, type_integer())
 }
 

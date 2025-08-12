@@ -146,6 +146,9 @@ fn (mut collector ConstraintCollector) collect(node ast.Node) {
 		.function_caller {
 			collector.collect_function_call(node)
 		}
+		.external_function_call {
+			collector.collect_external_function_call(node)
+		}
 		.list_cons {
 			collector.collect_list_cons(node)
 		}
@@ -198,6 +201,26 @@ fn (mut collector ConstraintCollector) collect_function_call(node ast.Node) {
 		}
 		else {}
 	}
+}
+
+fn (mut collector ConstraintCollector) collect_external_function_call(node ast.Node) {
+	// Parse module:function from the value field
+	parts := node.value.split(':')
+	if parts.len != 2 {
+		return
+	}
+
+	_ := parts[0] // module_name
+	_ := parts[1] // function_name
+
+	// Collect constraints for arguments
+	for arg in node.children {
+		collector.collect(arg)
+	}
+
+	// For external function calls, we don't add specific type constraints
+	// since we can't infer the exact types from external modules
+	// In a real implementation, you might want to check against module specifications
 }
 
 fn (mut collector ConstraintCollector) collect_list_cons(node ast.Node) {

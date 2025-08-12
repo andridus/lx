@@ -42,7 +42,7 @@ end'
 	expected := '-module(test).
 -export([concat/2]).
 
--spec concat(binary(), binary()) -> binary().
+-spec concat(binary(), binary()) -> [any()].
 concat(A_1, B_2) ->
     A_1 ++ B_2.
 '

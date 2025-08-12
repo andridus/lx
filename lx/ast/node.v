@@ -36,6 +36,7 @@ pub enum NodeKind {
 
 	// Binary operators
 	function_caller // +(a, b), *(a, b), >(a, b), etc.
+	external_function_call // module:function(args) - external module function calls
 	parentheses     // (expression)
 	directive_call  // $print(a), $type(a)
 

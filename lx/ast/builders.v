@@ -120,6 +120,16 @@ pub fn new_function_caller(id int, function_name string, arguments []Node, pos P
 	}
 }
 
+pub fn new_external_function_call(id int, module_name string, function_name string, arguments []Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .external_function_call
+		value:    '${module_name}:${function_name}'
+		children: arguments
+		position: pos
+	}
+}
+
 pub fn new_parentheses(id int, expression Node, pos Position) Node {
 	return Node{
 		id:       id

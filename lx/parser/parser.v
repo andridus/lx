@@ -4,6 +4,7 @@ import lexer
 import ast
 import errors
 import kernel
+import os
 
 pub struct Parser {
 	directives_table &DirectivesTable
@@ -15,14 +16,21 @@ mut:
 	next_ast_id    int  = 1
 	at_line_start  bool = true // Track if we're at the start of a new line
 	temp_doc_node  ?ast.Node
+	current_module_name string
 }
 
 pub fn new_parser(code string, file_path string, directives_table &DirectivesTable) Parser {
 	mut l := lexer.new_lexer(code, file_path)
-	mut p := Parser{
-		lexer:            l
-		error_reporter:   errors.new_error_reporter()
-		directives_table: directives_table
+	// Derive module name from file path: strip dirs and extension
+    mut base := os.base(file_path)
+    if idx := base.last_index('.') {
+        base = base[..idx]
+    }
+    mut p := Parser{
+        lexer:               l
+        error_reporter:      errors.new_error_reporter()
+        directives_table:    directives_table
+        current_module_name: base
 	}
 	p.current = p.lexer.next_token()
 	p.next = p.lexer.next_token()
@@ -711,6 +719,13 @@ fn (mut p Parser) parse_block() !ast.Node {
 			break // Match consumes all remaining expressions
 		}
 
+		// Check if this is a function definition
+		if p.current.type_ == .def {
+			func := p.parse_function()!
+			expressions << func
+			continue
+		}
+
 		expr := p.parse_expression()!
 		expressions << expr
 
@@ -834,6 +849,11 @@ fn (mut p Parser) parse_identifier_expression() !ast.Node {
 	p.advance()
 	if identifier.starts_with('$') {
 		return p.parse_directive_call(identifier, pos)
+	}
+
+	// Check for external function call: module:function(args)
+	if p.current.type_ == .colon {
+		return p.parse_external_function_call(identifier, pos)
 	}
 
 	// Verifica se é uma chamada de função (com parênteses)
@@ -970,6 +990,56 @@ fn (mut p Parser) parse_directive_call(directive_name string, pos ast.Position) 
 	p.advance() // Skip ')'
 
 	return ast.new_directive_call(p.get_next_id(), actual_name, arguments, pos)
+}
+
+fn (mut p Parser) parse_external_function_call(module_name string, pos ast.Position) !ast.Node {
+	// Skip the colon
+	p.advance()
+
+	// Expect function name after colon
+	if p.current.type_ != .identifier {
+		return error('Expected function name after colon in external function call')
+	}
+
+	function_name := p.current.value
+	p.advance()
+
+	// Expect opening parenthesis
+	if p.current.type_ != .lparen {
+		return error('Expected opening parenthesis after function name in external function call')
+	}
+
+	// Parse arguments
+	mut arguments := []ast.Node{}
+	p.advance() // Skip '('
+
+	if p.current.type_ != .rparen {
+		for {
+			arg := p.parse_expression()!
+			arguments << arg
+
+			if p.current.type_ == .rparen {
+				break
+			}
+
+			if p.current.type_ != .comma {
+				return error('Expected comma or closing parenthesis')
+			}
+
+			p.advance() // Skip comma
+		}
+	}
+
+	if p.current.type_ != .rparen {
+		return error('Expected closing parenthesis')
+	}
+
+	p.advance() // Skip ')'
+
+	// Resolve '_' as current module name if needed
+	resolved_module := if module_name == '_' { p.current_module_name } else { module_name }
+
+	return ast.new_external_function_call(p.get_next_id(), resolved_module, function_name, arguments, pos)
 }
 
 fn (p Parser) is_valid_directive(name string) bool {

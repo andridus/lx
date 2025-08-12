@@ -1,4 +1,93 @@
-def process_typed_list do
-([]) -> "empty"
-([(head :: integer) | tail]) -> head * 2
+application {
+  description: "Complex OTP Example",
+  vsn: "1.0.0",
+  applications: [:kernel, :stdlib, :crypto],
+  registered: [:main_supervisor]
+}
+
+record User {
+  id :: integer,
+  name :: string,
+  email :: string,
+  created_at :: integer
+}
+
+record Session {user_id :: integer, token :: string, expires_at :: integer}
+
+supervisor main_supervisor do
+  strategy = :one_for_one
+  children = [:user_worker, :session_worker, :auth_worker]
+end
+
+record Session { name :: string}
+record State {
+  users :: list(User),
+  next_id :: integer
+}
+record StateSession {
+  sessions :: list(Session)
+}
+worker user_worker do
+  def init(_args) do
+    {:ok, %{users: [], next_id: 1}}
+  end
+
+  def handle_call({:create_user, name, email}, _from, state :: State) do
+    new_user = %{id: state.next_id, name: name, email: email}
+    new_state = %{users: [new_user | state.users], next_id: state.next_id + 1}
+    {:reply, {:ok, new_user}, new_state}
+  end
+
+  def handle_call({:get_user, id}, _from, state :: State) do
+    user = __ROOT__:find_user_by_id(id, state.users)
+    {:reply, user, state}
+  end
+end
+
+worker session_worker do
+  def init(_args) do
+    {:ok, %{sessions: []}}
+  end
+
+  def handle_cast({:create_session, user_id, token}, state :: StateSession) do
+    session = %{user_id: user_id, token: token, expires_at: _:current_timestamp() + 3600}
+    new_state = %{sessions: [session | state.sessions]}
+    {:noreply, new_state}
+  end
+
+  def handle_call({:validate_session, token}, _from, state :: StateSession) do
+    valid = _:is_session_valid(token, state.sessions)
+    {:reply, valid, state}
+  end
+end
+
+worker auth_worker do
+  def handle_call({:authenticate, email, password}, _from, state :: StateSession) do
+    # Simplified authentication logic
+    result = if (email == "admin@example.com") and (password == "secret") do
+      {:ok, :authenticated}
+    else
+      {:error, :invalid_credentials}
+    end
+    {:reply, result, state}
+  end
+end
+
+def find_user_by_id(id, users) do
+  # Helper function to find user by ID
+  :not_found
+end
+
+def is_session_valid(token, sessions) do
+  # Helper function to validate session
+  false
+end
+
+def current_timestamp() do
+  # Helper function to get current timestamp
+  1234567890
+end
+
+def main() do
+  :ok
 end

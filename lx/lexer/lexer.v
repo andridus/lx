@@ -143,6 +143,8 @@ fn (mut l Lexer) read_string() Token {
 
 fn (mut l Lexer) read_colon_or_double_colon() Token {
 	start_pos := l.current_position()
+	// Capture previous character before advancing (character before ':')
+	prev_ch := if l.position > 0 { l.input[l.position - 1] } else { ` ` }
 	l.advance() // Skip ':'
 
 	// Check if next character is also ':' (double colon)
@@ -151,26 +153,34 @@ fn (mut l Lexer) read_colon_or_double_colon() Token {
 		return l.make_token_at(.double_colon, '::', start_pos)
 	}
 
-	// Check if next character is a letter (atom) or something else (colon)
-	if l.position >= l.input.len || !l.input[l.position].is_letter() {
-		// This is just a colon token
+	// Helper: determine if previous character indicates we should NOT parse an atom
+	// If previous char is an identifier character or a closing delimiter, this ':' is a separator
+	prev_is_ident := (prev_ch >= `a` && prev_ch <= `z`) || (prev_ch >= `A` && prev_ch <= `Z`) || (prev_ch >= `0` && prev_ch <= `9`) || prev_ch == `_`
+	prev_is_closer := prev_ch == `]` || prev_ch == `)` || prev_ch == `}`
+
+	// If previous suggests separator context, emit ':' token
+	if prev_is_ident || prev_is_closer {
 		return l.make_token_at(.colon, ':', start_pos)
 	}
 
-	// This is an atom, read the identifier part
-	mut value := ''
-
-	for l.position < l.input.len {
-		ch := l.input[l.position]
-		if ch.is_alnum() || ch == `_` {
-			value += ch.ascii_str()
-			l.advance()
-		} else {
-			break
+	// Otherwise, decide between atom or ':' based on next character
+	if l.position < l.input.len && l.input[l.position].is_letter() {
+		// This is an atom, read the identifier part
+		mut value := ''
+		for l.position < l.input.len {
+			ch := l.input[l.position]
+			if ch.is_alnum() || ch == `_` {
+				value += ch.ascii_str()
+				l.advance()
+			} else {
+				break
+			}
 		}
+		return l.make_token_at(.atom, value, start_pos)
 	}
 
-	return l.make_token_at(.atom, value, start_pos)
+	// Fallback: just a ':' token
+	return l.make_token_at(.colon, ':', start_pos)
 }
 
 fn (mut l Lexer) read_atom() Token {
