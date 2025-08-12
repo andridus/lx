@@ -763,20 +763,7 @@ fn type_to_erlang_spec(t ast.Type) string {
 fn (mut g ErlangGenerator) generate_function_caller(node ast.Node) ! {
 	function_name := node.value
 
-	// First, try to get function type from type table (user-defined functions)
-	if _ := g.type_table.get_function_type(function_name) {
-		g.output.write_string('${function_name}(')
-		for i, arg in node.children {
-			if i > 0 {
-				g.output.write_string(', ')
-			}
-			g.generate_node(arg)!
-		}
-		g.output.write_string(')')
-		return
-	}
-
-	// Second, try kernel for built-in functions
+	// First, try kernel for built-in functions (including operators)
 	if function_info := kernel.get_function_info(function_name) {
 		match function_info.fixity {
 			.prefix {
@@ -838,6 +825,36 @@ fn (mut g ErlangGenerator) generate_function_caller(node ast.Node) ! {
 				g.output.write_string(')')
 			}
 		}
+		return
+	}
+
+	// Second, try to get function type from type table (user-defined functions)
+	if _ := g.type_table.get_function_type(function_name) {
+		g.output.write_string('${function_name}(')
+		for i, arg in node.children {
+			if i > 0 {
+				g.output.write_string(', ')
+			}
+			g.generate_node(arg)!
+		}
+		g.output.write_string(')')
+		return
+	}
+
+	// Third, check if it's a variable (first-class function)
+	// Try to get type for this identifier - if it exists, it might be a variable
+	if _ := g.type_table.get_type(node.id) {
+		// This is likely a variable containing a function
+		// In Erlang, call variables containing functions with the correct mapped name
+		unique_name := g.get_unique_var_name(function_name)
+		g.output.write_string('${unique_name}(')
+		for i, arg in node.children {
+			if i > 0 {
+				g.output.write_string(', ')
+			}
+			g.generate_node(arg)!
+		}
+		g.output.write_string(')')
 		return
 	}
 
@@ -950,55 +967,12 @@ fn (mut g ErlangGenerator) generate_function_caller_to_string(node ast.Node) !st
 		return result
 	}
 
-	// Second, try kernel for built-in functions
-	function_info := kernel.get_function_info(function_name) or {
-		return error('Unknown function: ${function_name}')
-	}
-
-	match function_info.fixity {
-		.infix {
-			if node.children.len != 2 {
-				return error('Infix operator requires exactly 2 arguments')
-			}
-			if function_info.gen.len == 0 {
-				return error('No templates found for function: ${function_name}')
-			}
-			template := function_info.gen[0]['erl'] or {
-				return error('No Erlang template found for function: ${function_name}')
-			}
-			left_code := g.generate_node_to_string(node.children[0])!
-			right_code := g.generate_node_to_string(node.children[1])!
-			return template.replace('$1', left_code).replace('$2', right_code)
-		}
-		.prefix {
-			// Check if this is a multi-arg prefix function
-			if g.is_multi_arg_prefix_function(function_name) {
-				// Multi-arg prefix functions are called as regular functions
-				if function_info.gen.len == 0 {
-					return error('No templates found for function: ${function_name}')
-				}
-				template := function_info.gen[0]['erl'] or {
-					return error('No Erlang template found for function: ${function_name}')
-				}
-
-				// Generate all arguments
-				mut arg_codes := []string{}
-				for child in node.children {
-					arg_code := g.generate_node_to_string(child)!
-					arg_codes << arg_code
-				}
-
-				// Replace placeholders in template
-				mut result := template
-				for i, arg_code in arg_codes {
-					placeholder := '$${i + 1}'
-					result = result.replace(placeholder, arg_code)
-				}
-				return result
-			} else {
-				// Single-arg prefix functions
-				if node.children.len != 1 {
-					return error('Prefix operator requires exactly 1 argument')
+	// Second, try kernel for built-in functions (including operators)
+	if function_info := kernel.get_function_info(function_name) {
+		match function_info.fixity {
+			.infix {
+				if node.children.len != 2 {
+					return error('Infix operator requires exactly 2 arguments')
 				}
 				if function_info.gen.len == 0 {
 					return error('No templates found for function: ${function_name}')
@@ -1006,14 +980,76 @@ fn (mut g ErlangGenerator) generate_function_caller_to_string(node ast.Node) !st
 				template := function_info.gen[0]['erl'] or {
 					return error('No Erlang template found for function: ${function_name}')
 				}
-				arg_code := g.generate_node_to_string(node.children[0])!
-				return template.replace('$1', arg_code)
+				left_code := g.generate_node_to_string(node.children[0])!
+				right_code := g.generate_node_to_string(node.children[1])!
+				return template.replace('$1', left_code).replace('$2', right_code)
+			}
+			.prefix {
+				// Check if this is a multi-arg prefix function
+				if g.is_multi_arg_prefix_function(function_name) {
+					// Multi-arg prefix functions are called as regular functions
+					if function_info.gen.len == 0 {
+						return error('No templates found for function: ${function_name}')
+					}
+					template := function_info.gen[0]['erl'] or {
+						return error('No Erlang template found for function: ${function_name}')
+					}
+
+					// Generate all arguments
+					mut arg_codes := []string{}
+					for child in node.children {
+						arg_code := g.generate_node_to_string(child)!
+						arg_codes << arg_code
+					}
+
+					// Replace placeholders in template
+					mut result := template
+					for i, arg_code in arg_codes {
+						placeholder := '$${i + 1}'
+						result = result.replace(placeholder, arg_code)
+					}
+					return result
+				} else {
+					// Single-arg prefix functions
+					if node.children.len != 1 {
+						return error('Prefix operator requires exactly 1 argument')
+					}
+					if function_info.gen.len == 0 {
+						return error('No templates found for function: ${function_name}')
+					}
+					template := function_info.gen[0]['erl'] or {
+						return error('No Erlang template found for function: ${function_name}')
+					}
+					arg_code := g.generate_node_to_string(node.children[0])!
+					return template.replace('$1', arg_code)
+				}
+			}
+			else {
+				return error('Unsupported fixity: ${function_info.fixity}')
 			}
 		}
-		else {
-			return error('Unsupported fixity: ${function_info.fixity}')
-		}
 	}
+
+	// Third, check if it's a variable (first-class function)
+	// Try to get type for this identifier - if it exists, it might be a variable
+	if _ := g.type_table.get_type(node.id) {
+		// This is likely a variable containing a function
+		// In Erlang, call variables containing functions with the correct mapped name
+		unique_name := g.get_unique_var_name(function_name)
+		mut result := '${unique_name}('
+		for i, arg in node.children {
+			if i > 0 {
+				result += ', '
+			}
+			arg_code := g.generate_node_to_string(arg)!
+			result += arg_code
+		}
+		result += ')'
+		return result
+	}
+
+	// Finally, if not found anywhere
+	return error('Unknown function: ${function_name}')
 }
 
 fn (mut g ErlangGenerator) generate_parentheses_to_string(node ast.Node) !string {
@@ -1961,8 +1997,6 @@ fn (mut g ErlangGenerator) generate_match_expr(node ast.Node) ! {
 
 	g.output.write_string('\n    end')
 }
-
-
 
 // ============ Task 11: Concurrency Generation ============
 

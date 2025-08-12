@@ -111,7 +111,12 @@ fn (mut p Parser) parse_module() !ast.Node {
 		} else if p.current.type_ == .worker {
 			wrk := p.parse_worker_definition()!
 			functions << wrk
-		} else if p.current.type_ == .describe || p.current.type_ == .test {
+		} else if p.current.type_ == .describe {
+			describe_blocks := p.parse_describe_block()!
+			for test_func in describe_blocks {
+				functions << test_func
+			}
+		} else if p.current.type_ == .test {
 			test_block := p.parse_test_block()!
 			functions << test_block
 		} else {
@@ -187,7 +192,13 @@ fn (mut p Parser) parse_module_with_name(modname string) !ast.Node {
 				wrk := p.parse_worker_definition()!
 				functions << wrk
 			}
-			.describe, .test {
+			.describe {
+				describe_blocks := p.parse_describe_block()!
+				for test_func in describe_blocks {
+					functions << test_func
+				}
+			}
+			.test {
 				test_block := p.parse_test_block()!
 				functions << test_block
 			}
@@ -293,6 +304,7 @@ fn (mut p Parser) parse_function() !ast.Node {
 
 	if node := p.temp_doc_node {
 		p.directives_table.add_doc('${func_name}/${args.len}', node)
+		p.temp_doc_node = none // Clear after use to avoid applying to next function
 	}
 
 	return ast.new_function_with_params(func_id, func_name, args, body, start_pos)
@@ -693,7 +705,7 @@ fn (mut p Parser) parse_block() !ast.Node {
 			break
 		}
 
-						// Special handling for match expressions - they consume all remaining expressions
+		// Special handling for match expressions - they consume all remaining expressions
 		if p.current.type_ == .match {
 			match_expr := p.parse_match_with_continuation()!
 			expressions << match_expr
@@ -738,7 +750,8 @@ fn (mut p Parser) parse_expression_with_precedence(precedence int) !ast.Node {
 	for {
 		// Check for infix operators
 		if (p.current.type_ == .identifier && p.is_infix_function(p.current.value))
-			|| p.current.type_ == .exclamation || p.current.type_ == .slash || p.current.type_ == .in {
+			|| p.current.type_ == .exclamation || p.current.type_ == .slash
+			|| p.current.type_ == .in {
 			// Normalize operator token to a name understood by kernel
 			op_name := if p.current.type_ == .exclamation {
 				'!'
@@ -808,6 +821,7 @@ fn (mut p Parser) parse_prefix_expression() !ast.Node {
 		// Task 11: Advanced Features
 		.at_sign { p.parse_directive_new() }
 		.for_ { p.parse_list_comprehension() }
+		.assert { p.parse_assert_expression() }
 		else { error('Unexpected token: ${p.current.type_}') }
 	}
 }
@@ -2503,11 +2517,9 @@ fn (mut p Parser) parse_case_clauses_as_block() !ast.Node {
 fn (mut p Parser) parse_match_with_continuation() !ast.Node {
 	start_pos := p.current.position
 
-
 	p.advance() // Skip 'match'
 
 	pattern := p.parse_expression()!
-
 
 	if p.current.type_ != .left_arrow {
 		return p.error_and_return('Expected "<-" after match pattern')
@@ -2519,8 +2531,7 @@ fn (mut p Parser) parse_match_with_continuation() !ast.Node {
 	// Check for rescue clause
 	mut rescue_body := ast.Node{}
 
-		if p.current.type_ == .rescue {
-
+	if p.current.type_ == .rescue {
 		p.advance() // Skip 'rescue'
 
 		error_pattern := p.parse_expression()! // error pattern - should be a variable
@@ -2685,7 +2696,8 @@ fn (mut p Parser) parse_match_with_continuation() !ast.Node {
 		continuation_block := ast.new_block(p.get_next_id(), continuation_exprs, start_pos)
 		// Simple match (no rescue) with continuation
 
-		return ast.new_match_expr(p.get_next_id(), pattern, expr, continuation_block, start_pos)
+		return ast.new_match_expr(p.get_next_id(), pattern, expr, continuation_block,
+			start_pos)
 	} else {
 		// Simple match (no rescue) without continuation
 
@@ -3370,4 +3382,69 @@ fn (mut p Parser) parse_type_def() !ast.Node {
 		variants := [type_def]
 		return ast.new_type_def(p.get_next_id(), type_name, variants, start_pos)
 	}
+}
+
+// Parse assert expressions: assert condition
+fn (mut p Parser) parse_assert_expression() !ast.Node {
+	start_pos := p.current.position
+	p.advance() // Skip 'assert'
+
+	condition := p.parse_expression()!
+
+	return ast.new_function_caller(p.get_next_id(), 'assert', [condition], start_pos)
+}
+
+// Parse describe blocks: describe "name" do ... end
+fn (mut p Parser) parse_describe_block() ![]ast.Node {
+	p.advance() // Skip 'describe'
+
+	if p.current.type_ != .string {
+		return error('Expected test suite name string')
+	}
+
+	_ := p.current.value // describe name (not used for now)
+	p.advance()
+
+	if p.current.type_ != .do {
+		return error('Expected "do" after describe name')
+	}
+	p.advance() // Skip 'do'
+
+	// Skip newlines
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+
+	mut test_functions := []ast.Node{}
+
+	// Parse test blocks inside describe
+	for p.current.type_ != .end && p.current.type_ != .eof {
+		// Skip newlines
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+
+		if p.current.type_ == .end {
+			break
+		}
+
+		if p.current.type_ == .test {
+			test_block := p.parse_test_block()!
+			test_functions << test_block
+		} else {
+			return error('Only test blocks are allowed inside describe blocks')
+		}
+
+		// Skip newlines after test
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+	}
+
+	if p.current.type_ != .end {
+		return error('Expected "end" to close describe block')
+	}
+	p.advance() // Skip 'end'
+
+	return test_functions
 }

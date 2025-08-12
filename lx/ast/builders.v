@@ -435,10 +435,6 @@ pub fn new_match_expr(id int, pattern Node, expr Node, rescue_body ?Node, pos Po
 	}
 }
 
-
-
-
-
 // ============ Task 11: Concurrency Builders ============
 
 pub fn new_spawn_expr(id int, func_expr Node, pos Position) Node {
@@ -634,8 +630,6 @@ pub fn new_lambda_call(id int, lambda Node, args []Node, pos Position) Node {
 		position: pos
 	}
 }
-
-
 
 pub fn new_directive(id int, name string, args []Node, pos Position) Node {
 	return Node{

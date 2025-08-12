@@ -31,7 +31,7 @@ pub fn (dt &DirectivesTable) get_moduledoc() string {
 }
 
 pub fn (dt &DirectivesTable) get_doc(function_key string) ast.Node {
-	return dt.docs[function_key]
+	return dt.docs[function_key] or { ast.Node{} }
 }
 
 pub fn (dt &DirectivesTable) has_doc(function_key string) bool {

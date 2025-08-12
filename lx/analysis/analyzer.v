@@ -3588,8 +3588,6 @@ fn (mut a Analyzer) analyze_match_expr(node ast.Node) !ast.Node {
 	return analyzed_node
 }
 
-
-
 // ============ Task 11: Concurrency Analysis ============
 
 fn (mut a Analyzer) analyze_spawn_expr(node ast.Node) !ast.Node {
@@ -4145,19 +4143,25 @@ fn (mut a Analyzer) analyze_list_comprehension(node ast.Node) !ast.Node {
 	list_type := a.type_table.get_type(analyzed_list.id) or {
 		ast.Type{
 			name:   'list'
-			params: [ast.Type{ name: 'any', params: [] }]
+			params: [ast.Type{
+				name:   'any'
+				params: []
+			}]
 		}
 	}
 
 	element_type := if list_type.name == 'list' && list_type.params.len > 0 {
 		list_type.params[0]
 	} else {
-		ast.Type{ name: 'any', params: [] }
+		ast.Type{
+			name:   'any'
+			params: []
+		}
 	}
 
 	a.bind(var_node.value, TypeScheme{
 		quantified_vars: []
-		body: element_type
+		body:            element_type
 	})
 
 	// Analyze variable node
@@ -4187,7 +4191,10 @@ fn (mut a Analyzer) analyze_list_comprehension(node ast.Node) !ast.Node {
 
 	// List comprehensions return a list of the body expression type
 	body_type := a.type_table.get_type(analyzed_body.id) or {
-		ast.Type{ name: 'any', params: [] }
+		ast.Type{
+			name:   'any'
+			params: []
+		}
 	}
 
 	list_result_type := ast.Type{
@@ -4226,11 +4233,17 @@ fn (mut a Analyzer) analyze_test_block(node ast.Node) !ast.Node {
 		return error('Invalid test block')
 	}
 
+	// Save current scope
+	saved_env := a.current_env
+
 	// Enter scope for test
 	a.enter_scope('test_${node.value}')
-	defer { a.exit_scope() }
 
 	body := a.analyze_node(node.children[0])!
+
+	// Ensure we exit scope completely
+	a.exit_scope()
+	a.current_env = saved_env
 
 	analyzed_node := ast.Node{
 		...node

@@ -71,7 +71,7 @@ pub enum NodeKind {
 	if_expr     // if condition do ... else ... end
 	with_expr   // with pattern <- expr do ... else ... end
 	clause_list // list of with clauses
-	match_expr      // match pattern <- expr [rescue error do ... end] [continuation]
+	match_expr  // match pattern <- expr [rescue error do ... end] [continuation]
 
 	// Task 11: Concurrency and Processes
 	spawn_expr     // spawn(fn -> ... end)

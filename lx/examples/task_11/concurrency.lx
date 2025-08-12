@@ -1,5 +1,5 @@
 def start_server() do
-    pid = spawn(fn() -> server_loop() end)
+    pid = spawn(fn() -> server_loop())
     pid
 end
 
@@ -24,7 +24,7 @@ end
 
 worker server_worker do
     def start_link(_) do
-        {:ok, spawn_link(fn -> server_loop() end)}
+        {:ok, spawn_link(fn -> server_loop())}
     end
 end
 def main() do

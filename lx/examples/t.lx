@@ -1,7 +1,5 @@
-def test_list_comprehensions() do
-numbers = [1, 2, 3, 4, 5]
-squares = for x in numbers do
-    x*x
-end
-squares
+def tuple_with_parens() do
+  a = 2
+  b = 3
+  {(a + b) * 2, (a - b) * 2}
 end

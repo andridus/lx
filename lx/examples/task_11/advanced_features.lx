@@ -1,3 +1,9 @@
+def map(func, list) do
+    for x in list do
+        func(x)
+    end
+end
+
 @doc "This function greets a user"
 def greet(name) do
     "Hello, #{name}!"
@@ -30,7 +36,7 @@ end
 def test_list_comprehensions() do
     numbers = [1, 2, 3, 4, 5]
     squares = for x in numbers when x > 2 do
-        x*x
+        x * x
     end
     squares
 end
@@ -47,9 +53,7 @@ describe "Math operations" do
     end
 end
 
-def map(func, list) do
-    [func(x) || x <- list]
-end
+
 def main() do
-    greet()
+    greet("OLá")
 end

@@ -27,14 +27,14 @@ def risky_operation() do
     {:error, false}
 end
 
+def error_handler(error) do
+    error
+end
+
 def safe_operation() do
     match {:ok, value} <- risky_operation() rescue error do
         error_handler(error)
     end
-end
-
-def error_handler(error) do
-    error
 end
 def main() do
     categorize_age(20)

@@ -452,10 +452,12 @@ fn test_integration_scenario() {
 				[
 					ast.Type{
 						name:   'list'
-						params: [ast.Type{
-							name:   'string'
-							params: []
-						}]
+						params: [
+							ast.Type{
+								name:   'string'
+								params: []
+							},
+						]
 					},
 				]
 			}

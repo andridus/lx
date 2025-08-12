@@ -1056,6 +1056,29 @@ pub const native_functions = {
 			'erl': '$1 =:= nil'
 		}]
 	}
+	// Test framework functions
+	'assert':     FunctionInfo{
+		precedence:    0
+		associativity: .left
+		fixity:        .prefix
+		signatures:    [
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'boolean'
+					params: []
+				}]
+				return_type: ast.Type{
+					name:   'boolean'
+					params: []
+				}
+			},
+		]
+		gen:           [
+			{
+				'erl': 'case $1 of true -> true; false -> throw({assertion_failed, $1}) end'
+			},
+		]
+	}
 }
 
 pub fn get_function_info(function_name string) ?FunctionInfo {
