@@ -1,0 +1,9 @@
+application {
+  description: "An OTP application",
+  vsn: "0.1.0",
+  applications: [:kernel, :stdlib]
+}
+
+def main() do
+  :ok
+end

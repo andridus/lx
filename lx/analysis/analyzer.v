@@ -369,10 +369,16 @@ fn (mut a Analyzer) analyze_module(node ast.Node) !ast.Node {
 
 fn (mut a Analyzer) analyze_function(node ast.Node) !ast.Node {
 	// Only check scope for named functions, not anonymous functions (heads)
-	if node.value != '' && a.current_env > 0 {
-		a.error('Function definitions are only allowed in global scope, not inside functions',
-			node.position)
-		return error('Function definitions are only allowed in global scope, not inside functions')
+			if node.value != '' && a.current_env > 0 {
+		// Supervisor and worker contexts are treated as global scope since they generate separate files
+		current_scope_name := a.type_envs[a.current_env].scope_name
+		is_otp_context := current_scope_name.starts_with('supervisor_') || current_scope_name.starts_with('worker_')
+
+		if !is_otp_context {
+			a.error('Function definitions are only allowed in global scope, not inside functions',
+				node.position)
+			return error('Function definitions are only allowed in global scope, not inside functions')
+		}
 	}
 
 	function_name := node.value
@@ -420,24 +426,40 @@ fn (mut a Analyzer) analyze_function(node ast.Node) !ast.Node {
 		old_context := a.analysis_context
 		a.analysis_context = .function_parameter
 
-		arg_name := arg.value
-		arg_type := if arg.children.len > 0 {
-			a.extract_type_from_annotation(arg.children[0])!
-		} else {
-			ast.Type{
+		// Check if this is a pattern argument (has children with patterns)
+		if arg.value == '' && arg.children.len > 0 {
+			// This is a pattern argument, register all variables within the pattern
+			pattern := arg.children[0] // The pattern is the first child
+			a.register_pattern_variables(pattern)
+
+			// For pattern arguments, we use 'any' type for now
+			arg_type := ast.Type{
 				name:   'any'
 				params: []
 			}
+			parameters << arg_type
+			parameter_names << '_pattern' // Placeholder name for pattern
+		} else {
+			// Regular named argument
+			arg_name := arg.value
+			arg_type := if arg.children.len > 0 {
+				a.extract_type_from_annotation(arg.children[0])!
+			} else {
+				ast.Type{
+					name:   'any'
+					params: []
+				}
+			}
+
+			parameters << arg_type
+			parameter_names << arg_name
+
+			// Add argument to the function's environment
+			a.bind(arg_name, TypeScheme{
+				quantified_vars: []
+				body:            arg_type
+			})
 		}
-
-		parameters << arg_type
-		parameter_names << arg_name
-
-		// Add argument to the function's environment
-		a.bind(arg_name, TypeScheme{
-			quantified_vars: []
-			body:            arg_type
-		})
 
 		// Restore context
 		a.analysis_context = old_context
@@ -1241,8 +1263,19 @@ fn (mut a Analyzer) analyze_identifier(node ast.Node) !ast.Node {
 fn (mut a Analyzer) analyze_block(node ast.Node) !ast.Node {
 	// Enter a new scope for this block so that variables declared inside
 	// do not conflict with variables from outer scopes or sibling blocks
-	a.enter_scope('block')
-	defer { a.exit_scope() }
+	// But don't create nested scopes within OTP components (supervisor/worker)
+	mut should_create_scope := true
+	if a.current_env > 0 {
+		current_scope_name := a.type_envs[a.current_env].scope_name
+		if current_scope_name.starts_with('supervisor_') || current_scope_name.starts_with('worker_') {
+			should_create_scope = false
+		}
+	}
+
+	if should_create_scope {
+		a.enter_scope('block')
+		defer { a.exit_scope() }
+	}
 
 	mut analyzed_exprs := []ast.Node{}
 
@@ -2251,10 +2284,16 @@ fn (mut a Analyzer) analyze_record_update(node ast.Node) !ast.Node {
 // Function analysis functions
 fn (mut a Analyzer) analyze_function_definition(node ast.Node) !ast.Node {
 	// Validate that function definitions are only allowed in global scope
-	if a.current_env > 0 {
-		a.error('Function definitions are only allowed in global scope, not inside functions',
-			node.position)
-		return error('Function definitions are only allowed in global scope, not inside functions')
+		if a.current_env > 0 {
+		// Supervisor and worker contexts are treated as global scope since they generate separate files
+		current_scope_name := a.type_envs[a.current_env].scope_name
+		is_otp_context := current_scope_name.starts_with('supervisor_') || current_scope_name.starts_with('worker_')
+
+		if !is_otp_context {
+			a.error('Function definitions are only allowed in global scope, not inside functions',
+				node.position)
+			return error('Function definitions are only allowed in global scope, not inside functions')
+		}
 	}
 
 	function_name := node.value

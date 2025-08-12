@@ -558,3 +558,47 @@ mixed_type_patterns(VALUE_1) ->
 	result := compile_lx(lx_code)
 	assert result == expected
 }
+
+fn test_application_block_basic() {
+	lx_code := 'application {\n  description: "My App",\n  vsn: "0.1.0",\n  applications: [:kernel, :stdlib],\n  registered: [:main_server],\n  env: %{debug: true, port: 8080}\n}\n\ndef foo() do\n  1\nend'
+
+	expected := '-module(test).\n-export([foo/0]).\n\n%% Application config:\n%%  description: <<"My App"/utf8>>\n%%  vsn: <<"0.1.0"/utf8>>\n%%  applications: [kernel, stdlib]\n%%  registered: [main_server]\n%%  env: #{debug => true, port => 8080}\n\n-spec foo() -> integer().\nfoo() ->\n    1.\n'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+fn test_application_block_empty_and_commas() {
+	lx_code := 'application { }\n\napplication {\n  vsn: "1.0.0",\n}\n\ndef bar() do\n  2\nend'
+
+	expected := '-module(test).\n-export([bar/0]).\n\n%% Application config:\n\n%% Application config:\n%%  vsn: <<"1.0.0"/utf8>>\n\n-spec bar() -> integer().\nbar() ->\n    2.\n'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+fn test_pattern_matching_in_function_arguments() {
+	lx_code := 'def test_pattern({name, age}) do
+  {name, age}
+end
+
+def main() do
+  result = test_pattern({"João", 30})
+  result
+end'
+
+	expected := '-module(test).
+-export([test_pattern/1, main/0]).
+
+-spec test_pattern(any()) -> {any(), any()}.
+test_pattern(_1) ->
+    {NAME_2, AGE_3}.
+-spec main() -> {any(), any()}.
+main() ->
+    RESULT_4 = test_pattern({<<"João"/utf8>>, 30}),
+    RESULT_4.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}

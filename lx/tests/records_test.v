@@ -602,3 +602,39 @@ main() ->
 	result := compile_lx(lx_code)
 	assert result == expected
 }
+
+fn test_record_multiline_fields() {
+	lx_code := 'record User {
+  id :: integer,
+  name :: string,
+  email :: string,
+  created_at :: integer
+}
+
+record Session {
+  user_id :: integer,
+  token :: string,
+  expires_at :: integer
+}
+
+def main() do
+  user = User{id: 1, name: "John", email: "john@example.com", created_at: 1234567890}
+  session = Session{user_id: 1, token: "abc123", expires_at: 1234567890}
+  {user, session}
+end'
+
+	expected := '-module(test).
+-export([main/0]).
+
+-record(user, {id = nil :: integer(), name = nil :: binary(), email = nil :: binary(), created_at = nil :: integer()}).
+-record(session, {user_id = nil :: integer(), token = nil :: binary(), expires_at = nil :: integer()}).
+-spec main() -> {#user{}, #session{}}.
+main() ->
+    USER_1 = #user{id = 1, name = <<"John"/utf8>>, email = <<"john@example.com"/utf8>>, created_at = 1234567890},
+    SESSION_2 = #session{user_id = 1, token = <<"abc123"/utf8>>, expires_at = 1234567890},
+    {USER_1, SESSION_2}.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}

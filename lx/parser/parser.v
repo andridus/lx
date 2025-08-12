@@ -313,8 +313,21 @@ fn (mut p Parser) parse_function() !ast.Node {
 fn (mut p Parser) parse_arg() !ast.Node {
 	pos := p.current.position
 
+	// Handle pattern matching arguments (tuples, atoms, etc.)
+	if p.current.type_ == .lbrace {
+		// Parse tuple pattern as argument
+		tuple_pattern := p.parse_tuple_expression()!
+		return ast.Node{
+			id:       p.get_next_id()
+			kind:     .function_parameter
+			value:    ''  // No simple name for pattern
+			children: [tuple_pattern]
+			position: pos
+		}
+	}
+
 	if p.current.type_ != .identifier {
-		return p.error_and_return('Expected argument name')
+		return p.error_and_return('Expected argument name or pattern')
 	}
 	arg_name := p.current.value
 	p.advance()
@@ -822,6 +835,8 @@ fn (mut p Parser) parse_prefix_expression() !ast.Node {
 		.at_sign { p.parse_directive_new() }
 		.for_ { p.parse_list_comprehension() }
 		.assert { p.parse_assert_expression() }
+		// Function definitions (allowed inside supervisor/worker blocks)
+		.def { p.parse_function() }
 		else { error('Unexpected token: ${p.current.type_}') }
 	}
 }
@@ -1386,6 +1401,11 @@ fn (mut p Parser) parse_record_definition() !ast.Node {
 
 			if p.current.type_ == .comma {
 				p.advance() // Skip comma and continue
+
+				// Skip newlines after comma
+				for p.current.type_ == .newline {
+					p.advance()
+				}
 				continue
 			}
 
@@ -3107,10 +3127,74 @@ fn (mut p Parser) parse_application_config() !ast.Node {
 	if p.current.type_ != .lbrace {
 		return p.error_and_return('Expected "{" after application')
 	}
+	p.advance() // Skip '{'
 
-	config_map := p.parse_map_literal()!
+	// Skip newlines after opening brace
+	for p.current.type_ == .newline {
+		p.advance()
+	}
 
-	return ast.new_application_config(p.get_next_id(), config_map.children, start_pos)
+	// Allow empty application block
+	mut entries := []ast.Node{}
+	if p.current.type_ != .rbrace {
+		for {
+			// Parse key: identifier treated as atom (like map keys)
+			if p.current.type_ != .identifier {
+				return p.error_and_return('Expected key identifier in application block')
+			}
+			key_name := p.current.value
+			key_pos := p.current.position
+			p.advance() // Skip key identifier
+
+			if p.current.type_ != .colon {
+				return p.error_and_return('Expected colon after application key')
+			}
+			p.advance() // Skip ':'
+
+			// Parse value expression
+			value_expr := p.parse_expression()!
+
+			// Push as pair: [key_atom, value]
+			entries << ast.new_atom(p.get_next_id(), key_name, key_pos)
+			entries << value_expr
+
+			// Skip optional newlines after value
+			for p.current.type_ == .newline {
+				p.advance()
+			}
+
+			// Accept either '}' or ',' (with optional trailing comma before '}')
+			if p.current.type_ == .rbrace {
+				break
+			}
+			if p.current.type_ == .comma {
+				p.advance() // Skip ','
+				for p.current.type_ == .newline {
+					p.advance()
+				}
+				// Allow trailing comma
+				if p.current.type_ == .rbrace {
+					break
+				}
+				// Continue parsing next pair
+				continue
+			}
+
+			return p.error_and_return('Expected comma or closing brace in application block')
+		}
+	}
+
+	// Skip newlines before closing brace
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+
+	if p.current.type_ != .rbrace {
+		return p.error_and_return('Expected closing "}" for application block')
+	}
+	p.advance() // Skip '}'
+
+	return ast.new_application_config(p.get_next_id(), entries, start_pos)
 }
 
 // Parse import statement: import Module

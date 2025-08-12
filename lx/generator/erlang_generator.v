@@ -2041,28 +2041,142 @@ fn (mut g ErlangGenerator) generate_receive_expr(node ast.Node) ! {
 	g.output.write_string('\n    end')
 }
 
-// Generate supervisor definitions (as regular functions with metadata)
+// Generate supervisor definitions (as proper OTP supervisor modules)
 fn (mut g ErlangGenerator) generate_supervisor_def(node ast.Node) ! {
 	if node.children.len != 1 {
 		return error('Supervisor definition must have body')
 	}
 
-	g.output.write_string('supervisor_${node.value}() ->\n')
-	g.output.write_string('    ')
-	g.generate_node(node.children[0])! // body
-	g.output.write_string('.\n\n')
+		// Generate standard supervisor callbacks
+	g.output.write_string('-behaviour(supervisor).\n\n')
+	g.output.write_string('-export([start_link/0, init/1]).\n\n')
+
+	// start_link/0
+	g.output.write_string('start_link() ->\n')
+	g.output.write_string('    supervisor:start_link({local, ?MODULE}, ?MODULE, []).\n\n')
+
+	// init/1 - parse supervisor body for strategy and children
+	g.output.write_string('init([]) ->\n')
+
+	// Parse supervisor body for strategy and children
+	body := node.children[0]
+	mut strategy := 'one_for_one'
+	mut children_list := []string{}
+
+	// Extract strategy and children from body
+	for child in body.children {
+		if child.kind == .variable_binding {
+			if child.value == 'strategy' && child.children.len > 0 {
+				strategy_node := child.children[0]
+				if strategy_node.kind == .atom {
+					strategy = strategy_node.value
+				}
+			} else if child.value == 'children' && child.children.len > 0 {
+				children_node := child.children[0]
+				if children_node.kind == .list_literal {
+					for child_ref in children_node.children {
+						if child_ref.kind == .atom {
+							child_name := child_ref.value
+							children_list << '{${child_name}, {${child_name}, start_link, []}, permanent, 5000, worker, [${child_name}]}'
+						}
+					}
+				}
+			}
+		}
+	}
+
+	g.output.write_string('    Strategy = ${strategy},\n')
+	g.output.write_string('    Children = [\n')
+	for i, child_spec in children_list {
+		g.output.write_string('        ${child_spec}')
+		if i < children_list.len - 1 {
+			g.output.write_string(',')
+		}
+		g.output.write_string('\n')
+	}
+	g.output.write_string('    ],\n')
+	g.output.write_string('    {ok, {{Strategy, 5, 10}, Children}}.\n\n')
 }
 
-// Generate worker definitions (as regular functions with metadata)
+// Generate worker definitions (as proper OTP gen_server modules)
 fn (mut g ErlangGenerator) generate_worker_def(node ast.Node) ! {
 	if node.children.len != 1 {
 		return error('Worker definition must have body')
 	}
 
-	g.output.write_string('worker_${node.value}() ->\n')
-	g.output.write_string('    ')
-	g.generate_node(node.children[0])! // body
-	g.output.write_string('.\n\n')
+		// Generate standard gen_server callbacks
+	g.output.write_string('-behaviour(gen_server).\n\n')
+	g.output.write_string('-export([start_link/0, start_link/1]).\n')
+	g.output.write_string('-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).\n\n')
+
+	// start_link functions
+	g.output.write_string('start_link() ->\n')
+	g.output.write_string('    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).\n\n')
+	g.output.write_string('start_link(Args) ->\n')
+	g.output.write_string('    gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).\n\n')
+
+	// Parse worker body for user-defined callbacks
+	body := node.children[0]
+	mut has_init := false
+	mut has_handle_call := false
+	mut has_handle_cast := false
+	mut has_handle_info := false
+
+	// Generate user-defined functions from body
+	for child in body.children {
+		if child.kind == .function {
+			func_name := child.value
+			match func_name {
+				'init' {
+					has_init = true
+					g.generate_function(child)!
+				}
+				'handle_call' {
+					has_handle_call = true
+					g.generate_function(child)!
+				}
+				'handle_cast' {
+					has_handle_cast = true
+					g.generate_function(child)!
+				}
+				'handle_info' {
+					has_handle_info = true
+					g.generate_function(child)!
+				}
+				'start_link' {
+					// Skip - we generate our own start_link
+				}
+				else {
+					// Generate other functions as normal
+					g.generate_function(child)!
+				}
+			}
+		}
+	}
+
+	// Generate default callbacks if not provided
+	if !has_init {
+		g.output.write_string('init(Args) ->\n')
+		g.output.write_string('    {ok, #{}}.\n\n')
+	}
+	if !has_handle_call {
+		g.output.write_string('handle_call(_Req, _From, State) ->\n')
+		g.output.write_string('    {reply, ok, State}.\n\n')
+	}
+	if !has_handle_cast {
+		g.output.write_string('handle_cast(_Msg, State) ->\n')
+		g.output.write_string('    {noreply, State}.\n\n')
+	}
+	if !has_handle_info {
+		g.output.write_string('handle_info(_Info, State) ->\n')
+		g.output.write_string('    {noreply, State}.\n\n')
+	}
+
+	// Always generate terminate and code_change
+	g.output.write_string('terminate(_Reason, _State) ->\n')
+	g.output.write_string('    ok.\n\n')
+	g.output.write_string('code_change(_OldVsn, State, _Extra) ->\n')
+	g.output.write_string('    {ok, State}.\n\n')
 }
 
 // ============ Task 11: Binaries Generation ============
@@ -2194,9 +2308,23 @@ fn (mut g ErlangGenerator) generate_deps_declaration(node ast.Node) ! {
 // Generate application config (as comments)
 fn (mut g ErlangGenerator) generate_application_config(node ast.Node) ! {
 	g.output.write_string('%% Application config:\n')
-	for config_item in node.children {
-		g.output.write_string('%% ')
-		g.generate_node(config_item)!
+	// Children come in pairs [key_atom, value_expr, ...]
+	if node.children.len == 0 {
+		// Ensure a blank line when the application block is empty
+		g.output.write_string('\n')
+		return
+	}
+	for i := 0; i < node.children.len; i += 2 {
+		g.output.write_string('%%  ')
+		// key
+		key_node := node.children[i]
+		key_str := g.generate_node_to_string(key_node) or { 'unknown' }
+		g.output.write_string(key_str)
+		g.output.write_string(': ')
+		// value
+		val_node := node.children[i + 1]
+		val_str := g.generate_node_to_string(val_node) or { 'unknown' }
+		g.output.write_string(val_str)
 		g.output.write_string('\n')
 	}
 }
