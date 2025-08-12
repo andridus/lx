@@ -110,7 +110,7 @@ fn create_new_project(project_name string) {
 		'${project_name}/apps/${project_name}',
 		'${project_name}/apps/${project_name}/src',
 		'${project_name}/apps/${project_name}/include',
-		'${project_name}/apps/${project_name}/test'
+		'${project_name}/apps/${project_name}/test',
 	]
 
 	for dir in dirs {
@@ -141,7 +141,8 @@ fn create_new_project(project_name string) {
   {applications, [kernel, stdlib]},
   {env, []}]}.
 '
-	os.write_file('${project_name}/apps/${project_name}/src/${project_name}.app.src', app_src) or {
+	os.write_file('${project_name}/apps/${project_name}/src/${project_name}.app.src',
+		app_src) or {
 		eprintln('Failed to create .app.src: ${err}')
 		exit(1)
 	}
@@ -176,7 +177,7 @@ fn compile_target(target string, run_rebar bool) {
 		exit(1)
 	}
 
-		if os.is_dir(target) {
+	if os.is_dir(target) {
 		// Compile all .lx files in directory
 		lx_files := find_lx_files(target)
 		if lx_files.len == 0 {

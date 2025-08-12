@@ -64,8 +64,8 @@ end'
 	expected := '-module(test).
 -export([valid_pattern/1]).
 
--spec valid_pattern([integer()]) -> integer().
-valid_pattern([HEAD_1 | TAIL_2]) ->
+-spec valid_pattern(any()) -> integer().
+valid_pattern([HEAD_1]) ->
     HEAD_1 * 2;
 valid_pattern([]) ->
     0.

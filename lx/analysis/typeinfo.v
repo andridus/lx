@@ -63,3 +63,28 @@ pub fn type_module() ast.Type {
 pub fn type_to_string(t ast.Type) string {
 	return t.str()
 }
+
+// Specialized type constructors
+pub fn type_specialized_atom(atom_value string) ast.Type {
+	return ast.Type{
+		name:              'atom'
+		params:            []
+		specialized_value: atom_value
+	}
+}
+
+pub fn type_specialized_integer(int_value string) ast.Type {
+	return ast.Type{
+		name:              'integer'
+		params:            []
+		specialized_value: int_value
+	}
+}
+
+pub fn type_specialized_string(str_value string) ast.Type {
+	return ast.Type{
+		name:              'string'
+		params:            []
+		specialized_value: str_value
+	}
+}

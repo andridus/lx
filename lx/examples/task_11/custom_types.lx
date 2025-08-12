@@ -4,6 +4,15 @@ type opaque user_id :: integer
 type nominal email :: string
 type list(T) :: [] | {T, list(T)}
 
+record User {
+    name :: string,
+    age :: integer
+}
+record State {
+    users :: list(User)
+    next_id :: integer
+}
+
 def process_status(status :: status) do
     case status do
         :ok -> "Success"

@@ -320,7 +320,7 @@ fn (mut p Parser) parse_arg() !ast.Node {
 		return ast.Node{
 			id:       p.get_next_id()
 			kind:     .function_parameter
-			value:    ''  // No simple name for pattern
+			value:    '' // No simple name for pattern
 			children: [tuple_pattern]
 			position: pos
 		}
@@ -351,21 +351,7 @@ fn (mut p Parser) parse_arg() !ast.Node {
 }
 
 fn (mut p Parser) parse_type_annotation() !ast.Node {
-	pos := p.current.position
-
-	if p.current.type_ != .identifier {
-		return p.error_and_return('Expected type name')
-	}
-	type_name := p.current.value
-	p.advance()
-
-	return ast.Node{
-		id:       p.get_next_id()
-		kind:     .identifier
-		value:    type_name
-		children: []
-		position: pos
-	}
+	return p.parse_type_expression()
 }
 
 fn (mut p Parser) parse_function_body() !ast.Node {
@@ -1346,11 +1332,8 @@ fn (mut p Parser) parse_record_definition() !ast.Node {
 				if p.current.type_ == .double_colon {
 					p.advance() // Skip ::
 
-					if p.current.type_ != .identifier {
-						return p.error_and_return('Expected field type after ::')
-					}
-					field_type = p.current.value
-					p.advance() // Skip field type
+					type_expr := p.parse_type_expression()!
+					field_type = type_expr.value // For simple types, use the value
 				} else {
 					// No explicit type, will be inferred from default value
 					field_type = ''
@@ -1363,11 +1346,8 @@ fn (mut p Parser) parse_record_definition() !ast.Node {
 				}
 				p.advance() // Skip ::
 
-				if p.current.type_ != .identifier {
-					return p.error_and_return('Expected field type')
-				}
-				field_type = p.current.value
-				p.advance() // Skip field type
+				type_expr := p.parse_type_expression()!
+				field_type = type_expr.value // For simple types, use the value
 			}
 
 			// Create field type node
@@ -1727,10 +1707,75 @@ fn (mut p Parser) parse_type_alias() !ast.Node {
 }
 
 fn (mut p Parser) parse_type_expression() !ast.Node {
+	return p.parse_union_type()
+}
+
+// Parse union types: :ok | :error | :pending or Type1 | Type2
+fn (mut p Parser) parse_union_type() !ast.Node {
+	mut variants := []ast.Node{}
+
+	// Parse first variant
+	first_variant := p.parse_single_type()!
+	variants << first_variant
+
+	// Parse additional variants if there's a pipe
+	for p.current.type_ == .pipe {
+		p.advance() // Skip '|'
+
+		variant := p.parse_single_type()!
+		variants << variant
+	}
+
+	// If only one variant, return it directly
+	if variants.len == 1 {
+		return variants[0]
+	}
+
+	// Multiple variants - create union type
+	pos := variants[0].position
+	return ast.new_union_type(p.get_next_id(), variants, pos)
+}
+
+// Parse single type: identifier, atom, or parameterized type
+fn (mut p Parser) parse_single_type() !ast.Node {
 	pos := p.current.position
 
+	// Handle atoms
+	if p.current.type_ == .atom {
+		atom_value := p.current.value
+		p.advance()
+		return ast.new_atom(p.get_next_id(), atom_value, pos)
+	}
+
+	// Handle empty lists []
+	if p.current.type_ == .lbracket {
+		p.advance() // Skip '['
+		if p.current.type_ != .rbracket {
+			return p.error_and_return('Expected closing bracket for empty list type')
+		}
+		p.advance() // Skip ']'
+		return ast.new_list_literal(p.get_next_id(), [], pos)
+	}
+
+	// Handle tuples
+	if p.current.type_ == .lbrace {
+		return p.parse_tuple_type()
+	}
+
+	// Handle parentheses around types: (integer), (list(T)), etc.
+	if p.current.type_ == .lparen {
+		p.advance() // Skip '('
+		inner_type := p.parse_union_type()!
+		if p.current.type_ != .rparen {
+			return p.error_and_return('Expected closing parenthesis after type')
+		}
+		p.advance() // Skip ')'
+		return inner_type
+	}
+
+	// Handle identifiers
 	if p.current.type_ != .identifier {
-		return p.error_and_return('Expected type name')
+		return p.error_and_return('Expected type name, atom, tuple, or list')
 	}
 
 	type_name := p.current.value
@@ -1743,7 +1788,7 @@ fn (mut p Parser) parse_type_expression() !ast.Node {
 
 		if p.current.type_ != .rparen {
 			for {
-				param := p.parse_type_expression()!
+				param := p.parse_union_type()!
 				params << param
 
 				if p.current.type_ == .rparen {
@@ -1771,6 +1816,40 @@ fn (mut p Parser) parse_type_expression() !ast.Node {
 	}
 
 	return ast.new_identifier(p.get_next_id(), type_name, pos)
+}
+
+// Parse tuple types: {Type1, Type2, Type3}
+fn (mut p Parser) parse_tuple_type() !ast.Node {
+	if p.current.type_ != .lbrace {
+		return p.error_and_return('Expected "{"')
+	}
+
+	pos := p.current.position
+	p.advance() // Skip '{'
+
+	mut elements := []ast.Node{}
+
+	if p.current.type_ != .rbrace {
+		for {
+			element := p.parse_union_type()!
+			elements << element
+
+			if p.current.type_ == .rbrace {
+				break
+			}
+			if p.current.type_ != .comma {
+				return p.error_and_return('Expected comma or closing brace in tuple type')
+			}
+			p.advance() // Skip comma
+		}
+	}
+
+	if p.current.type_ != .rbrace {
+		return p.error_and_return('Expected closing brace in tuple type')
+	}
+	p.advance() // Skip '}'
+
+	return ast.new_tuple_literal(p.get_next_id(), elements, pos)
 }
 
 fn (mut p Parser) parse_case_expression() !ast.Node {
@@ -3456,15 +3535,21 @@ fn (mut p Parser) parse_type_def() !ast.Node {
 
 	type_def := p.parse_type_expression()!
 
+	// Create type name with generic parameters if present
+	mut full_type_name := type_name
+	if params.len > 0 {
+		full_type_name = '${type_name}(${params.join(', ')})'
+	}
+
 	// Create appropriate type node based on modifiers
 	if is_opaque {
-		return ast.new_opaque_type(p.get_next_id(), type_name, type_def, start_pos)
+		return ast.new_opaque_type(p.get_next_id(), full_type_name, type_def, start_pos)
 	} else if is_nominal {
-		return ast.new_nominal_type(p.get_next_id(), type_name, type_def, start_pos)
+		return ast.new_nominal_type(p.get_next_id(), full_type_name, type_def, start_pos)
 	} else {
 		// For regular types, convert single type_def to variants array
 		variants := [type_def]
-		return ast.new_type_def(p.get_next_id(), type_name, variants, start_pos)
+		return ast.new_type_def(p.get_next_id(), full_type_name, variants, start_pos)
 	}
 }
 

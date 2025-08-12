@@ -87,7 +87,8 @@ pub fn compile_file(file_path string) {
 
 // Check if source needs multi-file compilation (has application, supervisor, worker)
 fn needs_multi_file_compilation(code string) bool {
-	return code.contains('application {') || code.contains('supervisor ') || code.contains('worker ')
+	return code.contains('application {') || code.contains('supervisor ')
+		|| code.contains('worker ')
 }
 
 // Multi-file compilation: generates separate modules for each construct
@@ -150,7 +151,7 @@ pub fn compile_multi_file(code string, file_path string, base_module_name string
 
 	mut result := CompilationResult{
 		main_module: base_module_name
-		files: map[string]string{}
+		files:       map[string]string{}
 	}
 
 	// Generate each module
@@ -203,9 +204,10 @@ fn extract_modules_from_ast(main_ast ast.Node, base_name string) ![]ModuleInfo {
 			.supervisor_def {
 				// Create separate supervisor module
 				sup_name := child.value
-				sup_module_ast := ast.new_module(child.id, '${sup_name}_sup', [child], child.position)
+				sup_module_ast := ast.new_module(child.id, '${sup_name}_sup', [child],
+					child.position)
 				modules << ModuleInfo{
-					name: '${sup_name}_sup'
+					name:     '${sup_name}_sup'
 					filename: '${sup_name}_sup.erl'
 					ast_node: sup_module_ast
 				}
@@ -215,7 +217,7 @@ fn extract_modules_from_ast(main_ast ast.Node, base_name string) ![]ModuleInfo {
 				worker_name := child.value
 				worker_module_ast := ast.new_module(child.id, worker_name, [child], child.position)
 				modules << ModuleInfo{
-					name: worker_name
+					name:     worker_name
 					filename: '${worker_name}.erl'
 					ast_node: worker_module_ast
 				}
@@ -240,7 +242,7 @@ fn extract_modules_from_ast(main_ast ast.Node, base_name string) ![]ModuleInfo {
 	if main_children.len > 0 {
 		main_module_ast := ast.new_module(main_ast.id, base_name, main_children, main_ast.position)
 		modules << ModuleInfo{
-			name: base_name
+			name:     base_name
 			filename: '${base_name}.erl'
 			ast_node: main_module_ast
 		}

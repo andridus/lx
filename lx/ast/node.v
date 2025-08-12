@@ -118,6 +118,8 @@ pub struct Type {
 pub:
 	name   string
 	params []Type
+	// Support for specialized types (e.g., :ok is a specialized atom)
+	specialized_value ?string
 }
 
 // Task 11: Binary segment for bitstring operations
@@ -164,6 +166,15 @@ pub fn (p Position) str() string {
 }
 
 pub fn (t Type) str() string {
+	// If it's a specialized type, show the specialized value
+	if specialized := t.specialized_value {
+		if t.params.len == 0 {
+			return '${t.name}(${specialized})'
+		}
+		params_str := t.params.map(it.str()).join(', ')
+		return '${t.name}(${specialized}, ${params_str})'
+	}
+
 	if t.params.len == 0 {
 		return t.name
 	}
