@@ -42,7 +42,7 @@ pub fn compile_file(file_path string) {
 			exit(1)
 		}
 
-		// Write all generated files
+		// Write all generated files into the same dir as input (expected to be _build/apps/<app>/src)
 		for filename, file_content in result.files {
 			output_path := os.join_path(dir, filename)
 			os.write_file(output_path, file_content) or {
@@ -64,12 +64,14 @@ pub fn compile_file(file_path string) {
 
 		// Write .hrl if present
 		if result.hrl_content.len > 0 {
-			hrl_path := os.join_path(dir, '${module_name}.hrl')
-			os.write_file(hrl_path, result.hrl_content) or {
-				eprintln('Failed to write ${hrl_path}: ${err}')
+			hrl_path := os.join_path(os.dir(dir), 'include')
+			os.mkdir_all(hrl_path) or {}
+			hrl_file := os.join_path(hrl_path, '${module_name}.hrl')
+			os.write_file(hrl_file, result.hrl_content) or {
+				eprintln('Failed to write ${hrl_file}: ${err}')
 				exit(1)
 			}
-			println('Generated ${hrl_path}')
+			println('Generated ${hrl_file}')
 		}
 	} else {
 		// Single file compilation (legacy)
@@ -177,6 +179,51 @@ pub fn compile_multi_file(code string, file_path string, base_module_name string
 	// Generate .app.src and .hrl if needed
 	result.app_src_content = generate_app_src(analyzed_ast, base_module_name)!
 	result.hrl_content = generate_hrl(analyzed_ast, base_module_name)!
+
+	return result
+}
+
+// Fallback multi-file compilation without analysis (safer for OTP scaffolds)
+pub fn compile_multi_file_no_analyze(code string, file_path string, base_module_name string) !CompilationResult {
+	mut directives_table := parser.new_directives_table()
+	mut p := parser.new_parser(code, file_path, directives_table)
+	ast_node := p.parse_with_modname(base_module_name) or {
+		parser_errors := p.get_errors()
+		if parser_errors.len > 0 {
+			file_lines := os.read_file(file_path) or { '' }
+			lines := file_lines.split('\n')
+			mut error_msg := ''
+			for e in parser_errors {
+				error_msg += errors.format_error_detailed(e, lines) + '\n'
+			}
+			return error(error_msg)
+		}
+		return error('Parse error: ${err}')
+	}
+
+	// Extract constructs directly from parsed AST
+	modules := extract_modules_from_ast(ast_node, base_module_name)!
+
+	mut result := CompilationResult{
+		main_module: base_module_name
+		files:       map[string]string{}
+	}
+
+	for module_info in modules {
+		mut gen := generator.new_generator(directives_table)
+		erlang_code := gen.generate(module_info.ast_node) or {
+			errs := gen.get_errors()
+			if errs.len > 0 {
+				return error('Generation errors for ${module_info.name}:\n${errs.join('\n')}')
+			}
+			return error('Generation error for ${module_info.name}: ${err}')
+		}
+		result.files[module_info.filename] = erlang_code
+	}
+
+	// Generate .app.src and .hrl best-effort from parsed AST
+	result.app_src_content = generate_app_src(ast_node, base_module_name) or { '' }
+	result.hrl_content = generate_hrl(ast_node, base_module_name) or { '' }
 
 	return result
 }
@@ -407,16 +454,6 @@ pub fn compile_string_with_modname(code string, file_path string, module_name st
 		return error('Parse error: ${err}')
 	}
 
-	parser_errors := p.get_errors()
-	if parser_errors.len > 0 {
-		file_lines := os.read_file(file_path) or { '' }
-		lines := file_lines.split('\n')
-		mut error_msg := ''
-		for e in parser_errors {
-			error_msg += errors.format_error_detailed(e, lines) + '\n'
-		}
-		return error(error_msg)
-	}
 	mut analyzer := analysis.new_analyzer()
 	analyzed_ast := analyzer.analyze(ast_node) or {
 		analysis_errors := analyzer.get_errors()
@@ -431,6 +468,7 @@ pub fn compile_string_with_modname(code string, file_path string, module_name st
 		}
 		return error('Analysis error: ${err}')
 	}
+
 	analysis_errors := analyzer.get_errors()
 	if analysis_errors.len > 0 {
 		file_lines := os.read_file(file_path) or { '' }
@@ -441,21 +479,17 @@ pub fn compile_string_with_modname(code string, file_path string, module_name st
 		}
 		return error(error_msg)
 	}
+
 	mut gen := generator.new_generator(directives_table)
-	erlang_code := gen.generate_with_types(analyzed_ast, analyzer.get_type_table()) or {
+	result := gen.generate_with_types(analyzed_ast, analyzer.get_type_table()) or {
 		errs := gen.get_errors()
 		if errs.len > 0 {
-			return error('Generation errors:\n${errs.join('\n')}')
+			return error('Generate errors:\n' + errs.join('\n'))
 		}
-		return error('Generation error: ${err}')
+		return error('Generate error: ${err}')
 	}
 
-	generation_errors := gen.get_errors()
-	if generation_errors.len > 0 {
-		return error('Generation errors:\n${generation_errors.join('\n')}')
-	}
-	println('Compiled ${file_path}')
-	return erlang_code
+	return result
 }
 
 fn print_ast_nodes(node ast.Node, indent int) {
