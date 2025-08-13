@@ -262,8 +262,38 @@ fn launch_shell(dir string) {
 		exit(1)
 	}
 
+	// Ensure std kernel module lx (with recompile/0) is compiled and available in shell
+	std_src := os.join_path(original_dir, 'lx', 'kernel', 'lx.lx')
+	std_out_dir := os.join_path(dir, '_std_ebin')
+	os.mkdir_all(std_out_dir) or {}
+	if os.exists(std_src) {
+		// Generate Erlang source for lx kernel module
+		compile.compile_file(std_src)
+		erl_path := os.join_path('lx', 'kernel', 'lx.erl')
+		beam_path := os.join_path(std_out_dir, 'lx.beam')
+		// Compile to BEAM into _std_ebin
+		_ := os.execute('erlc -o ' + std_out_dir + ' ' + erl_path)
+		// Clean intermediate .erl to avoid polluting repo
+		os.rm(erl_path) or {}
+		if !os.exists(beam_path) {
+			// Best-effort: continue, but warn
+			println('Warning: failed to build lx.beam; lx:recompile/0 may be unavailable in shell')
+		}
+	} else {
+		println('Warning: missing lx/kernel/lx.lx; lx:recompile/0 will not be available')
+	}
+
+	// Build project before entering shell so shell starts with latest code
+	println('Running rebar3 compile...')
+	_ := os.system('rebar3 compile')
+
 	println('Launching rebar3 shell...')
-	os.system('rebar3 shell')
+	// Include _std_ebin in shell code path so lx module is loaded
+	if os.exists(std_out_dir) {
+		os.system('rebar3 shell -pa ' + std_out_dir)
+	} else {
+		os.system('rebar3 shell')
+	}
 	os.chdir(original_dir) or {}
 }
 

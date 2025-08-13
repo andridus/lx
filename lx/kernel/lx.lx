@@ -1,0 +1,28 @@
+def recompile() :: atom do
+os:cmd('rebar3 compile')
+libs_root = filename:join(['_build','default','lib'])
+match {:ok, apps} <- file:list_dir(libs_root)
+lists:foreach(fn(a) -> compile_file(a,libs_root), apps)
+end
+
+defp compile_file(app, libs_root) do
+ebin = filename:join([libs_root, app, 'ebin'])
+if filelib:is_dir(ebin) do
+  code:add_patha(ebin)
+
+  ebin
+  |> filename:join('*.beam')
+  |> filelib:wildcard()
+  |> lists:foreach(&reload_file/1, _)
+end
+end
+
+defp reload_file(beam_path) do
+mod =
+  beam_path
+  |> filename:basename('.beam')
+  |> erlang:list_to_atom()
+
+code:soft_purge(mod)
+code:load_file(mod)
+end

@@ -14,6 +14,7 @@ pub enum NodeKind {
 	integer
 	float
 	string
+	string_charlist
 	boolean
 	atom
 	nil
@@ -28,6 +29,7 @@ pub enum NodeKind {
 
 	// Function structure
 	function           // def function_name(args) do body end or (args) -> body
+	private_function   // defp function_name(args) do body end
 	function_parameter // function parameter definition
 	lambda_expression  // fn(x) -> body end
 

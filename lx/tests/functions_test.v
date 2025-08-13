@@ -751,3 +751,58 @@ process(N_2) ->
 	result := compile_lx(lx_code)
 	assert result == expected
 }
+
+fn test_private_function_not_exported_and_called_internally() {
+	lx_code := 'def public_main() do
+    helper(41)
+end
+
+defp helper(x :: integer) do
+    x + 1
+end'
+
+	expected := '-module(test).
+-export([public_main/0]).
+
+-spec public_main() -> any().
+public_main() ->
+    helper(41).
+-spec helper(integer()) -> integer().
+helper(X_1) ->
+    X_1 + 1.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+fn test_mixed_public_and_private_functions_exports() {
+	lx_code := 'def a() do
+    1
+end
+
+defp b() do
+    2
+end
+
+def c() do
+    3
+end'
+
+	expected := '-module(test).
+-export([a/0, c/0]).
+
+-spec a() -> integer().
+a() ->
+    1.
+-spec b() -> integer().
+b() ->
+    2.
+-spec c() -> integer().
+c() ->
+    3.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}

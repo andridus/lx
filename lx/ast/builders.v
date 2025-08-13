@@ -27,6 +27,15 @@ pub fn new_string(id int, value string, pos Position) Node {
 	}
 }
 
+pub fn new_charlist(id int, value string, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .string_charlist
+		value:    value
+		position: pos
+	}
+}
+
 pub fn new_boolean(id int, value bool, pos Position) Node {
 	return Node{
 		id:       id

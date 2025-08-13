@@ -134,3 +134,18 @@ hex_mixed() ->
 	result := compile_lx(lx_code)
 	assert result == expected
 }
+
+fn test_charlist_literal() {
+	lx_code := 'def clist() do
+        \'hello\'
+    end'
+	expected := '-module(test).
+-export([clist/0]).
+
+-spec clist() -> [integer()].
+clist() ->
+    "hello".
+'
+	result := compile_lx(lx_code)
+	assert result == expected
+}

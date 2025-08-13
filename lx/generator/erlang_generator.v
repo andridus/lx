@@ -87,7 +87,7 @@ fn (mut g ErlangGenerator) generate_node(node ast.Node) ! {
 		.block {
 			g.generate_block(node)!
 		}
-		.integer, .float, .string, .boolean, .atom, .nil {
+		.integer, .float, .string, .string_charlist, .boolean, .atom, .nil {
 			g.generate_literal(node)!
 		}
 		.function_caller {
@@ -305,7 +305,10 @@ fn (mut g ErlangGenerator) generate_module(node ast.Node) ! {
 	// Collect function exports
 	mut exports := []string{}
 	for child in node.children {
-		if child.kind == .function {
+		if child.kind == .function { // only public functions are exported
+			// skip private functions
+			// (private functions have kind .private_function and are not exported)
+
 			// Calculate arity from args block or from heads
 			mut arity := 0
 			mut arities := []int{}
@@ -396,7 +399,7 @@ fn (mut g ErlangGenerator) generate_module(node ast.Node) ! {
 
 	// Generate function definitions
 	for child in node.children {
-		if child.kind == .function {
+		if child.kind == .function || child.kind == .private_function {
 			g.generate_function(child)!
 		}
 	}
@@ -673,6 +676,10 @@ fn (mut g ErlangGenerator) generate_literal(node ast.Node) ! {
 		}
 		.string {
 			g.generate_string_literal(node)!
+		}
+		.string_charlist {
+			escaped := g.escape_string(node.value)
+			g.output.write_string('"${escaped}"')
 		}
 		.boolean {
 			g.output.write_string(node.value)
@@ -997,7 +1004,7 @@ fn (mut g ErlangGenerator) substitute_template(template string, args ...ast.Node
 
 fn (mut g ErlangGenerator) generate_node_to_string(node ast.Node) !string {
 	match node.kind {
-		.integer, .float, .string, .boolean, .atom, .nil {
+		.integer, .float, .string, .string_charlist, .boolean, .atom, .nil {
 			return g.generate_literal_to_string(node)
 		}
 		.variable_ref {
@@ -1047,6 +1054,10 @@ fn (mut g ErlangGenerator) generate_literal_to_string(node ast.Node) !string {
 		.string {
 			escaped := g.escape_string(node.value)
 			return '<<"${escaped}"/utf8>>'
+		}
+		.string_charlist {
+			escaped := g.escape_string(node.value)
+			return '"${escaped}"'
 		}
 		.nil {
 			return 'nil'
@@ -2603,7 +2614,11 @@ fn (mut g ErlangGenerator) generate_lambda_call(node ast.Node) ! {
 fn (mut g ErlangGenerator) generate_string_literal(node ast.Node) ! {
 	value := node.value
 	escaped := g.escape_string(value)
-	g.output.write_string('<<"${escaped}"/utf8>>')
+	if node.kind == .string_charlist {
+		g.output.write_string('"${escaped}"')
+	} else {
+		g.output.write_string('<<"${escaped}"/utf8>>')
+	}
 }
 
 // parse_hex_to_decimal converts a hexadecimal string to decimal integer

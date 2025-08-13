@@ -5,6 +5,7 @@ import ast
 pub enum TokenType {
 	// Keywords
 	def
+	defp
 	do
 	end
 	true_
@@ -48,6 +49,7 @@ pub enum TokenType {
 	integer
 	float
 	string
+	charlist
 	atom
 	identifier
 
@@ -60,6 +62,7 @@ pub enum TokenType {
 	lbracket     // [
 	rbracket     // ]
 	pipe         // |
+	pipe_forward // |>
 	lbrace       // {
 	rbrace       // }
 	percent      // %
@@ -109,6 +112,7 @@ pub fn (t Token) str() string {
 pub fn (tt TokenType) str() string {
 	return match tt {
 		.def { 'def' }
+		.defp { 'defp' }
 		.do { 'do' }
 		.end { 'end' }
 		.true_ { 'true' }
@@ -139,6 +143,7 @@ pub fn (tt TokenType) str() string {
 		.integer { 'integer' }
 		.float { 'float' }
 		.string { 'string' }
+		.charlist { 'charlist' }
 		.atom { 'atom' }
 		.identifier { 'identifier' }
 		.lparen { '(' }
@@ -149,6 +154,7 @@ pub fn (tt TokenType) str() string {
 		.lbracket { '[' }
 		.rbracket { ']' }
 		.pipe { '|' }
+		.pipe_forward { '|>' }
 		.lbrace { '{' }
 		.rbrace { '}' }
 		.percent { '%' }

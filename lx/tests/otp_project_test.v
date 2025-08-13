@@ -1,9 +1,5 @@
 module main
 
-import compile
-
-// Use external compile_lx function from utils.v
-
 fn test_application_block_basic_parsing() {
 	lx_code := 'application {
   description: "Test App",
@@ -14,11 +10,20 @@ def main() do
   :ok
 end'
 
+	expected := '-module(test).
+-export([main/0]).
+
+%% Application config:
+%%  description: <<"Test App"/utf8>>
+%%  vsn: <<"1.0.0"/utf8>>
+
+-spec main() -> atom().
+main() ->
+    ok.
+'
+
 	result := compile_lx(lx_code)
-	assert result.contains('-module(test)')
-	assert result.contains('%% Application config:')
-	assert result.contains('%%  description: <<"Test App"/utf8>>')
-	assert result.contains('%%  vsn: <<"1.0.0"/utf8>>')
+	assert result == expected
 }
 
 fn test_anonymous_function_dot_call() {
@@ -32,14 +37,24 @@ fn test_anonymous_function_dot_call() {
   {result1, result2}
 end'
 
+	expected := '-module(test).
+-export([test_lambda_calls/0]).
+
+-spec test_lambda_calls() -> {integer(), integer()}.
+test_lambda_calls() ->
+    ADD_1 = fun(X_2, Y_3) ->
+        X_2 + Y_3
+    end,
+    RESULT1_4 = ADD_1(5, 3),
+    MULTIPLY_5 = fun(A_6, B_7) ->
+        A_6 * B_7
+    end,
+    RESULT2_8 = MULTIPLY_5(4, 6),
+    {RESULT1_4, RESULT2_8}.
+'
+
 	result := compile_lx(lx_code)
-	assert result.contains('-module(test)')
-	assert result.contains('ADD_1 = fun(X_2, Y_3) ->')
-	assert result.contains('X_2 + Y_3')
-	assert result.contains('RESULT1_4 = ADD_1(5, 3)')
-	assert result.contains('MULTIPLY_5 = fun(A_6, B_7) ->')
-	assert result.contains('A_6 * B_7')
-	assert result.contains('RESULT2_8 = MULTIPLY_5(4, 6)')
+	assert result == expected
 }
 
 fn test_multi_clause_anonymous_function_dot_call() {
@@ -54,12 +69,23 @@ fn test_multi_clause_anonymous_function_dot_call() {
   result
 end'
 
+	expected := '-module(test).
+-export([test_multi_clause_lambda/0]).
+
+-spec test_multi_clause_lambda() -> any().
+test_multi_clause_lambda() ->
+    HANDLER_1 = fun
+        (ok) ->
+            <<"success"/utf8>>;
+        (error) ->
+            <<"failure"/utf8>>;
+        (_) ->
+            <<"unknown"/utf8>>
+    end,
+    RESULT_2 = HANDLER_1(ok),
+    RESULT_2.
+'
+
 	result := compile_lx(lx_code)
-	assert result.contains('-module(test)')
-	assert result.contains('HANDLER_1 = fun')
-	assert result.contains('(ok) ->')
-	assert result.contains('<<"success"/utf8>>')
-	assert result.contains('(error) ->')
-	assert result.contains('<<"failure"/utf8>>')
-	assert result.contains('RESULT_2 = HANDLER_1(ok)')
+	assert result == expected
 }

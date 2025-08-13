@@ -98,7 +98,7 @@ fn (mut p Parser) parse_module() !ast.Node {
 		if p.current.type_ == .record {
 			record := p.parse_record_definition()!
 			records << record
-		} else if p.current.type_ == .def {
+		} else if p.current.type_ == .def || p.current.type_ == .defp {
 			func := p.parse_function()!
 			functions << func
 		} else if p.current.type_ == .type {
@@ -172,7 +172,7 @@ fn (mut p Parser) parse_module_with_name(modname string) !ast.Node {
 				record := p.parse_record_definition()!
 				records << record
 			}
-			.def {
+			.def, .defp {
 				func := p.parse_function()!
 				functions << func
 			}
@@ -225,7 +225,8 @@ fn (mut p Parser) parse_module_with_name(modname string) !ast.Node {
 }
 
 fn (mut p Parser) parse_function() !ast.Node {
-	if p.current.type_ != .def {
+	is_private := p.current.type_ == .defp
+	if p.current.type_ != .def && p.current.type_ != .defp {
 		p.error('Expected "def", got "${p.current.value}"')
 		return error('Expected def')
 	}
@@ -315,7 +316,12 @@ fn (mut p Parser) parse_function() !ast.Node {
 		p.temp_doc_node = none // Clear after use to avoid applying to next function
 	}
 
-	return ast.new_function_with_params(func_id, func_name, args, body, start_pos)
+	mut fn_node := ast.new_function_with_params(func_id, func_name, args, body, start_pos)
+	if is_private {
+		// Recaracterizar como função privada (mesma estrutura, apenas o kind muda)
+		fn_node = ast.Node{ ...fn_node, kind: .private_function }
+	}
+	return fn_node
 }
 
 fn (mut p Parser) parse_arg() !ast.Node {
@@ -390,7 +396,8 @@ fn (mut p Parser) parse_function_body() !ast.Node {
 			break
 		}
 		expr := p.parse_expression()!
-		expressions << expr
+		mut chained_expr := expr
+
 		// Skip newlines após expressão
 		for p.current.type_ == .newline {
 			p.advance()
@@ -399,6 +406,9 @@ fn (mut p Parser) parse_function_body() !ast.Node {
 		if p.current.type_ == .semicolon {
 			p.advance() // Skip ';'
 		}
+
+		// Append the final (possibly chained) expression to the block
+		expressions << chained_expr
 	}
 
 	// Se há apenas uma expressão, retorna ela diretamente
@@ -628,6 +638,11 @@ fn (mut p Parser) parse_literal() !ast.Node {
 			p.advance()
 			ast.new_string(lit_id, value, pos)
 		}
+		.charlist {
+			value := p.current.value
+			p.advance()
+			ast.new_charlist(lit_id, value, pos)
+		}
 		.true_ {
 			p.advance()
 			ast.new_boolean(lit_id, true, pos)
@@ -727,7 +742,7 @@ fn (mut p Parser) parse_block() !ast.Node {
 		}
 
 		expr := p.parse_expression()!
-		expressions << expr
+		mut chained_expr := expr
 
 		// Check for semicolon or newline separator
 		if p.current.type_ == .semicolon {
@@ -737,24 +752,47 @@ fn (mut p Parser) parse_block() !ast.Node {
 				p.advance()
 			}
 		} else if p.current.type_ == .newline {
+			// Consume at least one newline
 			p.advance()
-			// Skip multiple newlines
+			// While there are multiple newlines, consume them
 			for p.current.type_ == .newline {
 				p.advance()
+			}
+			// If the next token starts a pipeline continuation, keep chaining
+			for p.current.type_ == .pipe_forward {
+				chained_expr = p.parse_pipeline_expression(chained_expr)!
+				// After each pipeline, allow newline continuation
+				if p.current.type_ == .newline {
+					p.advance()
+					for p.current.type_ == .newline {
+						p.advance()
+					}
+				}
 			}
 		} else {
 			// If we reach here, we have a complete expression
 			// Continue to next expression if there are more tokens
 			if p.current.type_ != .end && p.current.type_ != .eof && p.current.type_ != .else_ {
+				// Append current expression and continue parsing next
+				expressions << chained_expr
 				continue
 			}
+			// Append current expression before breaking on end/eof/else
+			expressions << chained_expr
 			break
 		}
+
+		// Append the final (possibly chained) expression to the block
+		expressions << chained_expr
 	}
 	return ast.new_block(p.get_next_id(), expressions, start_pos)
 }
 
 fn (mut p Parser) parse_expression() !ast.Node {
+	// Allow expressions to start after line breaks (e.g., after '=' then newline)
+	for p.current.type_ == .newline {
+		p.advance()
+	}
 	return p.parse_expression_with_precedence(0)
 }
 
@@ -762,6 +800,12 @@ fn (mut p Parser) parse_expression_with_precedence(precedence int) !ast.Node {
 	mut left := p.parse_prefix_expression()!
 
 	for {
+		// Pipeline operator support: left |> call_or_expr
+		if p.current.type_ == .pipe_forward {
+			left = p.parse_pipeline_expression(left)!
+			continue
+		}
+
 		// Check for infix operators
 		if (p.current.type_ == .identifier && p.is_infix_function(p.current.value))
 			|| p.current.type_ == .exclamation || p.current.type_ == .slash
@@ -815,7 +859,7 @@ fn (mut p Parser) parse_infix_expression_with_name(left ast.Node, name string) !
 
 fn (mut p Parser) parse_prefix_expression() !ast.Node {
 	return match p.current.type_ {
-		.integer, .float, .string, .true_, .false_, .atom, .nil_ { p.parse_literal() }
+		.integer, .float, .string, .charlist, .true_, .false_, .atom, .nil_ { p.parse_literal() }
 		.identifier { p.parse_identifier_expression() }
 		.lparen { p.parse_parentheses() }
 		.lbracket { p.parse_list_expression() }
@@ -849,6 +893,11 @@ fn (mut p Parser) parse_identifier_expression() !ast.Node {
 	p.advance()
 	if identifier.starts_with('$') {
 		return p.parse_directive_call(identifier, pos)
+	}
+
+	// Function capture: &name/arity or &Module:name/arity
+	if identifier.starts_with('&') {
+		return p.parse_function_capture(identifier, pos)
 	}
 
 	// Check for external function call: module:function(args)
@@ -3686,4 +3735,160 @@ fn (mut p Parser) parse_describe_block() ![]ast.Node {
 	p.advance() // Skip 'end'
 
 	return test_functions
+}
+
+// Pipeline parser: left |> expr
+fn (mut p Parser) parse_pipeline_expression(left ast.Node) !ast.Node {
+	pos := p.current.position
+	p.advance() // Skip '|>'
+
+	// Parse the right side expression
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+	right := p.parse_prefix_expression()!
+
+	// If right is a simple identifier or external call without parens, treat as call with no args
+	return p.inject_into_call(right, left, pos)
+}
+
+// Helper to inject left into a call expression, replacing '_' placeholders when present
+fn (mut p Parser) inject_into_call(call_node ast.Node, left ast.Node, pos ast.Position) !ast.Node {
+	mut target := call_node
+	// Expand bare identifier into a zero-arg function call
+	if target.kind == .variable_ref || target.kind == .identifier {
+		// Convert to function call with no args
+		target = ast.new_function_caller(p.get_next_id(), target.value, [], target.position)
+	}
+
+	// External function: value is "module:function"
+	if target.kind == .external_function_call {
+		mut args := target.children.clone()
+		mut replaced := false
+		for i in 0 .. args.len {
+			if args[i].kind == .variable_ref && args[i].value == '_' {
+				args[i] = left
+				replaced = true
+			}
+		}
+		if !replaced {
+			// Insert as first arg by default
+			args.prepend(left)
+		}
+		return ast.new_external_function_call(p.get_next_id(), target.value.split(':')[0], target.value.split(':')[1], args, pos)
+	}
+
+	// Regular function call
+	if target.kind == .function_caller {
+		mut args := target.children.clone()
+		mut replaced := false
+		for i in 0 .. args.len {
+			if args[i].kind == .variable_ref && args[i].value == '_' {
+				args[i] = left
+				replaced = true
+			}
+		}
+		if !replaced {
+			args.prepend(left)
+		}
+		return ast.new_function_caller(p.get_next_id(), target.value, args, pos)
+	}
+
+	// If the right side is a lambda_call like fun.(args) or record access, treat similar to function call
+	if target.kind == .lambda_call {
+		mut args := target.children[1..].clone()
+		mut replaced := false
+		for i in 0 .. args.len {
+			if args[i].kind == .variable_ref && args[i].value == '_' {
+				args[i] = left
+				replaced = true
+			}
+		}
+		if !replaced {
+			args.prepend(left)
+		}
+		return ast.new_lambda_call(p.get_next_id(), target.children[0], args, pos)
+	}
+
+	// If none of above, force a call: right(left)
+	return ast.new_function_caller(p.get_next_id(), target.value, [left], pos)
+}
+
+// Parse function capture expressions like &fun/1 or &Module:fun/2
+fn (mut p Parser) parse_function_capture(initial string, pos ast.Position) !ast.Node {
+	// Case 1: Single token form &fun/arity
+	if initial.contains('/') && !initial.contains(':') {
+		name_and_arity := initial[1..]
+		parts := name_and_arity.split('/')
+		if parts.len != 2 {
+			return error('Invalid function capture syntax')
+		}
+		function_name := parts[0]
+		arity := parts[1].int()
+		if arity < 0 {
+			return error('Invalid arity in function capture')
+		}
+		// Build parameters and body call
+		mut params := []ast.Node{}
+		mut args := []ast.Node{}
+		for i in 0 .. arity {
+			param_name := 'arg${i + 1}'
+			param := ast.new_function_parameter(p.get_next_id(), param_name, pos)
+			params << param
+			args << ast.new_variable_ref(p.get_next_id(), param_name, pos)
+		}
+		body := ast.new_function_caller(p.get_next_id(), function_name, args, pos)
+		return ast.new_anonymous_function(p.get_next_id(), params, body, pos)
+	}
+
+	// Case 2: Split tokens form &Module : fun/arity
+	module_with_amp := initial[1..]
+	module_name := if module_with_amp == '_' { p.current_module_name } else { module_with_amp }
+	if p.current.type_ != .colon {
+		return error('Expected ":" after module name in function capture')
+	}
+	p.advance() // Skip ':'
+	if p.current.type_ != .identifier {
+		return error('Expected function/arity after module name in function capture')
+	}
+	// Support both combined token ("fun/arity") and split tokens ("fun" "/" integer)
+	fn_token := p.current
+	p.advance()
+
+	mut function_name := ''
+	mut arity := -1
+
+	if fn_token.value.contains('/') {
+		parts := fn_token.value.split('/')
+		if parts.len != 2 {
+			return error('Invalid function capture syntax')
+		}
+		function_name = parts[0]
+		arity = parts[1].int()
+	} else if p.current.type_ == .slash {
+		// Split tokens form: identifier '/' integer
+		function_name = fn_token.value
+		p.advance() // Skip '/'
+		if p.current.type_ != .integer {
+			return error('Expected integer arity after "/" in function capture')
+		}
+		arity = p.current.value.int()
+		p.advance()
+	} else {
+		return error('Expected "/" with arity in function capture')
+	}
+
+	if arity < 0 {
+		return error('Invalid arity in function capture')
+	}
+	mut params := []ast.Node{}
+	mut args := []ast.Node{}
+	for i in 0 .. arity {
+		param_name := 'arg${i + 1}'
+		param := ast.new_function_parameter(p.get_next_id(), param_name, pos)
+		params << param
+		args << ast.new_variable_ref(p.get_next_id(), param_name, pos)
+	}
+	body := ast.new_external_function_call(p.get_next_id(), module_name, function_name, args, pos)
+	return ast.new_anonymous_function(p.get_next_id(), params, body, pos)
 }

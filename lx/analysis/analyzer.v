@@ -229,8 +229,8 @@ fn (mut a Analyzer) analyze_node(node ast.Node) !ast.Node {
 		.module {
 			a.analyze_module(node)
 		}
-		.function {
-			// All functions are named functions (no anonymous functions)
+		.function, .private_function {
+			// All functions (public or private) are named functions
 			a.analyze_function(node)
 		}
 		.variable_binding {
@@ -245,7 +245,7 @@ fn (mut a Analyzer) analyze_node(node ast.Node) !ast.Node {
 		.block {
 			a.analyze_block(node)
 		}
-		.integer, .float, .string, .boolean, .atom, .nil {
+		.integer, .float, .string, .string_charlist, .boolean, .atom, .nil {
 			a.analyze_literal(node)
 		}
 		.function_caller {
@@ -406,7 +406,7 @@ fn (mut a Analyzer) analyze_module(node ast.Node) !ast.Node {
 
 	// First pass: pre-register all function signatures for forward references
 	for child in node.children {
-		if child.kind == .function {
+		if child.kind == .function || child.kind == .private_function {
 			func_name := child.value
 			if func_name in function_names {
 				a.error('Duplicate function name: ${func_name}', child.position)
@@ -437,7 +437,7 @@ fn (mut a Analyzer) analyze_module(node ast.Node) !ast.Node {
 
 // Pre-register function signature for forward reference resolution
 fn (mut a Analyzer) preregister_function(node ast.Node) ! {
-	if node.kind != .function {
+	if node.kind != .function && node.kind != .private_function {
 		return
 	}
 
@@ -1253,6 +1253,13 @@ fn (mut a Analyzer) analyze_literal(node ast.Node) !ast.Node {
 				specialized_value: node.value
 			})
 		}
+		.string_charlist {
+			// Charlist: list of integers
+			a.type_table.assign_type(node.id, ast.Type{
+				name:   'list'
+				params: [ast.Type{ name: 'integer', params: [] }]
+			})
+		}
 		.boolean {
 			if node.value != 'true' && node.value != 'false' {
 				a.error('Invalid boolean value: ${node.value}', node.position)
@@ -1736,7 +1743,7 @@ fn (mut a Analyzer) analyze_external_function_call(node ast.Node) !ast.Node {
 	}
 
 	// Fallback: generic external function result when we don't know the type
-	a.type_table.assign_type(node.id, ast.Type{ name: 'external_function_result', params: [] })
+	a.type_table.assign_type(node.id, ast.Type{ name: 'any', params: [] })
 	return ast.Node{ ...node, children: analyzed_args }
 }
 
@@ -4405,19 +4412,43 @@ fn (mut a Analyzer) analyze_anonymous_function(node ast.Node) !ast.Node {
 	a.enter_scope('anonymous_function')
 	defer { a.exit_scope() }
 
-	mut analyzed_children := []ast.Node{}
+	// Parameters are all children except the last; last is the body
+	params := if node.children.len > 1 { node.children[0..node.children.len - 1] } else { []ast.Node{} }
 
-	for child in node.children {
-		analyzed_child := a.analyze_node(child)!
-		analyzed_children << analyzed_child
+	mut analyzed_params := []ast.Node{}
+	mut param_types := []ast.Type{}
+	for param in params {
+		analyzed_param := a.analyze_node(param)!
+		analyzed_params << analyzed_param
+		param_type := a.type_table.get_type(analyzed_param.id) or {
+			ast.Type{
+				name:   'any'
+				params: []
+			}
+		}
+		param_types << param_type
+		// Bind parameter in environment
+		scheme := TypeScheme{
+			quantified_vars: []
+			body:            param_type
+		}
+		a.bind(analyzed_param.value, scheme)
 	}
+
+	// Analyze body with parameters bound
+	body := node.children[node.children.len - 1]
+	analyzed_body := a.analyze_node(body)!
+
+	// Rebuild children list
+	mut analyzed_children := analyzed_params.clone()
+	analyzed_children << analyzed_body
 
 	analyzed_node := ast.Node{
 		...node
 		children: analyzed_children
 	}
 
-	// Anonymous functions are of type fun
+	// Anonymous functions are of type fun (keep it simple for now)
 	fun_type := ast.Type{
 		name:   'fun'
 		params: []
@@ -4609,7 +4640,7 @@ fn (mut a Analyzer) analyze_lambda_call(node ast.Node) !ast.Node {
 fn (a Analyzer) collect_local_function_names(body ast.Node) map[string]bool {
 	mut m := map[string]bool{}
 	for child in body.children {
-		if child.kind == .function && child.value != '' {
+		if (child.kind == .function || child.kind == .private_function) && child.value != '' {
 			m[child.value] = true
 		}
 	}

@@ -49,6 +49,7 @@ pub fn (mut l Lexer) next_token() Token {
 		`@` { l.advance_and_return(.at_sign, '@') }
 		`/` { l.advance_and_return(.slash, '/') }
 		`"` { l.read_string() }
+		`'` { l.read_charlist() }
 		`0`...`9` { l.read_number() }
 		`=` { l.read_equals_operators() }
 		`+`, `*`, `&`, `^`, `|`, `$`, `a`...`z`, `A`...`Z`, `_` { l.read_identifier() }
@@ -343,7 +344,9 @@ fn (mut l Lexer) read_identifier() Token {
 		'/' { TokenType.identifier }
 		'!' { TokenType.identifier }
 		'|' { TokenType.pipe }
+		'|>' { TokenType.pipe_forward }
 		'def' { TokenType.def }
+		'defp' { TokenType.defp }
 		'do' { TokenType.do }
 		'end' { TokenType.end }
 		'true' { TokenType.true_ }
@@ -476,4 +479,38 @@ fn (mut l Lexer) read_equals_operators() Token {
 	}
 
 	return l.make_token_at(.bind, '=', start_pos)
+}
+
+// Read single-quoted string -> .charlist
+fn (mut l Lexer) read_charlist() Token {
+	start_pos := l.current_position()
+	l.advance() // Skip opening '
+
+	mut value := ''
+	for l.position < l.input.len && l.input[l.position] != `'` {
+		ch := l.input[l.position]
+		if ch == `\\` {
+			l.advance()
+			if l.position >= l.input.len {
+				return l.make_error('Unterminated charlist literal')
+			}
+			escape_ch := l.input[l.position]
+			value += match escape_ch {
+				`n` { '\n' }
+				`t` { '\t' }
+				`r` { '\r' }
+				`\\` { '\\' }
+				`'` { '\'' }
+				else { escape_ch.ascii_str() }
+			}
+		} else {
+			value += ch.ascii_str()
+		}
+		l.advance()
+	}
+	if l.position >= l.input.len {
+		return l.make_error('Unterminated charlist literal')
+	}
+	l.advance() // Skip closing '
+	return l.make_token_at(.charlist, value, start_pos)
 }
