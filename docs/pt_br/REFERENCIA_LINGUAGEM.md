@@ -1,1060 +1,524 @@
-# Referência da Linguagem LX
+# LX Language Reference
 
-## Visão Geral
+## Overview
 
-LX é uma linguagem de programação funcional que compila para Erlang, combinando a sintaxe limpa do Elixir com recursos modernos de programação funcional e um sistema de tipos robusto.
+LX is a functional language that compiles to Erlang. It provides:
+- Pattern-matched multi-clause functions with guards
+- A strong type system with type annotations, custom types, and automatic spec generation
+- Records, lists, tuples, maps, binaries/bitstrings
+- Anonymous functions (lambdas), control-flow expressions (if, case, with, match)
+- Concurrency primitives (spawn, send, receive)
+- List comprehensions
 
-## Criação de Projetos
+Everything compiles to readable Erlang with `-spec` annotations.
 
-Para criar um novo projeto LX, utilize o comando:
+
+## Project Creation and CLI
+
+Use the `lx` CLI.
 
 ```bash
-lx new nome_do_projeto
+# Create a new umbrella-style project (apps/ + <project>.yml)
+lx new my_project
+
+# Inside the project, add a new app
+cd my_project
+lx add app my_app
+
+# Compile the whole project (generates _build/ umbrella with rebar3 files)
+lx .
+
+# Compile a file or a directory (non-project mode)
+lx compile path/to/file.lx
+lx compile path/to/dir
+
+# Run a single file (lightweight: erlc + erl)
+lx run path/to/file.lx
+
+# Open rebar3 shell for the project (precompiles first)
+lx shell [dir]
+
+# Create a global symlink to current lx binary
+sudo lx symlink [--force]
 ```
 
-Isso irá gerar a seguinte estrutura:
+Project layout created by `lx new <name>`:
 
 ```
-nome_do_projeto/
-├── application.lx         # Configuração principal do projeto
-├── src/                  # Código-fonte LX
-│   └── nome_do_projeto.lx # Módulo principal
+<project>/
+  apps/
+  <project>.yml           # project configuration for build (erl_opts, deps)
+  _build/                 # generated umbrella (rebar3, apps/*)
 ```
 
-Exemplo de `application.lx`:
+Notes:
+- `<project>.yml` is used to produce `_build/rebar.config` and `config/sys.config`.
+- For each app under `apps/<app>/`, sources are compiled into `_build/apps/<app>/src`.
+- The application descriptor `<app>.app.src` is generated/ensured in `_build`.
+
+
+## Syntax Basics
+
+### Comments
 ```lx
-application {
-  description: "example - A Lx Application",
-  vsn: "1.0.0",
-  applications: [:kernel, :stdlib],
-  registered: [],
-  env: %{
-    debug: true,
-    timeout: 5000,
-    port: "8080"
-  },
-  deps: []
-}
+# single line comment
 ```
 
-Exemplo de arquivo principal em `src/`:
+### Identifiers
+- Variables and functions: snake_case
+- Record names: snake_case (maps to Erlang `-record(name, ...)`)
+- Module name is implicitly the file name
+
+### Literals
 ```lx
-# Main application module
-record User{
-    name :: string,
-    age :: integer
-}
-
-def new_user(name :: string) do
-    User{name: name, age: 10}
-end
-```
-
-## Sintaxe Fundamental
-
-### Comentários
-
-```lx
-# Comentário de linha simples
-# Comentários começam com # e vão até o fim da linha
-```
-
-### Identificadores
-
-```lx
-# Identificadores de variáveis e funções (snake_case)
-variavel
-nome_da_funcao
-contador_1
-
-# Identificadores records (PascalCase)
-MinhaEstrutura
-ModuloExemplo
-```
-
-### Literais
-
-#### Números
-
-```lx
-# Inteiros
+# Numbers
 42
-0
-1_000_000  # Separadores para legibilidade
-
-# Ponto flutuante
 3.14
-2.71e8     # Notação científica
-```
 
-#### Strings
+# Strings (compile to UTF-8 binaries)
+"hello"
 
-```lx
-# Strings com aspas duplas
-"Olá, mundo!"
-"String com \"aspas\" escape"
-"String com \n quebra de linha"
-
-# Interpolação de strings
-nome = "João"
-idade = 25
-"Olá, #{nome}! Você tem #{idade} anos."
-```
-
-#### Booleanos
-
-```lx
+# Booleans
 true
 false
-```
 
-#### Nil
+# Nil
+nil
 
-```lx
-nil  # Representa ausência de valor
-```
-
-#### Átomos
-
-```lx
+# Atoms
 :ok
 :error
 :timeout
-:atom_with_underscores
 ```
 
-### Variáveis
 
+## Collections and Data
+
+### Lists
 ```lx
-# Declaração e atribuição
-nome = "Alice"
-idade = 30
-ativo = true
-
-# Variáveis são imutáveis por padrão
-x = 10
-# x = 20  # Erro: não pode reatribuir
-
-# Pattern matching em atribuições
-{:ok, resultado} = operacao()
-[primeiro | resto] = lista
-```
-
-#### Escopo de Variáveis
-
-```lx
-# Variáveis têm escopo léxico (limitado ao bloco onde são definidas)
-# Bloco com escopo local
-def fun do
-  soma = do
-    y = 10  # Variável local do bloco
-    z = 20  # Variável local do bloco
-    y + z   # Resultado do bloco
-  end
-  .
-  .
-  .
-  soma
-end
-
-# Escopo em funções
-def calcular() do
-  a = 15  # Variável local da função
-  b = 25  # Variável local da função
-
-  # Bloco aninhado
-  resultado = do
-    temp = a * 2  # Pode acessar 'a' do escopo externo
-    temp + b      # Pode acessar 'b' do escopo externo
-  end
-
-  resultado
-end
-
-# Escopo em case/if
-valor = case numero do
-  n when n > 0 ->
-    positivo = true    # Variável local do case
-    "positivo"
-  _ ->
-    negativo = true    # Variável local do case
-    "não positivo"
-end
-# positivo e negativo não são acessíveis aqui
-```
-
-## Tipos de Dados
-
-### Listas
-
-```lx
-# Lista vazia
 []
-
-# Lista com elementos
-[1, 2, 3, 4, 5]
-["a", "b", "c"]
-[1, "dois", :tres]  # Tipos mistos
-
-# Operações com listas
-lista = [1, 2, 3]
-nova_lista = [0 | lista]  # [0, 1, 2, 3] (cons)
-concatenada = [1, 2] ++ [3, 4]  # [1, 2, 3, 4]
-
-# Decomposição
-[head | tail] = [1, 2, 3]
-# head = 1, tail = [2, 3]
-```
-
-### Tuplas
-
-```lx
-# Tupla vazia
-{}
-
-# Tuplas com elementos
-{1, 2}
-{:ok, "sucesso"}
-{:error, "falha", 404}
-{"nome", "idade", true}
-
-# Acesso por pattern matching
-{status, mensagem} = {:ok, "processado"}
-```
-
-### Mapas
-
-```lx
-# Mapa vazio
-%{}
-
-# Mapa com chaves e valores
-usuario = %{
-  nome: "João",
-  idade: 25,
-  ativo: true
-}
-
-# Acesso a valores
-nome = usuario.nome
-idade = usuario[:idade]
-
-# Atualização (retorna novo mapa)
-usuario_atualizado = %{usuario | idade: 26}
-
-# Adição de chaves
-usuario_com_email = %{usuario | email: "joao@email.com"}
-```
-
-### Binários e Bitstrings
-
-Os binários em LX seguem a sintaxe do Erlang, permitindo manipulação eficiente de dados binários e bitstrings.
-
-#### Sintaxe Básica
-
-```lx
-# Binário vazio
-<<>>
-
-# Binário com bytes
-<<1, 2, 3>>
-<<255, 0, 128>>
-
-# Binário com strings
-<<"hello">>
-<<"world", 0>>  # String com byte nulo
-
-# Binário com variáveis
-x = 42
-y = 100
-<<x, y>>  # <<42, 100>>
-```
-
-#### Especificação de Tamanho
-
-```lx
-# Tamanho em bits (apenas em pattern matching)
-# <<version:8, type:16, length:32>> = data
-
-# Em expressões, use valores sem tamanho específico
-<<42, 100, 255>>    # Bytes individuais
-<<1000, 2000>>      # Valores maiores serão truncados para bytes
-```
-
-#### Qualificações (Type Specifiers)
-
-As qualificações permitem especificar como os dados devem ser interpretados **apenas em pattern matching**:
-
-##### Pattern Matching com Qualificações
-```lx
-# Extração com tipos específicos
-<<version:8/integer, type:16/integer-big, data:32/binary>> = packet
-
-# Tipos suportados
-<<value:8/integer>>      # Inteiro (padrão)
-<<data:4/binary>>        # Dados binários
-<<char/utf8>>            # Caractere UTF-8
-
-# Sinal e endianness
-<<signed_val:16/integer-signed>>    # Com sinal
-<<big_val:16/integer-big>>          # Big-endian
-<<little_val:16/integer-little>>    # Little-endian
-
-# Unidade
-<<data:32/binary-unit:8>>           # 32 unidades de 8 bits
-```
-
-##### Qualificações Combinadas
-```lx
-# Múltiplas qualificações separadas por hífen (apenas em pattern matching)
-<<version:8/integer,
-  msg_type:16/integer-big,
-  payload_size:32/integer-little,
-  payload:payload_size/binary>> = data
-```
-
-#### Pattern Matching com Binários
-
-```lx
-# Extração de valores
-def parse_header(packet) do
-  <<version:8, type:16, length:32>> = packet
-  {version, type, length}
-end
-
-# Pattern matching com qualificações
-def parse_message(data) do
-  <<version:8/integer,
-    msg_type:16/integer-big,
-    payload_size:32/integer-little,
-    payload:payload_size/binary>> = data
-  %{
-    version: version,
-    type: msg_type,
-    size: payload_size,
-    payload: payload
-  }
-end
-
-# Pattern matching com guards
-def process_packet(packet) do
-  case packet do
-    <<version:8, type:16>> when version == 1 and type == 100 ->
-      :valid_packet
-    <<version:8, _:16>> when version != 1 ->
-      {:error, :invalid_version}
-    _ ->
-      {:error, :malformed_packet}
-  end
-end
-```
-
-#### Construção de Binários
-
-```lx
-# Construção simples (expressões)
-def create_simple_binary() do
-  <<42, 100, 255>>  # Bytes individuais
-end
-
-def create_with_variables() do
-  version = 1
-  command = 200
-  <<version, command, 0, 0>>  # Header simples
-end
-
-# Para construção complexa, use pattern matching + concatenação
-def create_header(version, msg_type, payload) do
-  # Criar header básico
-  header = <<version, msg_type>>
-
-  # Concatenar com payload se necessário
-  case payload do
-    nil -> header
-    _ -> <<header/binary, payload/binary>>
-  end
-end
-```
-
-#### Exemplos Práticos
-
-##### Protocolo de Rede
-```lx
-record NetworkPacket {
-  version :: integer,
-  command :: integer,
-  payload :: binary
-}
-
-def encode_packet(packet) do
-  NetworkPacket{version: version, command: command, payload: payload} = packet
-  payload_size = byte_size(payload)
-  <<version:8, command:16/big, payload_size:32/big, payload/binary>>
-end
-
-def decode_packet(binary_data) do
-  <<version:8, command:16/big, payload_size:32/big, payload:payload_size/binary>> = binary_data
-  NetworkPacket{
-    version: version,
-    command: command,
-    payload: payload
-  }
-end
-```
-
-##### Processamento de Imagens
-```lx
-def parse_bmp_header(bmp_data) do
-  <<
-    # BMP Header
-    signature:2/binary,           # "BM"
-    file_size:32/little,         # Tamanho do arquivo
-    reserved:32,                 # Reservado
-    data_offset:32/little,       # Offset para dados da imagem
-
-    # DIB Header
-    header_size:32/little,       # Tamanho do header
-    width:32/signed-little,      # Largura da imagem
-    height:32/signed-little,     # Altura da imagem
-    planes:16/little,            # Número de planos
-    bits_per_pixel:16/little,    # Bits por pixel
-
-    rest/binary
-  >> = bmp_data
-
-  %{
-    signature: signature,
-    file_size: file_size,
-    data_offset: data_offset,
-    width: width,
-    height: height,
-    bits_per_pixel: bits_per_pixel,
-    rest: rest
-  }
-end
-```
-
-##### Serialização de Dados
-```lx
-def serialize_user(user) do
-  User{name: name, age: age, active: active} = user
-  name_bytes = String.to_binary(name)
-  name_length = byte_size(name_bytes)
-  active_flag = if active do 1 else 0 end
-
-  <<name_length:16, name_bytes/binary, age:32, active_flag:8>>
-end
-
-def deserialize_user(binary_data) do
-  <<name_length:16, name_bytes:name_length/binary, age:32, active_flag:8>> = binary_data
-  name = String.from_binary(name_bytes)
-  active = active_flag == 1
-
-  User{name: name, age: age, active: active}
-end
-```
-
-#### Referência de Qualificações
-
-| Qualificação | Descrição | Exemplo |
-|--------------|-----------|---------|
-| `integer` | Inteiro (padrão) | `<<42:16/integer>>` |
-| `float` | Ponto flutuante | `<<3.14:32/float>>` |
-| `binary` | Dados binários | `<<data:8/binary>>` |
-| `bitstring` | Sequência de bits | `<<bits:12/bitstring>>` |
-| `utf8` | Caractere UTF-8 | `<<char/utf8>>` |
-| `utf16` | Caractere UTF-16 | `<<char/utf16>>` |
-| `utf32` | Caractere UTF-32 | `<<char/utf32>>` |
-| `signed` | Com sinal | `<<-42:8/signed>>` |
-| `unsigned` | Sem sinal (padrão) | `<<200:8/unsigned>>` |
-| `big` | Big-endian (padrão) | `<<1000:16/big>>` |
-| `little` | Little-endian | `<<1000:16/little>>` |
-| `native` | Endianness nativo | `<<1000:16/native>>` |
-| `unit:N` | N bits por unidade | `<<data:4/binary-unit:8>>` |
-
-#### Limitações e Considerações
-
-**Limitações Atuais:**
-- **Expressões binárias**: Suportam apenas valores simples sem especificação de tamanho ou qualificações
-- **Pattern matching**: Suporta tamanhos e qualificações completas
-- **Construção complexa**: Use pattern matching para extrair e concatenação para construir
-
-**Regras Gerais:**
-- Pattern matching com binários falha se os dados não corresponderem exatamente ao padrão
-- Valores em expressões são tratados como bytes individuais
-- Para manipulação avançada de binários, combine pattern matching com funções de concatenação
-
-**Exemplos do que funciona:**
-```lx
-# Expressões simples
-<<1, 2, 3>>
-<<version, command>>
-
-# Pattern matching completo
-<<version:8/integer, data:32/binary>> = packet
-
-# Combinação
-def process(packet) do
-  <<version:8, command:8, payload/binary>> = packet
-  new_command = command + 1
-  response = <<version, new_command>>
-  {response, payload}
-end
-```
-
-### Records
-
-```lx
-# Definição de record
-record Pessoa {
-  nome :: string,
-  idade :: integer,
-  email :: string
-}
-
-# Criação de instância
-pessoa = Pessoa{
-  nome: "Maria",
-  idade: 28,
-  email: "maria@email.com"
-}
-
-# Acesso a campos
-nome = pessoa.nome
-idade = pessoa.idade
-
-# Atualização (retorna novo record)
-pessoa_atualizada = Pessoa{pessoa | idade: 29}
+[1, 2, 3]
+
+# Cons and concatenation
+[0 | [1, 2]]     # [0, 1, 2]
+[1, 2] ++ [3, 4] # [1, 2, 3, 4]
 
 # Pattern matching
-case pessoa do
-  Pessoa{nome: nome, idade: idade} when idade >= 18 ->
-    "#{nome} é maior de idade"
-  Pessoa{nome: nome} ->
-    "#{nome} é menor de idade"
+[head | tail] = [1, 2, 3]
+```
+
+### Tuples
+```lx
+{1, 2}
+{:ok, "ok"}
+
+{status, msg} = {:error, "oops"}
+```
+
+### Maps
+Implemented with creation, access, update and pattern matching.
+```lx
+user = %{ name: "John", age: 30 }
+name = user.name       # dot access
+age  = user[:age]      # index access
+
+user2 = %{ user | age: 31 }             # update
+user3 = %{ user | email: "john@x.com" } # add key
+
+# pattern matching in maps
+auth = case user do
+  %{name: n} -> {:ok, n}
+  _ -> {:error}
 end
 ```
 
-## Funções
 
-### Definição de Funções
+## Binaries and Bitstrings
 
+Both expressions and pattern matching support sizes and qualifiers (endianness, signedness, types).
+
+### Expressions
 ```lx
-# Função simples
-def somar(a, b) do
-  a + b
-end
+<<>>
+<<1, 2, 3>>
 
-# Função privada
-defp multiplicar(a, b) do
-  a * b
-end
+value = 0x1234
+big    = <<value:16/big>>
+little = <<value:16/little>>
 
-# Função com múltiplas cláusulas
-def fatorial do
-  (0) ->   1
-  (n) when n > 0 -> n * fatorial(n - 1)
-end
+int_val = 42
+float_val = 3.14
+bin = <<int_val:32/integer, float_val:64/float>>
 
-# Função multiplas clausulas com guards
-def categorizar_idade do
-    (idade) when idade < 18 -> :menor
-    (idade) when idade >= 18 and idade < 65 -> :adulto
-    (_) -> :idoso
-end
-```
-
-### Funções Anônimas
-
-```lx
-# Função anônima simples
-quadrado = fn(x) -> x * x end
-
-# Uso
-resultado = quadrado(5)  # 25
-
-# Função anônima com múltiplas cláusulas
-processar = fn
-  {:ok, valor} -> valor * 2
-  {:error, _} -> 0
-end
-```
-
-### Especificações de Tipo
-
-```lx
-# Especificação de tipo para função
-def somar(a :: integer, b :: integer) do
-  a + b
-end
-
-# Especificação com tipos genéricos
-def mapear(lista :: list(any), funcao :: (any -> integer)) :: integer do
-  case lista do
-    [] -> []
-    [h | t] -> [funcao(h) | mapear(t, funcao)]
-  end
-end
-```
-
-## Controle de Fluxo
-
-### Expressões Condicionais
-
-```lx
-# If-else
-resultado = if temperatura > 30 do
-  "quente"
-else
-  "normal"
-end
-
-# Case
-status = case resposta do
-  {:ok, dados} -> {:sucesso, dados}
-  {:error, motivo} -> {:falha, motivo}
-  _ -> {:desconhecido}
-end
+data = "hello"
+chunk = <<data/binary>>
 ```
 
 ### Pattern Matching
-
 ```lx
-# Pattern Match com listas
-def processar_lista(lista) do
-  case lista do
-    [] -> :vazia
-    [item] -> {:um_item, item}
-    [primeiro, segundo | resto] ->
-      {:multiplos, primeiro, segundo, resto}
-  end
+def parse_header(packet) do
+  <<version:8, size:16, rest/binary>> = packet
+  {version, size, rest}
 end
 
-# Pattern Match com tuplas
-def processar_resultado(resultado) do
-  case resultado do
-    {:ok, valor} -> valor
-    {:error, :not_found} -> "não encontrado"
-    {:error, motivo} -> "erro: #{motivo}"
-  end
-end
-
-# Pattern Match com records
-def processar_pessoa(pessoa) do
-  case pessoa do
-    Pessoa{nome: nome, idade: idade} when idade >= 18 ->
-      "#{nome} pode votar"
-    Pessoa{nome: nome} ->
-      "#{nome} não pode votar ainda"
-  end
+# Mixed options and variable-size segment
+def decode(packet) do
+  <<typ:4, _rsv:4, id:16/big, sz:32/big, payload:sz/binary, _/binary>> = packet
+  {typ, id, payload}
 end
 ```
 
-### Guards
 
+## Records
+
+Define records with typed fields:
 ```lx
-# Guards em funções
-def classificar_numero do
-  (n) when n > 0 ->  :positivo
-  (n) when n < 0 ->  :negativo
-  (n) when n == 0 -> :zero
-end
+record user { name :: string, age :: integer }
 
-# Guards compostos
-def validar_usuario do
-  (nome, idade) when is_string(nome) and idade >= 0 -> :valido
-  (_, _) -> :invalido
-end
-```
+u = user{name: "John", age: 30}
+u.name           # field access
 
-## Concorrência
-
-### Processos
-
-```lx
-# Spawn de processo
-pid = spawn(fn ->
-  # Código do processo
-  loop()
-end)
-
-# Envio de mensagem
-pid ! {:mensagem, "dados"}
-
-# Recebimento de mensagem
-receive do
-  {:mensagem, dados} ->
-    # Processar dados
-    processar(dados)
-  {:stop} ->
-    :ok
-after
-  5000 ->
-    :timeout
-end
-```
-
-### Supervisores
-
-```lx
-# Configuração de supervisor
-supervisor locate_supervisor do
-  strategy :one_for_one
-  children [
-    worker: [MeuWorker]
-    supervisor: [MeuSupervisor]
-  ]
-  def start_link(_) do
-    # Lógica de inicialização
+# Pattern matching
+def who(u) do
+  case u do
+    user{name: n, age: a} when a > 18 -> n
+    _ -> "minor"
   end
 end
 ```
 
-### Workers
+Generated Erlang uses `-record(user, ...)` and `#user{...}`.
 
+
+## Functions
+
+### Definitions
 ```lx
-# Configuração de worker
-worker locate_worker do
-  def start_link(_) do
-    # Lógica de inicialização
-  end
-end
-```
-
-## Tipos Customizados
-
-### Definições de Tipo
-
-A linguagem LX possui um sistema de tipos robusto, incluindo tipos nominais, opacos, genéricos e recursivos.
-
-#### Tipo união
-```lx
-type status :: :ok | :error | :pending
-```
-
-#### Tipo genérico
-```lx
-type result(T) :: {:some, T} | :none
-```
-
-#### Tipo recursivo
-```lx
-type list(T) :: [] | {T, list(T)}
-```
-
-#### Alias simples
-```lx
-type nome :: string
-type idade :: integer
-```
-
-#### Alias opaco
-```lx
-type opaque user_id :: integer
-```
-
-#### Alias nominal
-```lx
-type nominal email :: string
-```
-
-#### Uso de tipos em funções
-```lx
-def soma(a :: integer, b :: integer) :: integer do
+# public function
+def add(a :: integer, b :: integer) do
   a + b
 end
 
-def processa_resultado(res :: result(integer)) :: integer do
-  case res do
-    {:some, v} -> v
-    :none -> 0
+# private function
+defp helper(x :: integer) do
+  x + 1
+end
+```
+
+### Multiple Clauses and Guards
+```lx
+def classify do
+  (n) when n > 0 -> :positive
+  (n) when n < 0 -> :negative
+  (_) -> :zero
+end
+
+# pattern-based dispatch
+def process_list do
+  ([]) -> "empty"
+  ([h | _]) -> "non_empty"
+end
+```
+
+### Return Type Annotation (on multi-clause blocks)
+```lx
+def countdown :: string do
+  (0) -> "done"
+  (n :: integer) -> countdown(n - 1)
+end
+```
+
+### Type Specs
+- Types are inferred and emitted as `-spec` in Erlang.
+- Parameter annotations with `::` influence the generated spec.
+- Multi-clause functions may produce union return types.
+
+
+## Anonymous Functions (Lambdas)
+
+Single-line and multi-line forms, including multi-head lambdas. Invocation uses `.(...)`.
+```lx
+# single-line
+def demo() do
+  f = fn(x :: integer, y :: integer) -> x + y
+  f.(3, 4)
+end
+
+# multi-line do/end
+def demo2() do
+  g = fn(x :: integer) do
+    y = x * 2
+    y + 1
   end
-end
-```
-
-#### Tipos em records
-```lx
-record Pessoa {
-  nome :: string,
-  idade :: integer,
-  email :: email
-}
-```
-
-## Módulos
-
-### Estrutura de Módulo
-No lx não se declara módulo, o nome do módulo é o nome do arquivo.
-```lx
-
-# Deps
-deps [:cowboy, :outro_modulo]
-
-# Exportações são automáticas para funções públicas (def)
-# Funções privadas usam defp
-
-# Definições de tipos
-record Usuario {
-  id :: integer,
-  nome :: string
-}
-
-# Funções públicas
-def criar_usuario(nome) do
-  Usuario{id: gerar_id(), nome: nome}
+  g.(10)
 end
 
-# Funções privadas
-defp gerar_id() do
-  :random.uniform(1000000)
-end
-```
-
-## Tratamento de Erros
-
-### With Expression
-
-```lx
-def processar_dados(dados) do
-  case validar(dados) do
-    {:ok, validados} ->
-      {:ok, salvos}
-    {:error, motivo} ->
-      {:error, motivo}
+# multi-head
+def demo3() do
+  h = fn do
+    (:ok) -> "success"
+    (:error) -> "failure"
+    (_) -> "unknown"
   end
+  h.(:ok)
 end
 ```
 
-### With Expression
+Limitations:
+- Anonymous functions are not recursive (self calls are rejected in current implementation).
 
+
+## Control Flow
+
+### If
 ```lx
-def processar_dados(dados) do
-  with {:ok, validados} <- validar(dados),
-       {:ok, processados} <- processar(validados),
-       {:ok, salvos} <- salvar(processados) do
-    {:ok, salvos}
+def test_if(x) do
+  if x > 0 do
+    "positive"
   else
-    {:error, motivo} -> {:error, motivo}
+    "not positive"
+  end
+end
+
+# If without else returns nil in the false branch
+```
+
+### Case (with patterns and guards)
+```lx
+def handle(result) do
+  case result do
+    {:ok, data} -> data
+    {:error, reason} -> reason
+    _ -> "unknown"
   end
 end
 ```
 
-### Match expression
-
+### With expression
 ```lx
-def processar_dados(dados) do
-  match {:ok, validados} <- validar(dados)
-  match {:ok, processados} <- processar(validados)
-  match {:ok, salvos} <- salvar(processados)
-  {:ok, salvos}
-end
-```
-
-### Match..Rescue expression
-
-```lx
-def processar_dados(dados) do
-  match {:ok, validados} <- validar(dados) rescue error do {:error, error} end
-  match {:ok, processados} <- processar(validados) rescue error do {:error, error} end
-  match {:ok, salvos} <- salvar(processados) rescue error do {:error, error} end
-  {:ok, salvos}
-end
-```
-
-## Diretivas
-
-```lx
-# Documentação
-@doc "Calcula a soma de dois números"
-def calcular(a, b) do
-  a + b
-end
-```
-
-## Testes
-
-### Testes Unitários
-
-```lx
-# Definição de teste
-describe "Módulo de matemática" do
-  test "soma de números positivos" do
-    assert somar(2, 3) == 5
-  end
-
-  test "soma com zero" do
-    assert somar(5, 0) == 5
-    assert somar(0, 5) == 5
+def test_with() do
+  result = {:success, 10}
+  with {:success, x} <- result do
+    x
+  else
+    {:error, _} -> 0
   end
 end
 ```
 
-## Exemplos Práticos
-
-### Servidor de Estado
-
+### Match and Match..Rescue
 ```lx
-record Estado {
-  contador :: integer,
-  nome :: string
-}
-
-def iniciar_servidor() do
-  spawn(fn -> loop(Estado{contador: 0, nome: "servidor"}) end)
+# match propagates non-matching values
+def test_simple_match() do
+  data = {:ok, "success"}
+  match {:ok, value} <- data
+  value
 end
 
-defp loop(estado) do
-  receive do
-    {:incrementar, pid} ->
-      novo_estado = Estado{estado | contador: estado.contador + 1}
-      pid ! {:ok, novo_estado.contador}
-      loop(novo_estado)
-
-    {:obter_estado, pid} ->
-      pid ! {:ok, estado}
-      loop(estado)
-
-    {:parar} ->
-      :ok
+# rescue on mismatch
+def test_match_rescue() do
+  data = {:error, "failed"}
+  match {:ok, res} <- data rescue err do
+    {:failed, err}
   end
+  :done
 end
 ```
 
-### Processamento de Lista
+
+## Concurrency
+
+Supported primitives:
+- `spawn(fn() -> ... end)` – spawns a process
+- Send operator `!`
+- `receive do ... end`
 
 ```lx
-def processar_numeros(numeros) do
-  numeros
-  |> filtrar_positivos()
-  |> mapear_quadrados()
-  |> somar_todos()
-end
-
-defp filtrar_positivos(lista) do
-  case lista do
-    [] -> []
-    [h | t] when h > 0 -> [h | filtrar_positivos(t)]
-    [_ | t] -> filtrar_positivos(t)
-  end
-end
-
-defp mapear_quadrados(lista) do
-  case lista do
-    [] -> []
-    [h | t] -> [h * h | mapear_quadrados(t)]
-  end
-end
-
-defp somar_todos(lista) do
-  case lista do
-    [] -> 0
-    [h | t] -> h + somar_todos(t)
-  end
-end
-```
-
-### Sistema de Usuários
-
-```lx
-record Usuario {
-  id :: integer,
-  nome :: string,
-  email :: string,
-  ativo :: boolean
-}
-
-def criar_usuario(nome :: string, email :: string) :: {:ok, Usuario} | {:error, string} do
-  match :ok <- validar_nome(nome)
-  match :ok <- validar_email(email)
-  {:ok, Usuario{
-    id: gerar_id(),
-    nome: nome,
-    email: email,
-    ativo: true
-  }}
-end
-
-defp validar_nome(nome) when is_string(nome) and nome != "" do
+def server_loop() do
   :ok
 end
 
-defp validar_nome(_) do
-  {:error, "nome inválido"}
+def start() do
+  pid = spawn(fn() -> server_loop() end)
+  pid ! {:message, "hello"}
 end
 
-defp validar_email(email) when is_string(email) do
-  # Validação simplificada
-  case String.contains?(email, "@") do
-    true -> :ok
-    false -> {:error, "email inválido"}
+
+def wait() do
+  receive do
+    {:message, data} -> data
+    :stop -> :ok
   end
 end
 ```
 
-## Convenções de Estilo
 
-### Nomenclatura
+## List Comprehensions
 
-- **Variáveis e funções**: `snake_case`
-- **Records e módulos**: `PascalCase`
-- **Átomos**: `:lowercase` ou `:snake_case`
+Single-generator comprehensions with optional guard and transformation. Nesting is supported by nesting `for` blocks.
+```lx
+def squares() do
+  numbers = [1, 2, 3, 4]
+  for x in numbers do
+    x * x
+  end
+end
 
-### Indentação
+# with filter
+def filtered() do
+  numbers = [1, 2, 3, 4, 5]
+  for x in numbers when x > 2 do
+    x
+  end
+end
 
-- Use 2 espaços para indentação
-- Alinhe elementos de estruturas de dados
-- Quebre linhas longas de forma legível
+# nested
+def nested() do
+  matrix = [[1, 2], [3, 4]]
+  for row in matrix do
+    for x in row do
+      x + 1
+    end
+  end
+end
 
-### Comentários
-
-- Use comentários para explicar *por que*, não *o que*
-- Mantenha comentários atualizados com o código
-- Use docstrings para documentar APIs públicas
-
-## Ferramentas de Desenvolvimento
-
-### Compilação
-
-```bash
-# Compilar arquivo único
-lx compile arquivo.lx
-
-# Compilar projeto (diretório)
-lx compile caminho/do/projeto
-
-# Compilar com debug dos tokens
-gx compile arquivo.lx --debug-tokens
-
-# Compilar com debug do sistema de tipos
-lx compile arquivo.lx --debug-types
-
-# Compilar sem rodar o rebar3 (apenas gera código Erlang)
-lx compile caminho/do/projeto --no-rebar-compile
+# membership
+def membership() do
+  numbers = [1, 2, 3, 4, 5]
+  allowed = [2, 4]
+  for x in numbers when x in allowed do
+    x * 10
+  end
+end
 ```
 
-### Shell interativo do projeto
 
-```bash
-# Iniciar shell Erlang no contexto do projeto (compila antes de abrir o shell)
-lx shell caminho/do/projeto
+## Types
+
+### Built-in Types
+- integer, float, boolean, binary (string), atom, list(T), tuple(...), map(K, V), function
+
+### Type Annotations
+```lx
+def add(a :: integer, b :: integer) :: integer do
+  a + b
+end
 ```
 
-### Criação de link simbólico global
+### Custom Types
+```lx
+# Simple alias
+type user_id :: integer
 
-```bash
-# Cria um symlink /usr/local/bin/lx para o binário atual
-sudo lx symlink
+def id(x :: user_id) do
+  x
+end
+
+# Opaque type
+type opaque user_id :: integer
+
+# Nominal type
+type nominal email :: string
 ```
 
-## Opções do Compilador LX
+These generate corresponding Erlang type declarations (including `-opaque` and a nominal tag).
 
-- `lx new <nome>`: Cria um novo projeto LX
-- `lx compile <arquivo.lx|diretorio> [flags]`: Compila um arquivo ou projeto LX
-  - `--debug-tokens`: Mostra tokens gerados pelo lexer
-  - `--debug-types`: Mostra inferência e checagem de tipos
-  - `--no-rebar-compile`: Não executa o rebar3 após gerar o código Erlang
-- `lx shell [diretorio]`: Compila e abre shell Erlang no contexto do projeto
-- `lx symlink`: Cria um link simbólico global para o comando `lx`
 
-Esta referência cobre os principais aspectos da linguagem LX. Para exemplos mais detalhados e casos de uso específicos, consulte a documentação completa e os exemplos no diretório `ex/`.
-`
+## Directives
+
+- `@doc "Text"` – emits a module-level `-doc` attribute for the next public function
+- `$print(expr)` – compile-time inspection of an expression (removed from output)
+- `$type(expr)` – ensures and records the inferred type in the generated spec
+
+Examples:
+```lx
+@doc "Adds two numbers"
+def add(a :: integer, b :: integer) do
+  $print(a)
+  $type(a + b)
+  a + b
+end
+```
+
+Unknown directives or wrong arity produce errors.
+
+
+## Operators and Semantics
+
+- Arithmetic: `+ - * /`
+- Comparison: `== != < <= > >=` (`!=` compiles to Erlang `/=`)
+- Boolean: `and` / `or` (compile to Erlang `andalso` / `orelse`)
+- Bitwise: `&&& ||| ^^^ <<< >>>` (compile to `band bor bxor bsl bsr`)
+
+Operator precedence follows Erlang semantics.
+
+
+## Application Block, Imports and Deps
+
+The language supports an `application { ... }` block at file top. Its content is currently emitted as Erlang comments for documentation and tooling.
+```lx
+application {
+  description: "My App",
+  vsn: "0.1.0",
+  deps: [:cowboy, :jsx],
+  registered: [:main_server],
+  env: %{debug: true, port: 8080}
+}
+```
+
+`import :module` is accepted and currently emitted as a comment (`%% Import: module`).
+
+Dependency resolution and runtime linking are managed by the project build (rebar3) generated by the CLI from `<project>.yml`. The in-source `deps` and `import` act as metadata today and do not link code by themselves.
+
+
+## Limitations and Notes
+
+- Anonymous functions cannot be recursive.
+- `import` and `application.deps` are metadata in source; actual dependency management is handled by the CLI-generated rebar3 umbrella under `_build/`.
+- If without an `else` returns `nil` in the false branch.
+- Strings are UTF-8 binaries.
+
+
+## Style
+
+- Variables and functions: `snake_case`
+- Records: `snake_case`
+- Atoms: `:lowercase` or `:snake_case`
+- Keep functions small and prefer multiple clauses with pattern matching and guards.
+
+
+## Examples
+
+### Multi-clause with types
+```lx
+def factorial :: integer do
+  (0) -> 1
+  (n :: integer) -> n * factorial(n - 1)
+end
+```
+
+### Binary encode/decode
+```lx
+def encode(typ, id, payload) do
+  size = byte_size(payload)
+  <<typ:4, 0:4, id:16/big, size:32/big, payload/binary>>
+end
+
+def decode(packet) do
+  <<typ:4, _rsv:4, id:16/big, sz:32/big, data:sz/binary, _/binary>> = packet
+  {typ, id, data}
+end
+```
+
+### With + match
+```lx
+def example(maybe_data) do
+  with {:success, data} <- maybe_data do
+    data
+  else
+    _ -> "failed"
+  end
+end
+```
+
+This document reflects the features validated by the current test suite and CLI behavior. As the language evolves, sections will be extended accordingly.
