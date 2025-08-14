@@ -130,9 +130,19 @@ fn create_new_project(project_name string) {
 	}
 
 	// Create project config file
-	project_config := '# ${project_name}.config - Lx project configuration\n'
-	os.write_file('${project_name}/${project_name}.config', project_config) or {
-		eprintln('Failed to create ${project_name}.config: ${err}')
+	project_yml := '# ${project_name}.yml - Lx project configuration\n' +
+		'erl_opts:\n' +
+		'  - debug_info\n' +
+		'  - nowarn_unused_vars\n' +
+		'deps:\n' +
+		'  # Add your dependencies here\n' +
+		'  # Example:\n' +
+		'  # jsx: "3.1.0"\n' +
+		'  # cowboy:\n' +
+		'  #   git: "https://github.com/ninenines/cowboy.git"\n' +
+		'  #   branch: "master"\n'
+	os.write_file('${project_name}/${project_name}.yml', project_yml) or {
+		eprintln('Failed to create ${project_name}.yml: ${err}')
 		exit(1)
 	}
 
@@ -200,9 +210,12 @@ fn compile_target(target string, run_rebar bool) {
 
 		if run_rebar && os.exists('rebar.config') {
 			println('Running rebar3 compile...')
-			res := os.execute('rebar3 compile')
-			if res.exit_code != 0 {
-				eprintln('rebar3 compile failed: ${res.output}')
+
+			// Execute rebar3 with real-time output
+			exit_code := os.system('rebar3 compile')
+
+			if exit_code != 0 {
+				eprintln('rebar3 compile failed with exit code: ${exit_code}')
 				exit(1)
 			}
 			println('rebar3 compile completed successfully')
@@ -296,10 +309,13 @@ fn compile_project(project_dir string) {
 	original_dir := os.getwd()
 	os.chdir(build_dir) or {}
 	println('Running rebar3 compile in ${build_dir} ...')
-	res := os.execute('rebar3 compile')
+
+	// Execute rebar3 with real-time output
+	exit_code := os.system('rebar3 compile')
 	os.chdir(original_dir) or {}
-	if res.exit_code != 0 {
-		eprintln('rebar3 compile failed: ${res.output}')
+
+	if exit_code != 0 {
+		eprintln('rebar3 compile failed with exit code: ${exit_code}')
 		exit(1)
 	}
 	println('rebar3 compile completed successfully')
@@ -313,16 +329,36 @@ fn ensure_rebar_build_files(project_dir string) {
 	sys_config_path := os.join_path(config_dir, 'sys.config')
 	os.mkdir_all(build_dir) or {}
 
-	if !os.exists(rebar_path) {
-		content := '{erl_opts, [debug_info]}.' + '\n' +
-			'{deps, []}.' + '\n' +
-			'{apps_dir, ["apps/*"]}.' + '\n' +
-			'{shell, [' + '\n' +
-			'  {config, "config/sys.config"}' + '\n' +
-			']}.' + '\n' + '\n'
-		os.write_file(rebar_path, content) or {}
-		println('Created ${rebar_path}')
+	// Read project YAML configuration
+	project_name := if project_dir == '.' { os.base(os.getwd()) } else { os.base(project_dir) }
+	project_yml_path := os.join_path(project_dir, '${project_name}.yml')
+
+	mut erl_opts := 'debug_info, nowarn_unused_vars'
+	mut deps_content := '[]'
+
+	if os.exists(project_yml_path) {
+		yml_content := os.read_file(project_yml_path) or { '' }
+		if yml_content.len > 0 {
+			// Parse YAML for erl_opts and deps
+			parsed_config := parse_project_yml(yml_content)
+			if parsed_config.erl_opts.len > 0 {
+				erl_opts = parsed_config.erl_opts
+			}
+			if parsed_config.deps.len > 0 {
+				deps_content = parsed_config.deps
+			}
+		}
 	}
+
+	content := '{erl_opts, [${erl_opts}]}.' + '\n' +
+		'{deps, ${deps_content}}.' + '\n' +
+		'{apps_dir, ["apps/*"]}.' + '\n' +
+		'{shell, [' + '\n' +
+		'  {config, "config/sys.config"}' + '\n' +
+		']}.' + '\n' + '\n'
+	os.write_file(rebar_path, content) or {}
+	println('Created ${rebar_path}')
+
 	if !os.exists(sys_config_path) {
 		os.mkdir_all(config_dir) or {}
 		os.write_file(sys_config_path, '[] .\n') or {}
@@ -371,7 +407,48 @@ fn generate_default_application_module(app_name string) string {
 
 // Generate a default .app.src content for an app
 fn default_app_src(app_name string) string {
-	return '{application, ${app_name},\n [\n  {description, "An OTP application"},\n  {vsn, "0.1.0"},\n  {registered, []},\n  {applications, [kernel, stdlib]},\n  {mod, {${app_name}_app, []}},\n  {env, []}\n ]}.\n'
+	// Check if there's a deps declaration in the project
+	mut applications := '[kernel, stdlib]'
+
+	// Look for deps in the project's main LX files
+	project_dir := os.getwd()
+	apps_dir := os.join_path(project_dir, 'apps')
+	if os.exists(apps_dir) {
+		// Check main project file for deps
+		main_lx_path := os.join_path(apps_dir, app_name, '${app_name}.lx')
+		if os.exists(main_lx_path) {
+			content := os.read_file(main_lx_path) or { '' }
+			if content.len > 0 {
+				// Simple parsing for deps [:cowboy, :jsx]
+				if content.contains('deps [') {
+					start_idx := content.index('deps [') or { -1 }
+					if start_idx >= 0 {
+						end_idx := content.index_after(']', start_idx) or { -1 }
+						if end_idx >= 0 {
+							deps_content := content[start_idx + 6..end_idx]
+							// Parse atoms from deps
+							mut deps_list := []string{}
+							lines := deps_content.split('\n')
+							for line in lines {
+								trimmed := line.trim_space()
+								if trimmed.starts_with(':') {
+									dep_name := trimmed[1..].trim_space()
+									if dep_name.len > 0 {
+										deps_list << dep_name
+									}
+								}
+							}
+							if deps_list.len > 0 {
+								applications = '[kernel, stdlib, ' + deps_list.join(', ') + ']'
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return '{application, ${app_name},\n [\n  {description, "An OTP application"},\n  {vsn, "0.1.0"},\n  {registered, []},\n  {applications, ${applications}},\n  {mod, {${app_name}_app, []}},\n  {env, []}\n ]}.\n'
 }
 
 // Rewrite the application name line in a generated .app.src content
@@ -424,7 +501,7 @@ fn run_single_file(file string) {
 fn launch_shell(dir string) {
 	// If rebar project files are missing, create them to allow shell to start
 	ensure_rebar_build_files(dir)
-
+	compile_target(dir, true)
 	original_dir := os.getwd()
 	os.chdir(dir) or {
 		eprintln('Failed to change directory: ${err}')
@@ -553,4 +630,130 @@ fn generate_initial_app_template(app_name string) string {
 		'def main() do\n' +
 		'  :ok\n' +
 		'end\n'
+}
+
+// Parse project YAML configuration
+struct ProjectConfig {
+mut:
+	erl_opts string
+	deps     string
+}
+
+fn parse_project_yml(yml_content string) ProjectConfig {
+	mut config := ProjectConfig{
+		erl_opts: 'debug_info, nowarn_unused_vars'
+		deps: '[]'
+	}
+
+	lines := yml_content.split('\n')
+
+	mut in_erl_opts := false
+	mut in_deps := false
+	mut erl_opts_list := []string{}
+	mut deps_list := []string{}
+	mut current_dep := ''
+	mut current_dep_git := ''
+	mut current_dep_branch := ''
+
+	for line in lines {
+		trimmed := line.trim_space()
+
+		if trimmed.starts_with('#') || trimmed.len == 0 {
+			continue
+		}
+
+		if trimmed == 'erl_opts:' {
+			in_erl_opts = true
+			in_deps = false
+			continue
+		}
+
+		if trimmed == 'deps:' {
+			in_erl_opts = false
+			in_deps = true
+			continue
+		}
+
+		if in_erl_opts && trimmed.starts_with('- ') {
+			opt := trimmed[2..].trim_space()
+			if opt.len > 0 {
+				erl_opts_list << opt
+			}
+		}
+
+		if in_deps {
+			// Check if this is a new dependency (not indented)
+			if !trimmed.starts_with('  ') && trimmed.contains(':') && !trimmed.starts_with('git:') && !trimmed.starts_with('branch:') {
+				// New dependency
+				parts := trimmed.split(':')
+				if parts.len >= 2 {
+					current_dep = parts[0].trim_space()
+					mut version := parts[1].trim_space().trim('"')
+					if version.starts_with('"') {
+						version = version[1..]
+					}
+					if version.ends_with('"') {
+						version = version[..version.len-1]
+					}
+
+					// If version is empty, this might be a Git dependency
+					if version.len == 0 {
+						current_dep_git = ''
+						current_dep_branch = ''
+					} else {
+						deps_list << '{${current_dep}, "${version}"}'
+						current_dep = ''
+					}
+				}
+			} else if trimmed.contains('git:') {
+				// Git URL for current dependency
+				// Find the position of 'git:' and extract everything after it
+				git_pos := trimmed.index('git:') or { -1 }
+				if git_pos >= 0 {
+					git_content := trimmed[git_pos + 4..].trim_space()
+					mut git_url := git_content.trim('"')
+					if git_url.starts_with('"') {
+						git_url = git_url[1..]
+					}
+					if git_url.ends_with('"') {
+						git_url = git_url[..git_url.len-1]
+					}
+					current_dep_git = git_url
+				}
+			} else if trimmed.contains('branch:') {
+				// Branch for current dependency
+				// Find the position of 'branch:' and extract everything after it
+				branch_pos := trimmed.index('branch:') or { -1 }
+				if branch_pos >= 0 {
+					branch_content := trimmed[branch_pos + 7..].trim_space()
+					mut branch := branch_content.trim('"')
+					if branch.starts_with('"') {
+						branch = branch[1..]
+					}
+					if branch.ends_with('"') {
+						branch = branch[..branch.len-1]
+					}
+					current_dep_branch = branch
+
+					// Now we have all info for Git dependency
+					if current_dep.len > 0 && current_dep_git.len > 0 {
+						deps_list << '{${current_dep}, {git, "${current_dep_git}", {branch, "${current_dep_branch}"}}}'
+						current_dep = ''
+						current_dep_git = ''
+						current_dep_branch = ''
+					}
+				}
+			}
+		}
+	}
+
+	if erl_opts_list.len > 0 {
+		config.erl_opts = erl_opts_list.join(', ')
+	}
+
+	if deps_list.len > 0 {
+		config.deps = '[${deps_list.join(', ')}]'
+	}
+
+	return config
 }

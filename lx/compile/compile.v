@@ -316,8 +316,9 @@ fn extract_modules_from_ast(main_ast ast.Node, base_name string) ![]ModuleInfo {
 // Generate .app.src content from application config
 fn generate_app_src(ast_node ast.Node, app_name string) !string {
 	mut app_config := map[string]string{}
+	mut deps_list := []string{}
 
-	// Extract application config
+	// Extract application config and deps declarations
 	for child in ast_node.children {
 		if child.kind == .application_config {
 			// Parse key-value pairs from children
@@ -329,18 +330,49 @@ fn generate_app_src(ast_node ast.Node, app_name string) !string {
 				value := format_app_src_value(value_node)!
 				app_config[key] = value
 			}
-			break
+		} else if child.kind == .deps_declaration {
+			// Extract deps from deps [:cowboy, :jsx]
+			for dep_node in child.children {
+				if dep_node.kind == .atom {
+					deps_list << dep_node.value
+				}
+			}
 		}
 	}
 
-	if app_config.len == 0 {
+	if app_config.len == 0 && deps_list.len == 0 {
 		return ''
 	}
 
 	// Set defaults
 	if 'applications' !in app_config {
-		app_config['applications'] = '[kernel, stdlib]'
+		mut applications := '[kernel, stdlib]'
+		// Add declared deps to applications if any
+		if deps_list.len > 0 {
+			applications = '[kernel, stdlib, ' + deps_list.join(', ') + ']'
+		}
+		app_config['applications'] = applications
+	} else if deps_list.len > 0 {
+		// Merge existing applications with declared deps
+		existing_apps := app_config['applications']
+		if existing_apps.starts_with('[') && existing_apps.ends_with(']') {
+			// Remove brackets and split
+			apps_content := existing_apps[1..existing_apps.len-1].trim_space()
+			if apps_content.len > 0 {
+				mut existing_list := apps_content.split(',').map(it.trim_space())
+				// Add deps that aren't already in applications
+				for dep in deps_list {
+					if dep !in existing_list {
+						existing_list << dep
+					}
+				}
+				app_config['applications'] = '[' + existing_list.join(', ') + ']'
+			} else {
+				app_config['applications'] = '[kernel, stdlib, ' + deps_list.join(', ') + ']'
+			}
+		}
 	}
+
 	// Ensure mod entry exists so application starts in shell
 	if 'mod' !in app_config {
 		app_config['mod'] = '{${app_name}_app, []}'
