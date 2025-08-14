@@ -501,7 +501,6 @@ fn run_single_file(file string) {
 fn launch_shell(dir string) {
 	// If rebar project files are missing, create them to allow shell to start
 	ensure_rebar_build_files(dir)
-	compile_target(dir, true)
 	original_dir := os.getwd()
 	os.chdir(dir) or {
 		eprintln('Failed to change directory: ${err}')
@@ -615,8 +614,7 @@ fn generate_initial_app_template(app_name string) string {
 	return 'application {\n' +
 		'  description: "' + app_name + ' application",\n' +
 		'  vsn: "0.1.0",\n' +
-		'  applications: [:kernel, :stdlib],\n' +
-		'  registered: [:' + app_name + '_sup]\n' +
+		'  deps: []\n' +
 		'}\n\n' +
 		'supervisor ' + app_name + '_sup do\n' +
 		'  strategy = :one_for_one\n' +

@@ -560,9 +560,9 @@ mixed_type_patterns(VALUE_1) ->
 }
 
 fn test_application_block_basic() {
-	lx_code := 'application {\n  description: "My App",\n  vsn: "0.1.0",\n  applications: [:kernel, :stdlib],\n  registered: [:main_server],\n  env: %{debug: true, port: 8080}\n}\n\ndef foo() do\n  1\nend'
+	lx_code := 'application {\n  description: "My App",\n  vsn: "0.1.0",\n  deps: [],\n  registered: [:main_server],\n  env: %{debug: true, port: 8080}\n}\n\ndef foo() do\n  1\nend'
 
-	expected := '-module(test).\n-export([foo/0]).\n\n%% Application config:\n%%  description: <<"My App"/utf8>>\n%%  vsn: <<"0.1.0"/utf8>>\n%%  applications: [kernel, stdlib]\n%%  registered: [main_server]\n%%  env: #{debug => true, port => 8080}\n\n-spec foo() -> integer().\nfoo() ->\n    1.\n'
+	expected := '-module(test).\n-export([foo/0]).\n\n%% Application config:\n%%  description: <<"My App"/utf8>>\n%%  vsn: <<"0.1.0"/utf8>>\n%%  deps: []\n%%  registered: [main_server]\n%%  env: #{debug => true, port => 8080}\n\n-spec foo() -> integer().\nfoo() ->\n    1.\n'
 
 	result := compile_lx(lx_code)
 	assert result == expected

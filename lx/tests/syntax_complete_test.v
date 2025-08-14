@@ -197,17 +197,11 @@ test_binary_string() ->
 // ============ Task 11: Module System Tests ============
 
 fn test_deps_declaration() {
-	lx_code := 'deps [:cowboy, :jsx]
-
+	lx_code := 'application {\n  deps: [:cowboy, :jsx]\n}\n\n
 def test_deps() do
     :ok
 end'
-	expected := '-module(test).
--export([test_deps/0]).
-
-%% Dependencies: [cowboy, jsx]
-
--spec test_deps() -> atom().
+	expected := '-module(test).\n-export([test_deps/0]).\n\n%% Application config:\n%%  deps: [cowboy, jsx]\n\n-spec test_deps() -> atom().
 test_deps() ->
     ok.
 '

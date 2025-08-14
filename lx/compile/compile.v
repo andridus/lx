@@ -327,15 +327,21 @@ fn generate_app_src(ast_node ast.Node, app_name string) !string {
 				value_node := child.children[i + 1]
 
 				key := key_node.value
+				// Special-case: deps lives inside application block
+				if key == 'deps' {
+					if value_node.kind == .list_literal {
+						for dep_node in value_node.children {
+							if dep_node.kind == .atom {
+								deps_list << dep_node.value
+							}
+						}
+					}
+					// Do not include 'deps' in app_config output
+					continue
+				}
+
 				value := format_app_src_value(value_node)!
 				app_config[key] = value
-			}
-		} else if child.kind == .deps_declaration {
-			// Extract deps from deps [:cowboy, :jsx]
-			for dep_node in child.children {
-				if dep_node.kind == .atom {
-					deps_list << dep_node.value
-				}
 			}
 		}
 	}

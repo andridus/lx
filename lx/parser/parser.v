@@ -104,9 +104,6 @@ fn (mut p Parser) parse_module() !ast.Node {
 		} else if p.current.type_ == .type {
 			type_def := p.parse_type_def()!
 			all_nodes << type_def
-		} else if p.current.type_ == .deps {
-			deps := p.parse_deps_declaration()!
-			all_nodes << deps
 		} else if p.current.type_ == .application {
 			app := p.parse_application_config()!
 			all_nodes << app
@@ -179,10 +176,6 @@ fn (mut p Parser) parse_module_with_name(modname string) !ast.Node {
 			.type {
 				type_def := p.parse_type_def()!
 				all_nodes << type_def
-			}
-			.deps {
-				deps := p.parse_deps_declaration()!
-				all_nodes << deps
 			}
 			.application {
 				app := p.parse_application_config()!
@@ -3336,8 +3329,8 @@ fn (mut p Parser) parse_application_config() !ast.Node {
 	mut entries := []ast.Node{}
 	if p.current.type_ != .rbrace {
 		for {
-			// Parse key: identifier treated as atom (like map keys)
-			if p.current.type_ != .identifier {
+			// Parse key: allow identifier or reserved 'deps' token
+			if p.current.type_ != .identifier && p.current.type_ != .deps {
 				return p.error_and_return('Expected key identifier in application block')
 			}
 			key_name := p.current.value

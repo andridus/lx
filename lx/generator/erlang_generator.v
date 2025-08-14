@@ -361,10 +361,6 @@ fn (mut g ErlangGenerator) generate_module(node ast.Node) ! {
 	// Module system comments (deps/import/application)
 	mut comments_emitted := false
 	for child in node.children {
-		if child.kind == .deps_declaration {
-			g.generate_deps_declaration(child)!
-			comments_emitted = true
-		}
 		if child.kind == .import_statement {
 			g.generate_import_statement(child)!
 			comments_emitted = true
