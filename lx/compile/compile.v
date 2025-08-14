@@ -176,6 +176,21 @@ pub fn compile_multi_file(code string, file_path string, base_module_name string
 		println('Compiled module ${module_info.name}')
 	}
 
+	// Ensure an application behaviour module exists so the app can start under rebar3 shell
+	app_module_name := base_module_name + '_app'
+	// Choose a root supervisor if any was defined (first *_sup module)
+	mut root_sup := ''
+	for module_info in modules {
+		if module_info.name.ends_with('_sup') {
+			root_sup = module_info.name
+			break
+		}
+	}
+	app_module_filename := app_module_name + '.erl'
+	if app_module_filename !in result.files {
+		result.files[app_module_filename] = generate_application_behaviour_module(app_module_name, root_sup)
+	}
+
 	// Generate .app.src and .hrl if needed
 	result.app_src_content = generate_app_src(analyzed_ast, base_module_name)!
 	result.hrl_content = generate_hrl(analyzed_ast, base_module_name)!
@@ -326,6 +341,10 @@ fn generate_app_src(ast_node ast.Node, app_name string) !string {
 	if 'applications' !in app_config {
 		app_config['applications'] = '[kernel, stdlib]'
 	}
+	// Ensure mod entry exists so application starts in shell
+	if 'mod' !in app_config {
+		app_config['mod'] = '{${app_name}_app, []}'
+	}
 
 	mut content := '{application, ${app_name},\n [\n'
 
@@ -430,6 +449,26 @@ fn generate_record_hrl(record_node ast.Node) !string {
 	}
 
 	return '-record(${record_name}, {${fields.join(', ')}}).'
+}
+
+// Generate a minimal application behaviour module, optionally starting a root supervisor
+fn generate_application_behaviour_module(app_module_name string, root_supervisor_module string) string {
+	mut content := ''
+	content += '-module(' + app_module_name + ').\n'
+	content += '-behaviour(application).\n\n'
+	content += '-export([start/2, stop/1]).\n\n'
+	content += 'start(_Type, _Args) ->\n'
+	if root_supervisor_module.len > 0 {
+		content += '    case ' + root_supervisor_module + ':start_link() of\n'
+		content += '        {ok, Pid} -> {ok, Pid};\n'
+		content += '        Error -> Error\n'
+		content += '    end.\n\n'
+	} else {
+		content += '    {ok, self()}.\n\n'
+	}
+	content += 'stop(_State) ->\n'
+	content += '    ok.\n'
+	return content
 }
 
 pub fn compile_string(code string, file_path string) !string {

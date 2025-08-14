@@ -230,6 +230,7 @@ fn compile_project(project_dir string) {
 	os.mkdir_all(build_apps_root) or {}
 
 	apps := os.ls(apps_dir) or { []string{} }
+	mut shell_apps := []string{}
 	for app_name in apps {
 		app_path := os.join_path(apps_dir, app_name)
 		if !os.is_dir(app_path) {
@@ -261,10 +262,35 @@ fn compile_project(project_dir string) {
 		}
 
 		// If no file produced an app.src, create a default one in _build
+		app_app_src_path := os.join_path(app_src_dir, '${app_name}.app.src')
 		if !app_src_written {
-			os.write_file(os.join_path(app_src_dir, '${app_name}.app.src'), default_app_src(app_name)) or {}
+			os.write_file(app_app_src_path, default_app_src(app_name)) or {}
+		} else {
+			// Ensure mod entry exists in existing app.src
+			mut content := os.read_file(app_app_src_path) or { '' }
+			if content.len > 0 && !content.contains('{mod,') {
+				// naive inject before env or at end
+				if content.contains('{env,') {
+					content = content.replace('{env,', '  {mod, {' + app_name + '_app, []}},\n  {env,')
+				} else {
+					content = content.replace('\n ]}.', ',\n  {mod, {' + app_name + '_app, []}}\n ]}.')
+				}
+				os.write_file(app_app_src_path, content) or {}
+			}
 		}
+
+		// Ensure an application behaviour module exists
+		app_app_module_path := os.join_path(app_src_dir, app_name + '_app.erl')
+		if !os.exists(app_app_module_path) {
+			os.write_file(app_app_module_path, generate_default_application_module(app_name)) or {}
+		}
+
+		// Add to shell apps list
+		shell_apps << app_name
 	}
+
+	// Update rebar.config with shell apps list
+	update_rebar_shell_apps(build_dir, shell_apps)
 
 	// Run rebar3 compile inside _build
 	original_dir := os.getwd()
@@ -304,9 +330,48 @@ fn ensure_rebar_build_files(project_dir string) {
 	}
 }
 
+// Write or update shell apps in rebar.config under _build
+fn update_rebar_shell_apps(build_dir string, apps []string) {
+	rebar_path := os.join_path(build_dir, 'rebar.config')
+	mut content := os.read_file(rebar_path) or { '' }
+	apps_list := '[' + apps.join(', ') + ']'
+	if content.contains('{shell,') {
+		if content.contains('{apps,') {
+			start := content.index('{apps,') or { -1 }
+			if start >= 0 {
+				end := content.index_after('}', start) or { -1 }
+				if end >= 0 {
+					before := content[..start]
+					after := content[end + 1..]
+					content = before + '{apps, ' + apps_list + '}' + after
+				}
+			}
+		} else {
+			content = content.replace('{shell, [', '{shell, [\n  {apps, ' + apps_list + '},')
+		}
+	} else {
+		content += '{shell, [\n  {apps, ' + apps_list + '},\n  {config, "config/sys.config"}\n]}.\n'
+	}
+	os.write_file(rebar_path, content) or { }
+}
+
+// Generate a minimal default application behaviour module for an app name
+fn generate_default_application_module(app_name string) string {
+	mod := app_name + '_app'
+	mut s := ''
+	s += '-module(' + mod + ').\n'
+	s += '-behaviour(application).\n\n'
+	s += '-export([start/2, stop/1]).\n\n'
+	s += 'start(_Type, _Args) ->\n'
+	s += '    {ok, self()}.\n\n'
+	s += 'stop(_State) ->\n'
+	s += '    ok.\n'
+	return s
+}
+
 // Generate a default .app.src content for an app
 fn default_app_src(app_name string) string {
-	return '{application, ${app_name},\n [\n  {description, "An OTP application"},\n  {vsn, "0.1.0"},\n  {registered, []},\n  {applications, [kernel, stdlib]},\n  {env, []}\n ]}.\n'
+	return '{application, ${app_name},\n [\n  {description, "An OTP application"},\n  {vsn, "0.1.0"},\n  {registered, []},\n  {applications, [kernel, stdlib]},\n  {mod, {${app_name}_app, []}},\n  {env, []}\n ]}.\n'
 }
 
 // Rewrite the application name line in a generated .app.src content
