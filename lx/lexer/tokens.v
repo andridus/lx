@@ -53,6 +53,9 @@ pub enum TokenType {
 	atom
 	identifier
 
+	// Special tokens
+	module_token // __MODULE__
+
 	// Delimiters
 	lparen       // (
 	rparen       // )
@@ -146,6 +149,7 @@ pub fn (tt TokenType) str() string {
 		.charlist { 'charlist' }
 		.atom { 'atom' }
 		.identifier { 'identifier' }
+		.module_token { '__MODULE__' }
 		.lparen { '(' }
 		.rparen { ')' }
 		.bind { '=' }

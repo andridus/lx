@@ -1560,11 +1560,11 @@ fn (mut a Analyzer) analyze_binding(node ast.Node) !ast.Node {
 		}
 	}
 
-	// Bind variable in current function/block scope
-	a.bind(var_name, TypeScheme{
+	// Bind variable in current function/block scope with position
+	a.bind_with_position(var_name, TypeScheme{
 		quantified_vars: []
 		body:            value_type
-	})
+	}, node.position)
 
 	// Assign type to binding node
 	a.type_table.assign_type(node.id, value_type)
@@ -1682,7 +1682,15 @@ fn (mut a Analyzer) analyze_block(node ast.Node) !ast.Node {
 
 	// Type of block is type of last expression
 	if analyzed_exprs.len > 0 {
-		last_type := a.type_table.get_type(analyzed_exprs.last().id) or {
+		last_expr := analyzed_exprs.last()
+
+		// Mark the last expression as used if it's a variable reference
+		// because in Erlang/LX the last expression is the return value
+		if last_expr.kind == .variable_ref || last_expr.kind == .identifier {
+			a.mark_variable_used(last_expr.value)
+		}
+
+		last_type := a.type_table.get_type(last_expr.id) or {
 			ast.Type{
 				name:   'any'
 				params: []
@@ -2497,10 +2505,12 @@ fn (mut a Analyzer) analyze_record_definition(node ast.Node) !ast.Node {
 			// Get field type
 			mut field_type := ast.Type{}
 			if field_type_node.value != '' {
-				// Has explicit type
-				field_type = ast.Type{
-					name:   field_type_node.value
-					params: []
+				// Has explicit type - use extract_type_from_annotation to handle parameterized types
+				field_type = a.extract_type_from_annotation(field_type_node) or {
+					ast.Type{
+						name:   field_type_node.value
+						params: []
+					}
 				}
 
 				// Validate that default value type matches field type
@@ -2527,10 +2537,12 @@ fn (mut a Analyzer) analyze_record_definition(node ast.Node) !ast.Node {
 				return error('Field ${field_name} must have a type or default value')
 			}
 
-			// Create field type
-			field_type := ast.Type{
-				name:   field_type_node.value
-				params: []
+			// Create field type - use extract_type_from_annotation to handle parameterized types
+			field_type := a.extract_type_from_annotation(field_type_node) or {
+				ast.Type{
+					name:   field_type_node.value
+					params: []
+				}
 			}
 			field_types[field_name] = field_type
 		}

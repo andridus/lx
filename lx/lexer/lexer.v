@@ -380,6 +380,7 @@ fn (mut l Lexer) read_identifier() Token {
 		'assert' { TokenType.assert }
 		'for' { TokenType.for_ }
 		'in' { TokenType.in }
+		'__MODULE__' { TokenType.module_token }
 		else { TokenType.identifier }
 	}
 

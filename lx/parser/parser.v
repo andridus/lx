@@ -9,14 +9,15 @@ import os
 pub struct Parser {
 	directives_table &DirectivesTable
 mut:
-	lexer               lexer.Lexer
-	current             lexer.Token
-	next                lexer.Token
-	error_reporter      errors.ErrorReporter
-	next_ast_id         int  = 1
-	at_line_start       bool = true // Track if we're at the start of a new line
-	temp_doc_node       ?ast.Node
-	current_module_name string
+	lexer                 lexer.Lexer
+	current               lexer.Token
+	next                  lexer.Token
+	error_reporter        errors.ErrorReporter
+	next_ast_id           int  = 1
+	at_line_start         bool = true // Track if we're at the start of a new line
+	temp_doc_node         ?ast.Node
+	current_module_name   string
+	in_supervisor_context bool // Track if we're inside supervisor do...end block
 }
 
 pub fn new_parser(code string, file_path string, directives_table &DirectivesTable) Parser {
@@ -821,6 +822,15 @@ fn (mut p Parser) parse_variable_ref() !ast.Node {
 	return ast.new_variable_ref(p.get_next_id(), var_name, pos)
 }
 
+fn (mut p Parser) parse_module_token() !ast.Node {
+	pos := p.current.position
+	p.advance() // Skip '__MODULE__'
+
+	// Resolve __MODULE__ directly to the current module name as an atom
+	module_name := p.current_module_name
+	return ast.new_atom(p.get_next_id(), module_name, pos)
+}
+
 fn (mut p Parser) parse_block() !ast.Node {
 	mut expressions := []ast.Node{}
 	start_pos := p.current.position
@@ -980,6 +990,7 @@ fn (mut p Parser) parse_prefix_expression() !ast.Node {
 	return match p.current.type_ {
 		.integer, .float, .string, .charlist, .true_, .false_, .atom, .nil_ { p.parse_literal() }
 		.identifier { p.parse_identifier_expression() }
+		.module_token { p.parse_module_token() }
 		.lparen { p.parse_parentheses() }
 		.lbracket { p.parse_list_expression() }
 		.lbrace { p.parse_tuple_expression() }
@@ -1060,7 +1071,18 @@ fn (mut p Parser) parse_identifier_expression() !ast.Node {
 		return ast.new_function_caller(p.get_next_id(), identifier, [arg], pos)
 	}
 
-	// Verifica se é um binding (identificador seguido de =)
+	// Special handling for supervisor directives - only allow new syntax without '='
+	if p.in_supervisor_context && (identifier == 'strategy' || identifier == 'children') {
+		// Reject old syntax with '='
+		if p.current.type_ == .bind {
+			return p.error_and_return('Supervisor directives must use new syntax without "=". Use "${identifier} :value" instead of "${identifier} = :value"')
+		}
+		// Accept new syntax without '='
+		value := p.parse_expression()!
+		return ast.new_variable_binding(p.get_next_id(), identifier, value, pos)
+	}
+
+	// Verifica se é um binding (identificador seguido de =) for other contexts
 	if p.current.type_ == .bind {
 		p.advance() // Skip '='
 		value := p.parse_expression()!
@@ -1561,6 +1583,7 @@ fn (mut p Parser) parse_record_definition() !ast.Node {
 			mut default_value := ast.Node{}
 			mut has_default := false
 			mut field_type := ''
+			mut field_type_node := ast.Node{}
 
 			if p.current.type_ == .bind {
 				p.advance() // Skip '='
@@ -1573,9 +1596,19 @@ fn (mut p Parser) parse_record_definition() !ast.Node {
 
 					type_expr := p.parse_type_expression()!
 					field_type = type_expr.value // For simple types, use the value
+					// Use the complete type expression node to preserve parameters
+					field_type_node = type_expr
 				} else {
 					// No explicit type, will be inferred from default value
 					field_type = ''
+					// Create empty field type node for cases with default values and no explicit type
+					field_type_node = ast.Node{
+						id:       p.get_next_id()
+						kind:     .identifier
+						value:    field_type
+						children: []
+						position: pos
+					}
 				}
 			} else {
 				// No default value, expect :: and type
@@ -1587,15 +1620,8 @@ fn (mut p Parser) parse_record_definition() !ast.Node {
 
 				type_expr := p.parse_type_expression()!
 				field_type = type_expr.value // For simple types, use the value
-			}
-
-			// Create field type node
-			field_type_node := ast.Node{
-				id:       p.get_next_id()
-				kind:     .identifier
-				value:    field_type
-				children: []
-				position: pos
+				// Use the complete type expression node to preserve parameters
+				field_type_node = type_expr
 			}
 
 			// Create field node with proper AST structure
@@ -1652,13 +1678,13 @@ fn (mut p Parser) parse_record_literal() !ast.Node {
 	pos := p.current.position
 
 	if p.current.type_ != .identifier {
-		return error('Expected record name')
+		return p.error_and_return('Expected record name')
 	}
 	record_name := p.current.value
 	p.advance() // Skip record name
 
 	if p.current.type_ != .lbrace {
-		return error('Expected opening brace after record name')
+		return p.error_and_return('Expected opening brace after record name')
 	}
 	p.advance() // Skip '{'
 
@@ -1667,13 +1693,14 @@ fn (mut p Parser) parse_record_literal() !ast.Node {
 	if p.current.type_ != .rbrace {
 		for {
 			if p.current.type_ != .identifier {
-				return error('Expected field name')
+				return p.error_and_return('Expected field name')
 			}
 			field_name := p.current.value
 			p.advance() // Skip field name
 
 			if p.current.type_ != .colon {
-				return error('Expected colon after field name')
+				return p.error_and_return_with_suggestion('Expected colon after field name',
+					'Record field syntax: field_name: value')
 			}
 			p.advance() // Skip ':'
 
@@ -1695,7 +1722,7 @@ fn (mut p Parser) parse_record_literal() !ast.Node {
 			}
 
 			if p.current.type_ != .comma {
-				return error('Expected comma or closing brace')
+				return p.error_and_return('Expected comma or closing brace')
 			}
 
 			p.advance() // Skip comma
@@ -1703,7 +1730,7 @@ fn (mut p Parser) parse_record_literal() !ast.Node {
 	}
 
 	if p.current.type_ != .rbrace {
-		return error('Expected closing brace')
+		return p.error_and_return('Expected closing brace')
 	}
 
 	p.advance() // Skip '}'
@@ -1716,7 +1743,7 @@ fn (mut p Parser) parse_record_literal_with_name(record_node ast.Node) !ast.Node
 	pos := record_node.position
 
 	if p.current.type_ != .lbrace {
-		return error('Expected opening brace after record name')
+		return p.error_and_return('Expected opening brace after record name')
 	}
 	p.advance() // Skip '{'
 
@@ -1725,13 +1752,14 @@ fn (mut p Parser) parse_record_literal_with_name(record_node ast.Node) !ast.Node
 	if p.current.type_ != .rbrace {
 		for {
 			if p.current.type_ != .identifier {
-				return error('Expected field name')
+				return p.error_and_return('Expected field name')
 			}
 			field_name := p.current.value
 			p.advance() // Skip field name
 
 			if p.current.type_ != .colon {
-				return error('Expected colon after field name')
+				return p.error_and_return_with_suggestion('Expected colon after field name',
+					'Record field syntax: field_name: value')
 			}
 			p.advance() // Skip ':'
 
@@ -1753,7 +1781,7 @@ fn (mut p Parser) parse_record_literal_with_name(record_node ast.Node) !ast.Node
 			}
 
 			if p.current.type_ != .comma {
-				return error('Expected comma or closing brace')
+				return p.error_and_return('Expected comma or closing brace')
 			}
 
 			p.advance() // Skip comma
@@ -1761,7 +1789,7 @@ fn (mut p Parser) parse_record_literal_with_name(record_node ast.Node) !ast.Node
 	}
 
 	if p.current.type_ != .rbrace {
-		return error('Expected closing brace')
+		return p.error_and_return('Expected closing brace')
 	}
 
 	p.advance() // Skip '}'
@@ -1836,13 +1864,13 @@ fn (mut p Parser) parse_record_update_with_name() !ast.Node {
 	// Don't advance here since we already advanced past % in parse_map_literal
 
 	if p.current.type_ != .identifier {
-		return error('Expected record name after %')
+		return p.error_and_return('Expected record name after %')
 	}
 	record_name := p.current.value
 	p.advance() // Skip record name
 
 	if p.current.type_ != .lbrace {
-		return error('Expected opening brace after record name')
+		return p.error_and_return('Expected opening brace after record name')
 	}
 	p.advance() // Skip '{'
 
@@ -1850,7 +1878,7 @@ fn (mut p Parser) parse_record_update_with_name() !ast.Node {
 	record_expr := p.parse_expression()!
 
 	if p.current.type_ != .pipe {
-		return error('Expected | after record expression')
+		return p.error_and_return('Expected | after record expression')
 	}
 	p.advance() // Skip '|'
 
@@ -1860,13 +1888,14 @@ fn (mut p Parser) parse_record_update_with_name() !ast.Node {
 	for {
 		// Parse field name
 		if p.current.type_ != .identifier {
-			return error('Expected field name after |')
+			return p.error_and_return('Expected field name after |')
 		}
 		field_name := p.current.value
 		p.advance() // Skip field name
 
 		if p.current.type_ != .colon {
-			return error('Expected colon after field name')
+			return p.error_and_return_with_suggestion('Expected colon after field name',
+				'Record update syntax: field_name: value')
 		}
 		p.advance() // Skip ':'
 
@@ -1888,21 +1917,21 @@ fn (mut p Parser) parse_record_update_with_name() !ast.Node {
 		}
 
 		if p.current.type_ != .comma {
-			return error('Expected comma or closing brace')
+			return p.error_and_return('Expected comma or closing brace')
 		}
 
 		p.advance() // Skip comma
 	}
 
 	if p.current.type_ != .rbrace {
-		return error('Expected closing brace')
+		return p.error_and_return('Expected closing brace')
 	}
 	p.advance() // Skip '}'
 
 	// For now, we'll use the first field update
 	// TODO: Support multiple field updates
 	if field_updates.len == 0 {
-		return error('Expected at least one field update')
+		return p.error_and_return('Expected at least one field update')
 	}
 
 	// If there's only one field update, use it
@@ -3569,7 +3598,10 @@ fn (mut p Parser) parse_supervisor_definition() !ast.Node {
 		p.advance()
 	}
 
+	// Set supervisor context before parsing block
+	p.in_supervisor_context = true
 	body := p.parse_block()!
+	p.in_supervisor_context = false // Reset context
 
 	if p.current.type_ != .end {
 		return p.error_and_return('Expected "end" to close supervisor definition')

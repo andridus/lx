@@ -608,7 +608,7 @@ fn find_lx_files(dir string) []string {
 fn generate_initial_app_template(app_name string) string {
 	return 'application {\n' + '  description: "' + app_name + ' application",\n' +
 		'  vsn: "0.1.0",\n' + '  deps: []\n' + '}\n\n' + 'supervisor ' + app_name + '_sup do\n' +
-		'  strategy = :one_for_one\n' + '  children = [:' + app_name + '_worker]\n' + 'end\n\n' +
+		'  strategy :one_for_one\n' + '  children [:' + app_name + '_worker]\n' + 'end\n\n' +
 		'worker ' + app_name + '_worker do\n' + '  def init(_args) do\n' + '    {:ok, %{}}\n' +
 		'  end\n' + 'end\n\n' + 'def main() do\n' + '  :ok\n' + 'end\n'
 }

@@ -1495,11 +1495,8 @@ fn (mut g ErlangGenerator) generate_record_definition(node ast.Node) ! {
 		// Determine field type
 		mut field_type := ast.Type{}
 		if field_type_node.value != '' {
-			// Use explicit type
-			field_type = ast.Type{
-				name:   field_type_node.value
-				params: []
-			}
+			// Use explicit type - convert the field_type_node to ast.Type properly
+			field_type = g.field_type_node_to_type(field_type_node)
 		} else if g.type_table != unsafe { nil } {
 			// Try to get inferred type from type table
 			if _ := g.type_table.get_record_type(node.value) {
@@ -2788,4 +2785,101 @@ fn (mut g ErlangGenerator) generate_external_function_call(node ast.Node) ! {
 	}
 
 	g.output.write_string(')')
+}
+
+// Convert an AST node representing a type expression into an ast.Type recursively
+fn (g ErlangGenerator) field_type_node_to_type(node ast.Node) ast.Type {
+	// Handle atoms as specialized atom types
+	if node.kind == .atom {
+		return ast.Type{
+			name:              'atom'
+			params:            []
+			specialized_value: node.value
+		}
+	}
+
+	// Handle union types
+	if node.kind == .union_type {
+		// For now, represent union types as 'union' type with variant types as params
+		mut variant_types := []ast.Type{}
+		for child in node.children {
+			variant_types << g.field_type_node_to_type(child)
+		}
+		return ast.Type{
+			name:   'union'
+			params: variant_types
+		}
+	}
+
+	// Handle tuple types
+	if node.kind == .tuple_literal {
+		mut element_types := []ast.Type{}
+		for child in node.children {
+			element_types << g.field_type_node_to_type(child)
+		}
+		return ast.Type{
+			name:   'tuple'
+			params: element_types
+		}
+	}
+
+	// Handle list types (including empty lists)
+	if node.kind == .list_literal {
+		if node.children.len == 0 {
+			// Empty list type []
+			return ast.Type{
+				name:   'list'
+				params: []
+			}
+		} else {
+			// List with element types
+			mut element_types := []ast.Type{}
+			for child in node.children {
+				element_types << g.field_type_node_to_type(child)
+			}
+			return ast.Type{
+				name:   'list'
+				params: element_types
+			}
+		}
+	}
+
+	// Identifier represents either a basic/custom type, a generic, a record, or an atom literal
+	if node.kind == .identifier {
+		// Handle parameterized types: name(T1, T2, ...)
+		if node.children.len > 0 {
+			mut param_types := []ast.Type{}
+			for child in node.children {
+				param_types << g.field_type_node_to_type(child)
+			}
+			return ast.Type{
+				name:   node.value
+				params: param_types
+			}
+		}
+
+		// No params: check for built-ins first
+		match node.value {
+			'integer', 'float', 'string', 'boolean', 'atom', 'any', 'term', 'module', 'nil',
+			'list', 'tuple', 'map' {
+				return ast.Type{
+					name:   node.value
+					params: []
+				}
+			}
+			else {}
+		}
+
+		// For other types (records, custom types), return as is
+		return ast.Type{
+			name:   node.value
+			params: []
+		}
+	}
+
+	// Fallback for unexpected nodes: treat as 'any'
+	return ast.Type{
+		name:   'any'
+		params: []
+	}
 }
