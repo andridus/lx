@@ -518,80 +518,29 @@ fn (mut p Parser) parse_block_expression() !ast.Node {
 fn (mut p Parser) parse_function_head() !ast.Node {
 	pos := p.current.position
 
-	if p.current.type_ != .lparen {
-		return p.error_and_return('Expected opening parenthesis for function head')
-	}
-	p.advance() // Skip '('
-
-	// Parse args
-	args := p.parse_args()!
-
-	if p.current.type_ != .rparen {
-		return p.error_and_return('Expected closing parenthesis')
-	}
-	p.advance() // Skip ')'
-
 	// Parse return type annotation (not used in simplified version)
 	if p.current.type_ == .double_colon {
 		p.advance() // Skip ::
 		p.parse_type_annotation()! // Parse but don't store
 	}
 
-	// Parse guard clause if present
-	mut guard := ast.Node{}
-	if p.current.type_ == .when {
-		p.advance() // Skip 'when'
-		guard = p.parse_expression()!
+	config := ClauseConfig{
+		require_parens: true
+		allow_guard: true
+		end_tokens: [.lparen, .end, .eof]
+		pattern_end_token: .arrow
 	}
 
-	if p.current.type_ != .arrow {
-		return p.error_and_return('Expected arrow (->)')
-	}
-	p.advance() // Skip '->'
+	clause := p.parse_generic_clause(config)!
 
-	// Parse body - check if there's a newline for multi-expression
-	mut body := ast.Node{}
-	if p.current.type_ == .newline {
-		// Multi-expression body
-		for p.current.type_ == .newline {
-			p.advance()
-		}
+	// Convert the clause to function format
+	args := clause.children[0] // pattern (args)
+	body := clause.children[1] // body
+	mut children := [args, body]
 
-		// Parse as block until we find next pattern or end
-		mut expressions := []ast.Node{}
-		for p.current.type_ != .lparen && p.current.type_ != .end && p.current.type_ != .eof {
-			// Skip newlines between expressions
-			for p.current.type_ == .newline {
-				p.advance()
-			}
-
-			if p.current.type_ == .lparen || p.current.type_ == .end || p.current.type_ == .eof {
-				break
-			}
-
-			expr := p.parse_expression()!
-			expressions << expr
-		}
-
-		if expressions.len == 0 {
-			return p.error_and_return('Expected at least one expression in function body')
-		}
-
-		// Create block node
-		body = ast.new_block(p.get_next_id(), expressions, pos)
-	} else {
-		// Single expression body
-		body = p.parse_expression()!
-	}
-
-	// Create function with args as children[0], body as children[1], and optional guard as children[2]
-	mut children := []ast.Node{}
-	children << args // args block
-	children << body // function body
-
-	// Add guard as third child if present
-	if guard.id != 0 {
-		children << guard
+	// Add guard if present
+	if clause.children.len > 2 {
+		children << clause.children[2] // guard
 	}
 
 	return ast.Node{
@@ -2139,16 +2088,13 @@ fn (mut p Parser) parse_case_expression() !ast.Node {
 		p.advance()
 	}
 
-	mut clauses := []ast.Node{}
-	for p.current.type_ != .end && p.current.type_ != .eof {
-		if p.current.type_ == .newline {
-			p.advance()
-			continue
-		}
-
-		clause := p.parse_case_clause()!
-		clauses << clause
+	config := ClauseConfig{
+		require_parens: false
+		allow_guard: true
+		end_tokens: [.end, .eof]
+		pattern_end_token: .arrow
 	}
+	clauses := p.parse_generic_clauses(config)!
 
 	if p.current.type_ != .end {
 		return p.error_and_return('Expected "end" to close case expression')
@@ -2159,146 +2105,18 @@ fn (mut p Parser) parse_case_expression() !ast.Node {
 }
 
 fn (mut p Parser) parse_case_clause() !ast.Node {
-	start_pos := p.current.position
-
-	// Parse pattern
-	pattern := p.parse_pattern()!
-
-	// Parse optional guard
-	mut guard := ast.Node{}
-	if p.current.type_ == .when {
-		p.advance() // Skip 'when'
-		guard = p.parse_expression()!
+	config := ClauseConfig{
+		require_parens: false
+		allow_guard: true
+		end_tokens: [.end, .eof]
+		pattern_end_token: .arrow
 	}
-
-	if p.current.type_ != .arrow {
-		return p.error_and_return('Expected "->" after case pattern')
-	}
-	p.advance() // Skip '->'
-
-	// Skip newlines after '->'
-	for p.current.type_ == .newline {
-		p.advance()
-	}
-
-	// Parse the body as a block instead of a single expression
-	// This allows complex expressions like 'with', 'if', etc. inside case clauses
-	body := p.parse_case_clause_body()!
-
-	// Se há guard, inclui como terceiro child, senão usa apenas pattern e body
-	if guard.id != 0 {
-		return ast.new_case_clause_with_guard(p.get_next_id(), pattern, guard, body, start_pos)
-	} else {
-		return ast.new_case_clause(p.get_next_id(), pattern, body, start_pos)
-	}
+	return p.parse_generic_clause(config)
 }
 
-// Parse the body of a case clause, which can contain multiple expressions
-// similar to how LX5 handles it
-fn (mut p Parser) parse_case_clause_body() !ast.Node {
-	mut expressions := []ast.Node{}
-	start_pos := p.current.position
+// Removed - functionality merged into parse_clause_body
 
-	for {
-		// Stop if we encounter patterns that indicate next case clause or end
-		if p.current.type_ == .end || p.current.type_ == .eof {
-			break
-		}
-
-		// Check if this looks like a new case pattern
-		if p.looks_like_case_pattern() {
-			break
-		}
-
-		// Skip newlines
-		for p.current.type_ == .newline {
-			p.advance()
-		}
-
-		// Stop again after skipping newlines
-		if p.current.type_ == .end || p.current.type_ == .eof {
-			break
-		}
-
-		if p.looks_like_case_pattern() {
-			break
-		}
-
-		expr := p.parse_expression()!
-		expressions << expr
-
-		// Handle separators
-		if p.current.type_ == .semicolon {
-			p.advance()
-		} else if p.current.type_ == .newline {
-			p.advance()
-		} else {
-			// If no separator and not at end, continue
-			if p.current.type_ != .end && p.current.type_ != .eof && !p.looks_like_case_pattern() {
-				continue
-			}
-			break
-		}
-	}
-
-	// If we only have one expression, return it directly
-	if expressions.len == 1 {
-		return expressions[0]
-	}
-
-	// If we have multiple expressions, create a block
-	return ast.new_block(p.get_next_id(), expressions, start_pos)
-}
-
-// Check if current position looks like a case pattern
-fn (mut p Parser) looks_like_case_pattern() bool {
-	// A case pattern can ONLY start at the beginning of a new line
-	// This is the key rule mentioned by the user
-	if !p.at_line_start {
-		return false
-	}
-
-	// First, check for obvious non-patterns
-	if p.current.type_ == .end || p.current.type_ == .eof || p.current.type_ == .else_
-		|| p.current.type_ == .if_ || p.current.type_ == .with || p.current.type_ == .case
-		|| p.current.type_ == .fn || p.current.type_ == .spawn || p.current.type_ == .receive
-		|| p.current.type_ == .do || p.current.type_ == .rescue {
-		return false
-	}
-
-	// For patterns that are followed immediately by -> or when, we're confident
-	if p.next.type_ == .arrow || p.next.type_ == .when {
-		return true
-	}
-
-	// Look ahead to see if this could be a pattern (followed by -> eventually)
-	// We need to be more careful about distinguishing patterns from expressions
-	return p.looks_ahead_for_pattern_indicators()
-}
-
-// Look ahead to see if current tokens form a pattern (eventually followed by -> or when)
-fn (mut p Parser) looks_ahead_for_pattern_indicators() bool {
-	// For complex patterns (records, lists, tuples), be more permissive
-	if p.current.type_ == .lbrace || p.current.type_ == .lbracket {
-		return true // Lists and tuples at line start in case context are likely patterns
-	}
-
-	// For record patterns like User{...}, check if identifier followed by {
-	if p.current.type_ == .identifier && p.next.type_ == .lbrace {
-		return true
-	}
-
-	// For simple literals, be very conservative - only if directly followed by -> or when
-	// This prevents string literals like "adult user" from being mistaken as patterns
-	if p.current.type_ == .identifier || p.current.type_ == .integer || p.current.type_ == .string
-		|| p.current.type_ == .atom || p.current.type_ == .true_ || p.current.type_ == .false_
-		|| p.current.type_ == .nil_ {
-		// Only consider it a pattern if immediately followed by -> or when
-		return p.next.type_ == .arrow || p.next.type_ == .when
-	}
-
-	return false
-}
+// Removed - functionality merged into looks_like_clause_pattern
 
 fn (mut p Parser) parse_pattern() !ast.Node {
 	match p.current.type_ {
@@ -2622,14 +2440,35 @@ fn (mut p Parser) parse_lambda_expression() !ast.Node {
 			p.advance()
 		}
 
-		// Parse multiple heads
+		// Parse multiple heads using generic clause parser
+		config := ClauseConfig{
+			require_parens: true
+			allow_guard: true
+			end_tokens: [.end, .eof]
+			pattern_end_token: .arrow
+		}
+
 		mut heads := []ast.Node{}
 		for p.current.type_ != .end && p.current.type_ != .eof {
 			for p.current.type_ == .newline {
 				p.advance()
 			}
 			if p.current.type_ == .lparen {
-				head := p.parse_function_head()!
+				clause := p.parse_generic_clause(config)!
+				// Convert clause to function format
+				args := clause.children[0]
+				body := clause.children[1]
+				mut children := [args, body]
+				if clause.children.len > 2 {
+					children << clause.children[2] // guard
+				}
+				head := ast.Node{
+					id:       p.get_next_id()
+					kind:     .function
+					value:    ''
+					children: children
+					position: clause.position
+				}
 				heads << head
 			} else {
 				break
@@ -2875,22 +2714,14 @@ fn (mut p Parser) looks_like_case_clause() bool {
 // Parse case-style clauses as a case expression block
 fn (mut p Parser) parse_case_clauses_as_block() !ast.Node {
 	start_pos := p.current.position
-	mut clauses := []ast.Node{}
 
-	for p.current.type_ != .end && p.current.type_ != .eof {
-		if p.current.type_ == .newline {
-			p.advance()
-			continue
-		}
-
-		clause := p.parse_case_clause()!
-		clauses << clause
-
-		// Skip optional newlines after clause
-		for p.current.type_ == .newline {
-			p.advance()
-		}
+	config := ClauseConfig{
+		require_parens: false
+		allow_guard: true
+		end_tokens: [.end, .eof]
+		pattern_end_token: .arrow
 	}
+	clauses := p.parse_generic_clauses(config)!
 
 	// Create a dummy case expression for the else clauses
 	dummy_expr := ast.new_identifier(p.get_next_id(), 'Error', start_pos)
@@ -3241,35 +3072,13 @@ fn (mut p Parser) parse_receive_expression() !ast.Node {
 		p.advance()
 	}
 
-	mut clauses := []ast.Node{}
-
-	for p.current.type_ != .end && p.current.type_ != .eof {
-		// Skip newlines between clauses
-		for p.current.type_ == .newline {
-			p.advance()
-		}
-
-		if p.current.type_ == .end {
-			break
-		}
-
-		pattern := p.parse_expression()!
-
-		if p.current.type_ != .arrow {
-			return p.error_and_return('Expected "->" after receive pattern')
-		}
-		p.advance() // Skip '->'
-
-		expr := p.parse_expression()!
-
-		clause := ast.new_case_clause(p.get_next_id(), pattern, expr, start_pos)
-		clauses << clause
-
-		// Skip optional semicolon
-		if p.current.type_ == .semicolon {
-			p.advance()
-		}
+	config := ClauseConfig{
+		require_parens: false
+		allow_guard: false
+		end_tokens: [.end, .eof]
+		pattern_end_token: .arrow
 	}
+	clauses := p.parse_generic_clauses(config)!
 
 	if p.current.type_ != .end {
 		return p.error_and_return('Expected "end" to close receive expression')
@@ -4070,4 +3879,244 @@ fn (mut p Parser) parse_function_capture(initial string, pos ast.Position) !ast.
 	body := ast.new_external_function_call(p.get_next_id(), module_name, function_name,
 		args, pos)
 	return ast.new_anonymous_function(p.get_next_id(), params, body, pos)
+}
+
+// ============ Generic Clause Parsing Functions ============
+
+// ClauseConfig defines how to parse different types of clauses
+struct ClauseConfig {
+	require_parens    bool   // true for function heads, false for case/receive
+	allow_guard       bool   // true for most clause types
+	end_tokens        []lexer.TokenType // tokens that end clause parsing
+	pattern_end_token lexer.TokenType   // token that ends pattern (arrow, etc)
+}
+
+// Parse a single clause with the given configuration
+fn (mut p Parser) parse_generic_clause(config ClauseConfig) !ast.Node {
+	start_pos := p.current.position
+
+	// Parse pattern(s)
+	mut pattern := ast.Node{}
+	if config.require_parens {
+		// Function head style: (pattern1, pattern2, ...)
+		if p.current.type_ != .lparen {
+			return p.error_and_return('Expected opening parenthesis for pattern')
+		}
+		p.advance() // Skip '('
+		pattern = p.parse_args()!
+		if p.current.type_ != .rparen {
+			return p.error_and_return('Expected closing parenthesis')
+		}
+		p.advance() // Skip ')'
+	} else {
+		// Case/receive style: single pattern
+		pattern = p.parse_pattern()!
+	}
+
+	// Parse optional guard
+	mut guard := ast.Node{}
+	if config.allow_guard && p.current.type_ == .when {
+		p.advance() // Skip 'when'
+		guard = p.parse_expression()!
+	}
+
+	// Expect pattern end token (usually arrow)
+	if p.current.type_ != config.pattern_end_token {
+		return p.error_and_return('Expected "${config.pattern_end_token}" after pattern')
+	}
+	p.advance() // Skip pattern end token
+
+	// Skip newlines after pattern end token
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+
+	// Parse body
+	body := p.parse_clause_body(config.end_tokens)!
+
+	// Create clause node with or without guard
+	if guard.id != 0 {
+		return ast.new_case_clause_with_guard(p.get_next_id(), pattern, guard, body, start_pos)
+	} else {
+		return ast.new_case_clause(p.get_next_id(), pattern, body, start_pos)
+	}
+}
+
+// Parse clause body until we hit an end token or start of next clause
+fn (mut p Parser) parse_clause_body(end_tokens []lexer.TokenType) !ast.Node {
+	mut expressions := []ast.Node{}
+	start_pos := p.current.position
+
+	for {
+		// Check for absolute end conditions (not lparen which can be part of expressions)
+		if (p.current.type_ in end_tokens && p.current.type_ != .lparen) || p.current.type_ == .eof {
+			break
+		}
+
+		// Special handling for lparen: more sophisticated detection
+		if p.current.type_ == .lparen && p.current.type_ in end_tokens {
+			// Only break if this looks like a function head pattern
+			if p.looks_like_function_head_pattern() {
+				break
+			}
+		}
+
+		// Check if this looks like a new clause pattern (at line start)
+		if p.at_line_start && p.looks_like_clause_pattern() {
+			break
+		}
+
+		// Skip newlines
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+
+		// Check end conditions again after skipping newlines
+		if (p.current.type_ in end_tokens && p.current.type_ != .lparen) || p.current.type_ == .eof {
+			break
+		}
+
+		// Special handling for lparen after newlines
+		if p.current.type_ == .lparen && p.current.type_ in end_tokens {
+			if p.looks_like_function_head_pattern() {
+				break
+			}
+		}
+
+		if p.at_line_start && p.looks_like_clause_pattern() {
+			break
+		}
+
+		expr := p.parse_expression()!
+		expressions << expr
+
+		// Handle separators
+		if p.current.type_ == .semicolon {
+			p.advance()
+		} else if p.current.type_ == .newline {
+			p.advance()
+		} else {
+			// Continue if there are more tokens and not at end
+			// Special case for lparen: only stop if it looks like function head
+			if p.current.type_ in end_tokens {
+				if p.current.type_ == .lparen {
+					if p.looks_like_function_head_pattern() {
+						break
+					}
+				} else {
+					break
+				}
+			}
+			if p.current.type_ == .eof || p.looks_like_clause_pattern() {
+				break
+			}
+		}
+	}
+
+	// Return single expression or block
+	if expressions.len == 1 {
+		return expressions[0]
+	}
+	return ast.new_block(p.get_next_id(), expressions, start_pos)
+}
+
+// Check if current lparen looks like start of a function head pattern
+fn (mut p Parser) looks_like_function_head_pattern() bool {
+	// Must start with lparen
+	if p.current.type_ != .lparen {
+		return false
+	}
+
+	// Simple heuristic: look ahead for pattern indicators without modifying parser state
+	// This is safer and avoids state corruption
+
+	// Check if we're at line start (most function heads start at line beginning)
+	if !p.at_line_start {
+		return false
+	}
+
+	// Look at the next few tokens to see if this looks like a function head
+	// Pattern: ( ... ) -> or ( ... ) when ... ->
+
+	// Use a simple lookahead: if next token after lparen looks like a parameter
+	// and we eventually find -> or when, it's likely a function head
+	if p.next.type_ == .identifier || p.next.type_ == .integer ||
+	   p.next.type_ == .string || p.next.type_ == .atom ||
+	   p.next.type_ == .true_ || p.next.type_ == .false_ ||
+	   p.next.type_ == .nil_ {
+		return true
+	}
+
+	return false
+}
+
+// Parse multiple clauses with the given configuration
+fn (mut p Parser) parse_generic_clauses(config ClauseConfig) ![]ast.Node {
+	mut clauses := []ast.Node{}
+
+	for p.current.type_ !in config.end_tokens && p.current.type_ != .eof {
+		// Skip newlines between clauses
+		for p.current.type_ == .newline {
+			p.advance()
+		}
+
+		if p.current.type_ in config.end_tokens {
+			break
+		}
+
+		clause := p.parse_generic_clause(config)!
+		clauses << clause
+
+		// Skip optional semicolon
+		if p.current.type_ == .semicolon {
+			p.advance()
+		}
+	}
+
+	return clauses
+}
+
+// Enhanced pattern detection for clauses
+fn (mut p Parser) looks_like_clause_pattern() bool {
+	// Must be at line start for clause patterns
+	if !p.at_line_start {
+		return false
+	}
+
+	// Check for obvious non-patterns
+	if p.current.type_ == .end || p.current.type_ == .eof || p.current.type_ == .else_
+		|| p.current.type_ == .if_ || p.current.type_ == .with || p.current.type_ == .case
+		|| p.current.type_ == .fn || p.current.type_ == .spawn || p.current.type_ == .receive
+		|| p.current.type_ == .do || p.current.type_ == .rescue {
+		return false
+	}
+
+	// Check for immediate pattern indicators
+	if p.next.type_ == .arrow || p.next.type_ == .when {
+		return true
+	}
+
+	// Check for parentheses (function head patterns)
+	if p.current.type_ == .lparen {
+		return true
+	}
+
+	// Check for complex patterns
+	if p.current.type_ == .lbrace || p.current.type_ == .lbracket {
+		return true
+	}
+
+	// Check for record patterns
+	if p.current.type_ == .identifier && p.next.type_ == .lbrace {
+		return true
+	}
+
+	// For simple literals, be conservative
+	if p.current.type_ == .identifier || p.current.type_ == .integer || p.current.type_ == .string
+		|| p.current.type_ == .atom || p.current.type_ == .true_ || p.current.type_ == .false_
+		|| p.current.type_ == .nil_ {
+		return p.next.type_ == .arrow || p.next.type_ == .when
+	}
+
+	return false
 }

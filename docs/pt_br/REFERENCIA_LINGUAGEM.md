@@ -8,6 +8,8 @@ LX é uma linguagem funcional que compila para Erlang. Ela oferece:
 - Records, listas, tuplas, mapas, binários/bitstrings
 - Funções anônimas (lambdas), expressões de controle de fluxo (if, case, with, match)
 - Primitivas de concorrência (spawn, send, receive)
+- Supervisors e workers OTP com sintaxe nativa
+- Referências antecipadas em todos os contextos
 - List comprehensions
 
 Tudo compila para Erlang legível com anotações `-spec`.
@@ -68,6 +70,7 @@ Notas:
 - Variáveis e funções: snake_case
 - Nomes de records: snake_case (mapeia para Erlang `-record(name, ...)`)
 - Nome do módulo é implicitamente o nome do arquivo
+- Supervisors e workers: snake_case (geram módulos Erlang separados)
 
 ### Literais
 ```lx
@@ -233,6 +236,26 @@ end
 - Anotações de parâmetro com `::` influenciam o spec gerado.
 - Funções multi-cláusula podem produzir tipos de retorno união.
 
+### Referências Antecipadas
+LX suporta referências antecipadas em todos os contextos (módulo raiz, supervisors e workers). Você pode chamar uma função antes de defini-la:
+
+```lx
+def processar() do
+  dados = obter_dados()  # função definida posteriormente
+  validar(dados)         # função definida posteriormente
+end
+
+def obter_dados() do
+  "dados"
+end
+
+def validar(dados) do
+  dados != nil
+end
+```
+
+Isso funciona tanto no módulo principal quanto dentro de blocos `supervisor` e `worker`.
+
 
 ## Funções Anônimas (Lambdas)
 
@@ -328,7 +351,7 @@ end
 
 ## Concorrência
 
-Primitivas suportadas:
+### Primitivas Básicas
 - `spawn(fn() -> ... end)` – cria um processo
 - Operador de envio `!`
 - `receive do ... end`
@@ -343,7 +366,6 @@ def iniciar() do
   pid ! {:mensagem, "olá"}
 end
 
-
 def aguardar() do
   receive do
     {:mensagem, dados} -> dados
@@ -351,6 +373,66 @@ def aguardar() do
   end
 end
 ```
+
+### Supervisors e Workers (OTP)
+
+LX suporta definições de supervisors e workers que geram módulos OTP apropriados.
+
+#### Supervisors
+```lx
+supervisor meu_supervisor do
+  strategy :one_for_one
+  children [:meu_worker, :outro_worker]
+
+  # Funções customizadas podem ser definidas
+  def get_status() do
+    :running
+  end
+
+  def restart_child(child_id) do
+    supervisor:restart_child(__MODULE__, child_id)
+  end
+end
+```
+
+Estratégias suportadas:
+- `:one_for_one` – se um filho falha, apenas ele é reiniciado
+- `:one_for_all` – se um filho falha, todos os filhos são reiniciados
+- `:rest_for_one` – se um filho falha, ele e todos os posteriores são reiniciados
+
+#### Workers
+```lx
+worker meu_worker do
+  def init(args) do
+    {:ok, %{estado: args}}
+  end
+
+  def handle_call(:get_estado, _from, state) do
+    {:reply, state.estado, state}
+  end
+
+  def handle_cast({:set_estado, novo}, _state) do
+    {:noreply, %{estado: novo}}
+  end
+
+  # Funções customizadas com referências antecipadas
+  def processar() do
+    dados = obter_dados()
+    processar_dados(dados)
+  end
+
+  def obter_dados() do
+    "dados importantes"
+  end
+
+  def processar_dados(dados) do
+    # processamento...
+    {:ok, dados}
+  end
+end
+```
+
+**Nota importante**: Tanto supervisors quanto workers suportam **referências antecipadas** - você pode chamar funções que são definidas posteriormente no mesmo bloco, assim como no módulo raiz.
 
 
 ## List Comprehensions
@@ -477,6 +559,7 @@ Resolução de dependências e linking em runtime são gerenciados pelo build do
 - `import` e `application.deps` são metadados no código-fonte; gerenciamento real de dependências é tratado pelo umbrella rebar3 gerado pelo CLI sob `_build/`.
 - If sem `else` retorna `nil` no ramo falso.
 - Strings são binários UTF-8.
+- Supervisors devem usar a nova sintaxe sem `=`: `strategy :one_for_one` e `children [:worker1]` em vez da sintaxe antiga com `=`.
 
 
 ## Estilo
@@ -518,6 +601,71 @@ def exemplo(dados_maybe) do
   else
     _ -> "falhou"
   end
+end
+```
+
+### Aplicação OTP Completa
+```lx
+application {
+  description: "Sistema bancário",
+  vsn: "1.0.0",
+  applications: [:kernel, :stdlib],
+  registered: [:banco_sup]
+}
+
+record conta {
+  numero :: string,
+  saldo :: float
+}
+
+supervisor banco_sup do
+  strategy :one_for_one
+  children [:gerenciador_contas]
+
+  def status() do
+    supervisor:which_children(__MODULE__)
+  end
+end
+
+worker gerenciador_contas do
+  def init(_args) do
+    {:ok, %{contas: []}}
+  end
+
+  def handle_call({:criar_conta, numero}, _from, state) do
+    nova_conta = criar_nova_conta(numero)  # referência antecipada
+    contas_atualizadas = [nova_conta | state.contas]
+    {:reply, {:ok, nova_conta}, %{state | contas: contas_atualizadas}}
+  end
+
+  def handle_call({:obter_saldo, numero}, _from, state) do
+    saldo = buscar_saldo(numero, state.contas)  # referência antecipada
+    {:reply, saldo, state}
+  end
+
+  # Funções auxiliares definidas após uso (referências antecipadas)
+  defp criar_nova_conta(numero) do
+    conta{numero: numero, saldo: 0.0}
+  end
+
+  defp buscar_saldo(numero, contas) do
+    case encontrar_conta(numero, contas) do  # referência antecipada
+      nil -> {:error, :conta_nao_encontrada}
+      conta -> {:ok, conta.saldo}
+    end
+  end
+
+  defp encontrar_conta(numero, contas) do
+    case contas do
+      [] -> nil
+      [conta{numero: ^numero} = c | _] -> c
+      [_ | resto] -> encontrar_conta(numero, resto)
+    end
+  end
+end
+
+def main() do
+  :ok
 end
 ```
 
