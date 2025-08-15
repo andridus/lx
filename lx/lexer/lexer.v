@@ -2,6 +2,7 @@ module lexer
 
 import ast
 
+// Lexer struct to hold the state of the lexer.
 pub struct Lexer {
 mut:
 	input    string
@@ -11,6 +12,7 @@ mut:
 	file     string
 }
 
+// new_lexer creates a new Lexer instance.
 pub fn new_lexer(input string, file string) Lexer {
 	return Lexer{
 		input:  input
@@ -20,9 +22,13 @@ pub fn new_lexer(input string, file string) Lexer {
 	}
 }
 
+// ===================
+// Main Lexing Function
+// ===================
+
+// next_token advances the lexer and returns the next token.
 pub fn (mut l Lexer) next_token() Token {
 	l.skip_whitespace()
-
 	if l.position >= l.input.len {
 		return l.make_token(.eof, '')
 	}
@@ -58,6 +64,11 @@ pub fn (mut l Lexer) next_token() Token {
 	}
 }
 
+// =======================
+// Core Movement & Utility
+// =======================
+
+// skip_whitespace skips whitespace and single-line comments.
 fn (mut l Lexer) skip_whitespace() {
 	for l.position < l.input.len {
 		ch := l.input[l.position]
@@ -73,6 +84,7 @@ fn (mut l Lexer) skip_whitespace() {
 	}
 }
 
+// advance advances the lexer's position.
 fn (mut l Lexer) advance() {
 	if l.position < l.input.len && l.input[l.position] == `\n` {
 		l.line++
@@ -83,34 +95,42 @@ fn (mut l Lexer) advance() {
 	l.position++
 }
 
+// advance_and_return advances and returns a token.
 fn (mut l Lexer) advance_and_return(token_type TokenType, value string) Token {
 	pos := l.current_position()
 	l.advance()
 	return l.make_token_at(token_type, value, pos)
 }
 
+// current_position returns the current position.
 fn (mut l Lexer) current_position() ast.Position {
 	return ast.new_position(l.line, l.column, l.file)
 }
 
+// make_token creates a new token at the current position.
 fn (mut l Lexer) make_token(token_type TokenType, value string) Token {
 	return new_token(token_type, value, l.current_position())
 }
 
+// make_token_at creates a new token at a specific position.
 fn (mut l Lexer) make_token_at(token_type TokenType, value string, pos ast.Position) Token {
 	return new_token(token_type, value, pos)
 }
 
+// make_error creates an error token.
 fn (mut l Lexer) make_error(msg string) Token {
 	return l.make_token(.error, msg)
 }
 
+// =====================
+// Token Reading Helpers
+// =====================
+
+// read_string reads a double-quoted string literal.
 fn (mut l Lexer) read_string() Token {
 	start_pos := l.current_position()
 	l.advance()
-
 	mut value := ''
-
 	for l.position < l.input.len && l.input[l.position] != `"` {
 		ch := l.input[l.position]
 		if ch == `\\` {
@@ -118,7 +138,6 @@ fn (mut l Lexer) read_string() Token {
 			if l.position >= l.input.len {
 				return l.make_error('Unterminated string literal')
 			}
-
 			escape_ch := l.input[l.position]
 			value += match escape_ch {
 				`n` { '\n' }
@@ -142,33 +161,25 @@ fn (mut l Lexer) read_string() Token {
 	return l.make_token_at(.string, value, start_pos)
 }
 
+// read_colon_or_double_colon reads a colon, double colon, or atom.
 fn (mut l Lexer) read_colon_or_double_colon() Token {
 	start_pos := l.current_position()
-	// Capture previous character before advancing (character before ':')
 	prev_ch := if l.position > 0 { l.input[l.position - 1] } else { ` ` }
-	l.advance() // Skip ':'
-
-	// Check if next character is also ':' (double colon)
+	l.advance()
 	if l.position < l.input.len && l.input[l.position] == `:` {
-		l.advance() // Skip second ':'
+		l.advance()
 		return l.make_token_at(.double_colon, '::', start_pos)
 	}
 
-	// Helper: determine if previous character indicates we should NOT parse an atom
-	// If previous char is an identifier character or a closing delimiter, this ':' is a separator
-	prev_is_ident := (prev_ch >= `a` && prev_ch <= `z`)
-		|| (prev_ch >= `A` && prev_ch <= `Z`) || (prev_ch >= `0` && prev_ch <= `9`)
-		|| prev_ch == `_`
+	prev_is_ident := (prev_ch >= `a` && prev_ch <= `z`) || (prev_ch >= `A` && prev_ch <= `Z`) ||
+		(prev_ch >= `0` && prev_ch <= `9`) || prev_ch == `_`
 	prev_is_closer := prev_ch == `]` || prev_ch == `)` || prev_ch == `}`
 
-	// If previous suggests separator context, emit ':' token
 	if prev_is_ident || prev_is_closer {
 		return l.make_token_at(.colon, ':', start_pos)
 	}
 
-	// Otherwise, decide between atom or ':' based on next character
 	if l.position < l.input.len && l.input[l.position].is_letter() {
-		// This is an atom, read the identifier part
 		mut value := ''
 		for l.position < l.input.len {
 			ch := l.input[l.position]
@@ -182,20 +193,18 @@ fn (mut l Lexer) read_colon_or_double_colon() Token {
 		return l.make_token_at(.atom, value, start_pos)
 	}
 
-	// Fallback: just a ':' token
 	return l.make_token_at(.colon, ':', start_pos)
 }
 
+// read_atom reads an atom starting with a colon.
 fn (mut l Lexer) read_atom() Token {
 	start_pos := l.current_position()
 	l.advance()
-
 	if l.position >= l.input.len || !l.input[l.position].is_letter() {
 		return l.make_error('Invalid atom: must start with letter')
 	}
 
 	mut value := ''
-
 	for l.position < l.input.len {
 		ch := l.input[l.position]
 		if ch.is_alnum() || ch == `_` {
@@ -205,81 +214,68 @@ fn (mut l Lexer) read_atom() Token {
 			break
 		}
 	}
-
 	return l.make_token_at(.atom, value, start_pos)
 }
 
+// read_number reads numeric literals including different bases.
 fn (mut l Lexer) read_number() Token {
 	start_pos := l.current_position()
 	start := l.position
-
-	// Check for hexadecimal literal (0x)
-	if l.position + 1 < l.input.len && l.input[l.position] == `0` && l.input[l.position + 1] == `x` {
-		l.advance() // Skip '0'
-		l.advance() // Skip 'x'
-
-		// Read hexadecimal digits
-		for l.position < l.input.len {
-			ch := l.input[l.position]
-			if ch.is_digit() || (ch >= `a` && ch <= `f`) || (ch >= `A` && ch <= `F`) {
+	if l.position + 1 < l.input.len && l.input[l.position] == `0` {
+		next_ch := l.input[l.position + 1]
+		match next_ch {
+			`x` {
 				l.advance()
-			} else {
-				break
+				l.advance()
+				for l.position < l.input.len {
+					ch := l.input[l.position]
+					if ch.is_digit() || (ch >= `a` && ch <= `f`) || (ch >= `A` && ch <= `F`) {
+						l.advance()
+					} else {
+						break
+					}
+				}
+				value := l.input[start..l.position]
+				return l.make_token_at(.integer, value, start_pos)
 			}
+			`o` {
+				l.advance()
+				l.advance()
+				for l.position < l.input.len {
+					ch := l.input[l.position]
+					if ch >= `0` && ch <= `7` {
+						l.advance()
+					} else {
+						break
+					}
+				}
+				value := l.input[start..l.position]
+				return l.make_token_at(.integer, value, start_pos)
+			}
+			`b` {
+				l.advance()
+				l.advance()
+				for l.position < l.input.len {
+					ch := l.input[l.position]
+					if ch == `0` || ch == `1` {
+						l.advance()
+					} else {
+						break
+					}
+				}
+				value := l.input[start..l.position]
+				return l.make_token_at(.integer, value, start_pos)
+			}
+			else {}
 		}
-
-		value := l.input[start..l.position]
-		return l.make_token_at(.integer, value, start_pos)
 	}
 
-	// Check for octal literal (0o)
-	if l.position + 1 < l.input.len && l.input[l.position] == `0` && l.input[l.position + 1] == `o` {
-		l.advance() // Skip '0'
-		l.advance() // Skip 'o'
-
-		// Read octal digits (0-7)
-		for l.position < l.input.len {
-			ch := l.input[l.position]
-			if ch >= `0` && ch <= `7` {
-				l.advance()
-			} else {
-				break
-			}
-		}
-
-		value := l.input[start..l.position]
-		return l.make_token_at(.integer, value, start_pos)
-	}
-
-	// Check for binary literal (0b)
-	if l.position + 1 < l.input.len && l.input[l.position] == `0` && l.input[l.position + 1] == `b` {
-		l.advance() // Skip '0'
-		l.advance() // Skip 'b'
-
-		// Read binary digits (0-1)
-		for l.position < l.input.len {
-			ch := l.input[l.position]
-			if ch == `0` || ch == `1` {
-				l.advance()
-			} else {
-				break
-			}
-		}
-
-		value := l.input[start..l.position]
-		return l.make_token_at(.integer, value, start_pos)
-	}
-
-	// Read decimal digits (and check for base generic format)
 	for l.position < l.input.len && l.input[l.position].is_digit() {
 		l.advance()
 	}
 
-	// Check for base generic format (BaseB)
 	if l.position < l.input.len && l.input[l.position] == `B` {
-		l.advance() // Skip 'B'
-
-		// Read digits/letters for the specified base
+		l.advance()
 		for l.position < l.input.len {
 			ch := l.input[l.position]
 			if ch.is_digit() || (ch >= `a` && ch <= `z`) || (ch >= `A` && ch <= `Z`) {
@@ -288,20 +284,16 @@ fn (mut l Lexer) read_number() Token {
 				break
 			}
 		}
-
 		value := l.input[start..l.position]
 		return l.make_token_at(.integer, value, start_pos)
 	}
 
-	// Check for float
 	if l.position < l.input.len && l.input[l.position] == `.` {
 		if l.position + 1 < l.input.len && l.input[l.position + 1].is_digit() {
 			l.advance()
-
 			for l.position < l.input.len && l.input[l.position].is_digit() {
 				l.advance()
 			}
-
 			value := l.input[start..l.position]
 			return l.make_token_at(.float, value, start_pos)
 		}
@@ -311,6 +303,7 @@ fn (mut l Lexer) read_number() Token {
 	return l.make_token_at(.integer, value, start_pos)
 }
 
+// read_identifier reads identifiers and keywords.
 fn (mut l Lexer) read_identifier() Token {
 	start_pos := l.current_position()
 	start := l.position
@@ -318,7 +311,7 @@ fn (mut l Lexer) read_identifier() Token {
 	for l.position < l.input.len {
 		ch := l.input[l.position]
 		if ch == `$` && l.position == start {
-			l.advance() // Skip $
+			l.advance()
 		} else if l.is_operator_char(ch) && l.position > start && before_has_operator {
 			l.advance()
 		} else if l.is_operator_char(ch) && l.position == start {
@@ -359,22 +352,18 @@ fn (mut l Lexer) read_identifier() Token {
 		'when' { TokenType.when }
 		'fn' { TokenType.fn }
 		'type' { TokenType.type }
-		// Task 11: Control Flow Keywords
 		'if' { TokenType.if_ }
 		'else' { TokenType.else_ }
 		'with' { TokenType.with }
 		'match' { TokenType.match }
 		'rescue' { TokenType.rescue }
-		// Task 11: Concurrency Keywords
 		'spawn' { TokenType.spawn }
 		'receive' { TokenType.receive }
 		'supervisor' { TokenType.supervisor }
 		'worker' { TokenType.worker }
-		// Task 11: Module System Keywords
 		'deps' { TokenType.deps }
 		'application' { TokenType.application }
 		'import' { TokenType.import }
-		// Task 11: Advanced Keywords
 		'describe' { TokenType.describe }
 		'test' { TokenType.test }
 		'assert' { TokenType.assert }
@@ -387,108 +376,94 @@ fn (mut l Lexer) read_identifier() Token {
 	return l.make_token_at(token_type, value, start_pos)
 }
 
+// is_operator_char checks if a character is an operator.
 fn (l Lexer) is_operator_char(ch u8) bool {
-	return ch == `+` || ch == `-` || ch == `*` || ch == `/` || ch == `=` || ch == `!` || ch == `<`
-		|| ch == `>` || ch == `&` || ch == `|` || ch == `^` || ch == `#` || ch == `@`
+	return ch == `+` || ch == `-` || ch == `*` || ch == `/` || ch == `=` || ch == `!` ||
+		ch == `<` || ch == `>` || ch == `&` || ch == `|` || ch == `^` || ch == `#` ||
+		ch == `@`
 }
 
+// read_arrow_or_minus reads a minus or an arrow `->`.
 fn (mut l Lexer) read_arrow_or_minus() Token {
 	start_pos := l.current_position()
-	l.advance() // Skip -
-
+	l.advance()
 	if l.position < l.input.len && l.input[l.position] == `>` {
-		l.advance() // Skip >
+		l.advance()
 		return l.make_token_at(.arrow, '->', start_pos)
 	}
-
 	return l.make_token_at(.identifier, '-', start_pos)
 }
 
-// Task 11: Read left angle operators: <, <<, <-
+// read_left_angle_operators reads `<`, `<<`, `<<<`, and `<=`.
 fn (mut l Lexer) read_left_angle_operators() Token {
 	start_pos := l.current_position()
-	l.advance() // Skip <
-
+	l.advance()
 	if l.position < l.input.len {
 		next_ch := l.input[l.position]
 		if next_ch == `<` {
-			l.advance() // Skip second <
-			// Check for third <
+			l.advance()
 			if l.position < l.input.len && l.input[l.position] == `<` {
-				l.advance() // Skip third <
-				// Shift-left operator
+				l.advance()
 				return l.make_token_at(.identifier, '<<<', start_pos)
 			}
-			// Binary literal opener
 			return l.make_token_at(.double_lt, '<<', start_pos)
 		} else if next_ch == `-` {
-			l.advance() // Skip -
+			l.advance()
 			return l.make_token_at(.left_arrow, '<-', start_pos)
 		} else if next_ch == `=` {
-			l.advance() // Skip '='
+			l.advance()
 			return l.make_token_at(.identifier, '<=', start_pos)
 		}
 	}
-
 	return l.make_token_at(.identifier, '<', start_pos)
 }
 
-// Task 11: Read right angle operators: >, >>, >>>
+// read_right_angle_operators reads `>`, `>>`, `>>>`, and `>=`.
 fn (mut l Lexer) read_right_angle_operators() Token {
 	start_pos := l.current_position()
-	l.advance() // Skip >
-
+	l.advance()
 	if l.position < l.input.len {
 		if l.input[l.position] == `>` {
-			l.advance() // Skip second >
-			// Check for third >
+			l.advance()
 			if l.position < l.input.len && l.input[l.position] == `>` {
-				l.advance() // Skip third >
-				// Shift-right operator
+				l.advance()
 				return l.make_token_at(.identifier, '>>>', start_pos)
 			}
-			// Binary literal closer
 			return l.make_token_at(.double_gt, '>>', start_pos)
 		} else if l.input[l.position] == `=` {
-			l.advance() // Skip '='
+			l.advance()
 			return l.make_token_at(.identifier, '>=', start_pos)
 		}
 	}
-
 	return l.make_token_at(.identifier, '>', start_pos)
 }
 
-// Read exclamation operators: !, !=
+// read_exclamation_operators reads `!` and `!=`.
 fn (mut l Lexer) read_exclamation_operators() Token {
 	start_pos := l.current_position()
-	l.advance() // Skip !
-
+	l.advance()
 	if l.position < l.input.len && l.input[l.position] == `=` {
-		l.advance() // Skip =
+		l.advance()
 		return l.make_token_at(.identifier, '!=', start_pos)
 	}
-
 	return l.make_token_at(.exclamation, '!', start_pos)
 }
 
-// Read equals operators: =, ==
+// read_equals_operators reads `=` and `==`.
 fn (mut l Lexer) read_equals_operators() Token {
 	start_pos := l.current_position()
-	l.advance() // Skip =
-
+	l.advance()
 	if l.position < l.input.len && l.input[l.position] == `=` {
-		l.advance() // Skip second =
+		l.advance()
 		return l.make_token_at(.identifier, '==', start_pos)
 	}
-
 	return l.make_token_at(.bind, '=', start_pos)
 }
 
-// Read single-quoted string -> .charlist
+// read_charlist reads a single-quoted character list.
 fn (mut l Lexer) read_charlist() Token {
 	start_pos := l.current_position()
-	l.advance() // Skip opening '
-
+	l.advance()
 	mut value := ''
 	for l.position < l.input.len && l.input[l.position] != `'` {
 		ch := l.input[l.position]
@@ -514,6 +489,6 @@ fn (mut l Lexer) read_charlist() Token {
 	if l.position >= l.input.len {
 		return l.make_error('Unterminated charlist literal')
 	}
-	l.advance() // Skip closing '
+	l.advance()
 	return l.make_token_at(.charlist, value, start_pos)
 }

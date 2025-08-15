@@ -3,20 +3,10 @@ module main
 import os
 import compile
 
+// Main function to handle command-line arguments and delegate tasks.
 fn main() {
 	if os.args.len < 2 {
-		eprintln('Usage: lx <command> [options]')
-		eprintln('')
-		eprintln('Commands:')
-		eprintln('  new <project>           Create new project (minimal)')
-		eprintln('  add app <name>          Add a new app to current project')
-		eprintln('  compile <file|dir>      Compile LX files')
-		eprintln('  .                       Compile current project (generate rebar3 structure)')
-		eprintln('  run <file.lx>          Compile and run single file')
-		eprintln('  shell [dir]            Launch rebar3 shell')
-		eprintln('  symlink                Create global symlink')
-		eprintln('  --version              Show version')
-		eprintln('  --help                 Show help')
+		print_help()
 		exit(1)
 	}
 
@@ -87,6 +77,11 @@ fn main() {
 	}
 }
 
+// =============================
+// Helper Functions for Commands
+// =============================
+
+// print_help prints the command-line help message.
 fn print_help() {
 	println('LX Compiler - OTP Project Support')
 	println('')
@@ -95,11 +90,11 @@ fn print_help() {
 	println('    lx add app <name>          Add app folder with <name>.lx')
 	println('    lx compile <file|dir>      Compile LX files to Erlang')
 	println('    lx .                       Compile project and generate rebar3 structure')
-	println('    lx run <file.lx>          Compile and run single LX file')
-	println('    lx shell [dir]            Launch rebar3 shell in project')
-	println('    lx symlink [--force]     Create/overwrite global symlink at /usr/local/bin/lx')
-	println('    lx --version              Show version information')
-	println('    lx --help                 Show this help message')
+	println('    lx run <file.lx>           Compile and run single LX file')
+	println('    lx shell [dir]             Launch rebar3 shell in project')
+	println('    lx symlink [--force]       Create/overwrite global symlink at /usr/local/bin/lx')
+	println('    lx --version               Show version information')
+	println('    lx --help                  Show this help message')
 	println('')
 	println('PROJECT LAYOUT:')
 	println('    <project>/')
@@ -107,7 +102,7 @@ fn print_help() {
 	println('      <project>.config')
 }
 
-// Create new minimal project skeleton
+// create_new_project creates a new minimal project skeleton.
 fn create_new_project(project_name string) {
 	if os.exists(project_name) {
 		eprintln('Error: Directory "${project_name}" already exists')
@@ -116,7 +111,6 @@ fn create_new_project(project_name string) {
 
 	println('Creating project: ${project_name}')
 
-	// Create directory structure (minimal)
 	dirs := [
 		project_name,
 		'${project_name}/apps',
@@ -129,7 +123,6 @@ fn create_new_project(project_name string) {
 		}
 	}
 
-	// Create project config file
 	project_yml := '# ${project_name}.yml - Lx project configuration\n' + 'erl_opts:\n' +
 		'  - debug_info\n' + '  - nowarn_unused_vars\n' + 'deps:\n' +
 		'  # Add your dependencies here\n' + '  # Example:\n' + '  # jsx: "3.1.0"\n' +
@@ -148,7 +141,7 @@ fn create_new_project(project_name string) {
 	println('  lx shell')
 }
 
-// Add a new app to the current project directory
+// add_app_to_project adds a new app to the current project directory.
 fn add_app_to_project(project_dir string, app_name string) {
 	apps_dir := os.join_path(project_dir, 'apps')
 	if !os.exists(apps_dir) {
@@ -167,7 +160,6 @@ fn add_app_to_project(project_dir string, app_name string) {
 		exit(1)
 	}
 
-	// Create initial file <app_name>.lx
 	initial_lx := generate_initial_app_template(app_name)
 	os.write_file(os.join_path(app_dir, '${app_name}.lx'), initial_lx) or {
 		eprintln('Failed to create initial LX file: ${err}')
@@ -177,7 +169,7 @@ fn add_app_to_project(project_dir string, app_name string) {
 	println('Added app ${app_name} at ${app_dir}')
 }
 
-// Compile target (file or directory)
+// compile_target compiles a file or directory.
 fn compile_target(target string, run_rebar bool) {
 	if !os.exists(target) {
 		eprintln('Error: "${target}" not found')
@@ -185,13 +177,11 @@ fn compile_target(target string, run_rebar bool) {
 	}
 
 	if os.is_dir(target) {
-		// If this looks like a project (has apps/), compile as project
 		if os.exists(os.join_path(target, 'apps')) {
 			compile_project(target)
 			return
 		}
 
-		// Compile all .lx files in directory (non-project)
 		lx_files := find_lx_files(target)
 		if lx_files.len == 0 {
 			println('No .lx files found in ${target}')
@@ -204,10 +194,7 @@ fn compile_target(target string, run_rebar bool) {
 
 		if run_rebar && os.exists('rebar.config') {
 			println('Running rebar3 compile...')
-
-			// Execute rebar3 with real-time output
 			exit_code := os.system('rebar3 compile')
-
 			if exit_code != 0 {
 				eprintln('rebar3 compile failed with exit code: ${exit_code}')
 				exit(1)
@@ -215,23 +202,19 @@ fn compile_target(target string, run_rebar bool) {
 			println('rebar3 compile completed successfully')
 		}
 	} else {
-		// Compile single file
 		compile.compile_file(target)
 	}
 }
 
-// Compile an Lx project: generate rebar3 structure and build
+// compile_project compiles an Lx project.
 fn compile_project(project_dir string) {
-	// Ensure rebar files under _build
 	ensure_rebar_build_files(project_dir)
-
 	apps_dir := os.join_path(project_dir, 'apps')
 	if !os.exists(apps_dir) {
 		eprintln('Error: apps/ directory not found in ${project_dir}')
 		exit(1)
 	}
 
-	// Build output apps dir inside _build
 	build_dir := os.join_path(project_dir, '_build')
 	build_apps_root := os.join_path(build_dir, 'apps')
 	os.mkdir_all(build_apps_root) or {}
@@ -244,40 +227,30 @@ fn compile_project(project_dir string) {
 			continue
 		}
 
-		// Target paths inside _build
 		app_build_dir := os.join_path(build_apps_root, app_name)
 		app_src_dir := os.join_path(app_build_dir, 'src')
 		app_include_dir := os.join_path(app_build_dir, 'include')
 		os.mkdir_all(app_src_dir) or {}
 		os.mkdir_all(app_include_dir) or {}
 
-		// Collect .lx files at the top level of the app directory (ignore src/include)
 		entries := os.ls(app_path) or { []string{} }
 		mut app_src_written := false
 		for entry in entries {
 			if entry.ends_with('.lx') {
 				lx_path := os.join_path(app_path, entry)
-				// Copy source into build src dir
 				build_lx_path := os.join_path(app_src_dir, entry)
 				os.cp(lx_path, build_lx_path) or {}
-
-				// Compile the .lx inside _build so all artifacts (.erl/.app.src/.hrl) are generated there
 				compile.compile_file(build_lx_path)
-
-				app_src_written = app_src_written
-					|| os.exists(os.join_path(app_src_dir, '${app_name}.app.src'))
+				app_src_written = app_src_written || os.exists(os.join_path(app_src_dir, '${app_name}.app.src'))
 			}
 		}
 
-		// If no file produced an app.src, create a default one in _build
 		app_app_src_path := os.join_path(app_src_dir, '${app_name}.app.src')
 		if !app_src_written {
 			os.write_file(app_app_src_path, default_app_src(app_name)) or {}
 		} else {
-			// Ensure mod entry exists in existing app.src
 			mut content := os.read_file(app_app_src_path) or { '' }
 			if content.len > 0 && !content.contains('{mod,') {
-				// naive inject before env or at end
 				if content.contains('{env,') {
 					content = content.replace('{env,', '  {mod, {' + app_name +
 						'_app, []}},\n  {env,')
@@ -289,28 +262,20 @@ fn compile_project(project_dir string) {
 			}
 		}
 
-		// Ensure an application behaviour module exists
 		app_app_module_path := os.join_path(app_src_dir, app_name + '_app.erl')
 		if !os.exists(app_app_module_path) {
 			os.write_file(app_app_module_path, generate_default_application_module(app_name)) or {}
 		}
 
-		// Add to shell apps list
 		shell_apps << app_name
 	}
 
-	// Update rebar.config with shell apps list
 	update_rebar_shell_apps(build_dir, shell_apps)
-
-	// Run rebar3 compile inside _build
 	original_dir := os.getwd()
 	os.chdir(build_dir) or {}
 	println('Running rebar3 compile in ${build_dir} ...')
-
-	// Execute rebar3 with real-time output
 	exit_code := os.system('rebar3 compile')
 	os.chdir(original_dir) or {}
-
 	if exit_code != 0 {
 		eprintln('rebar3 compile failed with exit code: ${exit_code}')
 		exit(1)
@@ -318,7 +283,116 @@ fn compile_project(project_dir string) {
 	println('rebar3 compile completed successfully')
 }
 
-// Ensure umbrella rebar.config under _build and sys.config under _build/config
+// run_single_file compiles and runs a single LX file.
+fn run_single_file(file string) {
+	if !os.exists(file) {
+		eprintln('Error: File "${file}" not found')
+		exit(1)
+	}
+
+	module_name := os.file_name(file).all_before_last('.')
+	dir := os.dir(file)
+	compile.compile_file(file)
+	original_dir := os.getwd()
+	os.chdir(dir) or {
+		eprintln('Failed to change directory: ${err}')
+		exit(1)
+	}
+	erl_file := module_name + '.erl'
+	res := os.execute('erlc ' + erl_file)
+	if res.exit_code != 0 {
+		eprintln('erlc failed: ' + res.output)
+		os.chdir(original_dir) or {}
+		exit(1)
+	}
+	run_res := os.execute('erl -noshell -eval \'io:format("~p\\n", [' + module_name +
+		':main()]).\' -s init stop')
+	if run_res.exit_code != 0 {
+		eprintln('erl failed: ' + run_res.output)
+		os.chdir(original_dir) or {}
+		exit(1)
+	}
+	print(run_res.output)
+	os.rm(erl_file) or {}
+	os.rm(module_name + '.beam') or {}
+	os.chdir(original_dir) or {}
+}
+
+// launch_shell launches the rebar3 shell.
+fn launch_shell(dir string) {
+	ensure_rebar_build_files(dir)
+	original_dir := os.getwd()
+	os.chdir(dir) or {
+		eprintln('Failed to change directory: ${err}')
+		exit(1)
+	}
+
+	rebar_check := os.execute('which rebar3')
+	if rebar_check.exit_code != 0 {
+		eprintln('Error: rebar3 not found in PATH')
+		eprintln('Please install rebar3: https://rebar3.readme.io/docs/getting-started')
+		os.chdir(original_dir) or {}
+		exit(1)
+	}
+
+	kernel_path := os.join_path(os.home_dir(), '.lx', 'kernel')
+	if os.exists(kernel_path) {
+		current_flags := os.getenv_opt('ERL_FLAGS') or { '' }
+		mut new_flags := '-pa ${kernel_path}'
+		if current_flags.len > 0 {
+			new_flags = new_flags + ' ' + current_flags
+		}
+		os.setenv('ERL_FLAGS', new_flags, true)
+		println('ERL_FLAGS set for shell: ${new_flags}')
+	}
+
+	apps_dir := os.join_path(dir, 'apps')
+	if os.exists(apps_dir) {
+		println('Compiling Lx sources under ${apps_dir} ...')
+		compile_project('.')
+	}
+
+	build_dir := os.join_path(dir, '_build')
+	println('Starting rebar3 shell in ${build_dir} ...')
+	os.chdir(build_dir) or {}
+	_ := os.system('rebar3 shell')
+	os.chdir(original_dir) or {}
+}
+
+// create_symlink creates a global symlink for the LX executable.
+fn create_symlink(force bool) {
+	lx_path := os.executable()
+	target := '/usr/local/bin/lx'
+
+	if os.exists(target) {
+		if force {
+			os.rm(target) or {
+				eprintln('Failed to remove existing target ${target}: ${err}')
+				exit(1)
+			}
+			println('Removed existing ${target}')
+		} else {
+			println('Symlink already exists at ${target}')
+			println('Use: sudo lx symlink --force  to overwrite')
+			return
+		}
+	}
+
+	os.symlink(lx_path, target) or {
+		eprintln('Failed to create symlink: ${err}')
+		eprintln('You may need to run with sudo: sudo lx symlink [--force]')
+		exit(1)
+	}
+
+	println('Created symlink: ${target} -> ${lx_path}')
+	println('You can now use "lx" from anywhere')
+}
+
+// =======================
+// Project Utility Functions
+// =======================
+
+// ensure_rebar_build_files ensures the necessary rebar files exist in _build.
 fn ensure_rebar_build_files(project_dir string) {
 	build_dir := os.join_path(project_dir, '_build')
 	rebar_path := os.join_path(build_dir, 'rebar.config')
@@ -326,17 +400,14 @@ fn ensure_rebar_build_files(project_dir string) {
 	sys_config_path := os.join_path(config_dir, 'sys.config')
 	os.mkdir_all(build_dir) or {}
 
-	// Read project YAML configuration
 	project_name := if project_dir == '.' { os.base(os.getwd()) } else { os.base(project_dir) }
 	project_yml_path := os.join_path(project_dir, '${project_name}.yml')
-
 	mut erl_opts := 'debug_info, nowarn_unused_vars'
 	mut deps_content := '[]'
 
 	if os.exists(project_yml_path) {
 		yml_content := os.read_file(project_yml_path) or { '' }
 		if yml_content.len > 0 {
-			// Parse YAML for erl_opts and deps
 			parsed_config := parse_project_yml(yml_content)
 			if parsed_config.erl_opts.len > 0 {
 				erl_opts = parsed_config.erl_opts
@@ -360,7 +431,7 @@ fn ensure_rebar_build_files(project_dir string) {
 	}
 }
 
-// Write or update shell apps in rebar.config under _build
+// update_rebar_shell_apps updates the rebar.config with shell apps list.
 fn update_rebar_shell_apps(build_dir string, apps []string) {
 	rebar_path := os.join_path(build_dir, 'rebar.config')
 	mut content := os.read_file(rebar_path) or { '' }
@@ -385,7 +456,7 @@ fn update_rebar_shell_apps(build_dir string, apps []string) {
 	os.write_file(rebar_path, content) or {}
 }
 
-// Generate a minimal default application behaviour module for an app name
+// generate_default_application_module generates a minimal default application behaviour module for an app.
 fn generate_default_application_module(app_name string) string {
 	mod := app_name + '_app'
 	mut s := ''
@@ -399,28 +470,22 @@ fn generate_default_application_module(app_name string) string {
 	return s
 }
 
-// Generate a default .app.src content for an app
+// default_app_src generates a default .app.src content for an app.
 fn default_app_src(app_name string) string {
-	// Check if there's a deps declaration in the project
 	mut applications := '[kernel, stdlib]'
-
-	// Look for deps in the project's main LX files
 	project_dir := os.getwd()
 	apps_dir := os.join_path(project_dir, 'apps')
 	if os.exists(apps_dir) {
-		// Check main project file for deps
 		main_lx_path := os.join_path(apps_dir, app_name, '${app_name}.lx')
 		if os.exists(main_lx_path) {
 			content := os.read_file(main_lx_path) or { '' }
 			if content.len > 0 {
-				// Simple parsing for deps [:cowboy, :jsx]
 				if content.contains('deps [') {
 					start_idx := content.index('deps [') or { -1 }
 					if start_idx >= 0 {
 						end_idx := content.index_after(']', start_idx) or { -1 }
 						if end_idx >= 0 {
 							deps_content := content[start_idx + 6..end_idx]
-							// Parse atoms from deps
 							mut deps_list := []string{}
 							lines := deps_content.split('\n')
 							for line in lines {
@@ -445,7 +510,7 @@ fn default_app_src(app_name string) string {
 	return '{application, ${app_name},\n [\n  {description, "An OTP application"},\n  {vsn, "0.1.0"},\n  {registered, []},\n  {applications, ${applications}},\n  {mod, {${app_name}_app, []}},\n  {env, []}\n ]}.\n'
 }
 
-// Rewrite the application name line in a generated .app.src content
+// rewrite_app_name rewrites the application name line in a generated .app.src content.
 fn rewrite_app_name(content string, app_name string) string {
 	mut lines := content.split('\n')
 	for i, line in lines {
@@ -457,154 +522,22 @@ fn rewrite_app_name(content string, app_name string) string {
 	return lines.join('\n')
 }
 
-// Run single file (lightweight mode)
-fn run_single_file(file string) {
-	if !os.exists(file) {
-		eprintln('Error: File "${file}" not found')
-		exit(1)
-	}
-
-	module_name := os.file_name(file).all_before_last('.')
-	dir := os.dir(file)
-	compile.compile_file(file)
-	original_dir := os.getwd()
-	os.chdir(dir) or {
-		eprintln('Failed to change directory: ${err}')
-		exit(1)
-	}
-	erl_file := module_name + '.erl'
-	res := os.execute('erlc ' + erl_file)
-	if res.exit_code != 0 {
-		eprintln('erlc failed: ' + res.output)
-		os.chdir(original_dir) or {}
-		exit(1)
-	}
-	run_res := os.execute('erl -noshell -eval \'io:format("~p\\n", [' + module_name +
-		":main()]).' -s init stop")
-	if run_res.exit_code != 0 {
-		eprintln('erl failed: ' + run_res.output)
-		os.chdir(original_dir) or {}
-		exit(1)
-	}
-	print(run_res.output)
-	os.rm(erl_file) or {}
-	os.rm(module_name + '.beam') or {}
-	os.chdir(original_dir) or {}
-}
-
-// Launch rebar3 shell
-fn launch_shell(dir string) {
-	// If rebar project files are missing, create them to allow shell to start
-	ensure_rebar_build_files(dir)
-	original_dir := os.getwd()
-	os.chdir(dir) or {
-		eprintln('Failed to change directory: ${err}')
-		exit(1)
-	}
-
-	// Check if rebar3 is available
-	rebar_check := os.execute('which rebar3')
-	if rebar_check.exit_code != 0 {
-		eprintln('Error: rebar3 not found in PATH')
-		eprintln('Please install rebar3: https://rebar3.readme.io/docs/getting-started')
-		os.chdir(original_dir) or {}
-		exit(1)
-	}
-
-	// Load kernel modules from ~/.lx/kernel if they exist (via ERL_FLAGS so the same VM sees it)
-	kernel_path := os.join_path(os.home_dir(), '.lx', 'kernel')
-	if os.exists(kernel_path) {
-		current_flags := os.getenv_opt('ERL_FLAGS') or { '' }
-		mut new_flags := '-pa ${kernel_path}'
-		if current_flags.len > 0 {
-			new_flags = new_flags + ' ' + current_flags
-		}
-		os.setenv('ERL_FLAGS', new_flags, true)
-		println('ERL_FLAGS set for shell: ${new_flags}')
-	}
-
-	// Pre-compile all .lx files under apps/
-	apps_dir := os.join_path(dir, 'apps')
-	if os.exists(apps_dir) {
-		println('Compiling Lx sources under ${apps_dir} ...')
-		compile_project('.')
-	}
-
-	// Launch rebar3 shell inside _build
-	build_dir := os.join_path(dir, '_build')
-	println('Starting rebar3 shell in ${build_dir} ...')
-	os.chdir(build_dir) or {}
-	_ := os.system('rebar3 shell')
-
-	os.chdir(original_dir) or {}
-}
-
-// Load kernel modules from specified directory
-fn load_kernel_modules(kernel_path string) {
-	entries := os.ls(kernel_path) or { return }
-
-	for entry in entries {
-		if entry.ends_with('.beam') {
-			module_name := os.file_name(entry).all_before_last('.')
-
-			// Add the kernel path to code path
-			code_path_cmd := 'erl -noshell -eval \'code:add_patha("${kernel_path}").\' -s init stop'
-			os.execute(code_path_cmd)
-
-			println('  Loaded kernel module: ${module_name}')
-		}
-	}
-}
-
-// Create global symlink
-fn create_symlink(force bool) {
-	lx_path := os.executable()
-	target := '/usr/local/bin/lx'
-
-	if os.exists(target) {
-		if force {
-			// Try remove existing symlink/file
-			os.rm(target) or {
-				eprintln('Failed to remove existing target ${target}: ${err}')
-				exit(1)
-			}
-			println('Removed existing ${target}')
-		} else {
-			println('Symlink already exists at ${target}')
-			println('Use: sudo lx symlink --force  to overwrite')
-			return
-		}
-	}
-
-	os.symlink(lx_path, target) or {
-		eprintln('Failed to create symlink: ${err}')
-		eprintln('You may need to run with sudo: sudo lx symlink [--force]')
-		exit(1)
-	}
-
-	println('Created symlink: ${target} -> ${lx_path}')
-	println('You can now use "lx" from anywhere')
-}
-
-// Helper function to find .lx files in directory
+// find_lx_files is a helper function to find .lx files in a directory.
 fn find_lx_files(dir string) []string {
 	mut files := []string{}
 	entries := os.ls(dir) or { return files }
-
 	for entry in entries {
 		full_path := os.join_path(dir, entry)
 		if os.is_dir(full_path) {
-			// Recursively search subdirectories
 			files << find_lx_files(full_path)
 		} else if entry.ends_with('.lx') {
 			files << full_path
 		}
 	}
-
 	return files
 }
 
-// Generate initial template for a new app including application, supervisor and a worker
+// generate_initial_app_template generates the initial template for a new app.
 fn generate_initial_app_template(app_name string) string {
 	return 'application {\n' + '  description: "' + app_name + ' application",\n' +
 		'  vsn: "0.1.0",\n' + '  deps: []\n' + '}\n\n' + 'supervisor ' + app_name + '_sup do\n' +
@@ -613,21 +546,24 @@ fn generate_initial_app_template(app_name string) string {
 		'  end\n' + 'end\n\n' + 'def main() do\n' + '  :ok\n' + 'end\n'
 }
 
-// Parse project YAML configuration
+// ==========================
+// Project Configuration Parsing
+// ==========================
+
+// ProjectConfig holds parsed project configuration.
 struct ProjectConfig {
 mut:
 	erl_opts string
 	deps     string
 }
 
+// parse_project_yml parses a project YAML file.
 fn parse_project_yml(yml_content string) ProjectConfig {
 	mut config := ProjectConfig{
 		erl_opts: 'debug_info, nowarn_unused_vars'
 		deps:     '[]'
 	}
-
 	lines := yml_content.split('\n')
-
 	mut in_erl_opts := false
 	mut in_deps := false
 	mut erl_opts_list := []string{}
@@ -635,38 +571,30 @@ fn parse_project_yml(yml_content string) ProjectConfig {
 	mut current_dep := ''
 	mut current_dep_git := ''
 	mut current_dep_branch := ''
-
 	for line in lines {
 		trimmed := line.trim_space()
-
 		if trimmed.starts_with('#') || trimmed.len == 0 {
 			continue
 		}
-
 		if trimmed == 'erl_opts:' {
 			in_erl_opts = true
 			in_deps = false
 			continue
 		}
-
 		if trimmed == 'deps:' {
 			in_erl_opts = false
 			in_deps = true
 			continue
 		}
-
 		if in_erl_opts && trimmed.starts_with('- ') {
 			opt := trimmed[2..].trim_space()
 			if opt.len > 0 {
 				erl_opts_list << opt
 			}
 		}
-
 		if in_deps {
-			// Check if this is a new dependency (not indented)
-			if !trimmed.starts_with('  ') && trimmed.contains(':') && !trimmed.starts_with('git:')
-				&& !trimmed.starts_with('branch:') {
-				// New dependency
+			if !trimmed.starts_with('  ') && trimmed.contains(':') && !trimmed.starts_with('git:') &&
+				!trimmed.starts_with('branch:') {
 				parts := trimmed.split(':')
 				if parts.len >= 2 {
 					current_dep = parts[0].trim_space()
@@ -677,8 +605,6 @@ fn parse_project_yml(yml_content string) ProjectConfig {
 					if version.ends_with('"') {
 						version = version[..version.len - 1]
 					}
-
-					// If version is empty, this might be a Git dependency
 					if version.len == 0 {
 						current_dep_git = ''
 						current_dep_branch = ''
@@ -688,8 +614,6 @@ fn parse_project_yml(yml_content string) ProjectConfig {
 					}
 				}
 			} else if trimmed.contains('git:') {
-				// Git URL for current dependency
-				// Find the position of 'git:' and extract everything after it
 				git_pos := trimmed.index('git:') or { -1 }
 				if git_pos >= 0 {
 					git_content := trimmed[git_pos + 4..].trim_space()
@@ -703,8 +627,6 @@ fn parse_project_yml(yml_content string) ProjectConfig {
 					current_dep_git = git_url
 				}
 			} else if trimmed.contains('branch:') {
-				// Branch for current dependency
-				// Find the position of 'branch:' and extract everything after it
 				branch_pos := trimmed.index('branch:') or { -1 }
 				if branch_pos >= 0 {
 					branch_content := trimmed[branch_pos + 7..].trim_space()
@@ -716,8 +638,6 @@ fn parse_project_yml(yml_content string) ProjectConfig {
 						branch = branch[..branch.len - 1]
 					}
 					current_dep_branch = branch
-
-					// Now we have all info for Git dependency
 					if current_dep.len > 0 && current_dep_git.len > 0 {
 						deps_list << '{${current_dep}, {git, "${current_dep_git}", {branch, "${current_dep_branch}"}}}'
 						current_dep = ''
@@ -728,14 +648,11 @@ fn parse_project_yml(yml_content string) ProjectConfig {
 			}
 		}
 	}
-
 	if erl_opts_list.len > 0 {
 		config.erl_opts = erl_opts_list.join(', ')
 	}
-
 	if deps_list.len > 0 {
 		config.deps = '[${deps_list.join(', ')}]'
 	}
-
 	return config
 }

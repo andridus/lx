@@ -1,64 +1,64 @@
 # Type aliases for common types
-type StringList = list(string)
-type NumberList = list(integer)
-type StringMap = map(string, string)
-type NumberMap = map(string, integer)
+type string_list :: list(string)
+type number_list :: list(integer)
+type string_map :: map(string, string)
+type number_map :: map(string, integer)
 
-def string_list_length(list) do
+def string_list_length(list :: string_list) do
     length(list)
 end
 
-def number_list_sum(list) do
-    foldl(+, 0, list)
+def number_list_sum(list :: number_list) do
+    lists:foldl(&erlang:+/2, 0, list)
 end
 
 def string_map_keys(map) do
-    map_keys(map)
+    maps:keys(map)
 end
 
 def number_map_values(map) do
-    map_values(map)
+    maps:values(map)
 end
 
 # Generic type aliases
-type Option(T) = {some: T} | {none: nil}
-type Result(T, E) = {ok: T} | {error: E}
-type Either(L, R) = {left: L} | {right: R}
+type option(T) :: {:some, T} | {:none, nil}
+type result(T, E) :: {:ok, T} | {:error, E}
+type either(L, R) :: {:left, L} | {:right, R}
 
-def option_map(f, option) do
+def option_map(f, option) :: option(integer) do
     case option do
-        {some: value} -> {some: f(value)}
-        {none: _} -> {none: nil}
+        {:some, value} -> {:some, f(value)}
+        {:none, _} -> {:none, nil}
     end
 end
 
-def option_bind(f, option) do
+def option_bind(f, option) :: option(string) do
     case option do
-        {some: value} -> f(value)
-        {none: _} -> {none: nil}
+        {:some, value} -> f(value)
+        {:none, _} -> {:none, nil}
     end
 end
 
-def result_map(f, result) do
+def result_map(f, result) :: result(integer, string) do
     case result do
-        {ok: value} -> {ok: f(value)}
-        {error: err} -> {error: err}
+        {:ok, value} -> {:ok, f(value)}
+        {:error, err} -> {:error, err}
     end
 end
 
-def either_map_left(f, either) do
+def either_map_left(f, either) :: either(integer, integer) do
     case either do
-        {left: value} -> {left: f(value)}
-        {right: value} -> {right: value}
+        {:left, value} -> {:left, f(value)}
+        {:right, value} -> {:right, value}
     end
 end
 
 def either_map_right(f, either) do
     case either do
-        {left: value} -> {left: value}
-        {right: value} -> {right: f(value)}
+        {:left, value} -> {:left, value}
+        {:right, value} -> {:right, f(value)}
     end
 end
 def main() do
-    string_list_length()
+    string_list_length(["some", "other"])
 end

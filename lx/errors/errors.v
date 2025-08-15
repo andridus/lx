@@ -2,6 +2,7 @@ module errors
 
 import ast
 
+// ErrorKind defines the type of error.
 pub enum ErrorKind {
 	lexical
 	parser
@@ -9,6 +10,7 @@ pub enum ErrorKind {
 	generation
 }
 
+// Err struct to hold error information.
 pub struct Err {
 pub:
 	kind       ErrorKind
@@ -17,17 +19,20 @@ pub:
 	suggestion string
 }
 
+// ErrorReporter collects and reports errors.
 pub struct ErrorReporter {
 mut:
 	errors []Err
 }
 
+// new_error_reporter creates a new ErrorReporter.
 pub fn new_error_reporter() ErrorReporter {
 	return ErrorReporter{
 		errors: []
 	}
 }
 
+// report adds a new error to the reporter.
 pub fn (mut er ErrorReporter) report(kind ErrorKind, message string, position ast.Position) {
 	err_obj := Err{
 		kind:     kind
@@ -37,6 +42,7 @@ pub fn (mut er ErrorReporter) report(kind ErrorKind, message string, position as
 	er.errors << err_obj
 }
 
+// report_with_suggestion adds a new error with a suggestion.
 pub fn (mut er ErrorReporter) report_with_suggestion(kind ErrorKind, message string, position ast.Position, suggestion string) {
 	err_obj := Err{
 		kind:       kind
@@ -47,14 +53,17 @@ pub fn (mut er ErrorReporter) report_with_suggestion(kind ErrorKind, message str
 	er.errors << err_obj
 }
 
+// has_errors checks if there are any errors.
 pub fn (er &ErrorReporter) has_errors() bool {
 	return er.errors.len > 0
 }
 
+// all returns all collected errors.
 pub fn (er &ErrorReporter) all() []Err {
 	return er.errors
 }
 
+// format_all formats all collected errors into a single string.
 pub fn (er &ErrorReporter) format_all() string {
 	mut out := []string{}
 	for err in er.errors {
@@ -63,6 +72,11 @@ pub fn (er &ErrorReporter) format_all() string {
 	return out.join('\n')
 }
 
+// ===================
+// Error Formatting
+// ===================
+
+// format_error formats a single error object.
 pub fn format_error(err Err) string {
 	pos := if err.position.line > 0 && err.position.column > 0 {
 		'${err.position.file}:${err.position.line}:${err.position.column}'
@@ -72,18 +86,7 @@ pub fn format_error(err Err) string {
 	return '[${err.kind.str()}] ${pos} ${err.message}'
 }
 
-fn red() string {
-	return '\x1b[31m'
-}
-
-fn white() string {
-	return '\x1b[37m'
-}
-
-fn reset() string {
-	return '\x1b[0m'
-}
-
+// format_error_detailed formats a single error with detailed context.
 pub fn format_error_detailed(err Err, source_lines []string) string {
 	mut out := ''
 	out += red() +
@@ -118,6 +121,27 @@ pub fn format_error_detailed(err Err, source_lines []string) string {
 	return out
 }
 
+// =====================
+// Formatting Colors
+// =====================
+
+fn red() string {
+	return '\x1b[31m'
+}
+
+fn white() string {
+	return '\x1b[37m'
+}
+
+fn reset() string {
+	return '\x1b[0m'
+}
+
+// =====================
+// Enum String
+// =====================
+
+// str returns a string representation of the ErrorKind.
 pub fn (k ErrorKind) str() string {
 	return match k {
 		.lexical { 'Lexical' }

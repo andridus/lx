@@ -1991,9 +1991,9 @@ fn (mut p Parser) parse_single_type() !ast.Node {
 	}
 
 	// Handle identifiers
-	if p.current.type_ != .identifier {
-		return p.error_and_return('Expected type name, atom, tuple, or list')
-	}
+	// if p.current.type_ != .identifier {
+	// 	return p.error_and_return('Expected type name, atom, tuple, or list')
+	// }
 
 	type_name := p.current.value
 	p.advance()
@@ -2417,7 +2417,7 @@ fn (mut p Parser) parse_tuple_pattern() !ast.Node {
 	}
 
 	if p.current.type_ != .rbrace {
-		return error('Expected closing brace in tuple pattern')
+		return p.error_and_return('Expected closing brace in tuple pattern')
 	}
 	p.advance() // Skip '}'
 
