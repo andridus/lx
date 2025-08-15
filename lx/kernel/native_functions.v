@@ -1056,6 +1056,146 @@ pub const native_functions = {
 			'erl': '$1 =:= nil'
 		}]
 	}
+	'is_atom':    FunctionInfo{
+		precedence:    0
+		associativity: .left
+		fixity:        .prefix
+		signatures:    [
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'any'
+					params: []
+				}]
+				return_type: ast.Type{
+					name:   'boolean'
+					params: []
+				}
+			},
+		]
+		gen:           [{
+			'erl': 'is_atom($1)'
+		}]
+	}
+	'is_integer': FunctionInfo{
+		precedence:    0
+		associativity: .left
+		fixity:        .prefix
+		signatures:    [
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'any'
+					params: []
+				}]
+				return_type: ast.Type{
+					name:   'boolean'
+					params: []
+				}
+			},
+		]
+		gen:           [{
+			'erl': 'is_integer($1)'
+		}]
+	}
+	'is_float':   FunctionInfo{
+		precedence:    0
+		associativity: .left
+		fixity:        .prefix
+		signatures:    [
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'any'
+					params: []
+				}]
+				return_type: ast.Type{
+					name:   'boolean'
+					params: []
+				}
+			},
+		]
+		gen:           [{
+			'erl': 'is_float($1)'
+		}]
+	}
+	'is_binary':  FunctionInfo{
+		precedence:    0
+		associativity: .left
+		fixity:        .prefix
+		signatures:    [
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'any'
+					params: []
+				}]
+				return_type: ast.Type{
+					name:   'boolean'
+					params: []
+				}
+			},
+		]
+		gen:           [{
+			'erl': 'is_binary($1)'
+		}]
+	}
+	'is_list':    FunctionInfo{
+		precedence:    0
+		associativity: .left
+		fixity:        .prefix
+		signatures:    [
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'any'
+					params: []
+				}]
+				return_type: ast.Type{
+					name:   'boolean'
+					params: []
+				}
+			},
+		]
+		gen:           [{
+			'erl': 'is_list($1)'
+		}]
+	}
+	'is_tuple':   FunctionInfo{
+		precedence:    0
+		associativity: .left
+		fixity:        .prefix
+		signatures:    [
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'any'
+					params: []
+				}]
+				return_type: ast.Type{
+					name:   'boolean'
+					params: []
+				}
+			},
+		]
+		gen:           [{
+			'erl': 'is_tuple($1)'
+		}]
+	}
+	'is_map':     FunctionInfo{
+		precedence:    0
+		associativity: .left
+		fixity:        .prefix
+		signatures:    [
+			TypeSignature{
+				parameters:  [ast.Type{
+					name:   'any'
+					params: []
+				}]
+				return_type: ast.Type{
+					name:   'boolean'
+					params: []
+				}
+			},
+		]
+		gen:           [{
+			'erl': 'is_map($1)'
+		}]
+	}
 	// Test framework functions
 	'assert':     FunctionInfo{
 		precedence:    0

@@ -478,6 +478,13 @@ fn (mut p Parser) parse_function_head() !ast.Node {
 		p.parse_type_annotation()! // Parse but don't store
 	}
 
+	// Parse guard clause if present
+	mut guard := ast.Node{}
+	if p.current.type_ == .when {
+		p.advance() // Skip 'when'
+		guard = p.parse_expression()!
+	}
+
 	if p.current.type_ != .arrow {
 		return p.error_and_return('Expected arrow (->)')
 	}
@@ -518,10 +525,15 @@ fn (mut p Parser) parse_function_head() !ast.Node {
 		body = p.parse_expression()!
 	}
 
-	// Create function with args as children[0] and body as children[1]
+	// Create function with args as children[0], body as children[1], and optional guard as children[2]
 	mut children := []ast.Node{}
 	children << args // args block
 	children << body // function body
+
+	// Add guard as third child if present
+	if guard.id != 0 {
+		children << guard
+	}
 
 	return ast.Node{
 		id:       p.get_next_id()
@@ -611,6 +623,58 @@ fn (mut p Parser) parse_args() !ast.Node {
 	}
 }
 
+fn (mut p Parser) parse_string_interpolation(id int, value string, pos ast.Position) !ast.Node {
+	mut segments := []ast.Node{}
+	mut current_pos := 0
+
+	for current_pos < value.len {
+		// Find next interpolation start
+		interp_start_opt := value.index_after('#{', current_pos)
+
+		if interp_start_opt == none {
+			// No more interpolations, add remaining string
+			if current_pos < value.len {
+				remaining := value[current_pos..]
+				if remaining.len > 0 {
+					segments << ast.new_string(p.get_next_id(), remaining, pos)
+				}
+			}
+			break
+		}
+
+		interp_start := interp_start_opt or { break }
+
+		// Add string segment before interpolation
+		if interp_start > current_pos {
+			before := value[current_pos..interp_start]
+			if before.len > 0 {
+				segments << ast.new_string(p.get_next_id(), before, pos)
+			}
+		}
+
+		// Find interpolation end
+		interp_end_opt := value.index_after('}', interp_start + 2)
+		if interp_end_opt == none {
+			return p.error_and_return('Unclosed string interpolation')
+		}
+
+		interp_end := interp_end_opt or {
+			return p.error_and_return('Unclosed string interpolation')
+		}
+
+		// Extract and parse interpolation expression
+		expr_str := value[interp_start + 2..interp_end]
+		if expr_str.len > 0 {
+			// Create a simple variable reference for now
+			segments << ast.new_variable_ref(p.get_next_id(), expr_str, pos)
+		}
+
+		current_pos = interp_end + 1
+	}
+
+	return ast.new_string_interpolation(id, segments, pos)
+}
+
 fn (mut p Parser) parse_literal() !ast.Node {
 	pos := p.current.position
 	lit_id := p.get_next_id()
@@ -629,6 +693,10 @@ fn (mut p Parser) parse_literal() !ast.Node {
 		.string {
 			value := p.current.value
 			p.advance()
+			// Check if string contains interpolation
+			if value.contains('#{') {
+				return p.parse_string_interpolation(lit_id, value, pos)
+			}
 			ast.new_string(lit_id, value, pos)
 		}
 		.charlist {

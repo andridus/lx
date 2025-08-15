@@ -15,6 +15,7 @@ mut:
 	var_map          map[string]string // Maps original var names to unique Erlang names
 	next_hash        int = 1
 	directives_table &parser.DirectivesTable
+	in_pattern       bool // Track if we're in pattern matching context
 }
 
 pub fn new_generator(directives_table &parser.DirectivesTable) ErlangGenerator {
@@ -545,7 +546,9 @@ fn (mut g ErlangGenerator) generate_function(node ast.Node) ! {
 											unique_name := g.get_unique_var_name(arg.value)
 											g.output.write_string(unique_name)
 										} else {
+											g.in_pattern = true
 											g.generate_node(arg)!
+											g.in_pattern = false
 										}
 									}
 								} else {
@@ -554,10 +557,23 @@ fn (mut g ErlangGenerator) generate_function(node ast.Node) ! {
 										unique_name := g.get_unique_var_name(head_args.value)
 										g.output.write_string(unique_name)
 									} else {
+										g.in_pattern = true
 										g.generate_node(head_args)!
+										g.in_pattern = false
 									}
 								}
-								g.output.write_string(') ->\n    ')
+								g.output.write_string(')')
+
+								// Generate guard if present (third child)
+								if head.children.len >= 3 {
+									guard := head.children[2]
+									if guard.id != 0 {
+										g.output.write_string(' when ')
+										g.generate_node(guard)!
+									}
+								}
+
+								g.output.write_string(' ->\n    ')
 
 								// Generate head body
 								if head.children.len > 1 {
@@ -591,7 +607,9 @@ fn (mut g ErlangGenerator) generate_function(node ast.Node) ! {
 										unique_name := g.get_unique_var_name(arg.value)
 										g.output.write_string(unique_name)
 									} else {
+										g.in_pattern = true
 										g.generate_node(arg)!
+										g.in_pattern = false
 									}
 								}
 							} else {
@@ -600,10 +618,23 @@ fn (mut g ErlangGenerator) generate_function(node ast.Node) ! {
 									unique_name := g.get_unique_var_name(head_args.value)
 									g.output.write_string(unique_name)
 								} else {
+									g.in_pattern = true
 									g.generate_node(head_args)!
+									g.in_pattern = false
 								}
 							}
-							g.output.write_string(') ->\n    ')
+							g.output.write_string(')')
+
+							// Generate guard if present (third child)
+							if head.children.len >= 3 {
+								guard := head.children[2]
+								if guard.id != 0 {
+									g.output.write_string(' when ')
+									g.generate_node(guard)!
+								}
+							}
+
+							g.output.write_string(' ->\n    ')
 
 							// Generate head body
 							if head.children.len > 1 {
@@ -1337,7 +1368,13 @@ fn (mut g ErlangGenerator) generate_map_literal(node ast.Node) ! {
 		// Generate key (can be any term LX)
 		key := node.children[i]
 		g.generate_node(key)!
-		g.output.write_string(' => ')
+
+		// Use := for pattern matching, => for map creation/update
+		if g.in_pattern {
+			g.output.write_string(' := ')
+		} else {
+			g.output.write_string(' => ')
+		}
 
 		// Generate value
 		value := node.children[i + 1]
@@ -1362,7 +1399,13 @@ fn (mut g ErlangGenerator) generate_map_literal_to_string(node ast.Node) !string
 		key := node.children[i]
 		key_code := g.generate_node_to_string(key)!
 		result += key_code
-		result += ' => '
+
+		// Use := for pattern matching, => for map creation/update
+		if g.in_pattern {
+			result += ' := '
+		} else {
+			result += ' => '
+		}
 
 		// Generate value
 		value := node.children[i + 1]
@@ -1696,6 +1739,7 @@ fn (mut g ErlangGenerator) generate_function_clause(node ast.Node) ! {
 	if node.children.len >= 2 {
 		args_block := node.children[0]
 		body := node.children[1]
+		guard := if node.children.len >= 3 { node.children[2] } else { ast.Node{} }
 
 		// Generate arguments
 		g.output.write_string('(')
@@ -1705,13 +1749,25 @@ fn (mut g ErlangGenerator) generate_function_clause(node ast.Node) ! {
 					g.output.write_string(', ')
 				}
 				// Generate argument as pattern
+				g.in_pattern = true
 				g.generate_node(arg)!
+				g.in_pattern = false
 			}
 		} else {
 			// Single argument
+			g.in_pattern = true
 			g.generate_node(args_block)!
+			g.in_pattern = false
 		}
-		g.output.write_string(') ->\n            ')
+		g.output.write_string(')')
+
+		// Generate guard if present
+		if guard.id != 0 {
+			g.output.write_string(' when ')
+			g.generate_node(guard)!
+		}
+
+		g.output.write_string(' ->\n            ')
 
 		// Generate body
 		g.generate_node(body)!
@@ -2506,20 +2562,29 @@ fn (mut g ErlangGenerator) generate_import_statement(node ast.Node) ! {
 
 // ============ Task 11: Advanced Features Generation ============
 
-// Generate string interpolation (as binary concatenation)
+// Generate string interpolation (as iolist_to_binary with format)
 fn (mut g ErlangGenerator) generate_string_interpolation(node ast.Node) ! {
-	g.output.write_string('<<')
+	// Build format string and arguments
+	mut format_parts := []string{}
+	mut args := []string{}
 
-	for i, segment in node.children {
-		g.generate_node(segment)!
-		if i < node.children.len - 1 {
-			g.output.write_string('/binary, ')
+	for segment in node.children {
+		if segment.kind == .string {
+			// String literals - add to format string
+			format_parts << segment.value
 		} else {
-			g.output.write_string('/binary')
+			// Variables - add ~p placeholder and argument
+			format_parts << '~p'
+			mut arg_code := g.generate_node_to_string(segment)!
+			args << arg_code
 		}
 	}
 
-	g.output.write_string('>>')
+	format_string := format_parts.join('')
+
+	g.output.write_string('iolist_to_binary(io_lib:format("${format_string}", [')
+	g.output.write_string(args.join(', '))
+	g.output.write_string(']))')
 }
 
 // Generate anonymous functions
