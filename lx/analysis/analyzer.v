@@ -4333,6 +4333,14 @@ fn (mut a Analyzer) analyze_supervisor_def(node ast.Node) !ast.Node {
 		}
 	}
 
+	// Pre-register all function signatures for forward references (like in module analysis)
+	body_node := node.children[0]
+	for child in body_node.children {
+		if child.kind == .function || child.kind == .private_function {
+			a.preregister_function(child)!
+		}
+	}
+
 	body := a.analyze_node(node.children[0])!
 
 	analyzed_node := ast.Node{
@@ -4367,6 +4375,14 @@ fn (mut a Analyzer) analyze_worker_def(node ast.Node) !ast.Node {
 	defer {
 		if a.otp_contexts.len > 0 {
 			a.otp_contexts = a.otp_contexts[..a.otp_contexts.len - 1]
+		}
+	}
+
+	// Pre-register all function signatures for forward references (like in module analysis)
+	body_node := node.children[0]
+	for child in body_node.children {
+		if child.kind == .function || child.kind == .private_function {
+			a.preregister_function(child)!
 		}
 	}
 

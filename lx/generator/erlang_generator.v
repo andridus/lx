@@ -2300,7 +2300,8 @@ fn (mut g ErlangGenerator) generate_supervisor_def(node ast.Node) ! {
 	mut strategy := 'one_for_one'
 	mut children_list := []string{}
 
-	// Extract strategy and children from body
+	// Extract strategy and children from body, and collect functions
+	mut supervisor_functions := []ast.Node{}
 	for child in body.children {
 		if child.kind == .variable_binding {
 			if child.value == 'strategy' && child.children.len > 0 {
@@ -2319,6 +2320,9 @@ fn (mut g ErlangGenerator) generate_supervisor_def(node ast.Node) ! {
 					}
 				}
 			}
+		} else if child.kind == .function || child.kind == .private_function {
+			// Collect functions defined in supervisor
+			supervisor_functions << child
 		}
 	}
 
@@ -2333,6 +2337,26 @@ fn (mut g ErlangGenerator) generate_supervisor_def(node ast.Node) ! {
 	}
 	g.output.write_string('    ],\n')
 	g.output.write_string('    {ok, {{Strategy, 5, 10}, Children}}.\n\n')
+
+	// Generate supervisor functions if any are defined
+	if supervisor_functions.len > 0 {
+		// Add function exports
+		mut exported_functions := []string{}
+		for func in supervisor_functions {
+			if func.kind == .function { // Only export public functions
+				arity := if func.children.len > 0 { func.children[0].children.len } else { 0 }
+				exported_functions << '${func.value}/${arity}'
+			}
+		}
+		if exported_functions.len > 0 {
+			g.output.write_string('-export([${exported_functions.join(', ')}]).\n\n')
+		}
+
+		// Generate function definitions
+		for func in supervisor_functions {
+			g.generate_function(func)!
+		}
+	}
 }
 
 // Generate worker definitions (as proper OTP gen_server modules)

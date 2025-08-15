@@ -18,8 +18,8 @@ def send_message(pid, msg) do
 end
 
 supervisor main_supervisor do
-    strategy = :one_for_one
-    children = [server_worker]
+    strategy :one_for_one
+    children [server_worker]
 end
 
 worker server_worker do
