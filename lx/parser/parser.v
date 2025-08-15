@@ -335,41 +335,84 @@ fn (mut p Parser) parse_function() !ast.Node {
 fn (mut p Parser) parse_arg() !ast.Node {
 	pos := p.current.position
 
-	// Handle pattern matching arguments (tuples, atoms, etc.)
-	if p.current.type_ == .lbrace {
-		// Parse tuple pattern as argument
+	// Parse current argument - use same logic as parse_args
+	mut arg := ast.Node{}
+
+	if p.current.type_ == .identifier {
+		// Identifier with optional type annotation
+		arg_name := p.current.value
+		arg_pos := p.current.position
+		p.advance()
+
+		// Parse type annotation if present
+		mut type_annotation := ast.Node{}
+		if p.current.type_ == .double_colon {
+			p.advance() // Skip ::
+			type_annotation = p.parse_type_annotation()!
+		}
+
+		arg = ast.Node{
+			id:       p.get_next_id()
+			kind:     .function_parameter
+			value:    arg_name
+			children: if type_annotation.id != 0 { [type_annotation] } else { [] }
+			position: arg_pos
+		}
+	} else if p.current.type_ == .integer || p.current.type_ == .float || p.current.type_ == .string
+		|| p.current.type_ == .atom || p.current.type_ == .true_ || p.current.type_ == .false_
+		|| p.current.type_ == .nil_ {
+		// Literal pattern
+		literal := p.parse_literal()!
+		arg = ast.Node{
+			id:       p.get_next_id()
+			kind:     .function_parameter
+			value:    '' // No simple name for pattern
+			children: [literal]
+			position: pos
+		}
+	} else if p.current.type_ == .lbracket {
+		// List literal or list cons pattern
+		list_pattern := p.parse_list_expression()!
+		arg = ast.Node{
+			id:       p.get_next_id()
+			kind:     .function_parameter
+			value:    '' // No simple name for pattern
+			children: [list_pattern]
+			position: pos
+		}
+	} else if p.current.type_ == .lbrace {
+		// Tuple pattern
 		tuple_pattern := p.parse_tuple_expression()!
-		return ast.Node{
+		arg = ast.Node{
 			id:       p.get_next_id()
 			kind:     .function_parameter
 			value:    '' // No simple name for pattern
 			children: [tuple_pattern]
 			position: pos
 		}
-	}
-
-	if p.current.type_ != .identifier {
-		return p.error_and_return('Expected argument name or pattern')
-	}
-	arg_name := p.current.value
-	p.advance()
-
-	// Parse type annotation
-	if p.current.type_ == .double_colon {
-		p.advance() // Skip ::
-		type_annotation := p.parse_type_annotation()!
-
-		// Create parameter with type annotation
-		return ast.Node{
+	} else if p.current.type_ == .percent {
+		// Map pattern
+		map_pattern := p.parse_map_literal()!
+		arg = ast.Node{
 			id:       p.get_next_id()
 			kind:     .function_parameter
-			value:    arg_name
-			children: [type_annotation]
+			value:    '' // No simple name for pattern
+			children: [map_pattern]
+			position: pos
+		}
+	} else {
+		// Try to parse as any other expression/pattern
+		pattern := p.parse_expression()!
+		arg = ast.Node{
+			id:       p.get_next_id()
+			kind:     .function_parameter
+			value:    '' // No simple name for pattern
+			children: [pattern]
 			position: pos
 		}
 	}
 
-	return ast.new_function_parameter(p.get_next_id(), arg_name, pos)
+	return arg
 }
 
 fn (mut p Parser) parse_type_annotation() !ast.Node {
@@ -2199,15 +2242,32 @@ fn (mut p Parser) looks_like_case_pattern() bool {
 		return true
 	}
 
-	// For tokens that could reasonably start a pattern at line beginning,
-	// assume they are patterns (since we're at line start in case context)
-	if p.current.type_ == .lbrace || p.current.type_ == .lbracket || p.current.type_ == .identifier
-		|| p.current.type_ == .integer || p.current.type_ == .string || p.current.type_ == .atom
-		|| p.current.type_ == .true_ || p.current.type_ == .false_ || p.current.type_ == .nil_ {
+	// Look ahead to see if this could be a pattern (followed by -> eventually)
+	// We need to be more careful about distinguishing patterns from expressions
+	return p.looks_ahead_for_pattern_indicators()
+}
+
+// Look ahead to see if current tokens form a pattern (eventually followed by -> or when)
+fn (mut p Parser) looks_ahead_for_pattern_indicators() bool {
+	// For complex patterns (records, lists, tuples), be more permissive
+	if p.current.type_ == .lbrace || p.current.type_ == .lbracket {
+		return true // Lists and tuples at line start in case context are likely patterns
+	}
+
+	// For record patterns like User{...}, check if identifier followed by {
+	if p.current.type_ == .identifier && p.next.type_ == .lbrace {
 		return true
 	}
 
-	// For everything else, be conservative
+	// For simple literals, be very conservative - only if directly followed by -> or when
+	// This prevents string literals like "adult user" from being mistaken as patterns
+	if p.current.type_ == .identifier || p.current.type_ == .integer || p.current.type_ == .string
+		|| p.current.type_ == .atom || p.current.type_ == .true_ || p.current.type_ == .false_
+		|| p.current.type_ == .nil_ {
+		// Only consider it a pattern if immediately followed by -> or when
+		return p.next.type_ == .arrow || p.next.type_ == .when
+	}
+
 	return false
 }
 

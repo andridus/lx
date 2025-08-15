@@ -273,3 +273,271 @@ process_with_type(D_1) ->
 	result := compile_lx(lx_code)
 	assert result == expected
 }
+
+// ============ Record Usage Detection Tests ============
+
+// Test record usage in patterns
+fn test_record_usage_in_patterns() {
+	lx_code := 'record User{ name :: string, age :: integer }
+
+def process_user(u) do
+    case u do
+        User{name: _name, age: age} when age > 18 ->
+            "adult user"
+        User{age: age} when age <= 18 -> "minor"
+        _ -> "invalid user"
+    end
+end'
+	expected := '-module(test).
+-export([process_user/1]).
+
+-record(user, {name = nil :: binary(), age = nil :: integer()}).
+-spec process_user(any()) -> binary().
+process_user(U_1) ->
+    case U_1 of
+        #user{name = _NAME_2, age = AGE_3} when AGE_3 > 18 ->
+            <<"adult user"/utf8>>;
+        #user{age = AGE_3} when AGE_3 =< 18 ->
+            <<"minor"/utf8>>;
+        _ ->
+            <<"invalid user"/utf8>>
+    end.
+'
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+// Test record usage in literals
+fn test_record_usage_in_literals() {
+	lx_code := 'record Person { name :: string, age :: integer }
+
+def create_person(name :: string, age :: integer) do
+    Person{name: name, age: age}
+end'
+	expected := '-module(test).
+-export([create_person/2]).
+
+-record(person, {name = nil :: binary(), age = nil :: integer()}).
+-spec create_person(binary(), integer()) -> #person{}.
+create_person(NAME_1, AGE_2) ->
+    #person{name = NAME_1, age = AGE_2}.
+'
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+// Test record usage in field access
+fn test_record_usage_in_field_access() {
+	lx_code := 'record Person { name :: string, age :: integer }
+
+def get_name(person :: Person) do
+    person.name
+end'
+	expected := '-module(test).
+-export([get_name/1]).
+
+-record(person, {name = nil :: binary(), age = nil :: integer()}).
+-spec get_name(#person{}) -> binary().
+get_name(PERSON_1) ->
+    PERSON_1#person.name.
+'
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+// ============ Type Validation Error Tests ============
+
+// Test undefined base type error
+fn test_undefined_base_type_error() {
+	lx_code := 'record User{ id :: integer, name :: string }
+type user_type :: user
+
+def create_typed_user(id :: integer, name :: string) do
+    User{id: id, name: name}
+end'
+
+	// Should fail compilation due to undefined type 'user'
+	result := compile_lx_with_error(lx_code)
+	assert result.contains('Undefined type: user')
+}
+
+// Test valid base type (record reference)
+fn test_valid_record_base_type() {
+	lx_code := 'record User{ id :: integer, name :: string }
+type user_type :: User
+
+def create_typed_user(id :: integer, name :: string) :: user_type do
+    User{id: id, name: name}
+end'
+	expected := '-module(test).
+-export([create_typed_user/2]).
+
+-record(user, {id = nil :: integer(), name = nil :: binary()}).
+-type user_type() :: #user{}.
+-spec create_typed_user(integer(), binary()) -> user_type().
+create_typed_user(ID_1, NAME_2) ->
+    #user{id = ID_1, name = NAME_2}.
+'
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+// ============ Return Type Compatibility Tests ============
+
+// Test compatible specialized atom types
+fn test_compatible_specialized_atom_types() {
+	lx_code := 'type status :: :ok
+
+def get_status() :: status do
+    :ok
+end'
+	expected := '-module(test).
+-export([get_status/0]).
+
+-type status() :: atom().
+-spec get_status() -> status().
+get_status() ->
+    ok.
+'
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+// Test incompatible specialized atom types
+fn test_incompatible_specialized_atom_types() {
+	lx_code := 'type status :: :ok
+
+def get_status() :: status do
+    :error
+end'
+
+	// Should fail due to type mismatch
+	result := compile_lx_with_error(lx_code)
+	assert result.contains('Return type mismatch')
+}
+
+// Test generic atom to specialized atom compatibility
+fn test_generic_atom_compatibility() {
+	lx_code := 'type my_atom :: atom
+
+def get_atom() :: my_atom do
+    :anything
+end'
+	expected := '-module(test).
+-export([get_atom/0]).
+
+-type my_atom() :: atom().
+-spec get_atom() -> my_atom().
+get_atom() ->
+    anything.
+'
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+// Test type alias compatibility
+fn test_type_alias_compatibility() {
+	lx_code := 'type status :: atom
+type result :: status
+
+def process() :: result do
+    :success
+end'
+	expected := '-module(test).
+-export([process/0]).
+
+-type status() :: atom().
+-type result() :: status().
+-spec process() -> result().
+process() ->
+    success.
+'
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+// Test any to specific type resolution
+fn test_any_to_specific_type_resolution() {
+	lx_code := 'type user_id :: integer
+
+def get_id() :: user_id do
+    42
+end'
+	expected := '-module(test).
+-export([get_id/0]).
+
+-type user_id() :: integer().
+-spec get_id() -> user_id().
+get_id() ->
+    42.
+'
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+// ============ Unused Type Detection Tests ============
+
+// Test unused type error
+fn test_unused_type_error() {
+	lx_code := 'type status :: :ok
+
+def process_data(input) do
+    input
+end'
+
+	// Should fail due to unused type
+	result := compile_lx_with_error(lx_code)
+	assert result.contains('Unused type: status')
+}
+
+// Test opaque type usage detection
+fn test_opaque_type_usage() {
+	lx_code := 'type opaque user_id :: integer
+
+def create_user_id(id :: integer) :: user_id do
+    id
+end
+
+def get_user_id(uid :: user_id) :: user_id do
+    uid
+end'
+	expected := '-module(test).
+-export([create_user_id/1, get_user_id/1]).
+
+-opaque user_id() :: integer().
+-spec create_user_id(integer()) -> user_id().
+create_user_id(ID_1) ->
+    ID_1.
+-spec get_user_id(user_id()) -> user_id().
+get_user_id(UID_2) ->
+    UID_2.
+'
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+// Test nominal type usage detection
+fn test_nominal_type_usage() {
+	lx_code := 'type nominal temperature :: float
+
+def create_temp(t :: float) :: temperature do
+    t
+end
+
+def get_celsius(temp :: temperature) :: temperature do
+    temp
+end'
+	expected := '-module(test).
+-export([create_temp/1, get_celsius/1]).
+
+-nominal temperature() :: float().
+-spec create_temp(float()) -> temperature().
+create_temp(T_1) ->
+    T_1.
+-spec get_celsius(temperature()) -> temperature().
+get_celsius(TEMP_2) ->
+    TEMP_2.
+'
+	result := compile_lx(lx_code)
+	assert result == expected
+}

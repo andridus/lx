@@ -1696,9 +1696,17 @@ fn (g ErlangGenerator) needs_parentheses(node ast.Node) bool {
 // New generation functions for additional functionality
 
 fn (mut g ErlangGenerator) generate_function_parameter(node ast.Node) ! {
-	// Function parameters are just identifiers, generate as variable name
-	unique_name := g.get_unique_var_name(node.value)
-	g.output.write_string(unique_name)
+	// Check if this parameter has a value (identifier) or is a pattern
+	if node.value != '' {
+		// This is an identifier parameter (with or without type annotation)
+		unique_name := g.get_unique_var_name(node.value)
+		g.output.write_string(unique_name)
+	} else if node.children.len > 0 {
+		// This is a pattern parameter (atom, tuple, list, etc.)
+		g.generate_node(node.children[0])!
+	} else {
+		return error('Invalid function parameter: no value or pattern')
+	}
 }
 
 fn (mut g ErlangGenerator) generate_lambda_expression(node ast.Node) ! {

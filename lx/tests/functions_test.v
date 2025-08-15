@@ -591,12 +591,12 @@ end'
 -export([test_pattern/1, main/0]).
 
 -spec test_pattern(any()) -> {any(), any()}.
-test_pattern(_1) ->
-    {NAME_2, AGE_3}.
+test_pattern({NAME_1, AGE_2}) ->
+    {NAME_1, AGE_2}.
 -spec main() -> {any(), any()}.
 main() ->
-    RESULT_4 = test_pattern({<<"João"/utf8>>, 30}),
-    RESULT_4.
+    RESULT_3 = test_pattern({<<"João"/utf8>>, 30}),
+    RESULT_3.
 '
 
 	result := compile_lx(lx_code)
@@ -805,4 +805,209 @@ c() ->
 
 	result := compile_lx(lx_code)
 	assert result == expected
+}
+
+// Tests for pattern matching in function arguments
+// These tests validate that both single-head and multi-head functions
+// accept the same types of patterns as arguments
+
+fn test_single_head_function_atom_pattern() {
+	lx_code := 'def handle_atom(:ok) do
+    "success"
+end'
+
+	expected := '-module(test).
+-export([handle_atom/1]).
+
+-spec handle_atom(any()) -> binary().
+handle_atom(ok) ->
+    <<"success"/utf8>>.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+fn test_multi_head_function_atom_pattern() {
+	lx_code := 'def handle_atom do
+    (:ok) -> "success"
+    (:error) -> "failure"
+end'
+
+	expected := '-module(test).
+-export([handle_atom/1]).
+
+-spec handle_atom(atom()) -> binary().
+handle_atom(ok) ->
+    <<"success"/utf8>>;
+handle_atom(error) ->
+    <<"failure"/utf8>>.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+fn test_single_head_function_number_pattern() {
+	lx_code := 'def handle_number(42) do
+    "the answer"
+end'
+
+	expected := '-module(test).
+-export([handle_number/1]).
+
+-spec handle_number(any()) -> binary().
+handle_number(42) ->
+    <<"the answer"/utf8>>.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+fn test_multi_head_function_number_pattern() {
+	lx_code := 'def handle_number do
+    (0) -> "zero"
+    (42) -> "the answer"
+end'
+
+	expected := '-module(test).
+-export([handle_number/1]).
+
+-spec handle_number(integer()) -> binary().
+handle_number(0) ->
+    <<"zero"/utf8>>;
+handle_number(42) ->
+    <<"the answer"/utf8>>.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+fn test_single_head_function_tuple_pattern() {
+	lx_code := 'def handle_tuple({_x, _y}) do
+    "tuple matched"
+end'
+
+	expected := '-module(test).
+-export([handle_tuple/1]).
+
+-spec handle_tuple(any()) -> binary().
+handle_tuple({_X_1, _Y_2}) ->
+    <<"tuple matched"/utf8>>.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+fn test_multi_head_function_tuple_pattern() {
+	lx_code := 'def handle_tuple do
+    ({_x, _y}) -> "pair"
+    ({_x, _y, _z}) -> "triple"
+end'
+
+	expected := '-module(test).
+-export([handle_tuple/1]).
+
+-spec handle_tuple(any()) -> binary().
+handle_tuple({_X_1, _Y_2}) ->
+    <<"pair"/utf8>>;
+handle_tuple({_X_1, _Y_2, _Z_3}) ->
+    <<"triple"/utf8>>.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+fn test_single_head_function_list_pattern() {
+	lx_code := 'def handle_list([_h | _t]) do
+    "non-empty list"
+end'
+
+	expected := '-module(test).
+-export([handle_list/1]).
+
+-spec handle_list(any()) -> binary().
+handle_list([_H_1 | _T_2]) ->
+    <<"non-empty list"/utf8>>.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+fn test_multi_head_function_list_pattern() {
+	lx_code := 'def handle_list do
+    ([]) -> "empty"
+    ([_h | _t]) -> "non-empty"
+end'
+
+	expected := '-module(test).
+-export([handle_list/1]).
+
+-spec handle_list(any()) -> binary().
+handle_list([]) ->
+    <<"empty"/utf8>>;
+handle_list([_H_1 | _T_2]) ->
+    <<"non-empty"/utf8>>.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+fn test_single_head_function_mixed_patterns() {
+	lx_code := 'def mixed_single_atom(:atom) do
+    "atom"
+end
+
+def mixed_single_number(123) do
+    "number"
+end
+
+def mixed_single_tuple({a, b}) do
+    a + b
+end'
+
+	expected := '-module(test).
+-export([mixed_single_atom/1, mixed_single_number/1, mixed_single_tuple/1]).
+
+-spec mixed_single_atom(any()) -> binary().
+mixed_single_atom(atom) ->
+    <<"atom"/utf8>>.
+-spec mixed_single_number(any()) -> binary().
+mixed_single_number(123) ->
+    <<"number"/utf8>>.
+-spec mixed_single_tuple(any()) -> integer().
+mixed_single_tuple({A_1, B_2}) ->
+    A_1 + B_2.
+'
+
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+fn test_pattern_equivalence_single_vs_multi() {
+	// Test that the same pattern in single-head and multi-head produces equivalent Erlang
+	single_code := 'def single_handler(:test_atom) do
+    :ok
+end'
+
+	multi_code := 'def multi_handler do
+    (:test_atom) -> :ok
+end'
+
+	single_result := compile_lx(single_code)
+	multi_result := compile_lx(multi_code)
+
+	// Both should generate the same pattern matching for atom_term
+	assert single_result.contains('single_handler(test_atom) ->')
+	assert multi_result.contains('multi_handler(test_atom) ->')
+
+	// Both should return the same atom
+	assert single_result.contains('ok.')
+	assert multi_result.contains('ok.')
 }

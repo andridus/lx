@@ -61,7 +61,7 @@ pub fn (mut a Analyzer) check_unused_variables() ! {
 		for var_name, position in unused_vars {
 			// Skip underscore variables as they are intended to be unused
 			if !var_name.starts_with('_') && var_name != '_pattern' {
-				a.error('Unused variable: ${var_name}. Consider prefixing with _ if intentionally unused',
+				a.error('Unused variable: `${var_name}`. If this variable is intentionally unused, prefix it with an underscore: `_${var_name}`',
 					position)
 				return error('Unused variable: ${var_name}')
 			}
@@ -1795,9 +1795,12 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 				params: []
 			}
 		}
-		a.type_table.assign_type(node.id, ast.Type{ name: 'list', params: [
-			common_type,
-		] })
+		a.type_table.assign_type(node.id, ast.Type{
+			name:   'list'
+			params: [
+				common_type,
+			]
+		})
 		return ast.Node{
 			...node
 			children: analyzed_args
@@ -3529,7 +3532,7 @@ fn (mut a Analyzer) analyze_pattern_with_type(node ast.Node, expected_type ast.T
 				quantified_vars: []
 				body:            expected_type
 			}
-			a.bind(node.value, scheme)
+			a.bind_with_position(node.value, scheme, node.position)
 			a.type_table.assign_type(node.id, expected_type)
 			return node
 		}
@@ -3605,12 +3608,22 @@ fn (mut a Analyzer) analyze_pattern_with_type(node ast.Node, expected_type ast.T
 			a.type_table.mark_type_used(record_name)
 
 			mut analyzed_children := []ast.Node{}
-			for child in node.children {
-				analyzed_child := a.analyze_pattern_with_type(child, ast.Type{
-					name:   'any'
-					params: []
-				})!
-				analyzed_children << analyzed_child
+			for field in node.children {
+				// Each field is an identifier node with the field name,
+				// and the field value (variable to bind) is in field.children[0]
+				if field.children.len > 0 {
+					analyzed_field_value := a.analyze_pattern_with_type(field.children[0],
+						ast.Type{
+						name:   'any'
+						params: []
+					})!
+					analyzed_children << ast.Node{
+						...field
+						children: [analyzed_field_value]
+					}
+				} else {
+					analyzed_children << field
+				}
 			}
 
 			a.type_table.assign_type(node.id, expected_type)
@@ -3891,6 +3904,16 @@ fn (mut a Analyzer) register_pattern_variables(pattern ast.Node) {
 			// Parentheses pattern (pattern) - recurse into the inner pattern
 			if pattern.children.len > 0 {
 				a.register_pattern_variables(pattern.children[0])
+			}
+		}
+		.record_literal {
+			// Record pattern User{name: _name, age: age} - register variables in field values
+			for field in pattern.children {
+				// Each field is an identifier node with the field name,
+				// and the field value (variable to bind) is in field.children[0]
+				if field.children.len > 0 {
+					a.register_pattern_variables(field.children[0])
+				}
 			}
 		}
 		else {

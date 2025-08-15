@@ -652,3 +652,128 @@ test_atom_match(STATUS_1) ->
 	result := compile_lx(lx_code)
 	assert result == expected
 }
+
+// Test case with line breaks after arrow - basic case
+fn test_case_with_line_breaks_basic() {
+	lx_code := 'def test_case(x) do
+    case x do
+        1 ->
+            "one"
+        2 ->
+            "two"
+        _ ->
+            "other"
+    end
+end'
+	expected := '-module(test).
+-export([test_case/1]).
+
+-spec test_case(any()) -> binary().
+test_case(X_1) ->
+    case X_1 of
+        1 ->
+            <<"one"/utf8>>;
+        2 ->
+            <<"two"/utf8>>;
+        _ ->
+            <<"other"/utf8>>
+    end.
+'
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+// Test case with line breaks - record patterns
+fn test_case_with_line_breaks_records() {
+	lx_code := 'record User{ name :: string, age :: integer }
+
+def process_user(u) do
+    case u do
+        User{name: _name, age: age} when age > 18 ->
+            "adult user"
+        User{age: age} when age <= 18 ->
+            "minor"
+        _ ->
+            "invalid user"
+    end
+end'
+	expected := '-module(test).
+-export([process_user/1]).
+
+-record(user, {name = nil :: binary(), age = nil :: integer()}).
+-spec process_user(any()) -> binary().
+process_user(U_1) ->
+    case U_1 of
+        #user{name = _NAME_2, age = AGE_3} when AGE_3 > 18 ->
+            <<"adult user"/utf8>>;
+        #user{age = AGE_3} when AGE_3 =< 18 ->
+            <<"minor"/utf8>>;
+        _ ->
+            <<"invalid user"/utf8>>
+    end.
+'
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+// Test case with line breaks - mixed inline and multiline
+fn test_case_with_line_breaks_mixed() {
+	lx_code := 'def test_mixed(x) do
+    case x do
+        1 -> "one"
+        2 ->
+            "two"
+        3 ->
+            "three"
+        _ -> "other"
+    end
+end'
+	expected := '-module(test).
+-export([test_mixed/1]).
+
+-spec test_mixed(any()) -> binary().
+test_mixed(X_1) ->
+    case X_1 of
+        1 ->
+            <<"one"/utf8>>;
+        2 ->
+            <<"two"/utf8>>;
+        3 ->
+            <<"three"/utf8>>;
+        _ ->
+            <<"other"/utf8>>
+    end.
+'
+	result := compile_lx(lx_code)
+	assert result == expected
+}
+
+// Test case with line breaks - complex expressions in body
+fn test_case_with_line_breaks_complex() {
+	lx_code := 'def test_complex(x) do
+    case x do
+        {:ok, value} ->
+            value + 1
+        {:error, reason} ->
+            reason
+        _ ->
+            nil
+    end
+end'
+	expected := '-module(test).
+-export([test_complex/1]).
+
+-spec test_complex(any()) -> any().
+test_complex(X_1) ->
+    case X_1 of
+        {ok, VALUE_2} ->
+            VALUE_2 + 1;
+        {error, REASON_3} ->
+            REASON_3;
+        _ ->
+            nil
+    end.
+'
+	result := compile_lx(lx_code)
+	assert result == expected
+}
