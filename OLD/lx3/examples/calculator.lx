@@ -1,0 +1,6 @@
+x = 10
+y = 5
+sum = x + y
+product = x * y
+difference = x - y
+quotient = x / y

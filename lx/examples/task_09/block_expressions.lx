@@ -1,0 +1,15 @@
+def complex_function(a, b) do
+    x = a * 2
+    y = b + 3
+    result1 = x + y
+    result1
+end
+
+def nested_blocks() do
+    outer = 10; inner = 20
+    result2 = outer + inner
+    result2
+end
+def main() do
+    complex_function(1, 2)
+end

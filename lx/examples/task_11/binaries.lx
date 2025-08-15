@@ -1,0 +1,32 @@
+def encode_packet(version, data) do
+    data_size = byte_size(data)
+    <<version:8, data_size:32/big, data/binary>>
+end
+
+def decode_packet(packet) do
+    <<version:8, data_size:32/big, data:data_size/binary>> = packet
+    {:ok, %{version: version, data: data}}
+end
+
+def parse_binary_header(binary) do
+    <<
+        signature:2/binary,
+        version:8/integer,
+        flags:16/integer-little,
+        rest/binary
+    >> = binary
+
+    %{signature: signature, version: version, flags: flags, rest: rest}
+end
+
+def create_simple_binary() do
+    <<1, 2, 3>>
+end
+
+def create_string_binary() do
+    <<"hello world">>
+end
+
+def main() do
+    create_simple_binary()
+end

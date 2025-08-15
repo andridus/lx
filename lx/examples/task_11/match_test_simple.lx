@@ -1,0 +1,21 @@
+def test_simple_match() do
+    data = {:ok, "success"}
+    match {:ok, result} <- data
+    result
+end
+
+def test_single_variable() do
+    data = "hello"
+    match value <- data
+    value
+end
+
+def test_complex_match(value) do
+  match {:ok, value2} <- value
+  match {:ok, value3} <- value2
+  :some
+end
+
+def main() do
+    test_single_variable()
+end

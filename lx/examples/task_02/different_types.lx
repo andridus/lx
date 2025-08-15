@@ -1,0 +1,6 @@
+def main() do
+    number = 42
+    text = "Hello"
+    flag = true
+    number
+end

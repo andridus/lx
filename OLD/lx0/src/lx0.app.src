@@ -1,0 +1,16 @@
+{application, lx0,
+ [{description, "LX Language Compiler"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {mod, {lx0_app, []}},
+  {applications,
+   [kernel,
+    stdlib
+   ]},
+  {env,[]},
+  {modules, []},
+
+  {maintainers, []},
+  {licenses, ["Apache-2.0"]},
+  {links, []}
+ ]}.

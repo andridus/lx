@@ -1,0 +1,16 @@
+def complex_list_operations() do
+    # Construção de lista com cons
+    numbers = [1, 2, 3]
+    extended = [0 | numbers]
+
+    # Concatenação de múltiplas listas
+    combined = [1, 2] ++ [3, 4] ++ [5, 6]
+
+    # Lista aninhada
+    matrix = [[1, 2], [3, 4], [5, 6]]
+
+    {extended, combined, matrix}
+end
+def main() do
+    complex_list_operations()
+end

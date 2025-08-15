@@ -1,0 +1,51 @@
+def length(list) do
+    case list do
+        [] -> 0
+        [_ | tail] -> 1 + length(tail)
+    end
+end
+
+def reverse(list) do
+    case list do
+        [] -> []
+        [head | tail] -> reverse(tail) ++ [head]
+    end
+end
+
+def append(list1, list2) do
+    case list1 do
+        [] -> list2
+        [head | tail] -> [head | append(tail, list2)]
+    end
+end
+
+def flatten(list) do
+    case list do
+        [] -> []
+        [head | tail] -> append(head, flatten(tail))
+    end
+end
+
+def deep_map(f, list) do
+    case list do
+        [] -> []
+        [head | tail] -> [f(head) | deep_map(f, tail)]
+    end
+end
+
+def tree_map(f, tree) do
+    case tree do
+        {value, children} -> {f(value), map(fn(child) -> tree_map(f, child) end, children)}
+    end
+end
+
+def tree_fold(f, acc, tree) do
+    case tree do
+        {value, children} ->
+            new_acc = f(acc, value)
+            foldl(fn(acc, child) -> tree_fold(f, acc, child) end, new_acc, children)
+    end
+end
+def main() do
+    length()
+end

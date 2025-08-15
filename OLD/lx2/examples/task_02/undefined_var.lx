@@ -1,0 +1,4 @@
+def undefined_var() do
+    x = 42
+    y
+end

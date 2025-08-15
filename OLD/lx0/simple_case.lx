@@ -1,0 +1,5 @@
+def test() do
+  case 1 do
+    1 -> "one"
+  end
+end

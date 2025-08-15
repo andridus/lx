@@ -1,0 +1,8 @@
+application {
+  description: "Banking - A Lx Application",
+  vsn: "1.0.0",
+  applications: [:kernel, :stdlib],
+  registered: [],
+  env: %{},
+  deps: []
+}

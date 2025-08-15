@@ -1,0 +1,8 @@
+def test_comparison() do
+    a = 10
+    b = 5
+    a == b
+end
+def main() do
+    test_comparison()
+end

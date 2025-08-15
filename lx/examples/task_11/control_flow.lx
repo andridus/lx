@@ -1,0 +1,41 @@
+def categorize_age(age) do
+    if age < 18 do
+        "minor"
+    else
+        "adult"
+    end
+end
+
+def process_result(result) do
+    case result do
+        {:ok, data} -> "Success"
+        {:error, reason} -> "Error"
+        _ -> "Unknown result"
+    end
+end
+
+def get_user_info(id) do
+    result = {:ok, "user123"}
+    with {:ok, user} <- result do
+        {:ok, {user, "profile"}}
+    else
+       _ -> {:error, "not found"}
+    end
+end
+
+def risky_operation() do
+    {:error, false}
+end
+
+def error_handler(error) do
+    error
+end
+
+def safe_operation() do
+    match {:ok, value} <- risky_operation() rescue error do
+        error_handler(error)
+    end
+end
+def main() do
+    categorize_age(20)
+end

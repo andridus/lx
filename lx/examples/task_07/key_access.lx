@@ -1,0 +1,11 @@
+def key_access_example() do
+    map = %{name: "Ana", age: 25, active: true, "key": "value", 42: "answer"}
+    name = map_get(:name, map)
+    age = map_get(:age, map)
+    value = map_get("key", map)
+    answer = map_get(42, map)
+    {name, age, value, answer}
+end
+def main() do
+    key_access_example()
+end

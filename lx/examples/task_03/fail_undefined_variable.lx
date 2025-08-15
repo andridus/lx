@@ -1,0 +1,11 @@
+# This example is expected to fail due to undefined variable
+# It should be treated as a successful test when it fails
+
+def fail_undefined_variable() do
+    x = 10
+    y + x  # y is not defined, this should fail
+end
+
+def main() do
+    fail_undefined_variable()
+end

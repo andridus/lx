@@ -1,0 +1,13 @@
+def error_examples() do
+    # Erro: número incorreto de argumentos
+    $print(x, y)  # $print requer exatamente 1 argumento
+
+    # Erro: diretiva desconhecida
+    $unknown(x)
+
+    # Erro: parênteses obrigatórios para diretivas
+    $print x
+end
+def main() do
+    error_examples()
+end

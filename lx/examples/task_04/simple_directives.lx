@@ -1,0 +1,8 @@
+def test() do
+    x = 42
+    $print(x)
+    x
+end
+def main() do
+    test()
+end

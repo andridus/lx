@@ -1,0 +1,5 @@
+def multiple_bindings() do
+    a = 10
+    b = 20
+    a + b
+end

@@ -1,0 +1,6 @@
+def different_types() do
+    number = 42
+    text = "Hello"
+    flag = true
+    text
+end

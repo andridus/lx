@@ -1,0 +1,34 @@
+def answer() do
+    42
+end
+
+def greeting() do
+    "Hello, World!"
+end
+
+def pi() do
+    3.14159
+end
+
+def is_active() do
+    true
+end
+
+def is_inactive() do
+    false
+end
+
+def status() do
+    :ok
+end
+
+def error_status() do
+    :error
+end
+
+def empty() do
+    nil
+end
+def main() do
+    answer()
+end

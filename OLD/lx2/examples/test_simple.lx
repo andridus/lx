@@ -1,0 +1,6 @@
+# Arquivo de teste simples
+x = 42
+y = "hello"
+z = :world
+w = true
+v = nil

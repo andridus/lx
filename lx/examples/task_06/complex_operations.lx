@@ -1,0 +1,22 @@
+def complex_tuple_operations() do
+    # Tupla básica
+    point = {10, 20}
+
+    # Tupla aninhada
+    rectangle = {{0, 0}, {100, 200}}
+
+    # Tupla com tipos mistos
+    user = {1, "João", 30, true}
+
+    # Acesso a elementos
+    x = element(1, point)
+    y = element(2, point)
+
+    # Modificação de elemento
+    updated_user = setelement(3, user, 31)
+
+    {point, rectangle, updated_user}
+end
+def main() do
+    complex_tuple_operations()
+end

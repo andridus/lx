@@ -1,0 +1,12 @@
+# This example is expected to fail due to invalid list cons
+# It should be treated as a successful test when it fails
+
+def fail_invalid_list_cons() do
+    head = "not_a_list"
+    tail = "string"
+    [head | tail]  # head should be a single element, not a string
+end
+
+def main() do
+    fail_invalid_list_cons()
+end

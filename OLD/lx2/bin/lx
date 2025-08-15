@@ -1,0 +1,6 @@
+#!/usr/bin/env escript
+%% -*- erlang -*-
+%%! -pa _build/default/lib/lx2/ebin
+
+main(Args) ->
+    lx2_cli:main(Args).

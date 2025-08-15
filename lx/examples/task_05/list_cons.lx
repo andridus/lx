@@ -1,0 +1,9 @@
+def list_cons_example() do
+    head = 1
+    tail = [2, 3, 4]
+    [head | tail]
+end
+
+def main() do
+    list_cons_example()
+end

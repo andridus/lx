@@ -1,0 +1,19 @@
+# Records definidos no escopo global
+record Address { street :: string, city :: string }
+record Person { name :: string, age :: integer, address :: Address }
+
+def nested_records() do
+    address = Address{street: "Rua A", city: "São Paulo"}
+    person = Person{name: "Ana", age: 25, address: address}
+
+    # Acesso aninhado
+    person_name = person.name
+    person_age = person.age
+    address_street = person.address.street
+    address_city = person.address.city
+
+    {person, person_name, person_age, address_street, address_city}
+end
+def main() do
+    nested_records()
+end

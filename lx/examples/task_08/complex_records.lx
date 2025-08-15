@@ -1,0 +1,30 @@
+# Records definidos no escopo global
+record Point { x :: integer, y :: integer }
+record Rectangle { top_left :: Point, bottom_right :: Point, color :: string }
+
+def complex_record_operations() do
+    # Criação de records
+    point1 = Point{x: 0, y: 0}
+    point2 = Point{x: 100, y: 100}
+    rect = Rectangle{top_left: point1, bottom_right: point2, color: "blue"}
+
+    # Acesso a campos
+    top_x = rect.top_left.x
+    top_y = rect.top_left.y
+    bottom_x = rect.bottom_right.x
+    bottom_y = rect.bottom_right.y
+    color = rect.color
+
+    # Atualização de campos
+    updated_rect = %Rectangle{rect | color: "red"}
+    updated_point = %Point{point1 | x: 10}
+
+    # Cálculos usando campos
+    width = bottom_x - top_x
+    height = bottom_y - top_y
+
+    {rect, updated_rect, updated_point, width, height, color}
+end
+def main() do
+    complex_record_operations()
+end

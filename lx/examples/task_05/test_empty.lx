@@ -1,0 +1,6 @@
+def test_empty() do
+    []
+end
+def main() do
+    test_empty()
+end

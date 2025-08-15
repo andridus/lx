@@ -1,0 +1,10 @@
+def test_operations() do
+    list = [1, 2, 3, 4, 5]
+    len = length(list)
+    has_three = 3 in list
+    has_six = 6 in list
+    len
+end
+def main() do
+    test_operations()
+end

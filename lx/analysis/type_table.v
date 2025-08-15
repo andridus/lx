@@ -1,253 +1,143 @@
 module analysis
 
-// TypeTable manages the mapping between AST node IDs and their type information
-// This is the core of the Hindley-Milner implementation strategy
+import ast
+
+pub struct RecordType {
+pub:
+	name           string
+	fields         map[string]ast.Type // field_name -> field_type
+	field_defaults map[string]ast.Node // field_name -> field_default
+}
+
+pub struct FunctionType {
+pub:
+	name        string
+	parameters  []ast.Type
+	return_type ast.Type
+	heads       []FunctionHead
+}
+
+pub struct FunctionHead {
+pub:
+	patterns    []ast.Type
+	return_type ast.Type
+}
+
+@[heap]
 pub struct TypeTable {
 pub mut:
-	types          map[int]TypeInfo // ast_id -> TypeInfo
-	next_id        int = 1 // Next available ID (start with 1, 0 reserved for errors)
-	debug_mode     bool     // Enable detailed logging
-	operations_log []string // Log of all operations for debugging
+	types          map[int]ast.Type
+	next_id        int = 1
+	record_types   map[string]RecordType   // record_name -> RecordType
+	function_types map[string]FunctionType // function_name -> FunctionType
+	custom_types   map[string]ast.Type     // type_name -> Type definition
+	used_types     map[string]bool         // track which types have been used
+	type_positions map[string]ast.Position // track where each type was defined
 }
 
-// new_type_table creates a new empty type table
 pub fn new_type_table() TypeTable {
 	return TypeTable{
-		types:          map[int]TypeInfo{}
+		types:          map[int]ast.Type{}
 		next_id:        1
-		debug_mode:     false
-		operations_log: []string{}
+		record_types:   map[string]RecordType{}
+		function_types: map[string]FunctionType{}
+		custom_types:   map[string]ast.Type{}
+		used_types:     map[string]bool{}
+		type_positions: map[string]ast.Position{}
 	}
 }
 
-// new_type_table_with_debug creates a new type table with debug mode enabled
-pub fn new_type_table_with_debug() TypeTable {
-	mut tt := new_type_table()
-	tt.debug_mode = true
-	tt.log_operation('TypeTable created with debug mode enabled')
-	return tt
+pub fn (mut tt TypeTable) assign_type(id int, typ ast.Type) {
+	tt.types[id] = typ
 }
 
-// enable_debug enables debug mode
-pub fn (mut tt TypeTable) enable_debug() {
-	tt.debug_mode = true
-	tt.log_operation('Debug mode enabled')
+pub fn (tt TypeTable) get_type(id int) ?ast.Type {
+	return tt.types[id] or { none }
 }
 
-// disable_debug disables debug mode
-pub fn (mut tt TypeTable) disable_debug() {
-	tt.debug_mode = false
-	tt.log_operation('Debug mode disabled')
-}
-
-// log_operation logs an operation if debug mode is enabled
-fn (mut tt TypeTable) log_operation(operation string) {
-	if tt.debug_mode {
-		tt.operations_log << operation
-		println('[TYPE_TABLE] ${operation}')
-	}
-}
-
-// assign_type assigns a type to an AST node ID
-pub fn (mut tt TypeTable) assign_type(ast_id int, type_info TypeInfo) {
-	if ast_id <= 0 {
-		panic('Invalid ast_id: ${ast_id}')
-	}
-
-	old_type := tt.types[ast_id] or { TypeInfo{} }
-	tt.types[ast_id] = type_info
-
-	if tt.debug_mode {
-		if ast_id in tt.types && old_type.generic != '' {
-			tt.log_operation('REASSIGN: AST ID ${ast_id} changed from ${old_type} to ${type_info}')
-		} else {
-			tt.log_operation('ASSIGN: AST ID ${ast_id} <- ${type_info}')
-		}
-	}
-}
-
-// assign_type_with_pos assigns a type to an AST node ID with position information
-pub fn (mut tt TypeTable) assign_type_with_pos(ast_id int, type_info TypeInfo, pos string, expr_text string) {
-	if ast_id <= 0 {
-		panic('Invalid ast_id: ${ast_id}')
-	}
-
-	old_type := tt.types[ast_id] or { TypeInfo{} }
-	tt.types[ast_id] = type_info
-
-	if tt.debug_mode {
-		if ast_id in tt.types && old_type.generic != '' {
-			tt.log_operation('REASSIGN: ${pos} "${expr_text}" :: ${old_type} -> ${type_info}')
-		} else {
-			tt.log_operation('ASSIGN: ${pos} "${expr_text}" :: ${type_info}')
-		}
-	}
-}
-
-// get_type retrieves the type for an AST node ID
-pub fn (tt TypeTable) get_type(ast_id int) ?TypeInfo {
-	if tt.debug_mode {
-		if ast_id in tt.types {
-			type_info := tt.types[ast_id]
-			println('[TYPE_TABLE] GET: AST ID ${ast_id} -> ${type_info} (generic: "${type_info.generic}")')
-			return type_info
-		} else {
-			println('[TYPE_TABLE] GET: AST ID ${ast_id} -> NOT FOUND')
-			return none
-		}
-	}
-
-	// Non-debug version
-	if ast_id in tt.types {
-		return tt.types[ast_id]
-	}
-	return none
-}
-
-// generate_id generates a new unique AST ID
 pub fn (mut tt TypeTable) generate_id() int {
 	id := tt.next_id
 	tt.next_id++
-	tt.log_operation('GENERATE_ID: Generated new AST ID ${id}')
 	return id
 }
 
-// has_type checks if an AST node ID has a type assigned
-pub fn (tt TypeTable) has_type(ast_id int) bool {
-	exists := ast_id in tt.types
-	if tt.debug_mode {
-		println('[TYPE_TABLE] HAS_TYPE: AST ID ${ast_id} -> ${exists}')
+pub fn (mut tt TypeTable) register_record_type(name string, fields map[string]ast.Type, field_defaults map[string]ast.Node) {
+	tt.record_types[name] = RecordType{
+		name:           name
+		fields:         fields
+		field_defaults: field_defaults
 	}
-	return exists
 }
 
-// debug_print prints the entire type table for debugging
-pub fn (tt TypeTable) debug_print() {
-	println('=== TYPE TABLE DEBUG ===')
-	println('Total types: ${tt.types.len}')
-	println('Next ID: ${tt.next_id}')
-	println('Debug mode: ${tt.debug_mode}')
-	println('Operations logged: ${tt.operations_log.len}')
-
-	println('\nType assignments:')
-	for ast_id, type_info in tt.types {
-		println('  AST ID ${ast_id}: ${type_info}')
-	}
-
-	if tt.debug_mode && tt.operations_log.len > 0 {
-		println('\nOperations log:')
-		for i, op in tt.operations_log {
-			println('  ${i + 1}: ${op}')
-		}
-	}
-	println('========================')
+pub fn (tt TypeTable) get_record_type(name string) ?RecordType {
+	return tt.record_types[name] or { return none }
 }
 
-// debug_print_summary prints a summary of the type table
-pub fn (tt TypeTable) debug_print_summary() {
-	println('=== TYPE TABLE SUMMARY ===')
-	println('Total types: ${tt.types.len}')
-	println('Next ID: ${tt.next_id}')
+pub fn (tt TypeTable) get_field_type(record_name string, field_name string) ?ast.Type {
+	record_type := tt.get_record_type(record_name) or { return none }
+	return record_type.fields[field_name] or { return none }
+}
 
-	// Group types by generic
-	mut type_counts := map[string]int{}
-	for _, type_info in tt.types {
-		generic_str := type_info.generic
-		type_counts[generic_str] = type_counts[generic_str] + 1
+pub fn (tt TypeTable) get_field_default(record_name string, field_name string) ?ast.Node {
+	record_type := tt.get_record_type(record_name) or { return none }
+	return record_type.field_defaults[field_name] or { return none }
+}
+
+// Function type management
+pub fn (mut tt TypeTable) register_function_type(name string, parameters []ast.Type, return_type ast.Type) {
+	tt.function_types[name] = FunctionType{
+		name:        name
+		parameters:  parameters
+		return_type: return_type
+		heads:       []
 	}
-
-	println('Type distribution:')
-	for generic, count in type_counts {
-		println('  ${generic}: ${count}')
-	}
-	println('=========================')
 }
 
-// validate_completeness validates that all expected AST nodes have types
-pub fn (tt TypeTable) validate_completeness(expected_ids []int) ![]int {
-	mut missing := []int{}
-
-	for ast_id in expected_ids {
-		if !tt.has_type(ast_id) {
-			missing << ast_id
-		}
-	}
-
-	if tt.debug_mode {
-		if missing.len > 0 {
-			println('[TYPE_TABLE] VALIDATION: Missing types for AST IDs: ${missing}')
-		} else {
-			println('[TYPE_TABLE] VALIDATION: All expected AST IDs have types')
-		}
-	}
-
-	return missing
+pub fn (tt TypeTable) get_function_type(name string) ?FunctionType {
+	return tt.function_types[name] or { return none }
 }
 
-// get_all_types returns all types in the table
-pub fn (tt TypeTable) get_all_types() map[int]TypeInfo {
-	return tt.types
+// Custom type management
+pub fn (mut tt TypeTable) register_custom_type(name string, type_def ast.Type) {
+	tt.custom_types[name] = type_def
 }
 
-// clear removes all types from the table
-pub fn (mut tt TypeTable) clear() {
-	tt.types.clear()
-	tt.next_id = 1
-	tt.operations_log.clear()
-	tt.log_operation('TypeTable cleared')
+pub fn (tt TypeTable) get_custom_type(name string) ?ast.Type {
+	return tt.custom_types[name] or { return none }
 }
 
-// get_operations_log returns the operations log
-pub fn (tt TypeTable) get_operations_log() []string {
-	return tt.operations_log
+// Mark a type as used
+pub fn (mut tt TypeTable) mark_type_used(name string) {
+	tt.used_types[name] = true
 }
 
-// print_operations_log prints the operations log
-pub fn (tt TypeTable) print_operations_log() {
-	println('=== TYPE TABLE OPERATIONS LOG ===')
-	for i, op in tt.operations_log {
-		println('${i + 1}: ${op}')
-	}
-	println('================================')
+// Register type position
+pub fn (mut tt TypeTable) register_type_position(name string, pos ast.Position) {
+	tt.type_positions[name] = pos
 }
 
-// print_detailed_type_assignments prints type assignments with source code context
-pub fn (tt TypeTable) print_detailed_type_assignments() {
-	println('=== DETAILED TYPE ASSIGNMENTS ===')
+// Get type position
+pub fn (tt TypeTable) get_type_position(name string) ?ast.Position {
+	return tt.type_positions[name] or { none }
+}
 
-	// Group by position for better readability
-	mut assignments_by_line := map[int][]string{}
+// Get all unused types
+pub fn (tt TypeTable) get_unused_types() []string {
+	mut unused := []string{}
 
-	for op in tt.operations_log {
-		if op.starts_with('ASSIGN: ') {
-			// Extract line number from position
-			parts := op.split(' ')
-			if parts.len >= 2 {
-				pos_part := parts[1]
-				if pos_part.contains(':') {
-					line_parts := pos_part.split(':')
-					if line_parts.len >= 2 {
-						line_num := line_parts[0].int()
-						if line_num !in assignments_by_line {
-							assignments_by_line[line_num] = []
-						}
-						assignments_by_line[line_num] << op.replace('ASSIGN: ', '')
-					}
-				}
-			}
+	// Check custom types
+	for type_name, _ in tt.custom_types {
+		if !tt.used_types[type_name] {
+			unused << type_name
 		}
 	}
 
-	// Print assignments sorted by line number
-	mut sorted_lines := assignments_by_line.keys()
-	sorted_lines.sort()
-
-	for line_num in sorted_lines {
-		println('Line ${line_num}:')
-		for assignment in assignments_by_line[line_num] {
-			println('  ${assignment}')
+	// Check record types
+	for record_name, _ in tt.record_types {
+		if !tt.used_types[record_name] {
+			unused << record_name
 		}
 	}
 
-	println('==================================')
+	return unused
 }

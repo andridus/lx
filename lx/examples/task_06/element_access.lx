@@ -1,0 +1,12 @@
+def element_access_example() do
+    tuple = {1, "hello", :atom, 3.14}
+    first = element(1, tuple)
+    second = element(2, tuple)
+    third = element(3, tuple)
+    fourth = element(4, tuple)
+    {first, second, third, fourth}
+end
+
+def main() do
+    element_access_example()
+end

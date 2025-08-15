@@ -1,0 +1,85 @@
+
+record Account {
+    id :: integer,
+    balance :: float
+}
+
+def create_account() do
+    :account_manager.create_account()
+end
+
+def list_accounts() do
+    :account_manager.list_accounts()
+end
+
+def get_balance(account_id :: string) do
+    :account_manager.get_balance(account_id)
+end
+
+def transfer(from :: string, to :: string, amount :: float) do
+    :account_manager.transfer(from, to, amount)
+end
+
+supervisor do
+    children [account_manager]
+    strategy :one_for_all
+    # intensity 0
+    # period 0
+end
+
+worker account_manager do
+    def start_link() do
+        :gen_server.start_link({:local, __MODULE__}, __MODULE__, %{}, [])
+    end
+
+    def init(state) do
+        {:ok, state}
+    end
+
+    def create_account() do
+        :gen_server.call(__MODULE__, :create)
+    end
+
+    def list_accounts() do
+        :gen_server.call(__MODULE__, :list)
+    end
+
+    def get_balance(id :: integer) do
+        :gen_server.call(__MODULE__, {:balance, id})
+    end
+
+    def transfer(from :: string, to :: string, amount :: float) do
+        :gen_server.call(__MODULE__, {:trasfer, from, to, amount})
+    end
+
+    ## Callbacks
+    def handle_call do
+        (:create, _from, state) ->
+            uuid = ":utils.uuid()"
+            account = Account{id: uuid, balance: 0.0}
+            {:reply, {:ok, account}, :maps.put(uuid, account, state)}
+
+        (:list, _from, state) ->
+            {:reply, state, state}
+
+        ({:balance, uuid}, _from, state) ->
+            with Account{} = account <- :maps.get(uuid, state) do
+                {:reply, {:ok, account}, state}
+            else
+                {:reply, {:error, :not_found}, state}
+            end
+
+        ({:transfer, from, to, amount}, _from, state) ->
+            match Account{} = from_account <- :maps.get(from, state) rescue _ do {:reply, {:error, :from_not_found}, state} end
+            match Account{} = to_account <- :maps.get(to, state) rescue _ do {:reply, {:error, :to_not_found}, state} end
+
+            new_state =
+                %{ state |
+                    from => %Account{from_account | balance: from_account.balance - amount},
+                    to => %Account{to_account | balance: from_account.balance + amount}
+                }
+            {:reply, :ok, new_state}
+
+    end
+
+end

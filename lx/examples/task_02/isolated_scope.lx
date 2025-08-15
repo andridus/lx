@@ -1,0 +1,9 @@
+def main() do
+    x = 42
+    x
+end
+
+def function2() do
+    x = "hello"
+    x
+end

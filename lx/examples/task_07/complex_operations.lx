@@ -1,0 +1,26 @@
+def complex_map_operations() do
+    # Map básico com diferentes tipos de chaves
+    user = %{id: 1, name: "João", age: 30, "email": "joao@example.com", 42: "magic"}
+
+    # Map aninhado
+    config = %{database: %{host: "localhost", port: 5432}, "api_key": "secret123"}
+
+    # Acesso a chaves de diferentes tipos
+    name = map_get(:name, user)
+    age = map_get(:age, user)
+    email = map_get("email", user)
+    magic = map_get(42, user)
+
+    # Atualização de chaves de diferentes tipos
+    updated_user = map_put(:age, 31, user)
+    updated_user2 = map_put("email", "new@example.com", updated_user)
+
+    # Remoção de chaves de diferentes tipos
+    clean_user = map_remove(:id, updated_user2)
+    clean_user2 = map_remove("email", clean_user)
+
+    {user, config, clean_user2}
+end
+def main() do
+    complex_map_operations()
+end

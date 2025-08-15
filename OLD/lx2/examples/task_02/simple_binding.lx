@@ -1,0 +1,4 @@
+def simple_binding() do
+    x = 42
+    x
+end

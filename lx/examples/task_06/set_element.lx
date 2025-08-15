@@ -1,0 +1,8 @@
+def set_element_example() do
+    tuple = {1, 2, 3, 4}
+    modified = setelement(2, tuple, "changed")
+    modified
+end
+def main() do
+    set_element_example()
+end

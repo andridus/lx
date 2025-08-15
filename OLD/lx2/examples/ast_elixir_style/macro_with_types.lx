@@ -1,0 +1,7 @@
+# Exemplo: Macro com tipos específicos
+defmacro +(left :: number, right :: number) do
+  {binary_op, [], [+, left, right]}
+end
+
+# Uso:
+result = 5 + 3

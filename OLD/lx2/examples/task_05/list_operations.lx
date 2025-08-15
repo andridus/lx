@@ -1,0 +1,38 @@
+% Definição dos operadores como macros
+defmacro ++(left, right) do
+    {++, _, [left, right]}
+end
+
+defmacro in(element, list) do
+    {in, _, [element, list]}
+end
+
+defmacro length(list) do
+    {length, _, [list]}
+end
+
+% Uso dos operadores
+def concatenation() do
+    list1 = [1, 2, 3]
+    list2 = [4, 5, 6]
+    list1 ++ list2
+end
+
+def length_operation() do
+    numbers = [1, 2, 3, 4, 5]
+    length(numbers)
+end
+
+def membership_test() do
+    numbers = [1, 2, 3, 4, 5]
+    3 in numbers
+end
+
+def complex_operations() do
+    list1 = [1, 2, 3]
+    list2 = [4, 5, 6]
+    combined = list1 ++ list2
+    size = length(combined)
+    has_five = 5 in combined
+    {combined, size, has_five}
+end

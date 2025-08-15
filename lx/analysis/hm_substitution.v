@@ -1,160 +1,184 @@
 module analysis
 
-// Substitution represents a substitution in the HM system
-// Maps type variable IDs to their substituted types
-pub struct Substitution {
-pub mut:
-	subst map[int]TypeInfo // TypeVar.id -> TypeInfo
-}
+import ast
 
-// new_substitution creates an empty substitution
-pub fn new_substitution() Substitution {
-	return Substitution{
-		subst: map[int]TypeInfo{}
-	}
-}
-
-// singleton creates a substitution with a single mapping
-pub fn singleton_substitution(var_id int, type_info TypeInfo) Substitution {
-	mut s := new_substitution()
-	s.subst[var_id] = type_info
-	return s
-}
-
-// apply_to_type applies substitution to a type
-pub fn (s Substitution) apply_to_type(t TypeInfo) TypeInfo {
-	// For now, we'll work with the existing TypeInfo structure
-	// In a full HM implementation, we'd need to handle type variables properly
-
-	// If this is a type variable, substitute it
-	if t.generic == 'typevar' {
-		if value := t.value {
-			// Parse the type variable ID from the value
-			var_id := value.int()
-			if substituted := s.subst[var_id] {
-				return substituted
-			}
-		}
+pub fn compose_substitutions(sub1 Substitution, sub2 Substitution) Substitution {
+	mut result := Substitution{
+		mappings: sub1.mappings.clone()
 	}
 
-	// For complex types, recursively apply substitution
-	if t.generic == 'list' && t.values.len > 0 {
-		element_type := s.apply_to_type(t.values[0])
-		return typeinfo_list(element_type)
+	// Apply sub2 to all values in sub1
+	for key, value in result.mappings {
+		result.mappings[key] = substitute_in_type(value, sub2)
 	}
 
-	if t.generic == 'map' && t.values.len >= 2 {
-		key_type := s.apply_to_type(t.values[0])
-		value_type := s.apply_to_type(t.values[1])
-		return typeinfo_map(key_type, value_type)
-	}
-
-	if t.generic == 'tuple' && t.values.len > 0 {
-		element_types := t.values.map(s.apply_to_type(it))
-		return typeinfo_tuple(element_types)
-	}
-
-	if t.generic == 'union' && t.values.len > 0 {
-		union_types := t.values.map(s.apply_to_type(it))
-		return typeinfo_union(union_types)
-	}
-
-	// For primitive types, return as-is
-	return t
-}
-
-// apply_to_scheme applies substitution to a type scheme
-pub fn (s Substitution) apply_to_scheme(scheme TypeScheme) TypeScheme {
-	// Remove bound variables from substitution
-	mut filtered_subst := map[int]TypeInfo{}
-	for var_id, type_info in s.subst {
-		mut is_bound := false
-		for bound_var in scheme.vars {
-			if bound_var.id == var_id {
-				is_bound = true
-				break
-			}
-		}
-		if !is_bound {
-			filtered_subst[var_id] = type_info
-		}
-	}
-
-	filtered_s := Substitution{
-		subst: filtered_subst
-	}
-
-	return TypeScheme{
-		vars:      scheme.vars
-		type_info: filtered_s.apply_to_type(scheme.type_info)
-	}
-}
-
-// apply_to_env applies substitution to a type environment
-pub fn (s Substitution) apply_to_env(env TypeEnv) TypeEnv {
-	mut new_bindings := map[string]TypeScheme{}
-	for name, scheme in env.bindings {
-		new_bindings[name] = s.apply_to_scheme(scheme)
-	}
-
-	return TypeEnv{
-		bindings: new_bindings
-		parent:   env.parent
-	}
-}
-
-// compose composes two substitutions (s1 ∘ s2)
-pub fn (s1 Substitution) compose(s2 Substitution) Substitution {
-	mut result := new_substitution()
-
-	// Apply s1 to all types in s2
-	for var_id, type_info in s2.subst {
-		result.subst[var_id] = s1.apply_to_type(type_info)
-	}
-
-	// Add mappings from s1 that are not in s2
-	for var_id, type_info in s1.subst {
-		if var_id !in s2.subst {
-			result.subst[var_id] = type_info
+	// Add mappings from sub2 that are not in sub1
+	for key, value in sub2.mappings {
+		if key !in result.mappings {
+			result.mappings[key] = value
 		}
 	}
 
 	return result
 }
 
-// identity returns the identity substitution
-pub fn identity_substitution() Substitution {
-	return new_substitution()
-}
+pub fn apply_substitution_to_constraints(constraints []Constraint, substitution Substitution) []Constraint {
+	mut result := []Constraint{}
 
-// str returns a string representation of the substitution
-pub fn (s Substitution) str() string {
-	mut mappings := []string{}
-	for var_id, type_info in s.subst {
-		mappings << '${var_id} -> ${type_info.str()}'
+	for constraint in constraints {
+		result << Constraint{
+			left:     substitute_in_type(constraint.left, substitution)
+			right:    substitute_in_type(constraint.right, substitution)
+			position: constraint.position
+		}
 	}
-	return '[${mappings.join(', ')}]'
+
+	return result
 }
 
-// is_empty checks if the substitution is empty
-pub fn (s Substitution) is_empty() bool {
-	return s.subst.len == 0
-}
-
-// domain returns the domain of the substitution (all variable IDs)
-pub fn (s Substitution) domain() []int {
-	mut vars := []int{}
-	for var_id, _ in s.subst {
-		vars << var_id
+pub fn apply_substitution_to_type_env(env TypeEnv, substitution Substitution) TypeEnv {
+	mut new_env := TypeEnv{
+		scope_name: env.scope_name
+		bindings:   map[string]TypeScheme{}
 	}
-	return vars
+
+	for name, scheme in env.bindings {
+		new_env.bindings[name] = substitute_in_type_scheme(scheme, substitution)
+	}
+
+	return new_env
 }
 
-// Helper function to create a type variable TypeInfo
-pub fn typeinfo_typevar(var_id int, name string) TypeInfo {
-	return TypeInfo{
-		generic: 'typevar'
-		value:   var_id.str()
-		values:  []
+pub fn is_identity_substitution(substitution Substitution) bool {
+	// Check if the substitution maps each variable to itself
+	for key, value in substitution.mappings {
+		if value.name != key {
+			return false
+		}
 	}
+	return true
+}
+
+pub fn restrict_substitution(substitution Substitution, vars []string) Substitution {
+	mut result := Substitution{
+		mappings: map[string]ast.Type{}
+	}
+
+	for var in vars {
+		if value := substitution.mappings[var] {
+			result.mappings[var] = value
+		}
+	}
+
+	return result
+}
+
+pub fn union_substitutions(sub1 Substitution, sub2 Substitution) !Substitution {
+	mut result := Substitution{
+		mappings: sub1.mappings.clone()
+	}
+
+	for key, value in sub2.mappings {
+		if key in result.mappings {
+			// Check if the mappings are compatible
+			if result.mappings[key].name != value.name {
+				return error('Incompatible substitutions for variable: ${key}')
+			}
+		} else {
+			result.mappings[key] = value
+		}
+	}
+
+	return result
+}
+
+pub fn substitute_in_type(typ ast.Type, substitution Substitution) ast.Type {
+	// Check if this type is a type variable that needs substitution
+	if typ.name.starts_with('T') && typ.params.len == 0 {
+		if new_type := substitution.mappings[typ.name] {
+			return new_type
+		}
+		// No substitution found, return original
+		return typ
+	}
+
+	// Apply substitution to parameters recursively
+	mut new_params := []ast.Type{}
+	for param in typ.params {
+		new_params << substitute_in_type(param, substitution)
+	}
+
+	return ast.Type{
+		name:   typ.name
+		params: new_params
+	}
+}
+
+pub fn substitute_in_type_scheme(scheme TypeScheme, substitution Substitution) TypeScheme {
+	// Create a new substitution that excludes quantified variables
+	mut filtered_substitution := Substitution{
+		mappings: map[string]ast.Type{}
+	}
+
+	for key, value in substitution.mappings {
+		// Only include if the variable is not quantified
+		mut is_quantified := false
+		for var in scheme.quantified_vars {
+			if var.name == key {
+				is_quantified = true
+				break
+			}
+		}
+
+		if !is_quantified {
+			filtered_substitution.mappings[key] = value
+		}
+	}
+
+	new_body := substitute_in_type(scheme.body, filtered_substitution)
+
+	return TypeScheme{
+		quantified_vars: scheme.quantified_vars
+		body:            new_body
+	}
+}
+
+pub fn get_domain(substitution Substitution) []string {
+	mut domain := []string{}
+	for key in substitution.mappings.keys() {
+		domain << key
+	}
+	return domain
+}
+
+pub fn get_range(substitution Substitution) []ast.Type {
+	mut range := []ast.Type{}
+	for value in substitution.mappings.values() {
+		range << value
+	}
+	return range
+}
+
+pub fn is_ground_substitution(substitution Substitution) bool {
+	// Check if all values in the substitution are ground types (no type variables)
+	for value in substitution.mappings.values() {
+		if contains_type_variables(value) {
+			return false
+		}
+	}
+	return true
+}
+
+fn contains_type_variables(typ ast.Type) bool {
+	if typ.name.starts_with('T') && typ.params.len == 0 {
+		return true
+	}
+
+	for param in typ.params {
+		if contains_type_variables(param) {
+			return true
+		}
+	}
+
+	return false
 }

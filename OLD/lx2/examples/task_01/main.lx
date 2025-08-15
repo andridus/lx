@@ -1,0 +1,11 @@
+def main() do
+    "Hello from LX2!"
+end
+
+def answer() do
+    42
+end
+
+def greeting() do
+    "Hello, World!"
+end

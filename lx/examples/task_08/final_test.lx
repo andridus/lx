@@ -1,0 +1,28 @@
+# Records definidos no escopo global
+record Address { street :: string, city :: string, country :: string }
+record Person { name :: string, age :: integer, address :: Address, active :: boolean }
+
+def final_test() do
+    # Criação de records
+    address = Address{street: "Rua das Flores", city: "São Paulo", country: "Brasil"}
+    person = Person{name: "Maria", age: 30, address: address, active: true}
+
+    # Acesso a campos
+    name = person.name
+    age = person.age
+    street = person.address.street
+    city = person.address.city
+    country = person.address.country
+    active = person.active
+
+    # Atualização de campos
+    updated_person = %Person{person | age: 31}
+    updated_address = %Address{address | city: "Rio de Janeiro"}
+    updated_person2 = %Person{person | address: updated_address}
+
+    # Resultado
+    {person, updated_person, updated_person2, name, age, street, city, country, active}
+end
+def main() do
+    final_test()
+end

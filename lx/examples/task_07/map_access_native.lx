@@ -1,0 +1,21 @@
+def map_access_native() do
+    # Map básico
+    user = %{name: "João", age: 30, "email": "joao@example.com", 42: "magic"}
+
+    # Acesso usando sintaxe nativa
+    name = user[:name]
+    age = user[:age]
+    email = user["email"]
+    magic = user[42]
+
+    # Acesso com variáveis
+    key1 = :name
+    key2 = "email"
+    value1 = user[key1]
+    value2 = user[key2]
+
+    {name, age, email, magic, value1, value2}
+end
+def main() do
+    map_access_native()
+end

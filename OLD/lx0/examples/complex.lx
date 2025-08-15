@@ -1,0 +1,37 @@
+# Complex LX example demonstrating various features
+
+record Person {
+    name :: string,
+    age :: integer,
+    email :: string
+}
+
+record Address {
+    street :: string,
+    city :: string,
+    country :: string
+}
+
+def create_person(name, age, email) do
+    Person{name: name, age: age, email: email}
+end
+
+def create_address(street, city, country) do
+    Address{street: street, city: city, country: country}
+end
+
+def get_person_info(person) do
+    "Person info"
+end
+
+def calculate_birth_year(current_age) do
+    2024 - current_age
+end
+
+def is_adult(person) do
+    18
+end
+
+def format_address(address) do
+    "Address info"
+end

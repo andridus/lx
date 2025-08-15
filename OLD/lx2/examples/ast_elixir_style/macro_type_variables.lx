@@ -1,0 +1,7 @@
+# Exemplo: Macro com variáveis de tipo
+defmacro filter(fun :: {fun, [T], boolean}, list :: {list, T}) do
+  {list_filter, [], [fun, list]}
+end
+
+# Uso:
+evens = filter(fn(x) do x % 2 == 0 end, [1, 2, 3, 4, 5])

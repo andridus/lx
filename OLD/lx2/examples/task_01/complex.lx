@@ -1,0 +1,27 @@
+def main() do
+    "Main function"
+end
+
+def answer() do
+    42
+end
+
+def greeting() do
+    "Hello, World!"
+end
+
+def status() do
+    :ok
+end
+
+def pi() do
+    3.14159
+end
+
+def truth() do
+    true
+end
+
+def nothing() do
+    nil
+end

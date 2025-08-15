@@ -1,0 +1,7 @@
+# Exemplo: Macro com tipos compostos
+defmacro map(fun :: {fun, [T], U}, list :: {list, T}) do
+  {list_map, [], [fun, list]}
+end
+
+# Uso:
+doubled = map(fn(x) do x * 2 end, [1, 2, 3])

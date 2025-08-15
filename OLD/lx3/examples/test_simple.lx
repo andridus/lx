@@ -1,0 +1,7 @@
+defmacro infix +(left :: integer, right :: integer) do
+    {:'+', #{line => 1, column => 1, type => undefined}, [left, right]}
+end
+
+x = 10
+y = 5
+sum = x + y

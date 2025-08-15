@@ -1,0 +1,20 @@
+def precedence_example() do
+    # This should evaluate as 2 + (3 * 4) = 14, not (2 + 3) * 4 = 20
+    2 + 3 * 4
+end
+
+def parentheses_override() do
+    # This should evaluate as (2 + 3) * 4 = 20
+    (2 + 3) * 4
+end
+
+def complex_expression() do
+    a = 10
+    b = 5
+    c = 3
+    # Should evaluate as ((a + b) * c) - 2 = ((10 + 5) * 3) - 2 = 43
+    (a + b) * c - 2
+end
+def main() do
+    precedence_example()
+end

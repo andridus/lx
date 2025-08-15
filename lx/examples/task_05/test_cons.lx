@@ -1,0 +1,6 @@
+def test_cons() do
+    [1 | [2, 3]]
+end
+def main() do
+    test_cons()
+end
