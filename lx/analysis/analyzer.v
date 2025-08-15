@@ -40,6 +40,35 @@ pub fn (mut a Analyzer) bind(name string, scheme TypeScheme) {
 	a.type_envs[a.current_env].bindings[name] = scheme
 }
 
+pub fn (mut a Analyzer) bind_with_position(name string, scheme TypeScheme, position ast.Position) {
+	a.type_envs[a.current_env].bind_with_position(name, scheme, position)
+}
+
+pub fn (mut a Analyzer) mark_variable_used(name string) {
+	// Mark variable as used in the scope where it was found
+	for i := a.current_env; i >= 0; i-- {
+		if name in a.type_envs[i].bindings {
+			a.type_envs[i].mark_used(name)
+			break
+		}
+	}
+}
+
+pub fn (mut a Analyzer) check_unused_variables() ! {
+	// Check for unused variables in current function scope
+	if a.current_env > 0 {
+		unused_vars := a.type_envs[a.current_env].get_unused_variables_with_positions()
+		for var_name, position in unused_vars {
+			// Skip underscore variables as they are intended to be unused
+			if !var_name.starts_with('_') && var_name != '_pattern' {
+				a.error('Unused variable: ${var_name}. Consider prefixing with _ if intentionally unused',
+					position)
+				return error('Unused variable: ${var_name}')
+			}
+		}
+	}
+}
+
 pub fn (mut a Analyzer) enter_scope(scope_name string) {
 	new_env := new_type_env(scope_name)
 	a.type_envs << new_env
@@ -60,12 +89,9 @@ fn (mut a Analyzer) with_context(ctx AnalysisContext, f fn (mut Analyzer) !ast.N
 }
 
 fn (mut a Analyzer) extract_type_from_annotation(node ast.Node) !ast.Type {
-	// Se o nó é um identifier simples (tipo básico), retorna diretamente
+	// Se o nó é um identifier simples (tipo básico), usa type_node_to_type para marcar como usado
 	if node.kind == .identifier {
-		return ast.Type{
-			name:   node.value
-			params: []
-		}
+		return a.type_node_to_type(node)
 	}
 
 	// Se o nó não é uma anotação de tipo válida, retorna 'any'
@@ -169,7 +195,7 @@ fn (mut a Analyzer) type_node_to_type(node ast.Node) ast.Type {
 			else {}
 		}
 
-		// Records start with capital letter; keep the name as-is
+		// Check if this is a record type (either starts with capital or is a defined record)
 		if node.value.len > 0 && node.value[0].is_capital() {
 			return ast.Type{
 				name:   node.value
@@ -177,7 +203,40 @@ fn (mut a Analyzer) type_node_to_type(node ast.Node) ast.Type {
 			}
 		}
 
-		// Otherwise, treat as generic type variable
+		// Check if this identifier is a defined record type
+		if _ := a.type_table.get_record_type(node.value) {
+			// Mark record type as used
+			a.type_table.mark_type_used(node.value)
+			return ast.Type{
+				name:              node.value
+				params:            []
+				specialized_value: 'record_type'
+			}
+		}
+
+		// Check if this identifier is a defined custom type
+		if _ := a.type_table.get_custom_type(node.value) {
+			// Mark custom type as used
+			a.type_table.mark_type_used(node.value)
+			return ast.Type{
+				name:              node.value
+				params:            []
+				specialized_value: 'custom_type'
+			}
+		}
+
+		// Check if this is a valid built-in type or generic type variable
+		// Single uppercase letters are generic type variables (T, U, V, etc.)
+		if node.value.len == 1 && node.value[0].is_capital() {
+			return ast.Type{
+				name:   node.value
+				params: []
+			}
+		}
+
+		// If we reach here, it's potentially an undefined type
+		// During pre-processing, not all types may be available yet
+		// So we return a placeholder and let the actual analysis phase handle validation
 		return ast.Type{
 			name:   node.value
 			params: []
@@ -222,6 +281,103 @@ fn (mut a Analyzer) error(msg string, pos ast.Position) {
 
 fn (mut a Analyzer) error_with_suggestion(msg string, pos ast.Position, suggestion string) {
 	a.error_reporter.report_with_suggestion(.analysis, msg, pos, suggestion)
+}
+
+// Check for unused types and report warnings
+fn (mut a Analyzer) check_unused_types() {
+	unused_types := a.type_table.get_unused_types()
+	for type_name in unused_types {
+		// Get the position where the type was defined
+		pos := a.type_table.get_type_position(type_name) or {
+			ast.Position{
+				line:   0
+				column: 0
+				file:   ''
+			}
+		}
+		// For now, just report as an error
+		// In the future, this could be a warning instead
+		a.error('Unused type: ${type_name}', pos)
+	}
+}
+
+// Check if a type name is valid (built-in, record, or custom type)
+fn (mut a Analyzer) is_valid_type(type_name string) bool {
+	// Check if it's a built-in type
+	builtin_types := ['integer', 'float', 'atom', 'string', 'binary', 'boolean', 'any', 'list',
+		'tuple', 'map']
+	if type_name in builtin_types {
+		return true
+	}
+
+	// Check if it's a registered record type
+	if _ := a.type_table.get_record_type(type_name) {
+		return true
+	}
+
+	// Check if it's a registered custom type
+	if _ := a.type_table.get_custom_type(type_name) {
+		return true
+	}
+
+	// Check if it's a generic type variable (single uppercase letter)
+	if type_name.len == 1 && type_name[0].is_capital() {
+		return true
+	}
+
+	return false
+}
+
+// Check if two types are compatible for return type validation
+fn (mut a Analyzer) are_types_compatible(inferred ast.Type, annotated ast.Type) bool {
+	// Rule 3: If inferred type is 'any', any annotated type is compatible
+	if inferred.name == 'any' {
+		return true
+	}
+
+	// Rule 1: If types are exactly the same, check specialized values
+	if inferred.name == annotated.name {
+		// If both have specialized values, they must match exactly
+		if inferred_spec := inferred.specialized_value {
+			if annotated_spec := annotated.specialized_value {
+				return inferred_spec == annotated_spec
+			}
+		}
+		// If no specialized values to check, types are compatible
+		return true
+	}
+
+	// Rule 2: If annotated type is a custom type alias, check what it resolves to
+	if specialized := annotated.specialized_value {
+		if specialized == 'custom_type' {
+			// Get the actual type definition for the custom type
+			if actual_type := a.type_table.get_custom_type(annotated.name) {
+				// Check if the inferred type matches the actual underlying type
+				return a.are_types_compatible(inferred, actual_type)
+			}
+		}
+	}
+
+	// Handle specialized atom types (like :ok, :error)
+	if inferred.name == 'atom' && annotated.name == 'atom' {
+		// Check if annotated type has a specialized value (specific atom)
+		if annotated_spec := annotated.specialized_value {
+			// If annotated type is specialized (e.g., :ok), check if inferred matches
+			if inferred_spec := inferred.specialized_value {
+				// Both are specialized atoms, they must match exactly
+				return inferred_spec == annotated_spec
+			} else {
+				// Inferred is generic atom, annotated is specific - incompatible
+				return false
+			}
+		} else {
+			// Annotated is generic atom, any atom is compatible
+			return true
+		}
+	}
+
+	// Add more compatibility rules as needed
+	return false
 }
 
 fn (mut a Analyzer) analyze_node(node ast.Node) !ast.Node {
@@ -404,7 +560,48 @@ fn (mut a Analyzer) analyze_module(node ast.Node) !ast.Node {
 
 	mut function_names := map[string]bool{}
 
-	// First pass: pre-register all function signatures for forward references
+	// First pass: pre-register all records and custom types for forward references
+	for child in node.children {
+		if child.kind == .record_definition {
+			record_name := child.value
+			// Pre-register record type (empty for now, will be filled later)
+			mut field_types := map[string]ast.Type{}
+			mut field_defaults := map[string]ast.Node{}
+			a.type_table.register_record_type(record_name, field_types, field_defaults)
+			// Register position for error reporting
+			a.type_table.register_type_position(record_name, child.position)
+		} else if child.kind == .type_def || child.kind == .opaque_type
+			|| child.kind == .nominal_type {
+			type_name := child.value
+			// Pre-register custom type (will be properly filled during analysis)
+			// Just register the name for now, the actual type will be set during analyze_type_def
+			if child.children.len > 0 {
+				base_type := a.type_node_to_type(child.children[0])
+				a.type_table.register_custom_type(type_name, base_type)
+			}
+			// Register position for error reporting
+			a.type_table.register_type_position(type_name, child.position)
+		}
+	}
+
+	// Validate that all custom type base types exist
+	for child in node.children {
+		if child.kind == .type_def || child.kind == .opaque_type || child.kind == .nominal_type {
+			if child.children.len > 0 {
+				base_type_node := child.children[0]
+				if base_type_node.kind == .identifier {
+					base_type_name := base_type_node.value
+					// Check if the base type exists (built-in, record, or custom type)
+					if !a.is_valid_type(base_type_name) {
+						a.error('Undefined type: ${base_type_name}', base_type_node.position)
+						return error('Undefined type: ${base_type_name}')
+					}
+				}
+			}
+		}
+	}
+
+	// Second pass: pre-register all function signatures for forward references
 	for child in node.children {
 		if child.kind == .function || child.kind == .private_function {
 			func_name := child.value
@@ -418,7 +615,7 @@ fn (mut a Analyzer) analyze_module(node ast.Node) !ast.Node {
 		}
 	}
 
-	// Second pass: analyze all nodes with function signatures already available
+	// Third pass: analyze all nodes with function signatures and records already available
 	for child in node.children {
 		analyzed_child := a.analyze_node(child)!
 		analyzed_children << analyzed_child
@@ -428,6 +625,9 @@ fn (mut a Analyzer) analyze_module(node ast.Node) !ast.Node {
 		name:   'module'
 		params: []
 	})
+
+	// Check for unused types at the end of module analysis
+	a.check_unused_types()
 
 	return ast.Node{
 		...node
@@ -443,11 +643,11 @@ fn (mut a Analyzer) preregister_function(node ast.Node) ! {
 
 	function_name := node.value
 	if function_name == '' {
-		return // Skip anonymous function heads
+		return
 	}
 
 	if node.children.len < 2 {
-		return // Need at least parameters and body
+		return
 	}
 
 	parameters_node := node.children[0]
@@ -1197,6 +1397,25 @@ fn (mut a Analyzer) analyze_function(node ast.Node) !ast.Node {
 		return_type = body_type
 	}
 
+	// Validate and resolve return type annotation if present
+	if return_type_annotation.name != 'any' {
+		// We have a return type annotation, validate it against inferred type
+		inferred_type := return_type
+		annotated_type := return_type_annotation
+
+		// Rule 1: If inferred type is different from annotated type, check compatibility
+		if !a.are_types_compatible(inferred_type, annotated_type) {
+			a.error('Return type mismatch: function returns ${inferred_type.name} but annotated as ${annotated_type.name}',
+				node.position)
+			return error('Return type mismatch')
+		}
+
+		// Rule 2 & 3: If types are compatible, use the annotated type
+		// This handles cases where inferred is 'atom' and annotated is 'custom_type :: atom'
+		// or where inferred is 'any' and annotated is a specific type
+		return_type = annotated_type
+	}
+
 	// Para funções com operadores aritméticos, force parâmetros para 'integer'
 	if body.kind == .function_caller && body.value in ['+', '-', '*', '/'] {
 		for i, _ in parameter_names {
@@ -1214,6 +1433,10 @@ fn (mut a Analyzer) analyze_function(node ast.Node) !ast.Node {
 		a.type_table.register_function_type(function_name, parameters, return_type)
 		// Create function type for this node - use the actual return type, not 'function'
 		a.type_table.assign_type(node.id, return_type)
+
+		// Check for unused variables before exiting function scope
+		a.check_unused_variables()!
+
 		// Restore the previous environment
 		a.current_env = 0
 	}
@@ -1246,7 +1469,7 @@ fn (mut a Analyzer) analyze_literal(node ast.Node) !ast.Node {
 			})
 		}
 		.string {
-			// Create specialized string type with the specific value
+			// Create specialized binary type with the specific value (strings are binaries in Erlang)
 			a.type_table.assign_type(node.id, ast.Type{
 				name:              'string'
 				params:            []
@@ -1257,7 +1480,10 @@ fn (mut a Analyzer) analyze_literal(node ast.Node) !ast.Node {
 			// Charlist: list of integers
 			a.type_table.assign_type(node.id, ast.Type{
 				name:   'list'
-				params: [ast.Type{ name: 'integer', params: [] }]
+				params: [ast.Type{
+					name:   'integer'
+					params: []
+				}]
 			})
 		}
 		.boolean {
@@ -1391,6 +1617,8 @@ fn (mut a Analyzer) analyze_variable_ref(node ast.Node) !ast.Node {
 
 	// Look up variable in current function's type environment
 	if scheme := a.lookup(var_name) {
+		// Mark variable as used
+		a.mark_variable_used(var_name)
 		a.type_table.assign_type(node.id, scheme.body)
 		return node
 	} else {
@@ -1413,6 +1641,8 @@ fn (mut a Analyzer) analyze_identifier(node ast.Node) !ast.Node {
 
 	// Look up variable in current function's type environment
 	if scheme := a.lookup(var_name) {
+		// Mark variable as used
+		a.mark_variable_used(var_name)
 		a.type_table.assign_type(node.id, scheme.body)
 		return node
 	} else {
@@ -1479,7 +1709,8 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 		// In OTP submodule contexts (worker/supervisor), require external qualifier unless the function is local
 		if a.otp_contexts.len > 0 {
 			if function_name !in a.otp_contexts[a.otp_contexts.len - 1].local_functions {
-				a.error('Undefined local function "${function_name}" in OTP context. Use _:${function_name}(...) or {module}:${function_name}(...).', node.position)
+				a.error('Undefined local function "${function_name}" in OTP context. Use _:${function_name}(...) or {module}:${function_name}(...).',
+					node.position)
 				return error('Undefined local function in OTP context')
 			}
 		}
@@ -1558,9 +1789,19 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 	// Special-case list concatenation to compute precise union of element types
 	if function_name == '++' {
 		element_types := collect_list_types_rec(node, &a.type_table)
-		common_type := a.infer_common_type(element_types) or { ast.Type{ name: 'any', params: [] } }
-		a.type_table.assign_type(node.id, ast.Type{ name: 'list', params: [common_type] })
-		return ast.Node{ ...node, children: analyzed_args }
+		common_type := a.infer_common_type(element_types) or {
+			ast.Type{
+				name:   'any'
+				params: []
+			}
+		}
+		a.type_table.assign_type(node.id, ast.Type{ name: 'list', params: [
+			common_type,
+		] })
+		return ast.Node{
+			...node
+			children: analyzed_args
+		}
 	}
 
 	// Para todas as funções do kernel, usa a primeira assinatura válida
@@ -1704,9 +1945,9 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 		if function_info.fixity == .prefix && analyzed_args.len == 1 {
 			sig := function_info.signatures[0]
 			a.type_table.assign_type(node.id, sig.return_type)
-		return ast.Node{
-			...node
-			children: analyzed_args
+			return ast.Node{
+				...node
+				children: analyzed_args
 			}
 		}
 	}
@@ -1739,12 +1980,18 @@ fn (mut a Analyzer) analyze_external_function_call(node ast.Node) !ast.Node {
 	if function_type := a.type_table.get_function_type(function_name) {
 		// Optional: could validate arity here if needed
 		a.type_table.assign_type(node.id, function_type.return_type)
-		return ast.Node{ ...node, children: analyzed_args }
+		return ast.Node{
+			...node
+			children: analyzed_args
+		}
 	}
 
 	// Fallback: generic external function result when we don't know the type
 	a.type_table.assign_type(node.id, ast.Type{ name: 'any', params: [] })
-	return ast.Node{ ...node, children: analyzed_args }
+	return ast.Node{
+		...node
+		children: analyzed_args
+	}
 }
 
 fn (mut a Analyzer) check_function_signatures(function_name string, left_type ast.Type, right_type ast.Type, signatures []kernel.TypeSignature) !ast.Type {
@@ -2308,6 +2555,9 @@ fn (mut a Analyzer) analyze_record_literal(node ast.Node) !ast.Node {
 		return error('Undefined record type: ${record_name}')
 	}
 
+	// Mark record as used when creating a literal
+	a.type_table.mark_type_used(record_name)
+
 	mut analyzed_fields := []ast.Node{}
 	mut provided_fields := map[string]bool{}
 
@@ -2429,6 +2679,9 @@ fn (mut a Analyzer) analyze_record_access(node ast.Node) !ast.Node {
 			return error('Unknown field ${field_name} in record ${record_type.name}')
 		}
 	}
+
+	// Mark record as used when accessing its fields
+	a.type_table.mark_type_used(record_type.name)
 
 	// Assign the field type to this node
 	a.type_table.assign_type(node.id, field_type)
@@ -2689,6 +2942,9 @@ fn (mut a Analyzer) analyze_function_head(node ast.Node) !ast.Node {
 		return_type = body_type
 	}
 
+	// Check for unused variables in function head scope
+	a.check_unused_variables()!
+
 	return ast.Node{
 		id:       node.id
 		kind:     node.kind
@@ -2883,6 +3139,34 @@ fn (a Analyzer) collect_types_from_union(typ ast.Type, mut all_types []ast.Type,
 	}
 }
 
+fn (a Analyzer) types_are_identical(t1 ast.Type, t2 ast.Type) bool {
+	// Check if two types are completely identical
+	if t1.name != t2.name {
+		return false
+	}
+
+	// Check specialized values (for atom types) - handle optional strings properly
+	t1_spec := t1.specialized_value or { '' }
+	t2_spec := t2.specialized_value or { '' }
+	if t1_spec != t2_spec {
+		return false
+	}
+
+	// Check parameter count
+	if t1.params.len != t2.params.len {
+		return false
+	}
+
+	// Check all parameters recursively
+	for i in 0 .. t1.params.len {
+		if !a.types_are_identical(t1.params[i], t2.params[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
 fn (a Analyzer) unify_types(t1 ast.Type, t2 ast.Type) ast.Type {
 	// If both types are the same and not union (but not lists, which need parameter checking), return the type
 	if t1.name == t2.name && t1.name != 'union' && t1.name != 'list' {
@@ -2950,11 +3234,17 @@ fn (a Analyzer) unify_types(t1 ast.Type, t2 ast.Type) ast.Type {
 
 		// Remove duplicates and create new union
 		mut unique_types := []ast.Type{}
-		mut seen_names := map[string]bool{}
 
 		for typ in all_types {
-			if !seen_names[typ.name] {
-				seen_names[typ.name] = true
+			// Check if this exact type is already in unique_types
+			mut is_duplicate := false
+			for existing in unique_types {
+				if a.types_are_identical(typ, existing) {
+					is_duplicate = true
+					break
+				}
+			}
+			if !is_duplicate {
 				unique_types << typ
 			}
 		}
@@ -3309,6 +3599,11 @@ fn (mut a Analyzer) analyze_pattern_with_type(node ast.Node, expected_type ast.T
 		}
 		.record_literal {
 			// Record pattern - analyze field patterns
+			record_name := node.value
+
+			// Mark record as used when used in patterns
+			a.type_table.mark_type_used(record_name)
+
 			mut analyzed_children := []ast.Node{}
 			for child in node.children {
 				analyzed_child := a.analyze_pattern_with_type(child, ast.Type{
@@ -3316,6 +3611,32 @@ fn (mut a Analyzer) analyze_pattern_with_type(node ast.Node, expected_type ast.T
 					params: []
 				})!
 				analyzed_children << analyzed_child
+			}
+
+			a.type_table.assign_type(node.id, expected_type)
+			return ast.Node{
+				...node
+				children: analyzed_children
+			}
+		}
+		.map_literal {
+			// Map pattern - analyze key-value patterns
+			mut analyzed_children := []ast.Node{}
+			for i := 0; i < node.children.len; i += 2 {
+				// Keys are typically literals or atoms (not variables in pattern context)
+				key := node.children[i]
+				analyzed_key := a.analyze_node(key)!
+				analyzed_children << analyzed_key
+
+				// Values can be variables that should be bound
+				if i + 1 < node.children.len {
+					value := node.children[i + 1]
+					analyzed_value := a.analyze_pattern_with_type(value, ast.Type{
+						name:   'any'
+						params: []
+					})!
+					analyzed_children << analyzed_value
+				}
 			}
 
 			a.type_table.assign_type(node.id, expected_type)
@@ -3338,6 +3659,23 @@ fn (mut a Analyzer) analyze_pattern_with_type(node ast.Node, expected_type ast.T
 				params: []
 			}
 			a.type_table.assign_type(node.id, binary_type)
+			return ast.Node{
+				...node
+				children: analyzed_children
+			}
+		}
+		.block {
+			// Block pattern (for function arguments) - analyze each child as pattern
+			mut analyzed_children := []ast.Node{}
+			for child in node.children {
+				analyzed_child := a.analyze_pattern_with_type(child, ast.Type{
+					name:   'any'
+					params: []
+				})!
+				analyzed_children << analyzed_child
+			}
+
+			a.type_table.assign_type(node.id, expected_type)
 			return ast.Node{
 				...node
 				children: analyzed_children
@@ -3456,10 +3794,10 @@ fn (mut a Analyzer) register_pattern_variables(pattern ast.Node) {
 				}
 			}
 
-			a.bind(pattern.value, TypeScheme{
+			a.bind_with_position(pattern.value, TypeScheme{
 				quantified_vars: []
 				body:            arg_type
-			})
+			}, pattern.position)
 		}
 		.list_cons {
 			// List cons pattern [head | tail]
@@ -3490,10 +3828,10 @@ fn (mut a Analyzer) register_pattern_variables(pattern ast.Node) {
 						}
 					}
 					// Register head variable
-					a.bind(actual_head.value, TypeScheme{
+					a.bind_with_position(actual_head.value, TypeScheme{
 						quantified_vars: []
 						body:            element_type
-					})
+					}, actual_head.position)
 				} else {
 					// Head is not a simple identifier, recurse into it
 					a.register_pattern_variables(head)
@@ -3516,10 +3854,10 @@ fn (mut a Analyzer) register_pattern_variables(pattern ast.Node) {
 						}
 					}
 
-					a.bind(tail.value, TypeScheme{
+					a.bind_with_position(tail.value, TypeScheme{
 						quantified_vars: []
 						body:            tail_type
-					})
+					}, tail.position)
 				} else {
 					// Tail is not a simple identifier, recurse into it
 					a.register_pattern_variables(tail)
@@ -3536,6 +3874,17 @@ fn (mut a Analyzer) register_pattern_variables(pattern ast.Node) {
 			// Tuple pattern {x, y, z}
 			for _, elem in pattern.children {
 				a.register_pattern_variables(elem)
+			}
+		}
+		.map_literal {
+			// Map pattern %{key: value, key2: value2}
+			for i := 0; i < pattern.children.len; i += 2 {
+				// Keys are typically literals (don't register as variables)
+				// Values can be variables that should be registered
+				if i + 1 < pattern.children.len {
+					value := pattern.children[i + 1]
+					a.register_pattern_variables(value)
+				}
 			}
 		}
 		.parentheses {
@@ -3939,8 +4288,15 @@ fn (mut a Analyzer) analyze_supervisor_def(node ast.Node) !ast.Node {
 	a.enter_scope(ctx_name)
 	defer { a.exit_scope() }
 	local_funcs := a.collect_local_function_names(node.children[0])
-	a.otp_contexts << OtpContextInfo{ name: ctx_name, local_functions: local_funcs }
-	defer { if a.otp_contexts.len > 0 { a.otp_contexts = a.otp_contexts[..a.otp_contexts.len-1] } }
+	a.otp_contexts << OtpContextInfo{
+		name:            ctx_name
+		local_functions: local_funcs
+	}
+	defer {
+		if a.otp_contexts.len > 0 {
+			a.otp_contexts = a.otp_contexts[..a.otp_contexts.len - 1]
+		}
+	}
 
 	body := a.analyze_node(node.children[0])!
 
@@ -3969,8 +4325,15 @@ fn (mut a Analyzer) analyze_worker_def(node ast.Node) !ast.Node {
 	a.enter_scope(ctx_name)
 	defer { a.exit_scope() }
 	local_funcs := a.collect_local_function_names(node.children[0])
-	a.otp_contexts << OtpContextInfo{ name: ctx_name, local_functions: local_funcs }
-	defer { if a.otp_contexts.len > 0 { a.otp_contexts = a.otp_contexts[..a.otp_contexts.len-1] } }
+	a.otp_contexts << OtpContextInfo{
+		name:            ctx_name
+		local_functions: local_funcs
+	}
+	defer {
+		if a.otp_contexts.len > 0 {
+			a.otp_contexts = a.otp_contexts[..a.otp_contexts.len - 1]
+		}
+	}
 
 	body := a.analyze_node(node.children[0])!
 
@@ -4413,7 +4776,11 @@ fn (mut a Analyzer) analyze_anonymous_function(node ast.Node) !ast.Node {
 	defer { a.exit_scope() }
 
 	// Parameters are all children except the last; last is the body
-	params := if node.children.len > 1 { node.children[0..node.children.len - 1] } else { []ast.Node{} }
+	params := if node.children.len > 1 {
+		node.children[0..node.children.len - 1]
+	} else {
+		[]ast.Node{}
+	}
 
 	mut analyzed_params := []ast.Node{}
 	mut param_types := []ast.Type{}

@@ -136,9 +136,9 @@ hex_mixed() ->
 }
 
 fn test_charlist_literal() {
-	lx_code := 'def clist() do
-        \'hello\'
-    end'
+	lx_code := "def clist() do
+        'hello'
+    end"
 	expected := '-module(test).
 -export([clist/0]).
 

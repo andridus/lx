@@ -156,7 +156,9 @@ fn (mut l Lexer) read_colon_or_double_colon() Token {
 
 	// Helper: determine if previous character indicates we should NOT parse an atom
 	// If previous char is an identifier character or a closing delimiter, this ':' is a separator
-	prev_is_ident := (prev_ch >= `a` && prev_ch <= `z`) || (prev_ch >= `A` && prev_ch <= `Z`) || (prev_ch >= `0` && prev_ch <= `9`) || prev_ch == `_`
+	prev_is_ident := (prev_ch >= `a` && prev_ch <= `z`)
+		|| (prev_ch >= `A` && prev_ch <= `Z`) || (prev_ch >= `0` && prev_ch <= `9`)
+		|| prev_ch == `_`
 	prev_is_closer := prev_ch == `]` || prev_ch == `)` || prev_ch == `}`
 
 	// If previous suggests separator context, emit ':' token
@@ -500,7 +502,7 @@ fn (mut l Lexer) read_charlist() Token {
 				`t` { '\t' }
 				`r` { '\r' }
 				`\\` { '\\' }
-				`'` { '\'' }
+				`'` { "'" }
 				else { escape_ch.ascii_str() }
 			}
 		} else {

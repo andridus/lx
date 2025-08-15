@@ -128,8 +128,8 @@ test_case(X_1) ->
 fn test_case_with_tuples() {
 	lx_code := 'def test_case(result) do
     case result do
-        {success, data} -> data
-        {error, reason} -> reason
+        {:success, data} -> data
+        {:error, reason} -> reason
         _ -> "unknown"
     end
 end'
@@ -139,10 +139,10 @@ end'
 -spec test_case(any()) -> any().
 test_case(RESULT_1) ->
     case RESULT_1 of
-        {SUCCESS_2, DATA_3} ->
-            DATA_3;
-        {ERROR_4, REASON_5} ->
-            REASON_5;
+        {success, DATA_2} ->
+            DATA_2;
+        {error, REASON_3} ->
+            REASON_3;
         _ ->
             <<"unknown"/utf8>>
     end.
@@ -214,9 +214,9 @@ end'
 
 // Test complex integration
 fn test_complex_integration() {
-	lx_code := 'type status :: ok
+	lx_code := 'type status :: {:string, binary}
 
-def process_data(input) do
+def process_data(input) :: status do
     binary_data = <<1, 2, 3>>
 
     result = case input do
@@ -236,8 +236,8 @@ end'
 	expected := '-module(test).
 -export([process_data/1]).
 
--type status() :: ok.
--spec process_data(any()) -> {any(), any()}.
+-type status() :: {atom(), binary()}.
+-spec process_data(any()) -> status().
 process_data(INPUT_1) ->
     BINARY_DATA_2 = <<1, 2, 3>>,
     RESULT_3 = case INPUT_1 of

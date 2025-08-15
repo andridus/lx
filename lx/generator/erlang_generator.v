@@ -5,6 +5,7 @@ import strings
 import analysis
 import kernel
 import parser
+import arrays
 
 @[heap]
 pub struct ErlangGenerator {
@@ -467,10 +468,10 @@ fn (mut g ErlangGenerator) generate_function(node ast.Node) ! {
 					if i > 0 {
 						g.output.write_string(', ')
 					}
-					g.output.write_string(type_to_erlang_spec_for_functions(param))
+					g.output.write_string(type_to_erlang_spec(param))
 				}
 			}
-			g.output.write_string(') -> ${type_to_erlang_spec_for_functions(function_type.return_type)}.\n')
+			g.output.write_string(') -> ${type_to_erlang_spec(function_type.return_type)}.\n')
 		}
 	} else {
 		// Single function - generate normal spec
@@ -481,10 +482,10 @@ fn (mut g ErlangGenerator) generate_function(node ast.Node) ! {
 					if i > 0 {
 						g.output.write_string(', ')
 					}
-					g.output.write_string(type_to_erlang_spec_for_functions(param))
+					g.output.write_string(type_to_erlang_spec(param))
 				}
 			}
-			g.output.write_string(') -> ${type_to_erlang_spec_for_functions(function_type.return_type)}.\n')
+			g.output.write_string(') -> ${type_to_erlang_spec(function_type.return_type)}.\n')
 		}
 	}
 
@@ -728,37 +729,132 @@ fn (g ErlangGenerator) escape_string(s string) string {
 		'\\t').replace('\r', '\\r')
 }
 
+// fn type_to_erlang_spec(t ast.Type) string {
+// 	return match t.name {
+// 		'union' {
+// 			if t.params.len > 0 {
+// 				arrays.uniq(t.params.map(type_to_erlang_spec)).join(' | ')
+// 			} else {
+// 				'any()'
+// 			}
+// 		}
+// 		'integer' {
+// 			// If it's a specialized integer, we still use integer() type in Erlang
+// 			'integer()'
+// 		}
+// 		'float' {
+// 			'float()'
+// 		}
+// 		'string' {
+// 			// If it's a specialized string, we still use binary() type in Erlang
+// 			'binary()'
+// 		}
+// 		'boolean' {
+// 			'boolean()'
+// 		}
+// 		'atom' {
+// 			// If it's a specialized atom, return just the atom name
+// 			if specialized := t.specialized_value {
+// 				specialized
+// 			} else {
+// 				'atom()'
+// 			}
+// 		}
+// 		'nil' {
+// 			'nil'
+// 		}
+// 		'module' {
+// 			'atom()'
+// 		}
+// 		'any' {
+// 			'any()'
+// 		}
+// 		'term' {
+// 			'term()'
+// 		}
+// 		'list' {
+// 			if t.params.len == 1 {
+// 				'[' + type_to_erlang_spec(t.params[0]) + ']'
+// 			} else {
+// 				'list()'
+// 			}
+// 		}
+// 		'tuple' {
+// 			if t.params.len > 0 {
+// 				elems := t.params.map(type_to_erlang_spec).join(', ')
+// 				'{' + elems + '}'
+// 			} else {
+// 				'tuple()'
+// 			}
+// 		}
+// 		'map' {
+// 			if t.params.len == 2 {
+// 				'#{' + type_to_erlang_spec(t.params[0]) + ' => ' +
+// 					type_to_erlang_spec(t.params[1]) + '}'
+// 			} else {
+// 				'map()'
+// 			}
+// 		}
+// 		'atom_literal' {
+// 			// Expect first param to carry the literal atom name
+// 			if t.params.len > 0 {
+// 				return t.params[0].name
+// 			}
+// 			'atom()'
+// 		}
+// 	else {
+// 		// Check if this is a single letter uppercase (generic type variable)
+// 		if t.name.len == 1 && t.name[0].is_capital() {
+// 			// Generic type variable like T, U, V
+// 			t.name
+// 		} else if t.name.len > 0 && t.name[0].is_capital() {
+// 			// Record type (should be converted to lowercase)
+// 			'#${t.name.to_lower()}{}'
+// 		} else if t.name.len == 0 {
+// 			'any()'
+// 		} else {
+// 			// For simple identifiers in type definitions, don't add ()
+// 			// This handles cases like "type status :: active" where active is just an atom name
+// 			if t.params.len == 0 && t.specialized_value == none {
+// 				t.name
+// 			} else {
+// 				// Custom type reference with parameters
+// 				t.name + '()'
+// 			}
+// 		}
+// 	}
+// }
+// }
+
+// Version of type_to_erlang_spec for function specs that always adds () for custom types
 fn type_to_erlang_spec(t ast.Type) string {
 	return match t.name {
 		'union' {
 			if t.params.len > 0 {
-				union_types := t.params.map(type_to_erlang_spec).join(' | ')
-				union_types
+				arrays.uniq(t.params.map(type_to_erlang_spec)).join(' | ')
 			} else {
 				'any()'
 			}
 		}
+		'binary' {
+			'binary()'
+		}
 		'integer' {
-			// If it's a specialized integer, we still use integer() type in Erlang
 			'integer()'
 		}
 		'float' {
 			'float()'
 		}
 		'string' {
-			// If it's a specialized string, we still use binary() type in Erlang
 			'binary()'
 		}
 		'boolean' {
 			'boolean()'
 		}
 		'atom' {
-			// If it's a specialized atom, return just the atom name
-			if specialized := t.specialized_value {
-				specialized
-			} else {
-				'atom()'
-			}
+			// For function specs, prefer atom() over specialized atoms
+			// unless it's in a union type context
+			'atom()'
 		}
 		'nil' {
 			'nil'
@@ -813,102 +909,23 @@ fn type_to_erlang_spec(t ast.Type) string {
 			} else if t.name.len == 0 {
 				'any()'
 			} else {
-				// For simple identifiers in type definitions, don't add ()
-				// This handles cases like "type status :: active" where active is just an atom name
-				if t.params.len == 0 && t.specialized_value == none {
-					t.name
+				// Check if this is a record type
+				if specialized := t.specialized_value {
+					if specialized == 'record_type' {
+						'#${t.name}{}'
+					} else if specialized == 'custom_type' {
+						// Custom types always get () in function specs
+						t.name + '()'
+					} else {
+						// For simple identifiers in type definitions, don't add ()
+						// This handles cases like "type status :: active" where active is just an atom name
+						t.name
+					}
 				} else {
 					// Custom type reference with parameters
-					t.name + '()'
+					result := t.name + '()'
+					result
 				}
-			}
-		}
-	}
-}
-
-// Version of type_to_erlang_spec for function specs that always adds () for custom types
-fn type_to_erlang_spec_for_functions(t ast.Type) string {
-	return match t.name {
-		'union' {
-			if t.params.len > 0 {
-				union_types := t.params.map(type_to_erlang_spec_for_functions).join(' | ')
-				union_types
-			} else {
-				'any()'
-			}
-		}
-		'integer' {
-			'integer()'
-		}
-		'float' {
-			'float()'
-		}
-		'string' {
-			'binary()'
-		}
-		'boolean' {
-			'boolean()'
-		}
-		'atom' {
-			// For function specs, prefer atom() over specialized atoms
-			// unless it's in a union type context
-			'atom()'
-		}
-		'nil' {
-			'nil'
-		}
-		'module' {
-			'atom()'
-		}
-		'any' {
-			'any()'
-		}
-		'term' {
-			'term()'
-		}
-		'list' {
-			if t.params.len == 1 {
-				'[' + type_to_erlang_spec_for_functions(t.params[0]) + ']'
-			} else {
-				'list()'
-			}
-		}
-		'tuple' {
-			if t.params.len > 0 {
-				elems := t.params.map(type_to_erlang_spec_for_functions).join(', ')
-				'{' + elems + '}'
-			} else {
-				'tuple()'
-			}
-		}
-		'map' {
-			if t.params.len == 2 {
-				'#{' + type_to_erlang_spec_for_functions(t.params[0]) + ' => ' +
-					type_to_erlang_spec_for_functions(t.params[1]) + '}'
-			} else {
-				'map()'
-			}
-		}
-		'atom_literal' {
-			// Expect first param to carry the literal atom name
-			if t.params.len > 0 {
-				return t.params[0].name
-			}
-			'atom()'
-		}
-		else {
-			// Check if this is a single letter uppercase (generic type variable)
-			if t.name.len == 1 && t.name[0].is_capital() {
-				// Generic type variable like T, U, V
-				t.name
-			} else if t.name.len > 0 && t.name[0].is_capital() {
-				// Record type (should be converted to lowercase)
-				'#${t.name.to_lower()}{}'
-			} else if t.name.len == 0 {
-				'any()'
-			} else {
-				// For function specs, always add () for custom types
-				t.name + '()'
 			}
 		}
 	}

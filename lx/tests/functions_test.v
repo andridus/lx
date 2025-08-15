@@ -110,17 +110,17 @@ process_value(N_1) ->
 
 fn test_multiple_head_function_with_multiple_args() {
 	lx_code := 'def compare do
-    (a, a) -> "equal"
-    (a, b) -> "different"
+    (_a, _a) -> "equal"
+    (_a, _b) -> "different"
 end'
 
 	expected := '-module(test).
 -export([compare/2]).
 
 -spec compare(any(), any()) -> binary().
-compare(A_1, A_1) ->
+compare(_A_1, _A_1) ->
     <<"equal"/utf8>>;
-compare(A_1, B_2) ->
+compare(_A_1, _B_2) ->
     <<"different"/utf8>>.
 '
 
@@ -132,7 +132,7 @@ fn test_multiple_head_function_with_literals() {
 	lx_code := 'def check_status do
     (:ok) -> "success"
     (:error) -> "failure"
-    (code) -> "unknown"
+    (_code) -> "unknown"
 end'
 
 	expected := '-module(test).
@@ -143,7 +143,7 @@ check_status(ok) ->
     <<"success"/utf8>>;
 check_status(error) ->
     <<"failure"/utf8>>;
-check_status(CODE_1) ->
+check_status(_CODE_1) ->
     <<"unknown"/utf8>>.
 '
 
@@ -154,7 +154,7 @@ check_status(CODE_1) ->
 fn test_multiple_head_function_with_complex_patterns() {
 	lx_code := 'def process_list do
     ([]) -> "empty"
-    ([head | tail]) -> "non_empty"
+    ([_head | _tail]) -> "non_empty"
 end'
 
 	expected := '-module(test).
@@ -163,7 +163,7 @@ end'
 -spec process_list(any()) -> binary().
 process_list([]) ->
     <<"empty"/utf8>>;
-process_list([HEAD_1 | TAIL_2]) ->
+process_list([_HEAD_1 | _TAIL_2]) ->
     <<"non_empty"/utf8>>.
 '
 
@@ -269,22 +269,22 @@ divide(A_1, B_2) ->
 	assert result == expected
 }
 
-// fn test_function_with_boolean_operations() {
-// 	lx_code := 'def is_even do
-//     (n :: integer) -> n % 2 == 0
-// end'
+fn test_function_with_boolean_operations() {
+	lx_code := 'def is_even do
+    (n :: integer) -> erlang:mod(n, 2) == 0
+end'
 
-// 	expected := '-module(test).
-// -export([is_even/1]).
+	expected := '-module(test).
+-export([is_even/1]).
 
-// -spec is_even(integer()) -> boolean().
-// is_even(N_1) ->
-//     N_1 % 2 == 0.
-// '
+-spec is_even(integer()) -> boolean().
+is_even(N_1) ->
+    erlang:mod(N_1, 2) == 0.
+'
 
-// 	result := compile_lx(lx_code)
-// 	assert result == expected
-// }
+	result := compile_lx(lx_code)
+	assert result == expected
+}
 
 fn test_function_with_mixed_numeric_types() {
 	lx_code := 'def mixed_math(a :: float, b :: float) do
@@ -303,45 +303,45 @@ mixed_math(A_1, B_2) ->
 	assert result == expected
 }
 
-// fn test_function_with_list_operations() {
-// 	lx_code := 'def list_ops do
-//     ([], item) -> [item]
-//     ([head | tail], item) -> [head | list_ops(tail, item)]
-// end'
+fn test_function_with_list_operations() {
+	lx_code := 'def list_ops :: list do
+    ([], item) -> [item]
+    ([head | tail], item) -> [head | list_ops(tail, item)]
+end'
 
-// 	expected := '-module(test).
-// -export([list_ops/2]).
+	expected := '-module(test).
+-export([list_ops/2]).
 
-// -spec list_ops(list(), any()) -> list().
-// list_ops([], Item_1) ->
-//     [Item_1];
-// list_ops([Head_1 | Tail_2], Item_3) ->
-//     [Head_1 | list_ops(Tail_2, Item_3)].
-// '
+-spec list_ops(any(), any()) -> list().
+list_ops([], ITEM_1) ->
+    [ITEM_1];
+list_ops([HEAD_2 | TAIL_3], ITEM_1) ->
+    [HEAD_2 | list_ops(TAIL_3, ITEM_1)].
+'
 
-// 	result := compile_lx(lx_code)
-// 	assert result == expected
-// }
+	result := compile_lx(lx_code)
+	assert result == expected
+}
 
-// fn test_function_with_tuple_operations() {
-// 	lx_code := 'def tuple_ops do
-//     ({a, b}) -> a + b
-//     ({a, b, c}) -> a + b + c
-// end'
+fn test_function_with_tuple_operations() {
+	lx_code := 'def tuple_ops do
+    ({a, b}) -> a + b
+    ({a, b, c}) -> a + b + c
+end'
 
-// 	expected := '-module(test).
-// -export([tuple_ops/1]).
+	expected := '-module(test).
+-export([tuple_ops/1]).
 
-// -spec tuple_ops(tuple()) -> integer().
-// tuple_ops({A_1, B_2}) ->
-//     A_1 + B_2;
-// tuple_ops({A_1, B_2, C_3}) ->
-//     A_1 + B_2 + C_3.
-// '
+-spec tuple_ops(any()) -> integer().
+tuple_ops({A_1, B_2}) ->
+    A_1 + B_2;
+tuple_ops({A_1, B_2, C_3}) ->
+    A_1 + B_2 + C_3.
+'
 
-// 	result := compile_lx(lx_code)
-// 	assert result == expected
-// }
+	result := compile_lx(lx_code)
+	assert result == expected
+}
 
 fn test_function_with_atom_patterns() {
 	lx_code := 'def atom_patterns do
@@ -369,7 +369,7 @@ atom_patterns(pending) ->
 fn test_function_with_nil_patterns() {
 	lx_code := 'def nil_patterns do
     (nil) -> "empty"
-    (value) -> "has value"
+    (_value) -> "has value"
 end'
 
 	expected := '-module(test).
@@ -378,7 +378,7 @@ end'
 -spec nil_patterns(any()) -> binary().
 nil_patterns(nil) ->
     <<"empty"/utf8>>;
-nil_patterns(VALUE_1) ->
+nil_patterns(_VALUE_1) ->
     <<"has value"/utf8>>.
 '
 
@@ -439,7 +439,7 @@ fn test_function_with_string_patterns() {
 	lx_code := 'def string_patterns do
     ("hello") -> "greeting"
     ("goodbye") -> "farewell"
-    (str) -> "other string"
+    (_str) -> "other string"
 end'
 
 	expected := '-module(test).
@@ -450,7 +450,7 @@ string_patterns(<<"hello"/utf8>>) ->
     <<"greeting"/utf8>>;
 string_patterns(<<"goodbye"/utf8>>) ->
     <<"farewell"/utf8>>;
-string_patterns(STR_1) ->
+string_patterns(_STR_1) ->
     <<"other string"/utf8>>.
 '
 
@@ -483,7 +483,7 @@ fn test_function_with_numeric_patterns() {
     (0) -> "zero"
     (1) -> "one"
     (2) -> "two"
-    (n) -> "other number"
+    (_n) -> "other number"
 end'
 
 	expected := '-module(test).
@@ -496,7 +496,7 @@ numeric_patterns(1) ->
     <<"one"/utf8>>;
 numeric_patterns(2) ->
     <<"two"/utf8>>;
-numeric_patterns(N_1) ->
+numeric_patterns(_N_1) ->
     <<"other number"/utf8>>.
 '
 
@@ -508,7 +508,7 @@ fn test_function_with_float_patterns() {
 	lx_code := 'def float_patterns do
     (0.0) -> "zero float"
     (1.0) -> "one float"
-    (f) -> "other float"
+    (_f) -> "other float"
 end'
 
 	expected := '-module(test).
@@ -519,7 +519,7 @@ float_patterns(0.0) ->
     <<"zero float"/utf8>>;
 float_patterns(1.0) ->
     <<"one float"/utf8>>;
-float_patterns(F_1) ->
+float_patterns(_F_1) ->
     <<"other float"/utf8>>.
 '
 
@@ -534,7 +534,7 @@ fn test_function_with_mixed_type_patterns() {
     ("zero") -> "string zero"
     (:zero) -> "atom zero"
     (nil) -> "nil"
-    (value) -> "other"
+    (_value) -> "other"
 end'
 
 	expected := '-module(test).
@@ -551,7 +551,7 @@ mixed_type_patterns(zero) ->
     <<"atom zero"/utf8>>;
 mixed_type_patterns(nil) ->
     <<"nil"/utf8>>;
-mixed_type_patterns(VALUE_1) ->
+mixed_type_patterns(_VALUE_1) ->
     <<"other"/utf8>>.
 '
 

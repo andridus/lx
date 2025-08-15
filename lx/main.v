@@ -130,16 +130,10 @@ fn create_new_project(project_name string) {
 	}
 
 	// Create project config file
-	project_yml := '# ${project_name}.yml - Lx project configuration\n' +
-		'erl_opts:\n' +
-		'  - debug_info\n' +
-		'  - nowarn_unused_vars\n' +
-		'deps:\n' +
-		'  # Add your dependencies here\n' +
-		'  # Example:\n' +
-		'  # jsx: "3.1.0"\n' +
-		'  # cowboy:\n' +
-		'  #   git: "https://github.com/ninenines/cowboy.git"\n' +
+	project_yml := '# ${project_name}.yml - Lx project configuration\n' + 'erl_opts:\n' +
+		'  - debug_info\n' + '  - nowarn_unused_vars\n' + 'deps:\n' +
+		'  # Add your dependencies here\n' + '  # Example:\n' + '  # jsx: "3.1.0"\n' +
+		'  # cowboy:\n' + '  #   git: "https://github.com/ninenines/cowboy.git"\n' +
 		'  #   branch: "master"\n'
 	os.write_file('${project_name}/${project_name}.yml', project_yml) or {
 		eprintln('Failed to create ${project_name}.yml: ${err}')
@@ -270,7 +264,8 @@ fn compile_project(project_dir string) {
 				// Compile the .lx inside _build so all artifacts (.erl/.app.src/.hrl) are generated there
 				compile.compile_file(build_lx_path)
 
-				app_src_written = app_src_written || os.exists(os.join_path(app_src_dir, '${app_name}.app.src'))
+				app_src_written = app_src_written
+					|| os.exists(os.join_path(app_src_dir, '${app_name}.app.src'))
 			}
 		}
 
@@ -284,9 +279,11 @@ fn compile_project(project_dir string) {
 			if content.len > 0 && !content.contains('{mod,') {
 				// naive inject before env or at end
 				if content.contains('{env,') {
-					content = content.replace('{env,', '  {mod, {' + app_name + '_app, []}},\n  {env,')
+					content = content.replace('{env,', '  {mod, {' + app_name +
+						'_app, []}},\n  {env,')
 				} else {
-					content = content.replace('\n ]}.', ',\n  {mod, {' + app_name + '_app, []}}\n ]}.')
+					content = content.replace('\n ]}.', ',\n  {mod, {' + app_name +
+						'_app, []}}\n ]}.')
 				}
 				os.write_file(app_app_src_path, content) or {}
 			}
@@ -350,12 +347,9 @@ fn ensure_rebar_build_files(project_dir string) {
 		}
 	}
 
-	content := '{erl_opts, [${erl_opts}]}.' + '\n' +
-		'{deps, ${deps_content}}.' + '\n' +
-		'{apps_dir, ["apps/*"]}.' + '\n' +
-		'{shell, [' + '\n' +
-		'  {config, "config/sys.config"}' + '\n' +
-		']}.' + '\n' + '\n'
+	content := '{erl_opts, [${erl_opts}]}.' + '\n' + '{deps, ${deps_content}}.' + '\n' +
+		'{apps_dir, ["apps/*"]}.' + '\n' + '{shell, [' + '\n' + '  {config, "config/sys.config"}' +
+		'\n' + ']}.' + '\n' + '\n'
 	os.write_file(rebar_path, content) or {}
 	println('Created ${rebar_path}')
 
@@ -388,7 +382,7 @@ fn update_rebar_shell_apps(build_dir string, apps []string) {
 	} else {
 		content += '{shell, [\n  {apps, ' + apps_list + '},\n  {config, "config/sys.config"}\n]}.\n'
 	}
-	os.write_file(rebar_path, content) or { }
+	os.write_file(rebar_path, content) or {}
 }
 
 // Generate a minimal default application behaviour module for an app name
@@ -485,7 +479,8 @@ fn run_single_file(file string) {
 		os.chdir(original_dir) or {}
 		exit(1)
 	}
-	run_res := os.execute('erl -noshell -eval \'io:format("~p\\n", [' + module_name + ':main()]).\' -s init stop')
+	run_res := os.execute('erl -noshell -eval \'io:format("~p\\n", [' + module_name +
+		":main()]).' -s init stop")
 	if run_res.exit_code != 0 {
 		eprintln('erl failed: ' + run_res.output)
 		os.chdir(original_dir) or {}
@@ -611,23 +606,11 @@ fn find_lx_files(dir string) []string {
 
 // Generate initial template for a new app including application, supervisor and a worker
 fn generate_initial_app_template(app_name string) string {
-	return 'application {\n' +
-		'  description: "' + app_name + ' application",\n' +
-		'  vsn: "0.1.0",\n' +
-		'  deps: []\n' +
-		'}\n\n' +
-		'supervisor ' + app_name + '_sup do\n' +
-		'  strategy = :one_for_one\n' +
-		'  children = [:' + app_name + '_worker]\n' +
-		'end\n\n' +
-		'worker ' + app_name + '_worker do\n' +
-		'  def init(_args) do\n' +
-		'    {:ok, %{}}\n' +
-		'  end\n' +
-		'end\n\n' +
-		'def main() do\n' +
-		'  :ok\n' +
-		'end\n'
+	return 'application {\n' + '  description: "' + app_name + ' application",\n' +
+		'  vsn: "0.1.0",\n' + '  deps: []\n' + '}\n\n' + 'supervisor ' + app_name + '_sup do\n' +
+		'  strategy = :one_for_one\n' + '  children = [:' + app_name + '_worker]\n' + 'end\n\n' +
+		'worker ' + app_name + '_worker do\n' + '  def init(_args) do\n' + '    {:ok, %{}}\n' +
+		'  end\n' + 'end\n\n' + 'def main() do\n' + '  :ok\n' + 'end\n'
 }
 
 // Parse project YAML configuration
@@ -640,7 +623,7 @@ mut:
 fn parse_project_yml(yml_content string) ProjectConfig {
 	mut config := ProjectConfig{
 		erl_opts: 'debug_info, nowarn_unused_vars'
-		deps: '[]'
+		deps:     '[]'
 	}
 
 	lines := yml_content.split('\n')
@@ -681,7 +664,8 @@ fn parse_project_yml(yml_content string) ProjectConfig {
 
 		if in_deps {
 			// Check if this is a new dependency (not indented)
-			if !trimmed.starts_with('  ') && trimmed.contains(':') && !trimmed.starts_with('git:') && !trimmed.starts_with('branch:') {
+			if !trimmed.starts_with('  ') && trimmed.contains(':') && !trimmed.starts_with('git:')
+				&& !trimmed.starts_with('branch:') {
 				// New dependency
 				parts := trimmed.split(':')
 				if parts.len >= 2 {
@@ -691,7 +675,7 @@ fn parse_project_yml(yml_content string) ProjectConfig {
 						version = version[1..]
 					}
 					if version.ends_with('"') {
-						version = version[..version.len-1]
+						version = version[..version.len - 1]
 					}
 
 					// If version is empty, this might be a Git dependency
@@ -714,7 +698,7 @@ fn parse_project_yml(yml_content string) ProjectConfig {
 						git_url = git_url[1..]
 					}
 					if git_url.ends_with('"') {
-						git_url = git_url[..git_url.len-1]
+						git_url = git_url[..git_url.len - 1]
 					}
 					current_dep_git = git_url
 				}
@@ -729,7 +713,7 @@ fn parse_project_yml(yml_content string) ProjectConfig {
 						branch = branch[1..]
 					}
 					if branch.ends_with('"') {
-						branch = branch[..branch.len-1]
+						branch = branch[..branch.len - 1]
 					}
 					current_dep_branch = branch
 

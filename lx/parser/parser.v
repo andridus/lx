@@ -9,28 +9,28 @@ import os
 pub struct Parser {
 	directives_table &DirectivesTable
 mut:
-	lexer          lexer.Lexer
-	current        lexer.Token
-	next           lexer.Token
-	error_reporter errors.ErrorReporter
-	next_ast_id    int  = 1
-	at_line_start  bool = true // Track if we're at the start of a new line
-	temp_doc_node  ?ast.Node
+	lexer               lexer.Lexer
+	current             lexer.Token
+	next                lexer.Token
+	error_reporter      errors.ErrorReporter
+	next_ast_id         int  = 1
+	at_line_start       bool = true // Track if we're at the start of a new line
+	temp_doc_node       ?ast.Node
 	current_module_name string
 }
 
 pub fn new_parser(code string, file_path string, directives_table &DirectivesTable) Parser {
 	mut l := lexer.new_lexer(code, file_path)
 	// Derive module name from file path: strip dirs and extension
-    mut base := os.base(file_path)
-    if idx := base.last_index('.') {
-        base = base[..idx]
-    }
-    mut p := Parser{
-        lexer:               l
-        error_reporter:      errors.new_error_reporter()
-        directives_table:    directives_table
-        current_module_name: base
+	mut base := os.base(file_path)
+	if idx := base.last_index('.') {
+		base = base[..idx]
+	}
+	mut p := Parser{
+		lexer:               l
+		error_reporter:      errors.new_error_reporter()
+		directives_table:    directives_table
+		current_module_name: base
 	}
 	p.current = p.lexer.next_token()
 	p.next = p.lexer.next_token()
@@ -258,10 +258,13 @@ fn (mut p Parser) parse_function() !ast.Node {
 		p.advance() // Skip ')'
 	}
 
-	// Skip return type annotation for now
+	// Parse return type annotation
+	mut return_type_annotation := ast.Node{}
+	mut has_return_type := false
 	if p.current.type_ == .double_colon {
 		p.advance() // Skip ::
-		p.parse_type_annotation()! // Parse but ignore for now
+		return_type_annotation = p.parse_type_annotation()!
+		has_return_type = true
 	}
 
 	if p.current.type_ != .do {
@@ -310,9 +313,21 @@ fn (mut p Parser) parse_function() !ast.Node {
 	}
 
 	mut fn_node := ast.new_function_with_params(func_id, func_name, args, body, start_pos)
+
+	// Add return type annotation as third child if present
+	if has_return_type {
+		fn_node = ast.Node{
+			...fn_node
+			children: [fn_node.children[0], fn_node.children[1], return_type_annotation]
+		}
+	}
+
 	if is_private {
 		// Recaracterizar como função privada (mesma estrutura, apenas o kind muda)
-		fn_node = ast.Node{ ...fn_node, kind: .private_function }
+		fn_node = ast.Node{
+			...fn_node
+			kind: .private_function
+		}
 	}
 	return fn_node
 }
@@ -1149,7 +1164,8 @@ fn (mut p Parser) parse_external_function_call(module_name string, pos ast.Posit
 	// Resolve '_' as current module name if needed
 	resolved_module := if module_name == '_' { p.current_module_name } else { module_name }
 
-	return ast.new_external_function_call(p.get_next_id(), resolved_module, function_name, arguments, pos)
+	return ast.new_external_function_call(p.get_next_id(), resolved_module, function_name,
+		arguments, pos)
 }
 
 fn (p Parser) is_valid_directive(name string) bool {
@@ -3800,87 +3816,88 @@ fn (mut p Parser) parse_describe_block() ![]ast.Node {
 
 // Pipeline parser: left |> expr
 fn (mut p Parser) parse_pipeline_expression(left ast.Node) !ast.Node {
-    pos := p.current.position
-    p.advance() // Skip '|>'
+	pos := p.current.position
+	p.advance() // Skip '|>'
 
-    // Parse the right side expression
-    for p.current.type_ == .newline {
-        p.advance()
-    }
-    right := p.parse_prefix_expression()!
+	// Parse the right side expression
+	for p.current.type_ == .newline {
+		p.advance()
+	}
+	right := p.parse_prefix_expression()!
 
-    // If left side is a variable binding (e.g., x = expr), inject into the value and keep the binding
-    if left.kind == .variable_binding {
-        // left.value holds the variable name, left.children[0] is the bound expression
-        bound_value := left.children[0]
-        injected := p.inject_into_call(right, bound_value, pos)!
-        return ast.new_variable_binding(p.get_next_id(), left.value, injected, left.position)
-    }
+	// If left side is a variable binding (e.g., x = expr), inject into the value and keep the binding
+	if left.kind == .variable_binding {
+		// left.value holds the variable name, left.children[0] is the bound expression
+		bound_value := left.children[0]
+		injected := p.inject_into_call(right, bound_value, pos)!
+		return ast.new_variable_binding(p.get_next_id(), left.value, injected, left.position)
+	}
 
-    // If right is a simple identifier or external call without parens, treat as call with no args
-    return p.inject_into_call(right, left, pos)
+	// If right is a simple identifier or external call without parens, treat as call with no args
+	return p.inject_into_call(right, left, pos)
 }
 
 // Helper to inject left into a call expression, replacing '_' placeholders when present
 fn (mut p Parser) inject_into_call(call_node ast.Node, left ast.Node, pos ast.Position) !ast.Node {
-    mut target := call_node
-    // Expand bare identifier into a zero-arg function call
-    if target.kind == .variable_ref || target.kind == .identifier {
-        // Convert to function call with no args
-        target = ast.new_function_caller(p.get_next_id(), target.value, [], target.position)
-    }
+	mut target := call_node
+	// Expand bare identifier into a zero-arg function call
+	if target.kind == .variable_ref || target.kind == .identifier {
+		// Convert to function call with no args
+		target = ast.new_function_caller(p.get_next_id(), target.value, [], target.position)
+	}
 
-    // External function: value is "module:function"
-    if target.kind == .external_function_call {
-        mut args := target.children.clone()
-        mut replaced := false
-        for i in 0 .. args.len {
-            if args[i].kind == .variable_ref && args[i].value == '_' {
-                args[i] = left
-                replaced = true
-            }
-        }
-        if !replaced {
-            // Insert as first arg by default
-            args.prepend(left)
-        }
-        return ast.new_external_function_call(p.get_next_id(), target.value.split(':')[0], target.value.split(':')[1], args, pos)
-    }
+	// External function: value is "module:function"
+	if target.kind == .external_function_call {
+		mut args := target.children.clone()
+		mut replaced := false
+		for i in 0 .. args.len {
+			if args[i].kind == .variable_ref && args[i].value == '_' {
+				args[i] = left
+				replaced = true
+			}
+		}
+		if !replaced {
+			// Insert as first arg by default
+			args.prepend(left)
+		}
+		return ast.new_external_function_call(p.get_next_id(), target.value.split(':')[0],
+			target.value.split(':')[1], args, pos)
+	}
 
-    // Regular function call
-    if target.kind == .function_caller {
-        mut args := target.children.clone()
-        mut replaced := false
-        for i in 0 .. args.len {
-            if args[i].kind == .variable_ref && args[i].value == '_' {
-                args[i] = left
-                replaced = true
-            }
-        }
-        if !replaced {
-            args.prepend(left)
-        }
-        return ast.new_function_caller(p.get_next_id(), target.value, args, pos)
-    }
+	// Regular function call
+	if target.kind == .function_caller {
+		mut args := target.children.clone()
+		mut replaced := false
+		for i in 0 .. args.len {
+			if args[i].kind == .variable_ref && args[i].value == '_' {
+				args[i] = left
+				replaced = true
+			}
+		}
+		if !replaced {
+			args.prepend(left)
+		}
+		return ast.new_function_caller(p.get_next_id(), target.value, args, pos)
+	}
 
-    // If the right side is a lambda_call like fun.(args) or record access, treat similar to function call
-    if target.kind == .lambda_call {
-        mut args := target.children[1..].clone()
-        mut replaced := false
-        for i in 0 .. args.len {
-            if args[i].kind == .variable_ref && args[i].value == '_' {
-                args[i] = left
-                replaced = true
-            }
-        }
-        if !replaced {
-            args.prepend(left)
-        }
-        return ast.new_lambda_call(p.get_next_id(), target.children[0], args, pos)
-    }
+	// If the right side is a lambda_call like fun.(args) or record access, treat similar to function call
+	if target.kind == .lambda_call {
+		mut args := target.children[1..].clone()
+		mut replaced := false
+		for i in 0 .. args.len {
+			if args[i].kind == .variable_ref && args[i].value == '_' {
+				args[i] = left
+				replaced = true
+			}
+		}
+		if !replaced {
+			args.prepend(left)
+		}
+		return ast.new_lambda_call(p.get_next_id(), target.children[0], args, pos)
+	}
 
-    // If none of above, force a call: right(left)
-    return ast.new_function_caller(p.get_next_id(), target.value, [left], pos)
+	// If none of above, force a call: right(left)
+	return ast.new_function_caller(p.get_next_id(), target.value, [left], pos)
 }
 
 // Parse function capture expressions like &fun/1 or &Module:fun/2
@@ -3958,6 +3975,7 @@ fn (mut p Parser) parse_function_capture(initial string, pos ast.Position) !ast.
 		params << param
 		args << ast.new_variable_ref(p.get_next_id(), param_name, pos)
 	}
-	body := ast.new_external_function_call(p.get_next_id(), module_name, function_name, args, pos)
+	body := ast.new_external_function_call(p.get_next_id(), module_name, function_name,
+		args, pos)
 	return ast.new_anonymous_function(p.get_next_id(), params, body, pos)
 }

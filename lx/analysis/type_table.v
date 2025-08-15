@@ -31,6 +31,8 @@ pub mut:
 	record_types   map[string]RecordType   // record_name -> RecordType
 	function_types map[string]FunctionType // function_name -> FunctionType
 	custom_types   map[string]ast.Type     // type_name -> Type definition
+	used_types     map[string]bool         // track which types have been used
+	type_positions map[string]ast.Position // track where each type was defined
 }
 
 pub fn new_type_table() TypeTable {
@@ -40,6 +42,8 @@ pub fn new_type_table() TypeTable {
 		record_types:   map[string]RecordType{}
 		function_types: map[string]FunctionType{}
 		custom_types:   map[string]ast.Type{}
+		used_types:     map[string]bool{}
+		type_positions: map[string]ast.Position{}
 	}
 }
 
@@ -100,4 +104,40 @@ pub fn (mut tt TypeTable) register_custom_type(name string, type_def ast.Type) {
 
 pub fn (tt TypeTable) get_custom_type(name string) ?ast.Type {
 	return tt.custom_types[name] or { return none }
+}
+
+// Mark a type as used
+pub fn (mut tt TypeTable) mark_type_used(name string) {
+	tt.used_types[name] = true
+}
+
+// Register type position
+pub fn (mut tt TypeTable) register_type_position(name string, pos ast.Position) {
+	tt.type_positions[name] = pos
+}
+
+// Get type position
+pub fn (tt TypeTable) get_type_position(name string) ?ast.Position {
+	return tt.type_positions[name] or { none }
+}
+
+// Get all unused types
+pub fn (tt TypeTable) get_unused_types() []string {
+	mut unused := []string{}
+
+	// Check custom types
+	for type_name, _ in tt.custom_types {
+		if !tt.used_types[type_name] {
+			unused << type_name
+		}
+	}
+
+	// Check record types
+	for record_name, _ in tt.record_types {
+		if !tt.used_types[record_name] {
+			unused << record_name
+		}
+	}
+
+	return unused
 }

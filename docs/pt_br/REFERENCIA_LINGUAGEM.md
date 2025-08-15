@@ -1,105 +1,105 @@
-# LX Language Reference
+# Referência da Linguagem LX
 
-## Overview
+## Visão Geral
 
-LX is a functional language that compiles to Erlang. It provides:
-- Pattern-matched multi-clause functions with guards
-- A strong type system with type annotations, custom types, and automatic spec generation
-- Records, lists, tuples, maps, binaries/bitstrings
-- Anonymous functions (lambdas), control-flow expressions (if, case, with, match)
-- Concurrency primitives (spawn, send, receive)
+LX é uma linguagem funcional que compila para Erlang. Ela oferece:
+- Funções com múltiplas cláusulas e pattern matching com guards
+- Um sistema de tipos forte com anotações de tipo, tipos customizados e geração automática de specs
+- Records, listas, tuplas, mapas, binários/bitstrings
+- Funções anônimas (lambdas), expressões de controle de fluxo (if, case, with, match)
+- Primitivas de concorrência (spawn, send, receive)
 - List comprehensions
 
-Everything compiles to readable Erlang with `-spec` annotations.
+Tudo compila para Erlang legível com anotações `-spec`.
 
 
-## Project Creation and CLI
+## Criação de Projetos e CLI
 
-Use the `lx` CLI.
+Use o CLI `lx`.
 
 ```bash
-# Create a new umbrella-style project (apps/ + <project>.yml)
-lx new my_project
+# Criar um novo projeto estilo umbrella (apps/ + <project>.yml)
+lx new meu_projeto
 
-# Inside the project, add a new app
-cd my_project
-lx add app my_app
+# Dentro do projeto, adicionar um novo app
+cd meu_projeto
+lx add app meu_app
 
-# Compile the whole project (generates _build/ umbrella with rebar3 files)
+# Compilar o projeto inteiro (gera umbrella _build/ com arquivos rebar3)
 lx .
 
-# Compile a file or a directory (non-project mode)
-lx compile path/to/file.lx
-lx compile path/to/dir
+# Compilar um arquivo ou diretório (modo não-projeto)
+lx compile caminho/para/arquivo.lx
+lx compile caminho/para/dir
 
-# Run a single file (lightweight: erlc + erl)
-lx run path/to/file.lx
+# Executar um arquivo único (leve: erlc + erl)
+lx run caminho/para/arquivo.lx
 
-# Open rebar3 shell for the project (precompiles first)
+# Abrir shell rebar3 para o projeto (pré-compila primeiro)
 lx shell [dir]
 
-# Create a global symlink to current lx binary
+# Criar um symlink global para o binário lx atual
 sudo lx symlink [--force]
 ```
 
-Project layout created by `lx new <name>`:
+Layout do projeto criado por `lx new <nome>`:
 
 ```
-<project>/
+<projeto>/
   apps/
-  <project>.yml           # project configuration for build (erl_opts, deps)
-  _build/                 # generated umbrella (rebar3, apps/*)
+  <projeto>.yml           # configuração do projeto para build (erl_opts, deps)
+  _build/                 # umbrella gerado (rebar3, apps/*)
 ```
 
-Notes:
-- `<project>.yml` is used to produce `_build/rebar.config` and `config/sys.config`.
-- For each app under `apps/<app>/`, sources are compiled into `_build/apps/<app>/src`.
-- The application descriptor `<app>.app.src` is generated/ensured in `_build`.
+Notas:
+- `<projeto>.yml` é usado para produzir `_build/rebar.config` e `config/sys.config`.
+- Para cada app sob `apps/<app>/`, as fontes são compiladas em `_build/apps/<app>/src`.
+- O descritor da aplicação `<app>.app.src` é gerado/garantido em `_build`.
 
 
-## Syntax Basics
+## Sintaxe Básica
 
-### Comments
+### Comentários
 ```lx
-# single line comment
+# comentário de linha única
 ```
 
-### Identifiers
-- Variables and functions: snake_case
-- Record names: snake_case (maps to Erlang `-record(name, ...)`)
-- Module name is implicitly the file name
+### Identificadores
+- Variáveis e funções: snake_case
+- Nomes de records: snake_case (mapeia para Erlang `-record(name, ...)`)
+- Nome do módulo é implicitamente o nome do arquivo
 
-### Literals
+### Literais
 ```lx
-# Numbers
+# Números
 42
 3.14
 
-# Strings (compile to UTF-8 binaries)
-"hello"
+# Strings (compilam para binários UTF-8)
+"olá"
 
-# Booleans
+# Booleanos
 true
 false
 
 # Nil
 nil
 
-# Atoms
+# Átomos
 :ok
 :error
 :timeout
 ```
 
 
-## Collections and Data
+## Coleções e Dados
 
-### Lists
+### Listas
 ```lx
 []
 [1, 2, 3]
 
-# Cons and concatenation
+# Cons e concatenação
 [0 | [1, 2]]     # [0, 1, 2]
 [1, 2] ++ [3, 4] # [1, 2, 3, 4]
 
@@ -107,136 +107,136 @@ nil
 [head | tail] = [1, 2, 3]
 ```
 
-### Tuples
+### Tuplas
 ```lx
 {1, 2}
 {:ok, "ok"}
 
-{status, msg} = {:error, "oops"}
+{status, msg} = {:error, "ops"}
 ```
 
-### Maps
-Implemented with creation, access, update and pattern matching.
+### Mapas
+Implementado com criação, acesso, atualização e pattern matching.
 ```lx
-user = %{ name: "John", age: 30 }
-name = user.name       # dot access
-age  = user[:age]      # index access
+usuario = %{ nome: "João", idade: 30 }
+nome = usuario.nome       # acesso por ponto
+idade = usuario[:idade]   # acesso por índice
 
-user2 = %{ user | age: 31 }             # update
-user3 = %{ user | email: "john@x.com" } # add key
+usuario2 = %{ usuario | idade: 31 }             # atualização
+usuario3 = %{ usuario | email: "joao@x.com" }   # adicionar chave
 
-# pattern matching in maps
-auth = case user do
-  %{name: n} -> {:ok, n}
+# pattern matching em mapas
+auth = case usuario do
+  %{nome: n} -> {:ok, n}
   _ -> {:error}
 end
 ```
 
 
-## Binaries and Bitstrings
+## Binários e Bitstrings
 
-Both expressions and pattern matching support sizes and qualifiers (endianness, signedness, types).
+Tanto expressões quanto pattern matching suportam tamanhos e qualificadores (endianness, signedness, tipos).
 
-### Expressions
+### Expressões
 ```lx
 <<>>
 <<1, 2, 3>>
 
-value = 0x1234
-big    = <<value:16/big>>
-little = <<value:16/little>>
+valor = 0x1234
+big    = <<valor:16/big>>
+little = <<valor:16/little>>
 
 int_val = 42
 float_val = 3.14
 bin = <<int_val:32/integer, float_val:64/float>>
 
-data = "hello"
-chunk = <<data/binary>>
+dados = "olá"
+pedaco = <<dados/binary>>
 ```
 
 ### Pattern Matching
 ```lx
-def parse_header(packet) do
-  <<version:8, size:16, rest/binary>> = packet
-  {version, size, rest}
+def parse_header(pacote) do
+  <<versao:8, tamanho:16, resto/binary>> = pacote
+  {versao, tamanho, resto}
 end
 
-# Mixed options and variable-size segment
-def decode(packet) do
-  <<typ:4, _rsv:4, id:16/big, sz:32/big, payload:sz/binary, _/binary>> = packet
-  {typ, id, payload}
+# Opções mistas e segmento de tamanho variável
+def decode(pacote) do
+  <<tipo:4, _rsv:4, id:16/big, sz:32/big, payload:sz/binary, _/binary>> = pacote
+  {tipo, id, payload}
 end
 ```
 
 
 ## Records
 
-Define records with typed fields:
+Defina records com campos tipados:
 ```lx
-record user { name :: string, age :: integer }
+record usuario { nome :: string, idade :: integer }
 
-u = user{name: "John", age: 30}
-u.name           # field access
+u = usuario{nome: "João", idade: 30}
+u.nome           # acesso ao campo
 
 # Pattern matching
-def who(u) do
+def quem(u) do
   case u do
-    user{name: n, age: a} when a > 18 -> n
-    _ -> "minor"
+    usuario{nome: n, idade: a} when a > 18 -> n
+    _ -> "menor"
   end
 end
 ```
 
-Generated Erlang uses `-record(user, ...)` and `#user{...}`.
+Erlang gerado usa `-record(usuario, ...)` e `#usuario{...}`.
 
 
-## Functions
+## Funções
 
-### Definitions
+### Definições
 ```lx
-# public function
-def add(a :: integer, b :: integer) do
+# função pública
+def adicionar(a :: integer, b :: integer) do
   a + b
 end
 
-# private function
+# função privada
 defp helper(x :: integer) do
   x + 1
 end
 ```
 
-### Multiple Clauses and Guards
+### Múltiplas Cláusulas e Guards
 ```lx
-def classify do
-  (n) when n > 0 -> :positive
-  (n) when n < 0 -> :negative
+def classificar do
+  (n) when n > 0 -> :positivo
+  (n) when n < 0 -> :negativo
   (_) -> :zero
 end
 
-# pattern-based dispatch
-def process_list do
-  ([]) -> "empty"
-  ([h | _]) -> "non_empty"
+# dispatch baseado em padrão
+def processar_lista do
+  ([]) -> "vazia"
+  ([h | _]) -> "não_vazia"
 end
 ```
 
-### Return Type Annotation (on multi-clause blocks)
+### Anotação de Tipo de Retorno (em blocos multi-cláusula)
 ```lx
-def countdown :: string do
-  (0) -> "done"
-  (n :: integer) -> countdown(n - 1)
+def contagem_regressiva :: string do
+  (0) -> "pronto"
+  (n :: integer) -> contagem_regressiva(n - 1)
 end
 ```
 
 ### Type Specs
-- Types are inferred and emitted as `-spec` in Erlang.
-- Parameter annotations with `::` influence the generated spec.
-- Multi-clause functions may produce union return types.
+- Tipos são inferidos e emitidos como `-spec` em Erlang.
+- Anotações de parâmetro com `::` influenciam o spec gerado.
+- Funções multi-cláusula podem produzir tipos de retorno união.
 
 
-## Anonymous Functions (Lambdas)
+## Funções Anônimas (Lambdas)
 
-Single-line and multi-line forms, including multi-head lambdas. Invocation uses `.(...)`.
+Formas single-line e multi-line, incluindo lambdas multi-head. Invocação usa `.(...)`.
 ```lx
 # single-line
 def demo() do
@@ -256,49 +256,49 @@ end
 # multi-head
 def demo3() do
   h = fn do
-    (:ok) -> "success"
-    (:error) -> "failure"
-    (_) -> "unknown"
+    (:ok) -> "sucesso"
+    (:error) -> "falha"
+    (_) -> "desconhecido"
   end
   h.(:ok)
 end
 ```
 
-Limitations:
-- Anonymous functions are not recursive (self calls are rejected in current implementation).
+Limitações:
+- Funções anônimas não são recursivas (auto-chamadas são rejeitadas na implementação atual).
 
 
-## Control Flow
+## Controle de Fluxo
 
 ### If
 ```lx
-def test_if(x) do
+def testar_if(x) do
   if x > 0 do
-    "positive"
+    "positivo"
   else
-    "not positive"
+    "não positivo"
   end
 end
 
-# If without else returns nil in the false branch
+# If sem else retorna nil no ramo falso
 ```
 
-### Case (with patterns and guards)
+### Case (com padrões e guards)
 ```lx
-def handle(result) do
-  case result do
-    {:ok, data} -> data
-    {:error, reason} -> reason
-    _ -> "unknown"
+def lidar(resultado) do
+  case resultado do
+    {:ok, dados} -> dados
+    {:error, motivo} -> motivo
+    _ -> "desconhecido"
   end
 end
 ```
 
-### With expression
+### Expressão with
 ```lx
-def test_with() do
-  result = {:success, 10}
-  with {:success, x} <- result do
+def testar_with() do
+  resultado = {:sucesso, 10}
+  with {:sucesso, x} <- resultado do
     x
   else
     {:error, _} -> 0
@@ -306,48 +306,48 @@ def test_with() do
 end
 ```
 
-### Match and Match..Rescue
+### Match e Match..Rescue
 ```lx
-# match propagates non-matching values
-def test_simple_match() do
-  data = {:ok, "success"}
-  match {:ok, value} <- data
-  value
+# match propaga valores não correspondentes
+def testar_match_simples() do
+  dados = {:ok, "sucesso"}
+  match {:ok, valor} <- dados
+  valor
 end
 
-# rescue on mismatch
-def test_match_rescue() do
-  data = {:error, "failed"}
-  match {:ok, res} <- data rescue err do
-    {:failed, err}
+# rescue em caso de não correspondência
+def testar_match_rescue() do
+  dados = {:error, "falhou"}
+  match {:ok, res} <- dados rescue err do
+    {:falhou, err}
   end
-  :done
+  :pronto
 end
 ```
 
 
-## Concurrency
+## Concorrência
 
-Supported primitives:
-- `spawn(fn() -> ... end)` – spawns a process
-- Send operator `!`
+Primitivas suportadas:
+- `spawn(fn() -> ... end)` – cria um processo
+- Operador de envio `!`
 - `receive do ... end`
 
 ```lx
-def server_loop() do
+def loop_servidor() do
   :ok
 end
 
-def start() do
-  pid = spawn(fn() -> server_loop() end)
-  pid ! {:message, "hello"}
+def iniciar() do
+  pid = spawn(fn() -> loop_servidor() end)
+  pid ! {:mensagem, "olá"}
 end
 
 
-def wait() do
+def aguardar() do
   receive do
-    {:message, data} -> data
-    :stop -> :ok
+    {:mensagem, dados} -> dados
+    :parar -> :ok
   end
 end
 ```
@@ -355,28 +355,28 @@ end
 
 ## List Comprehensions
 
-Single-generator comprehensions with optional guard and transformation. Nesting is supported by nesting `for` blocks.
+Compreensões de gerador único com filtro opcional e transformação. Aninhamento é suportado aninhando blocos `for`.
 ```lx
-def squares() do
-  numbers = [1, 2, 3, 4]
-  for x in numbers do
+def quadrados() do
+  numeros = [1, 2, 3, 4]
+  for x in numeros do
     x * x
   end
 end
 
-# with filter
-def filtered() do
-  numbers = [1, 2, 3, 4, 5]
-  for x in numbers when x > 2 do
+# com filtro
+def filtrados() do
+  numeros = [1, 2, 3, 4, 5]
+  for x in numeros when x > 2 do
     x
   end
 end
 
-# nested
-def nested() do
-  matrix = [[1, 2], [3, 4]]
-  for row in matrix do
-    for x in row do
+# aninhado
+def aninhados() do
+  matriz = [[1, 2], [3, 4]]
+  for linha in matriz do
+    for x in linha do
       x + 1
     end
   end
@@ -384,141 +384,141 @@ end
 
 # membership
 def membership() do
-  numbers = [1, 2, 3, 4, 5]
-  allowed = [2, 4]
-  for x in numbers when x in allowed do
+  numeros = [1, 2, 3, 4, 5]
+  permitidos = [2, 4]
+  for x in numeros when x in permitidos do
     x * 10
   end
 end
 ```
 
 
-## Types
+## Tipos
 
-### Built-in Types
+### Tipos Built-in
 - integer, float, boolean, binary (string), atom, list(T), tuple(...), map(K, V), function
 
-### Type Annotations
+### Anotações de Tipo
 ```lx
-def add(a :: integer, b :: integer) :: integer do
+def adicionar(a :: integer, b :: integer) :: integer do
   a + b
 end
 ```
 
-### Custom Types
+### Tipos Customizados
 ```lx
-# Simple alias
+# Alias simples
 type user_id :: integer
 
 def id(x :: user_id) do
   x
 end
 
-# Opaque type
+# Tipo opaco
 type opaque user_id :: integer
 
-# Nominal type
+# Tipo nominal
 type nominal email :: string
 ```
 
-These generate corresponding Erlang type declarations (including `-opaque` and a nominal tag).
+Estes geram declarações de tipo Erlang correspondentes (incluindo `-opaque` e uma tag nominal).
 
 
-## Directives
+## Diretivas
 
-- `@doc "Text"` – emits a module-level `-doc` attribute for the next public function
-- `$print(expr)` – compile-time inspection of an expression (removed from output)
-- `$type(expr)` – ensures and records the inferred type in the generated spec
+- `@doc "Texto"` – emite um atributo `-doc` de nível de módulo para a próxima função pública
+- `$print(expr)` – inspeção em tempo de compilação de uma expressão (removida da saída)
+- `$type(expr)` – garante e registra o tipo inferido no spec gerado
 
-Examples:
+Exemplos:
 ```lx
-@doc "Adds two numbers"
-def add(a :: integer, b :: integer) do
+@doc "Adiciona dois números"
+def adicionar(a :: integer, b :: integer) do
   $print(a)
   $type(a + b)
   a + b
 end
 ```
 
-Unknown directives or wrong arity produce errors.
+Diretivas desconhecidas ou aridade incorreta produzem erros.
 
 
-## Operators and Semantics
+## Operadores e Semântica
 
-- Arithmetic: `+ - * /`
-- Comparison: `== != < <= > >=` (`!=` compiles to Erlang `/=`)
-- Boolean: `and` / `or` (compile to Erlang `andalso` / `orelse`)
-- Bitwise: `&&& ||| ^^^ <<< >>>` (compile to `band bor bxor bsl bsr`)
+- Aritméticos: `+ - * /`
+- Comparação: `== != < <= > >=` (`!=` compila para Erlang `/=`)
+- Booleanos: `and` / `or` (compilam para Erlang `andalso` / `orelse`)
+- Bitwise: `&&& ||| ^^^ <<< >>>` (compilam para `band bor bxor bsl bsr`)
 
-Operator precedence follows Erlang semantics.
+Precedência de operadores segue a semântica Erlang.
 
 
-## Application Block, Imports and Deps
+## Bloco Application, Imports e Deps
 
-The language supports an `application { ... }` block at file top. Its content is currently emitted as Erlang comments for documentation and tooling.
+A linguagem suporta um bloco `application { ... }` no topo do arquivo. Seu conteúdo é atualmente emitido como comentários Erlang para documentação e ferramentas.
 ```lx
 application {
-  description: "My App",
+  description: "Meu App",
   vsn: "0.1.0",
   deps: [:cowboy, :jsx],
-  registered: [:main_server],
+  registered: [:servidor_principal],
   env: %{debug: true, port: 8080}
 }
 ```
 
-`import :module` is accepted and currently emitted as a comment (`%% Import: module`).
+`import :modulo` é aceito e atualmente emitido como comentário (`%% Import: modulo`).
 
-Dependency resolution and runtime linking are managed by the project build (rebar3) generated by the CLI from `<project>.yml`. The in-source `deps` and `import` act as metadata today and do not link code by themselves.
-
-
-## Limitations and Notes
-
-- Anonymous functions cannot be recursive.
-- `import` and `application.deps` are metadata in source; actual dependency management is handled by the CLI-generated rebar3 umbrella under `_build/`.
-- If without an `else` returns `nil` in the false branch.
-- Strings are UTF-8 binaries.
+Resolução de dependências e linking em runtime são gerenciados pelo build do projeto (rebar3) gerado pelo CLI a partir de `<projeto>.yml`. O `deps` e `import` no código-fonte atuam como metadados hoje e não linkam código por si mesmos.
 
 
-## Style
+## Limitações e Notas
 
-- Variables and functions: `snake_case`
+- Funções anônimas não podem ser recursivas.
+- `import` e `application.deps` são metadados no código-fonte; gerenciamento real de dependências é tratado pelo umbrella rebar3 gerado pelo CLI sob `_build/`.
+- If sem `else` retorna `nil` no ramo falso.
+- Strings são binários UTF-8.
+
+
+## Estilo
+
+- Variáveis e funções: `snake_case`
 - Records: `snake_case`
-- Atoms: `:lowercase` or `:snake_case`
-- Keep functions small and prefer multiple clauses with pattern matching and guards.
+- Átomos: `:lowercase` ou `:snake_case`
+- Mantenha funções pequenas e prefira múltiplas cláusulas com pattern matching e guards.
 
 
-## Examples
+## Exemplos
 
-### Multi-clause with types
+### Multi-cláusula com tipos
 ```lx
-def factorial :: integer do
+def fatorial :: integer do
   (0) -> 1
-  (n :: integer) -> n * factorial(n - 1)
+  (n :: integer) -> n * fatorial(n - 1)
 end
 ```
 
-### Binary encode/decode
+### Encode/decode binário
 ```lx
-def encode(typ, id, payload) do
-  size = byte_size(payload)
-  <<typ:4, 0:4, id:16/big, size:32/big, payload/binary>>
+def encode(tipo, id, payload) do
+  tamanho = byte_size(payload)
+  <<tipo:4, 0:4, id:16/big, tamanho:32/big, payload/binary>>
 end
 
-def decode(packet) do
-  <<typ:4, _rsv:4, id:16/big, sz:32/big, data:sz/binary, _/binary>> = packet
-  {typ, id, data}
+def decode(pacote) do
+  <<tipo:4, _rsv:4, id:16/big, sz:32/big, dados:sz/binary, _/binary>> = pacote
+  {tipo, id, dados}
 end
 ```
 
 ### With + match
 ```lx
-def example(maybe_data) do
-  with {:success, data} <- maybe_data do
-    data
+def exemplo(dados_maybe) do
+  with {:sucesso, dados} <- dados_maybe do
+    dados
   else
-    _ -> "failed"
+    _ -> "falhou"
   end
 end
 ```
 
-This document reflects the features validated by the current test suite and CLI behavior. As the language evolves, sections will be extended accordingly.
+Este documento reflete as funcionalidades validadas pela suíte de testes atual e comportamento da CLI. À medida que a linguagem evolui, as seções serão estendidas adequadamente.

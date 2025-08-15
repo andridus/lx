@@ -68,10 +68,10 @@ is_even(X_3) ->
 }
 
 fn test_pipeline_default_first_arg() {
-	lx_code := 'def join_ext(path) do
+	lx_code := "def join_ext(path) do
         path
-        |> filename:join(\'*.beam\')
-    end'
+        |> filename:join('*.beam')
+    end"
 
 	expected := '-module(test).
 -export([join_ext/1]).
@@ -87,7 +87,7 @@ join_ext(PATH_1) ->
 
 fn test_function_capture_module() {
 	lx_code := 'def to_atom(s) do
-        erlang:apply(&erlang:list_to_atom/1)
+        erlang:apply(:erlang, :list_to_atom, [s])
     end'
 
 	expected := '-module(test).
@@ -95,7 +95,7 @@ fn test_function_capture_module() {
 
 -spec to_atom(any()) -> any().
 to_atom(S_1) ->
-    erlang:apply(fun(ARG1_2) -> erlang:list_to_atom(ARG1_2) end).
+    erlang:apply(erlang, list_to_atom, [S_1]).
 '
 
 	result := compile_lx(lx_code)

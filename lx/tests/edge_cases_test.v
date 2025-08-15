@@ -7,7 +7,7 @@ fn test_any_type_propagation_in_unification() {
 	lx_code := 'def check_status do
 (:ok) -> "success"
 (:error) -> "failure"
-(code) -> "unknown"
+(_code) -> "unknown"
 end'
 
 	expected := '-module(test).
@@ -18,7 +18,7 @@ check_status(ok) ->
     <<"success"/utf8>>;
 check_status(error) ->
     <<"failure"/utf8>>;
-check_status(CODE_1) ->
+check_status(_CODE_1) ->
     <<"unknown"/utf8>>.
 '
 
@@ -51,7 +51,7 @@ fn test_list_pattern_matching_empty_vs_cons() {
 	// Test that empty list and cons patterns work together
 	lx_code := 'def process_list do
 ([]) -> "empty"
-([head | tail]) -> "non_empty"
+([_head | _tail]) -> "non_empty"
 end'
 
 	expected := '-module(test).
@@ -60,7 +60,7 @@ end'
 -spec process_list(any()) -> binary().
 process_list([]) ->
     <<"empty"/utf8>>;
-process_list([HEAD_1 | TAIL_2]) ->
+process_list([_HEAD_1 | _TAIL_2]) ->
     <<"non_empty"/utf8>>.
 '
 
@@ -93,7 +93,7 @@ fn test_list_element_type_annotation_extraction() {
 	// Test that type annotations are correctly extracted from list elements
 	lx_code := 'def process_list do
 ([]) -> "empty"
-([head :: integer]) -> "non_empty"
+([head :: integer]) -> "non_empty #{head}"
 end'
 
 	expected := '-module(test).
@@ -103,7 +103,7 @@ end'
 process_list([]) ->
     <<"empty"/utf8>>;
 process_list([HEAD_1]) ->
-    <<"non_empty"/utf8>>.
+    iolist_to_binary(io_lib:format("non_empty ~p", [HEAD_1])).
 '
 
 	result := compile_lx(lx_code)

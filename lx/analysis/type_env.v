@@ -1,5 +1,7 @@
 module analysis
 
+import ast
+
 @[heap]
 pub struct TypeEnv {
 	scope_name string
@@ -7,19 +9,30 @@ mut:
 	bindings map[string]TypeScheme
 	parent   ?&TypeEnv
 	children []&TypeEnv
+	// Track which variables have been used
+	used_variables map[string]bool
+	// Track variable positions for better error reporting
+	variable_positions map[string]ast.Position
 }
 
 pub fn new_type_env(scope_name string) TypeEnv {
 	return TypeEnv{
-		scope_name: scope_name
-		bindings:   map[string]TypeScheme{}
-		parent:     none
-		children:   []
+		scope_name:         scope_name
+		bindings:           map[string]TypeScheme{}
+		parent:             none
+		children:           []
+		used_variables:     map[string]bool{}
+		variable_positions: map[string]ast.Position{}
 	}
 }
 
 pub fn (mut env TypeEnv) bind(name string, scheme TypeScheme) {
 	env.bindings[name] = scheme
+}
+
+pub fn (mut env TypeEnv) bind_with_position(name string, scheme TypeScheme, position ast.Position) {
+	env.bindings[name] = scheme
+	env.variable_positions[name] = position
 }
 
 pub fn (env TypeEnv) lookup(name string) ?TypeScheme {
@@ -182,4 +195,46 @@ pub fn (scheme TypeScheme) str() string {
 
 	vars_str := scheme.quantified_vars.map(it.name).join(', ')
 	return 'forall ${vars_str}. ${scheme.body.str()}'
+}
+
+// Mark a variable as used
+pub fn (mut env TypeEnv) mark_used(name string) {
+	env.used_variables[name] = true
+}
+
+// Check if a variable has been used
+pub fn (env TypeEnv) is_used(name string) bool {
+	return env.used_variables[name] or { false }
+}
+
+// Get all unused variables in this scope
+pub fn (env TypeEnv) get_unused_variables() []string {
+	mut unused := []string{}
+	for name in env.bindings.keys() {
+		if !env.is_used(name) {
+			unused << name
+		}
+	}
+	return unused
+}
+
+// Get unused variables with their positions
+pub fn (env TypeEnv) get_unused_variables_with_positions() map[string]ast.Position {
+	mut unused := map[string]ast.Position{}
+	for name in env.bindings.keys() {
+		if !env.is_used(name) {
+			position := env.variable_positions[name] or { ast.Position{} }
+			unused[name] = position
+		}
+	}
+	return unused
+}
+
+// Get all variables (both used and unused) in this scope
+pub fn (env TypeEnv) get_all_variables() map[string]bool {
+	mut all_vars := map[string]bool{}
+	for name in env.bindings.keys() {
+		all_vars[name] = env.is_used(name)
+	}
+	return all_vars
 }

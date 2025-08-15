@@ -96,7 +96,7 @@ send_email(E_2) ->
 fn test_multiple_types() {
 	lx_code := 'type user_id :: integer
 type email :: string
-type status :: active
+type status :: :active
 
 def create_user(id :: user_id, email :: email, status :: status) do
     {id, email, status}
@@ -106,7 +106,7 @@ end'
 
 -type user_id() :: integer().
 -type email() :: binary().
--type status() :: active.
+-type status() :: atom().
 -spec create_user(user_id(), email(), status()) -> {user_id(), email(), status()}.
 create_user(ID_1, EMAIL_2, STATUS_3) ->
     {ID_1, EMAIL_2, STATUS_3}.
@@ -117,18 +117,18 @@ create_user(ID_1, EMAIL_2, STATUS_3) ->
 
 // Test types with records
 fn test_types_with_records() {
-	lx_code := 'record user { id :: integer, name :: string }
-type user_type :: user
+	lx_code := 'record User{ id :: integer, name :: string }
+type user_type :: User
 
-def create_typed_user(id :: integer, name :: string) do
-    user{id: id, name: name}
+def create_typed_user(id :: integer, name :: string) :: user_type do
+    User{id: id, name: name}
 end'
 	expected := '-module(test).
 -export([create_typed_user/2]).
 
 -record(user, {id = nil :: integer(), name = nil :: binary()}).
--type user_type() :: user.
--spec create_typed_user(integer(), binary()) -> user().
+-type user_type() :: #user{}.
+-spec create_typed_user(integer(), binary()) -> user_type().
 create_typed_user(ID_1, NAME_2) ->
     #user{id = ID_1, name = NAME_2}.
 '
@@ -163,9 +163,9 @@ end'
 
 // Test type with complex expressions
 fn test_type_complex_expressions() {
-	lx_code := 'type result :: atom
+	lx_code := 'type result :: {:integer, atom}
 
-def compute() do
+def compute() :: result do
     value = 42
     result = :success
     {value, result}
@@ -173,8 +173,8 @@ end'
 	expected := '-module(test).
 -export([compute/0]).
 
--type result() :: atom().
--spec compute() -> {integer(), atom()}.
+-type result() :: {atom(), atom()}.
+-spec compute() -> result().
 compute() ->
     VALUE_1 = 42,
     RESULT_2 = success,
@@ -236,14 +236,14 @@ end'
 fn test_type_simple_values() {
 	lx_code := 'type simple :: atom
 
-def get_simple() do
+def get_simple() :: simple do
     :atom
 end'
 	expected := '-module(test).
 -export([get_simple/0]).
 
 -type simple() :: atom().
--spec get_simple() -> atom().
+-spec get_simple() -> simple().
 get_simple() ->
     atom.
 '
@@ -253,10 +253,10 @@ get_simple() ->
 
 // Test integration with existing features
 fn test_type_integration() {
-	lx_code := 'type result :: atom
-record data { value :: integer }
+	lx_code := 'type result :: {:atom, integer}
+record Data { value :: integer }
 
-def process_with_type(d :: data) do
+def process_with_type(d :: Data) :: result do
     result = :success
     {result, d.value}
 end'
@@ -264,11 +264,11 @@ end'
 -export([process_with_type/1]).
 
 -record(data, {value = nil :: integer()}).
--type result() :: atom().
--spec process_with_type(data()) -> {atom(), integer()}.
+-type result() :: {atom(), integer()}.
+-spec process_with_type(#data{}) -> result().
 process_with_type(D_1) ->
     RESULT_2 = success,
-    {RESULT_2, D_1#record.value}.
+    {RESULT_2, D_1#data.value}.
 '
 	result := compile_lx(lx_code)
 	assert result == expected

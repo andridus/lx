@@ -63,7 +63,7 @@ fn test_pattern_variable_binding_with_type_annotations() {
 	// Test that type annotations in list patterns are correctly handled
 	lx_code := 'def process_typed_list do
 ([]) -> "empty"
-([(head :: integer) | tail]) -> head * 2
+([(head :: integer) | _tail]) -> head * 2
 end'
 
 	expected := '-module(test).
@@ -72,7 +72,7 @@ end'
 -spec process_typed_list([integer()]) -> binary() | integer().
 process_typed_list([]) ->
     <<"empty"/utf8>>;
-process_typed_list([HEAD_1 | TAIL_2]) ->
+process_typed_list([HEAD_1 | _TAIL_2]) ->
     HEAD_1 * 2.
 '
 

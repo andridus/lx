@@ -188,7 +188,8 @@ pub fn compile_multi_file(code string, file_path string, base_module_name string
 	}
 	app_module_filename := app_module_name + '.erl'
 	if app_module_filename !in result.files {
-		result.files[app_module_filename] = generate_application_behaviour_module(app_module_name, root_sup)
+		result.files[app_module_filename] = generate_application_behaviour_module(app_module_name,
+			root_sup)
 	}
 
 	// Generate .app.src and .hrl if needed
@@ -363,7 +364,7 @@ fn generate_app_src(ast_node ast.Node, app_name string) !string {
 		existing_apps := app_config['applications']
 		if existing_apps.starts_with('[') && existing_apps.ends_with(']') {
 			// Remove brackets and split
-			apps_content := existing_apps[1..existing_apps.len-1].trim_space()
+			apps_content := existing_apps[1..existing_apps.len - 1].trim_space()
 			if apps_content.len > 0 {
 				mut existing_list := apps_content.split(',').map(it.trim_space())
 				// Add deps that aren't already in applications
