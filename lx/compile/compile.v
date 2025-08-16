@@ -64,9 +64,8 @@ pub fn compile_file(file_path string) {
 
 		// Write .hrl if present
 		if result.hrl_content.len > 0 {
-			hrl_path := os.join_path(os.dir(dir), 'include')
-			os.mkdir_all(hrl_path) or {}
-			hrl_file := os.join_path(hrl_path, '${module_name}.hrl')
+			// Generate .hrl in the same directory as the .erl files
+			hrl_file := os.join_path(dir, '${module_name}.hrl')
 			os.write_file(hrl_file, result.hrl_content) or {
 				eprintln('Failed to write ${hrl_file}: ${err}')
 				exit(1)
@@ -87,10 +86,10 @@ pub fn compile_file(file_path string) {
 	}
 }
 
-// Check if source needs multi-file compilation (has application, supervisor, worker)
+// Check if source needs multi-file compilation (has application, supervisor, worker, or records)
 fn needs_multi_file_compilation(code string) bool {
 	return code.contains('application {') || code.contains('supervisor ')
-		|| code.contains('worker ')
+		|| code.contains('worker ') || code.contains('record ')
 }
 
 // Multi-file compilation: generates separate modules for each construct
@@ -158,8 +157,43 @@ pub fn compile_multi_file(code string, file_path string, base_module_name string
 
 	// Generate each module
 	for module_info in modules {
+		// Analyze each extracted module to apply base rules (like duplicate function validation)
+		// But disable unused type checking since records/types are global across all modules
+		mut module_analyzer := analysis.new_analyzer()
+		module_analyzer.disable_unused_type_check() // Disable for individual modules
+		analyzed_module_ast := module_analyzer.analyze(module_info.ast_node) or {
+			module_analysis_errors := module_analyzer.get_errors()
+			if module_analysis_errors.len > 0 {
+				file_lines := os.read_file(file_path) or { '' }
+				lines := file_lines.split('\n')
+				mut error_msg := ''
+				for e in module_analysis_errors {
+					error_msg += errors.format_error_detailed(e, lines) + '\n'
+				}
+				return error(error_msg)
+			}
+			return error('Analysis error for ${module_info.name}: ${err}')
+		}
+
+		module_analysis_errors := module_analyzer.get_errors()
+		if module_analysis_errors.len > 0 {
+			file_lines := os.read_file(file_path) or { '' }
+			lines := file_lines.split('\n')
+			mut error_msg := ''
+			for e in module_analysis_errors {
+				error_msg += errors.format_error_detailed(e, lines) + '\n'
+			}
+			return error(error_msg)
+		}
+
 		mut gen := generator.new_generator(directives_table)
-		erlang_code := gen.generate_with_types(module_info.ast_node, analyzer.get_type_table()) or {
+
+		// If this module needs .hrl, set the module name to the base module name
+		// so it can include the correct .hrl file
+		if module_info.needs_hrl {
+			gen.set_module_name(base_module_name)
+		}
+		erlang_code := gen.generate_with_types(analyzed_module_ast, module_analyzer.get_type_table()) or {
 			errs := gen.get_errors()
 			if errs.len > 0 {
 				return error('Generation errors for ${module_info.name}:\n${errs.join('\n')}')
@@ -190,6 +224,21 @@ pub fn compile_multi_file(code string, file_path string, base_module_name string
 	if app_module_filename !in result.files {
 		result.files[app_module_filename] = generate_application_behaviour_module(app_module_name,
 			root_sup)
+	}
+
+	// Perform global unused type check using the main analyzer that has seen all constructs
+	analyzer.check_unused_types()
+
+	// Check for any additional analysis errors after unused type check
+	final_analysis_errors := analyzer.get_errors()
+	if final_analysis_errors.len > 0 {
+		file_lines := os.read_file(file_path) or { '' }
+		lines := file_lines.split('\n')
+		mut error_msg := ''
+		for e in final_analysis_errors {
+			error_msg += errors.format_error_detailed(e, lines) + '\n'
+		}
+		return error(error_msg)
 	}
 
 	// Generate .app.src and .hrl if needed
@@ -227,6 +276,13 @@ pub fn compile_multi_file_no_analyze(code string, file_path string, base_module_
 
 	for module_info in modules {
 		mut gen := generator.new_generator(directives_table)
+
+		// If this module needs .hrl, set the module name to the base module name
+		// so it can include the correct .hrl file
+		if module_info.needs_hrl {
+			gen.set_module_name(base_module_name)
+		}
+
 		erlang_code := gen.generate(module_info.ast_node) or {
 			errs := gen.get_errors()
 			if errs.len > 0 {
@@ -249,6 +305,7 @@ struct ModuleInfo {
 	name     string
 	filename string
 	ast_node ast.Node
+	needs_hrl bool // Whether this module needs to include the .hrl file
 }
 
 // Extract separate modules from main AST
@@ -258,35 +315,62 @@ fn extract_modules_from_ast(main_ast ast.Node, base_name string) ![]ModuleInfo {
 	mut records := []ast.Node{}
 	mut application_nodes := []ast.Node{}
 
-	// Separate constructs
+	// First pass: collect all records and types
+	for child in main_ast.children {
+		match child.kind {
+			.record_definition, .type_def, .opaque_type, .nominal_type {
+				records << child
+			}
+			else {}
+		}
+	}
+
+	// Second pass: separate other constructs and create modules
 	for child in main_ast.children {
 		match child.kind {
 			.application_config {
 				application_nodes << child
 			}
-			.supervisor_def {
-				// Create separate supervisor module
-				sup_name := child.value
-				sup_module_ast := ast.new_module(child.id, '${sup_name}_sup', [child],
-					child.position)
-				modules << ModuleInfo{
-					name:     '${sup_name}_sup'
-					filename: '${sup_name}_sup.erl'
-					ast_node: sup_module_ast
-				}
+					.supervisor_def {
+			// Create separate supervisor module with the supervisor's body functions as direct children
+			sup_name := child.value
+			sup_body := if child.children.len > 0 { child.children[0] } else { ast.new_block(child.id, [], child.position) }
+			// Extract functions from supervisor body to be direct children of the module
+			sup_functions := if sup_body.kind == .block { sup_body.children } else { [sup_body] }
+			// Include records in supervisor module for type checking (will be collected later)
+			mut sup_children := []ast.Node{}
+			sup_children << records
+			sup_children << sup_functions
+			sup_module_ast := ast.new_module(child.id, '${sup_name}_sup', sup_children, child.position)
+			needs_hrl := records.len > 0
+			modules << ModuleInfo{
+				name:     '${sup_name}_sup'
+				filename: '${sup_name}_sup.erl'
+				ast_node: sup_module_ast
+				needs_hrl: needs_hrl
 			}
-			.worker_def {
-				// Create separate worker module
-				worker_name := child.value
-				worker_module_ast := ast.new_module(child.id, worker_name, [child], child.position)
-				modules << ModuleInfo{
-					name:     worker_name
-					filename: '${worker_name}.erl'
-					ast_node: worker_module_ast
-				}
+		}
+		.worker_def {
+			// Create separate worker module with the worker's body functions as direct children
+			worker_name := child.value
+			worker_body := if child.children.len > 0 { child.children[0] } else { ast.new_block(child.id, [], child.position) }
+			// Extract functions from worker body to be direct children of the module
+			worker_functions := if worker_body.kind == .block { worker_body.children } else { [worker_body] }
+			// Include records in worker module for type checking (will be collected later)
+			mut worker_children := []ast.Node{}
+			worker_children << records
+			worker_children << worker_functions
+			worker_module_ast := ast.new_module(child.id, worker_name, worker_children, child.position)
+			needs_hrl := records.len > 0
+			modules << ModuleInfo{
+				name:     worker_name
+				filename: '${worker_name}.erl'
+				ast_node: worker_module_ast
+				needs_hrl: needs_hrl
 			}
-			.record_definition {
-				records << child
+		}
+			.record_definition, .type_def, .opaque_type, .nominal_type {
+				// Already collected in first pass
 			}
 			else {
 				main_children << child
@@ -308,6 +392,7 @@ fn extract_modules_from_ast(main_ast ast.Node, base_name string) ![]ModuleInfo {
 			name:     base_name
 			filename: '${base_name}.erl'
 			ast_node: main_module_ast
+			needs_hrl: records.len > 0 // Include .hrl if there are records
 		}
 	}
 
@@ -444,23 +529,60 @@ fn format_app_src_value(node ast.Node) !string {
 	}
 }
 
-// Generate .hrl content from record definitions
+// Generate .hrl content from record definitions and custom types
 fn generate_hrl(ast_node ast.Node, app_name string) !string {
 	mut records := []ast.Node{}
+	mut custom_types := []ast.Node{}
 
-	// Collect all record definitions
+	// Collect all record definitions and custom types
 	for child in ast_node.children {
 		if child.kind == .record_definition {
 			records << child
+		} else if child.kind == .type_def || child.kind == .opaque_type || child.kind == .nominal_type {
+			custom_types << child
 		}
 	}
 
-	if records.len == 0 {
+	if records.len == 0 && custom_types.len == 0 {
 		return ''
 	}
 
 	mut content := '%% ${app_name}.hrl - Record definitions\n\n'
 
+	// Generate custom types first
+	for custom_type in custom_types {
+		// Try to generate proper -type declaration from AST
+		if custom_type.children.len > 0 {
+			type_def := custom_type.children[0]
+			mut erlang_type := 'any()'
+			match type_def.kind {
+				.identifier {
+					// Simple type alias like "string", "integer", etc.
+					match type_def.value {
+						'string' { erlang_type = 'binary()' }
+						'integer' { erlang_type = 'integer()' }
+						'float' { erlang_type = 'float()' }
+						'boolean' { erlang_type = 'boolean()' }
+						'atom' { erlang_type = 'atom()' }
+						else { erlang_type = 'any()' }
+					}
+				}
+				else {
+					erlang_type = 'any()'
+				}
+			}
+			content += '-type ${custom_type.value}() :: ${erlang_type}.\n'
+		} else {
+			content += '%% Type definition: ${custom_type.value}\n'
+		}
+	}
+
+	// Add blank line if we have both custom types and records
+	if custom_types.len > 0 && records.len > 0 {
+		content += '\n'
+	}
+
+	// Generate records
 	for record in records {
 		content += generate_record_hrl(record)! + '\n'
 	}
@@ -470,20 +592,44 @@ fn generate_hrl(ast_node ast.Node, app_name string) !string {
 
 // Generate single record definition for .hrl
 fn generate_record_hrl(record_node ast.Node) !string {
-	record_name := record_node.value
+	record_name := record_node.value.to_lower() // Convert to lowercase for Erlang convention
 	mut fields := []string{}
 
 	// Parse record fields from children
 	for child in record_node.children {
-		if child.kind == .identifier {
+		if child.kind == .record_field {
 			field_name := child.value
-			// Check for type annotation
-			if child.children.len > 0 && child.children[0].kind == .identifier {
-				field_type := child.children[0].value
-				fields << '${field_name} :: ${field_type}()'
+			mut field_def := field_name
+
+			// Check for default value first (Erlang syntax: field = value)
+			if child.children.len > 1 {
+				default_value := child.children[1]
+				match default_value.kind {
+					.string {
+						escaped := default_value.value.replace('"', '\\"')
+						field_def = '${field_name} = "${escaped}"'
+					}
+					.integer, .float, .boolean, .atom {
+						field_def = '${field_name} = ${default_value.value}'
+					}
+					.list_literal {
+						if default_value.children.len == 0 {
+							field_def = '${field_name} = []'
+						} else {
+							// For non-empty lists, we'll use a simple representation
+							field_def = '${field_name} = []'
+						}
+					}
+					else {
+						field_def = '${field_name} = nil'
+					}
+				}
 			} else {
-				fields << field_name
+				// No default value, add undefined (Erlang convention)
+				field_def += ' = undefined'
 			}
+
+			fields << field_def
 		}
 	}
 

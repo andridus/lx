@@ -17,18 +17,27 @@ mut:
 	next_hash        int = 1
 	directives_table &parser.DirectivesTable
 	in_pattern       bool // Track if we're in pattern matching context
+	// New fields for .hrl file generation
+	hrl_output       strings.Builder
+	module_name      string
+	has_records      bool
 }
 
 pub fn new_generator(directives_table &parser.DirectivesTable) ErlangGenerator {
 	return ErlangGenerator{
 		directives_table: directives_table
 		var_map:          map[string]string{}
+		hrl_output:       strings.new_builder(1024)
+		module_name:      ''
+		has_records:      false
 	}
 }
 
 pub fn (mut g ErlangGenerator) generate(node ast.Node) !string {
 	g.output = strings.new_builder(1024)
+	g.hrl_output = strings.new_builder(1024)
 	g.errors = []
+	g.has_records = false
 
 	g.generate_node(node)!
 
@@ -46,6 +55,21 @@ pub fn (mut g ErlangGenerator) generate_with_types(node ast.Node, type_table &an
 
 pub fn (g ErlangGenerator) get_errors() []string {
 	return g.errors
+}
+
+// Get the generated .hrl file content
+pub fn (mut g ErlangGenerator) get_hrl_content() string {
+	return g.hrl_output.str()
+}
+
+// Check if the generator has records (and thus generated a .hrl file)
+pub fn (mut g ErlangGenerator) has_generated_records() bool {
+	return g.has_records
+}
+
+// Set the module name for .hrl inclusion
+pub fn (mut g ErlangGenerator) set_module_name(name string) {
+	g.module_name = name
 }
 
 fn (mut g ErlangGenerator) get_unique_var_name(original_name string) string {
@@ -117,7 +141,7 @@ fn (mut g ErlangGenerator) generate_node(node ast.Node) ! {
 			g.generate_map_access(node)!
 		}
 		.record_definition {
-			g.generate_record_definition(node)!
+			// Records are now handled by .hrl files, skip direct generation
 		}
 		.record_literal {
 			g.generate_record_literal(node)!
@@ -285,6 +309,10 @@ fn (mut g ErlangGenerator) generate_block(node ast.Node) ! {
 
 fn (mut g ErlangGenerator) generate_module(node ast.Node) ! {
 	module_name := node.value
+	// Only set module_name if it hasn't been set externally (for .hrl inclusion)
+	if g.module_name == '' {
+		g.module_name = module_name
+	}
 	g.output.write_string('-module(${module_name}).\n')
 	// Generate module-level directives (@moduledoc)
 	moduledoc := g.directives_table.get_moduledoc()
@@ -377,21 +405,38 @@ fn (mut g ErlangGenerator) generate_module(node ast.Node) ! {
 		g.output.write_string('\n')
 	}
 
-	// Generate record definitions first
+	// Collect records and custom types by dependencies
+	mut records := []ast.Node{}
+	mut custom_types := []ast.Node{}
 	for child in node.children {
 		if child.kind == .record_definition {
-			g.generate_record_definition(child)!
+			records << child
+		} else if child.kind == .type_def || child.kind == .opaque_type || child.kind == .nominal_type {
+			custom_types << child
 		}
 	}
 
-	// Generate type definitions
-	for child in node.children {
-		if child.kind == .type_def {
-			g.generate_type_def(child)!
-		} else if child.kind == .opaque_type {
-			g.generate_opaque_type(child)!
-		} else if child.kind == .nominal_type {
-			g.generate_nominal_type(child)!
+	// If we have records or custom types, generate .hrl file and include it
+	if records.len > 0 || custom_types.len > 0 {
+		g.has_records = true
+		g.generate_hrl_file_with_types(records, custom_types)!
+		g.output.write_string('-include("${g.module_name}.hrl").\n\n')
+	} else if g.module_name != '' && g.module_name != node.value {
+		// This module needs to include .hrl from another module
+		g.output.write_string('-include("${g.module_name}.hrl").\n\n')
+	}
+
+	// Generate type definitions only if they won't be in .hrl
+	// If we have records or custom types, they are generated in .hrl, so skip here
+	if records.len == 0 && custom_types.len == 0 {
+		for child in node.children {
+			if child.kind == .type_def {
+				g.generate_type_def(child)!
+			} else if child.kind == .opaque_type {
+				g.generate_opaque_type(child)!
+			} else if child.kind == .nominal_type {
+				g.generate_nominal_type(child)!
+			}
 		}
 	}
 
@@ -1471,77 +1516,7 @@ fn (mut g ErlangGenerator) generate_map_access_to_string(node ast.Node) !string 
 	return 'maps:get(${key_code}, ${map_code})'
 }
 
-// Record generation functions
-fn (mut g ErlangGenerator) generate_record_definition(node ast.Node) ! {
-	record_name := node.value.to_lower() // Convert to lowercase for Erlang convention
-
-	// Generate record definition header
-	g.output.write_string('-record(${record_name}, {')
-
-	// Generate field definitions
-	for i, field in node.children {
-		if i > 0 {
-			g.output.write_string(', ')
-		}
-
-		if field.kind != .record_field {
-			g.error('Expected record field, got ${field.kind}')
-			return error('Expected record field, got ${field.kind}')
-		}
-
-		field_name := field.value
-		field_type_node := field.children[0]
-
-		// Determine field type
-		mut field_type := ast.Type{}
-		if field_type_node.value != '' {
-			// Use explicit type - convert the field_type_node to ast.Type properly
-			field_type = g.field_type_node_to_type(field_type_node)
-		} else if g.type_table != unsafe { nil } {
-			// Try to get inferred type from type table
-			if _ := g.type_table.get_record_type(node.value) {
-				if inferred_type := g.type_table.get_field_type(node.value, field_name) {
-					field_type = inferred_type
-				} else {
-					// Fallback to any() if type not found
-					field_type = ast.Type{
-						name:   'any'
-						params: []
-					}
-				}
-			} else {
-				// Fallback to any() if record type not found
-				field_type = ast.Type{
-					name:   'any'
-					params: []
-				}
-			}
-		} else {
-			// No type table available, fallback to any()
-			field_type = ast.Type{
-				name:   'any'
-				params: []
-			}
-		}
-
-		// Use the standard type conversion function
-		erlang_type := type_to_erlang_spec(field_type)
-
-		// Generate field with or without default value
-		if field.children.len > 1 {
-			// Field has default value
-			default_value := field.children[1]
-			g.output.write_string('${field_name} = ')
-			g.generate_node(default_value)!
-			g.output.write_string(' :: ${erlang_type}')
-		} else {
-			// Field without default value
-			g.output.write_string('${field_name} = nil :: ${erlang_type}')
-		}
-	}
-
-	g.output.write_string('}).\n')
-}
+// Record generation functions - now handled by .hrl files
 
 fn (mut g ErlangGenerator) generate_record_literal(node ast.Node) ! {
 	record_name := node.value.to_lower() // Convert to lowercase for Erlang convention
@@ -2288,6 +2263,11 @@ fn (mut g ErlangGenerator) generate_supervisor_def(node ast.Node) ! {
 	g.output.write_string('-behaviour(supervisor).\n\n')
 	g.output.write_string('-export([start_link/0, init/1]).\n\n')
 
+	// Include .hrl file if module_name is set (indicating records exist)
+	if g.module_name != '' {
+		g.output.write_string('-include("${g.module_name}.hrl").\n\n')
+	}
+
 	// start_link/0
 	g.output.write_string('start_link() ->\n')
 	g.output.write_string('    supervisor:start_link({local, ?MODULE}, ?MODULE, []).\n\n')
@@ -2337,26 +2317,6 @@ fn (mut g ErlangGenerator) generate_supervisor_def(node ast.Node) ! {
 	}
 	g.output.write_string('    ],\n')
 	g.output.write_string('    {ok, {{Strategy, 5, 10}, Children}}.\n\n')
-
-	// Generate supervisor functions if any are defined
-	if supervisor_functions.len > 0 {
-		// Add function exports
-		mut exported_functions := []string{}
-		for func in supervisor_functions {
-			if func.kind == .function { // Only export public functions
-				arity := if func.children.len > 0 { func.children[0].children.len } else { 0 }
-				exported_functions << '${func.value}/${arity}'
-			}
-		}
-		if exported_functions.len > 0 {
-			g.output.write_string('-export([${exported_functions.join(', ')}]).\n\n')
-		}
-
-		// Generate function definitions
-		for func in supervisor_functions {
-			g.generate_function(func)!
-		}
-	}
 }
 
 // Generate worker definitions (as proper OTP gen_server modules)
@@ -2367,8 +2327,43 @@ fn (mut g ErlangGenerator) generate_worker_def(node ast.Node) ! {
 
 	// Generate standard gen_server callbacks
 	g.output.write_string('-behaviour(gen_server).\n\n')
+
+	// Collect user-defined public functions for export
+	body := node.children[0]
+	mut user_exports := []string{}
+
+	for child in body.children {
+		if child.kind == .function {
+			func_name := child.value
+			// Skip callbacks, export other public functions
+			if func_name !in ['init', 'handle_call', 'handle_cast', 'handle_info', 'terminate', 'code_change', 'start_link'] {
+				// Calculate arity
+				mut arity := 0
+				if child.children.len > 0 {
+					args_block := child.children[0]
+					if args_block.kind == .block {
+						arity = args_block.children.len
+					}
+				}
+				user_exports << '${func_name}/${arity}'
+			}
+		}
+	}
+
+	// Export standard callbacks
 	g.output.write_string('-export([start_link/0, start_link/1]).\n')
-	g.output.write_string('-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).\n\n')
+	g.output.write_string('-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).\n')
+
+	// Export user-defined functions
+	if user_exports.len > 0 {
+		g.output.write_string('-export([${user_exports.join(', ')}]).\n')
+	}
+	g.output.write_string('\n')
+
+	// Include .hrl file if module_name is set (indicating records exist)
+	if g.module_name != '' {
+		g.output.write_string('-include("${g.module_name}.hrl").\n\n')
+	}
 
 	// start_link functions
 	g.output.write_string('start_link() ->\n')
@@ -2377,7 +2372,6 @@ fn (mut g ErlangGenerator) generate_worker_def(node ast.Node) ! {
 	g.output.write_string('    gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).\n\n')
 
 	// Parse worker body for user-defined callbacks
-	body := node.children[0]
 	mut has_init := false
 	mut has_handle_call := false
 	mut has_handle_cast := false
@@ -2906,4 +2900,367 @@ fn (g ErlangGenerator) field_type_node_to_type(node ast.Node) ast.Type {
 		name:   'any'
 		params: []
 	}
+}
+
+// Record dependency analysis and ordering
+fn (g ErlangGenerator) analyze_record_dependencies(records []ast.Node) []ast.Node {
+	if records.len <= 1 {
+		return records
+	}
+
+	// Build dependency graph
+	mut dependencies := map[string][]string{}
+	mut record_map := map[string]ast.Node{}
+
+	// Initialize record map and dependencies
+	for record in records {
+		record_name := record.value.to_lower()
+		record_map[record_name] = record
+		dependencies[record_name] = []
+	}
+
+	// Analyze dependencies by looking at field types
+	for record in records {
+		record_name := record.value.to_lower()
+
+		for field in record.children {
+			if field.kind != .record_field {
+				continue
+			}
+
+			// Check field type for record references
+			if field.children.len > 0 {
+				field_type_node := field.children[0]
+				field_type_name := g.extract_type_name_from_field_type(field_type_node)
+
+				// If field type is a record type, add dependency
+				if field_type_name != '' && field_type_name in record_map {
+					if field_type_name != record_name { // Avoid self-reference
+						dependencies[record_name] << field_type_name
+					}
+				}
+			}
+		}
+	}
+
+	// Topological sort using Kahn's algorithm
+	return g.topological_sort_records(records, dependencies, record_map)
+}
+
+fn (g ErlangGenerator) extract_type_name_from_field_type(field_type_node ast.Node) string {
+	match field_type_node.kind {
+		.identifier {
+			// Direct type reference like "BankAccount"
+			// Check if it's a parameterized type like "list(BankAccount)"
+			if field_type_node.children.len > 0 {
+				// This is a parameterized type, extract the first parameter
+				first_param := field_type_node.children[0]
+				if first_param.kind == .identifier {
+					return first_param.value.to_lower()
+				}
+			}
+			// Direct type reference
+			return field_type_node.value.to_lower()
+		}
+		else {}
+	}
+	return ''
+}
+
+fn (g ErlangGenerator) topological_sort_records(records []ast.Node, dependencies map[string][]string, record_map map[string]ast.Node) []ast.Node {
+	mut sorted := []ast.Node{}
+	mut in_degree := map[string]int{}
+
+	// Calculate in-degree for each record
+	for record_name, deps in dependencies {
+		in_degree[record_name] = deps.len
+	}
+
+	// Find records with no dependencies (in-degree = 0)
+	mut queue := []string{}
+	for record_name, degree in in_degree {
+		if degree == 0 {
+			queue << record_name
+		}
+	}
+
+	// Process queue
+	for queue.len > 0 {
+		current := queue[0]
+		queue.delete(0)
+
+		// Add to sorted list
+		if current in record_map {
+			sorted << record_map[current]
+		}
+
+		// Reduce in-degree for dependent records
+		for record_name, deps in dependencies {
+			if current in deps {
+				in_degree[record_name]--
+				if in_degree[record_name] == 0 {
+					queue << record_name
+				}
+			}
+		}
+	}
+
+	// If we couldn't sort all records, add remaining ones (circular dependencies)
+	for record_name, _ in record_map {
+		if record_name !in sorted.map(it.value.to_lower()) {
+			if record_name in record_map {
+				sorted << record_map[record_name]
+			}
+		}
+	}
+
+	return sorted
+}
+
+// Generate .hrl file with record definitions and custom types
+fn (mut g ErlangGenerator) generate_hrl_file_with_types(records []ast.Node, custom_types []ast.Node) ! {
+	// Add header comment
+	g.hrl_output.write_string('%% ${g.module_name}.hrl - Record definitions\n\n')
+
+	// Generate custom type definitions first
+	for custom_type in custom_types {
+		g.generate_type_def_hrl(custom_type)!
+	}
+
+	// Add blank line if we have both custom types and records
+	if custom_types.len > 0 && records.len > 0 {
+		g.hrl_output.write_string('\n')
+	}
+
+	// Sort records by dependencies (records with no dependencies first)
+	sorted_records := g.analyze_record_dependencies(records)
+
+	// Generate record definitions in dependency order
+	for record in sorted_records {
+		g.generate_record_definition_hrl(record)!
+	}
+}
+
+// Generate .hrl file with record definitions (legacy method)
+fn (mut g ErlangGenerator) generate_hrl_file(records []ast.Node) ! {
+	g.generate_hrl_file_with_types(records, [])!
+}
+
+// Generate type definition for .hrl file
+fn (mut g ErlangGenerator) generate_type_def_hrl(node ast.Node) ! {
+	// Extract base type name for lookup (remove generic parameters)
+	mut base_type_name := node.value
+	if node.value.contains('(') {
+		base_type_name = node.value.split('(')[0]
+	}
+
+	// Check if we have a type table to get the actual type definition
+	if g.type_table != unsafe { nil } {
+		if custom_type := g.type_table.get_custom_type(base_type_name) {
+			// Generate Erlang -type declaration using the full name with parameters
+			// Add () if no parameters are present
+			mut type_declaration := node.value
+			if !type_declaration.contains('(') {
+				type_declaration += '()'
+			}
+			type_spec := type_to_erlang_spec(custom_type)
+			g.hrl_output.write_string('-type ${type_declaration} :: ${type_spec}.\n')
+			return
+		}
+	}
+
+	// Fallback to comment if no type information available
+	g.hrl_output.write_string('%% Type definition: ${node.value}\n')
+}
+
+// Generate record definition for .hrl file
+fn (mut g ErlangGenerator) generate_record_definition_hrl(node ast.Node) ! {
+	record_name := node.value.to_lower() // Convert to lowercase for Erlang convention
+
+	// Generate record definition header
+	g.hrl_output.write_string('-record(${record_name}, {')
+
+	// Generate field definitions
+	for i, field in node.children {
+		if i > 0 {
+			g.hrl_output.write_string(', ')
+		}
+
+		if field.kind != .record_field {
+			g.error('Expected record field, got ${field.kind}')
+			return error('Expected record field, got ${field.kind}')
+		}
+
+		field_name := field.value
+		field_type_node := field.children[0]
+
+		// Determine field type
+		mut field_type := ast.Type{}
+		if field_type_node.value != '' {
+			// Use explicit type - convert the field_type_node to ast.Type properly
+			field_type = g.field_type_node_to_type(field_type_node)
+		} else if g.type_table != unsafe { nil } {
+			// Try to get inferred type from type table
+			if _ := g.type_table.get_record_type(node.value) {
+				if inferred_type := g.type_table.get_field_type(node.value, field_name) {
+					field_type = inferred_type
+				} else {
+					// Fallback to any() if type not found
+					field_type = ast.Type{
+						name:   'any'
+						params: []
+					}
+				}
+			} else {
+				// Fallback to any() if record type not found
+				field_type = ast.Type{
+					name:   'any'
+					params: []
+				}
+			}
+		} else {
+			// No type table available, fallback to any()
+			field_type = ast.Type{
+				name:   'any'
+				params: []
+			}
+		}
+
+		// Use the standard type conversion function
+		erlang_type := type_to_erlang_spec(field_type)
+
+		// Generate field with or without default value
+		if field.children.len > 1 {
+			// Field has default value
+			default_value := field.children[1]
+			g.hrl_output.write_string('${field_name} = ')
+			g.generate_node_to_hrl(default_value)!
+			g.hrl_output.write_string(' :: ${erlang_type}')
+		} else {
+			// Field without default value
+			g.hrl_output.write_string('${field_name} = nil :: ${erlang_type}')
+		}
+	}
+
+	g.hrl_output.write_string('}).\n\n')
+}
+
+// Helper function to generate nodes to .hrl output
+fn (mut g ErlangGenerator) generate_node_to_hrl(node ast.Node) ! {
+	match node.kind {
+		.integer, .float, .string, .string_charlist, .boolean, .atom, .nil {
+			g.generate_literal_to_hrl(node)!
+		}
+		.variable_ref {
+			g.generate_variable_ref_to_hrl(node)!
+		}
+		.identifier {
+			g.generate_identifier_to_hrl(node)!
+		}
+		.list_literal {
+			g.generate_list_literal_to_hrl(node)!
+		}
+		.tuple_literal {
+			g.generate_tuple_literal_to_hrl(node)!
+		}
+		.map_literal {
+			g.generate_map_literal_to_hrl(node)!
+		}
+		else {
+			return error('Unsupported node type for .hrl generation: ${node.kind}')
+		}
+	}
+}
+
+// Helper functions for .hrl generation
+fn (mut g ErlangGenerator) generate_literal_to_hrl(node ast.Node) ! {
+	match node.kind {
+		.integer, .float, .boolean, .atom {
+			g.hrl_output.write_string(node.value)
+		}
+		.string {
+			escaped := g.escape_string(node.value)
+			g.hrl_output.write_string('<<"${escaped}"/utf8>>')
+		}
+		.string_charlist {
+			escaped := g.escape_string(node.value)
+			g.hrl_output.write_string('"${escaped}"')
+		}
+		.nil {
+			g.hrl_output.write_string('nil')
+		}
+		else {
+			return error('Unknown literal type: ${node.kind}')
+		}
+	}
+}
+
+fn (mut g ErlangGenerator) generate_variable_ref_to_hrl(node ast.Node) ! {
+	original_name := node.value
+	unique_name := g.get_unique_var_name(original_name)
+	g.hrl_output.write_string(unique_name)
+}
+
+fn (mut g ErlangGenerator) generate_identifier_to_hrl(node ast.Node) ! {
+	original_name := node.value
+	unique_name := g.get_unique_var_name(original_name)
+	g.hrl_output.write_string(unique_name)
+}
+
+fn (mut g ErlangGenerator) generate_list_literal_to_hrl(node ast.Node) ! {
+	if node.children.len == 0 {
+		g.hrl_output.write_string('[]')
+		return
+	}
+
+	g.hrl_output.write_string('[')
+	for i, element in node.children {
+		if i > 0 {
+			g.hrl_output.write_string(', ')
+		}
+		g.generate_node_to_hrl(element)!
+	}
+	g.hrl_output.write_string(']')
+}
+
+fn (mut g ErlangGenerator) generate_tuple_literal_to_hrl(node ast.Node) ! {
+	if node.children.len == 0 {
+		g.hrl_output.write_string('{}')
+		return
+	}
+
+	g.hrl_output.write_string('{')
+	for i, element in node.children {
+		if i > 0 {
+			g.hrl_output.write_string(', ')
+		}
+		g.generate_node_to_hrl(element)!
+	}
+	g.hrl_output.write_string('}')
+}
+
+fn (mut g ErlangGenerator) generate_map_literal_to_hrl(node ast.Node) ! {
+	if node.children.len == 0 {
+		g.hrl_output.write_string('#{}')
+		return
+	}
+
+	g.hrl_output.write_string('#{')
+	for i := 0; i < node.children.len; i += 2 {
+		if i > 0 {
+			g.hrl_output.write_string(', ')
+		}
+
+		// Generate key
+		key := node.children[i]
+		g.generate_node_to_hrl(key)!
+
+		// Use => for map creation in .hrl
+		g.hrl_output.write_string(' => ')
+
+		// Generate value
+		value := node.children[i + 1]
+		g.generate_node_to_hrl(value)!
+	}
+	g.hrl_output.write_string('}')
 }

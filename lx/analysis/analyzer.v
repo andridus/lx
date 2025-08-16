@@ -6,12 +6,13 @@ import kernel
 
 pub struct Analyzer {
 mut:
-	error_reporter   errors.ErrorReporter
-	type_table       TypeTable
-	type_envs        []TypeEnv
-	current_env      int
-	analysis_context AnalysisContext
-	otp_contexts     []OtpContextInfo
+	error_reporter         errors.ErrorReporter
+	type_table             TypeTable
+	type_envs              []TypeEnv
+	current_env            int
+	analysis_context       AnalysisContext
+	otp_contexts           []OtpContextInfo
+	check_unused_types     bool = true // Control unused type checking
 }
 
 enum AnalysisContext {
@@ -267,6 +268,10 @@ pub fn (a Analyzer) get_errors() []errors.Err {
 	return a.error_reporter.all()
 }
 
+pub fn (mut a Analyzer) disable_unused_type_check() {
+	a.check_unused_types = false
+}
+
 pub fn (a Analyzer) get_function_type(name string) ?FunctionType {
 	return a.type_table.get_function_type(name)
 }
@@ -284,7 +289,11 @@ fn (mut a Analyzer) error_with_suggestion(msg string, pos ast.Position, suggesti
 }
 
 // Check for unused types and report warnings
-fn (mut a Analyzer) check_unused_types() {
+pub fn (mut a Analyzer) check_unused_types() {
+	// Skip unused type checking if disabled (for individual modules in multi-file compilation)
+	if !a.check_unused_types {
+		return
+	}
 	unused_types := a.type_table.get_unused_types()
 	for type_name in unused_types {
 		// Get the position where the type was defined
@@ -556,8 +565,12 @@ fn (mut a Analyzer) analyze_node(node ast.Node) !ast.Node {
 }
 
 fn (mut a Analyzer) analyze_module(node ast.Node) !ast.Node {
-	mut analyzed_children := []ast.Node{}
+	return a.analyze_base_module_like(node, 'module')!
+}
 
+// Applies base module rules that should be shared by module, supervisor and worker
+fn (mut a Analyzer) analyze_base_module_like(node ast.Node, module_type string) !ast.Node {
+	mut analyzed_children := []ast.Node{}
 	mut function_names := map[string]bool{}
 
 	// First pass: pre-register all records and custom types for forward references
@@ -602,11 +615,13 @@ fn (mut a Analyzer) analyze_module(node ast.Node) !ast.Node {
 	}
 
 	// Second pass: pre-register all function signatures for forward references
+	// This includes checking for duplicate function names - CRITICAL BASE RULE
 	for child in node.children {
 		if child.kind == .function || child.kind == .private_function {
 			func_name := child.value
 			if func_name in function_names {
 				a.error('Duplicate function name: ${func_name}', child.position)
+				return error('Duplicate function name: ${func_name}')
 			}
 			function_names[func_name] = true
 
@@ -622,11 +637,11 @@ fn (mut a Analyzer) analyze_module(node ast.Node) !ast.Node {
 	}
 
 	a.type_table.assign_type(node.id, ast.Type{
-		name:   'module'
+		name:   module_type
 		params: []
 	})
 
-	// Check for unused types at the end of module analysis
+	// Check for unused types at the end of module analysis (only if enabled)
 	a.check_unused_types()
 
 	return ast.Node{
@@ -4333,19 +4348,13 @@ fn (mut a Analyzer) analyze_supervisor_def(node ast.Node) !ast.Node {
 		}
 	}
 
-	// Pre-register all function signatures for forward references (like in module analysis)
-	body_node := node.children[0]
-	for child in body_node.children {
-		if child.kind == .function || child.kind == .private_function {
-			a.preregister_function(child)!
-		}
-	}
+	// Apply base module rules (including duplicate function validation) + supervisor specifics
+	analyzed_node := a.analyze_base_module_like(node.children[0], 'supervisor_spec')!
 
-	body := a.analyze_node(node.children[0])!
-
-	analyzed_node := ast.Node{
+	// Create supervisor node with analyzed body
+	final_node := ast.Node{
 		...node
-		children: [body]
+		children: [analyzed_node]
 	}
 
 	// Supervisors return supervisor specification
@@ -4353,8 +4362,8 @@ fn (mut a Analyzer) analyze_supervisor_def(node ast.Node) !ast.Node {
 		name:   'supervisor_spec'
 		params: []
 	}
-	a.type_table.assign_type(analyzed_node.id, supervisor_type)
-	return analyzed_node
+	a.type_table.assign_type(final_node.id, supervisor_type)
+	return final_node
 }
 
 fn (mut a Analyzer) analyze_worker_def(node ast.Node) !ast.Node {
@@ -4378,19 +4387,13 @@ fn (mut a Analyzer) analyze_worker_def(node ast.Node) !ast.Node {
 		}
 	}
 
-	// Pre-register all function signatures for forward references (like in module analysis)
-	body_node := node.children[0]
-	for child in body_node.children {
-		if child.kind == .function || child.kind == .private_function {
-			a.preregister_function(child)!
-		}
-	}
+	// Apply base module rules (including duplicate function validation) + worker specifics
+	analyzed_node := a.analyze_base_module_like(node.children[0], 'worker_spec')!
 
-	body := a.analyze_node(node.children[0])!
-
-	analyzed_node := ast.Node{
+	// Create worker node with analyzed body
+	final_node := ast.Node{
 		...node
-		children: [body]
+		children: [analyzed_node]
 	}
 
 	// Workers return worker specification
@@ -4398,8 +4401,8 @@ fn (mut a Analyzer) analyze_worker_def(node ast.Node) !ast.Node {
 		name:   'worker_spec'
 		params: []
 	}
-	a.type_table.assign_type(analyzed_node.id, worker_type)
-	return analyzed_node
+	a.type_table.assign_type(final_node.id, worker_type)
+	return final_node
 }
 
 // ============ Task 11: Binaries Analysis ============
