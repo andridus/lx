@@ -302,9 +302,9 @@ pub fn compile_multi_file_no_analyze(code string, file_path string, base_module_
 
 // Module information for multi-file generation
 struct ModuleInfo {
-	name     string
-	filename string
-	ast_node ast.Node
+	name      string
+	filename  string
+	ast_node  ast.Node
 	needs_hrl bool // Whether this module needs to include the .hrl file
 }
 
@@ -331,44 +331,58 @@ fn extract_modules_from_ast(main_ast ast.Node, base_name string) ![]ModuleInfo {
 			.application_config {
 				application_nodes << child
 			}
-					.supervisor_def {
-			// Create separate supervisor module with the supervisor's body functions as direct children
-			sup_name := child.value
-			sup_body := if child.children.len > 0 { child.children[0] } else { ast.new_block(child.id, [], child.position) }
-			// Extract functions from supervisor body to be direct children of the module
-			sup_functions := if sup_body.kind == .block { sup_body.children } else { [sup_body] }
-			// Include records in supervisor module for type checking (will be collected later)
-			mut sup_children := []ast.Node{}
-			sup_children << records
-			sup_children << sup_functions
-			sup_module_ast := ast.new_module(child.id, '${sup_name}_sup', sup_children, child.position)
-			needs_hrl := records.len > 0
-			modules << ModuleInfo{
-				name:     '${sup_name}_sup'
-				filename: '${sup_name}_sup.erl'
-				ast_node: sup_module_ast
-				needs_hrl: needs_hrl
+			.supervisor_def {
+				// Create separate supervisor module with the supervisor's body functions as direct children
+				sup_name := child.value
+				sup_body := if child.children.len > 0 {
+					child.children[0]
+				} else {
+					ast.new_block(child.id, [], child.position)
+				}
+				// Extract functions from supervisor body to be direct children of the module
+				sup_functions := if sup_body.kind == .block { sup_body.children } else { [
+						sup_body,
+					] }
+				// Include records in supervisor module for type checking (will be collected later)
+				mut sup_children := []ast.Node{}
+				sup_children << records
+				sup_children << sup_functions
+				sup_module_ast := ast.new_module(child.id, '${sup_name}_sup', sup_children,
+					child.position)
+				needs_hrl := records.len > 0
+				modules << ModuleInfo{
+					name:      '${sup_name}_sup'
+					filename:  '${sup_name}_sup.erl'
+					ast_node:  sup_module_ast
+					needs_hrl: needs_hrl
+				}
 			}
-		}
-		.worker_def {
-			// Create separate worker module with the worker's body functions as direct children
-			worker_name := child.value
-			worker_body := if child.children.len > 0 { child.children[0] } else { ast.new_block(child.id, [], child.position) }
-			// Extract functions from worker body to be direct children of the module
-			worker_functions := if worker_body.kind == .block { worker_body.children } else { [worker_body] }
-			// Include records in worker module for type checking (will be collected later)
-			mut worker_children := []ast.Node{}
-			worker_children << records
-			worker_children << worker_functions
-			worker_module_ast := ast.new_module(child.id, worker_name, worker_children, child.position)
-			needs_hrl := records.len > 0
-			modules << ModuleInfo{
-				name:     worker_name
-				filename: '${worker_name}.erl'
-				ast_node: worker_module_ast
-				needs_hrl: needs_hrl
+			.worker_def {
+				// Create separate worker module with the worker's body functions as direct children
+				worker_name := child.value
+				worker_body := if child.children.len > 0 {
+					child.children[0]
+				} else {
+					ast.new_block(child.id, [], child.position)
+				}
+				// Extract functions from worker body to be direct children of the module
+				worker_functions := if worker_body.kind == .block { worker_body.children } else { [
+						worker_body,
+					] }
+				// Include records in worker module for type checking (will be collected later)
+				mut worker_children := []ast.Node{}
+				worker_children << records
+				worker_children << worker_functions
+				worker_module_ast := ast.new_module(child.id, worker_name, worker_children,
+					child.position)
+				needs_hrl := records.len > 0
+				modules << ModuleInfo{
+					name:      worker_name
+					filename:  '${worker_name}.erl'
+					ast_node:  worker_module_ast
+					needs_hrl: needs_hrl
+				}
 			}
-		}
 			.record_definition, .type_def, .opaque_type, .nominal_type {
 				// Already collected in first pass
 			}
@@ -389,9 +403,9 @@ fn extract_modules_from_ast(main_ast ast.Node, base_name string) ![]ModuleInfo {
 	if main_children.len > 0 {
 		main_module_ast := ast.new_module(main_ast.id, base_name, main_children, main_ast.position)
 		modules << ModuleInfo{
-			name:     base_name
-			filename: '${base_name}.erl'
-			ast_node: main_module_ast
+			name:      base_name
+			filename:  '${base_name}.erl'
+			ast_node:  main_module_ast
 			needs_hrl: records.len > 0 // Include .hrl if there are records
 		}
 	}
@@ -538,7 +552,8 @@ fn generate_hrl(ast_node ast.Node, app_name string) !string {
 	for child in ast_node.children {
 		if child.kind == .record_definition {
 			records << child
-		} else if child.kind == .type_def || child.kind == .opaque_type || child.kind == .nominal_type {
+		} else if child.kind == .type_def || child.kind == .opaque_type
+			|| child.kind == .nominal_type {
 			custom_types << child
 		}
 	}

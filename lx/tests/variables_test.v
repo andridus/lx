@@ -20,7 +20,7 @@ test_function() ->
 fn test_multiple_bindings() {
 	lx_code := 'def test_function() do
         a = 10
-        b = 20
+        _b = 20
         a
     end'
 	result := compile_lx(lx_code)
@@ -30,7 +30,7 @@ fn test_multiple_bindings() {
 -spec test_function() -> integer().
 test_function() ->
     A_1 = 10,
-    B_2 = 20,
+    _B_2 = 20,
     A_1.
 '
 	assert result == expected
@@ -38,7 +38,7 @@ test_function() ->
 
 fn test_explicit_separators() {
 	lx_code := 'def test_function() do
-        a = 1; b = 2; c = 3
+        a = 1; _b = 2; _c = 3
         a
     end'
 	result := compile_lx(lx_code)
@@ -48,8 +48,8 @@ fn test_explicit_separators() {
 -spec test_function() -> integer().
 test_function() ->
     A_1 = 1,
-    B_2 = 2,
-    C_3 = 3,
+    _B_2 = 2,
+    _C_3 = 3,
     A_1.
 '
 	assert result == expected
@@ -58,8 +58,8 @@ test_function() ->
 fn test_different_types() {
 	lx_code := 'def test_function() do
         number = 42
-        text = "Hello"
-        flag = true
+        _text = "Hello"
+        _flag = true
         number
     end'
 	result := compile_lx(lx_code)
@@ -69,8 +69,8 @@ fn test_different_types() {
 -spec test_function() -> integer().
 test_function() ->
     NUMBER_1 = 42,
-    TEXT_2 = <<"Hello"/utf8>>,
-    FLAG_3 = true,
+    _TEXT_2 = <<"Hello"/utf8>>,
+    _FLAG_3 = true,
     NUMBER_1.
 '
 	assert result == expected

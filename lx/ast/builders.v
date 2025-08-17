@@ -18,6 +18,15 @@ pub fn new_float(id int, value f64, pos Position) Node {
 	}
 }
 
+pub fn new_pattern_match_with_expr(id int, pattern Node, expr Node, pos Position) Node {
+	return Node{
+		id:       id
+		kind:     .pattern_match
+		children: [pattern, expr]
+		position: pos
+	}
+}
+
 pub fn new_string(id int, value string, pos Position) Node {
 	return Node{
 		id:       id

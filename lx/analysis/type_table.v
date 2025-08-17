@@ -10,16 +10,20 @@ pub:
 }
 
 pub struct FunctionType {
-pub:
-	name        string
-	parameters  []ast.Type
+pub mut:
 	return_type ast.Type
-	heads       []FunctionHead
+pub:
+	name       string
+	parameters []ast.Type
+	heads      []FunctionHead
+	public     bool = true
 }
 
 pub struct FunctionHead {
 pub:
-	patterns    []ast.Type
+	node_id  int
+	patterns []ast.Type
+pub mut:
 	return_type ast.Type
 }
 
@@ -44,6 +48,34 @@ pub fn new_type_table() TypeTable {
 		custom_types:   map[string]ast.Type{}
 		used_types:     map[string]bool{}
 		type_positions: map[string]ast.Position{}
+	}
+}
+
+pub fn (mut tt TypeTable) update_function_head(function_name string, node_id int, head FunctionHead) {
+	if mut function := tt.function_types[function_name] {
+		mut return_types := []ast.Type{}
+		mut heads := []FunctionHead{}
+		for mut head1 in function.heads {
+			if head1.node_id == node_id {
+				return_types << head.return_type
+				heads << head
+			} else {
+				return_types << head1.return_type
+				heads << head1
+			}
+		}
+		mut return_type_ := function.return_type
+		if return_types.len > 1 {
+			return_type_ = ast.Type{
+				name:   'union'
+				params: return_types
+			}
+		}
+		tt.function_types[function_name] = FunctionType{
+			...function
+			heads:       heads
+			return_type: return_type_
+		}
 	}
 }
 
@@ -84,12 +116,12 @@ pub fn (tt TypeTable) get_field_default(record_name string, field_name string) ?
 }
 
 // Function type management
-pub fn (mut tt TypeTable) register_function_type(name string, parameters []ast.Type, return_type ast.Type) {
+pub fn (mut tt TypeTable) register_function_type(name string, heads []FunctionHead, return_type ast.Type, public bool) {
 	tt.function_types[name] = FunctionType{
 		name:        name
-		parameters:  parameters
 		return_type: return_type
-		heads:       []
+		heads:       heads
+		public:      public
 	}
 }
 

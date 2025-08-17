@@ -26,7 +26,7 @@ end'
 -export([add/2]).
 
 -spec add(integer(), integer()) -> integer().
-add(A_1, B_2) ->
+add(A_1, B_2) when is_integer(A_1) andalso is_integer(B_2) ->
     A_1 + B_2.
 '
 
@@ -43,7 +43,7 @@ end'
 -export([concat/2]).
 
 -spec concat(binary(), binary()) -> [any()].
-concat(A_1, B_2) ->
+concat(A_1, B_2) when is_binary(A_1) andalso is_binary(B_2) ->
     A_1 ++ B_2.
 '
 
@@ -60,7 +60,7 @@ end'
 -export([complex_calc/2]).
 
 -spec complex_calc(integer(), integer()) -> integer().
-complex_calc(X_1, Y_2) ->
+complex_calc(X_1, Y_2) when is_integer(X_1) andalso is_integer(Y_2) ->
     (X_1 + Y_2) * 2.
 '
 
@@ -77,10 +77,10 @@ end'
 	expected := '-module(test).
 -export([factorial/1]).
 
--spec factorial(integer()) -> integer().
+-spec factorial(any()) -> integer().
 factorial(0) ->
     1;
-factorial(N_1) ->
+factorial(N_1) when is_integer(N_1) ->
     N_1 * factorial(N_1 - 1).
 '
 
@@ -97,10 +97,10 @@ end'
 	expected := '-module(test).
 -export([process_value/1]).
 
--spec process_value(integer()) -> binary() | integer().
+-spec process_value(any()) -> binary() | integer().
 process_value(0) ->
     <<"zero"/utf8>>;
-process_value(N_1) ->
+process_value(N_1) when is_integer(N_1) ->
     N_1 * 2.
 '
 
@@ -160,7 +160,7 @@ end'
 	expected := '-module(test).
 -export([process_list/1]).
 
--spec process_list(any()) -> binary().
+-spec process_list(list()) -> binary().
 process_list([]) ->
     <<"empty"/utf8>>;
 process_list([_HEAD_1 | _TAIL_2]) ->
@@ -181,12 +181,12 @@ end'
 	expected := '-module(test).
 -export([calculate/2]).
 
--spec calculate(integer(), integer()) -> integer().
-calculate(0, Y_1) ->
+-spec calculate(any(), any()) -> integer().
+calculate(0, Y_1) when is_integer(Y_1) ->
     Y_1 * 2;
-calculate(X_2, 0) ->
+calculate(X_2, 0) when is_integer(X_2) ->
     X_2 * 3;
-calculate(X_2, Y_1) ->
+calculate(X_2, Y_1) when is_integer(X_2) andalso is_integer(Y_1) ->
     (X_2 + Y_1) * 4.
 '
 
@@ -222,7 +222,7 @@ end'
 -export([multi_expr/2]).
 
 -spec multi_expr(integer(), integer()) -> integer().
-multi_expr(A_1, B_2) ->
+multi_expr(A_1, B_2) when is_integer(A_1) andalso is_integer(B_2) ->
     SUM_3 = A_1 + B_2,
     PRODUCT_4 = A_1 * B_2,
     SUM_3 + PRODUCT_4.
@@ -241,10 +241,10 @@ end'
 	expected := '-module(test).
 -export([countdown/1]).
 
--spec countdown(integer()) -> binary().
+-spec countdown(any()) -> any().
 countdown(0) ->
     <<"done"/utf8>>;
-countdown(N_1) ->
+countdown(N_1) when is_integer(N_1) ->
     countdown(N_1 - 1).
 '
 
@@ -261,7 +261,7 @@ end'
 -export([divide/2]).
 
 -spec divide(float(), float()) -> float().
-divide(A_1, B_2) ->
+divide(A_1, B_2) when is_float(A_1) andalso is_float(B_2) ->
     A_1 / B_2.
 '
 
@@ -277,8 +277,8 @@ end'
 	expected := '-module(test).
 -export([is_even/1]).
 
--spec is_even(integer()) -> boolean().
-is_even(N_1) ->
+-spec is_even(integer()) -> any().
+is_even(N_1) when is_integer(N_1) ->
     erlang:mod(N_1, 2) == 0.
 '
 
@@ -295,7 +295,7 @@ end'
 -export([mixed_math/2]).
 
 -spec mixed_math(float(), float()) -> float().
-mixed_math(A_1, B_2) ->
+mixed_math(A_1, B_2) when is_float(A_1) andalso is_float(B_2) ->
     A_1 + B_2.
 '
 
@@ -312,7 +312,7 @@ end'
 	expected := '-module(test).
 -export([list_ops/2]).
 
--spec list_ops(any(), any()) -> list().
+-spec list_ops(list(), any()) -> [any()].
 list_ops([], ITEM_1) ->
     [ITEM_1];
 list_ops([HEAD_2 | TAIL_3], ITEM_1) ->
@@ -332,7 +332,7 @@ end'
 	expected := '-module(test).
 -export([tuple_ops/1]).
 
--spec tuple_ops(any()) -> integer().
+-spec tuple_ops(({any(), any()} | {any(), any(), any()})) -> integer().
 tuple_ops({A_1, B_2}) ->
     A_1 + B_2;
 tuple_ops({A_1, B_2, C_3}) ->
@@ -467,7 +467,7 @@ end'
 	expected := '-module(test).
 -export([boolean_patterns/1]).
 
--spec boolean_patterns(boolean()) -> binary().
+-spec boolean_patterns(any()) -> binary().
 boolean_patterns(true) ->
     <<"truth"/utf8>>;
 boolean_patterns(false) ->
@@ -590,7 +590,7 @@ end'
 	expected := '-module(test).
 -export([test_pattern/1, main/0]).
 
--spec test_pattern(any()) -> {any(), any()}.
+-spec test_pattern({any(), any()}) -> {any(), any()}.
 test_pattern({NAME_1, AGE_2}) ->
     {NAME_1, AGE_2}.
 -spec main() -> {any(), any()}.
@@ -741,10 +741,10 @@ end'
 -export([start/1, process/1]).
 
 -spec start(integer()) -> any().
-start(X_1) ->
+start(X_1) when is_integer(X_1) ->
     process(X_1).
 -spec process(integer()) -> integer().
-process(N_2) ->
+process(N_2) when is_integer(N_2) ->
     N_2 * 2.
 '
 
@@ -768,7 +768,7 @@ end'
 public_main() ->
     helper(41).
 -spec helper(integer()) -> integer().
-helper(X_1) ->
+helper(X_1) when is_integer(X_1) ->
     X_1 + 1.
 '
 
@@ -819,7 +819,7 @@ end'
 	expected := '-module(test).
 -export([handle_atom/1]).
 
--spec handle_atom(any()) -> binary().
+-spec handle_atom(atom()) -> binary().
 handle_atom(ok) ->
     <<"success"/utf8>>.
 '
@@ -874,7 +874,7 @@ end'
 	expected := '-module(test).
 -export([handle_number/1]).
 
--spec handle_number(integer()) -> binary().
+-spec handle_number(any()) -> binary().
 handle_number(0) ->
     <<"zero"/utf8>>;
 handle_number(42) ->
@@ -893,7 +893,7 @@ end'
 	expected := '-module(test).
 -export([handle_tuple/1]).
 
--spec handle_tuple(any()) -> binary().
+-spec handle_tuple({any(), any()}) -> binary().
 handle_tuple({_X_1, _Y_2}) ->
     <<"tuple matched"/utf8>>.
 '
@@ -911,7 +911,7 @@ end'
 	expected := '-module(test).
 -export([handle_tuple/1]).
 
--spec handle_tuple(any()) -> binary().
+-spec handle_tuple(({any(), any()} | {any(), any(), any()})) -> binary().
 handle_tuple({_X_1, _Y_2}) ->
     <<"pair"/utf8>>;
 handle_tuple({_X_1, _Y_2, _Z_3}) ->
@@ -930,7 +930,7 @@ end'
 	expected := '-module(test).
 -export([handle_list/1]).
 
--spec handle_list(any()) -> binary().
+-spec handle_list(list()) -> binary().
 handle_list([_H_1 | _T_2]) ->
     <<"non-empty list"/utf8>>.
 '
@@ -948,7 +948,7 @@ end'
 	expected := '-module(test).
 -export([handle_list/1]).
 
--spec handle_list(any()) -> binary().
+-spec handle_list(list()) -> binary().
 handle_list([]) ->
     <<"empty"/utf8>>;
 handle_list([_H_1 | _T_2]) ->
@@ -975,13 +975,13 @@ end'
 	expected := '-module(test).
 -export([mixed_single_atom/1, mixed_single_number/1, mixed_single_tuple/1]).
 
--spec mixed_single_atom(any()) -> binary().
+-spec mixed_single_atom(atom()) -> binary().
 mixed_single_atom(atom) ->
     <<"atom"/utf8>>.
 -spec mixed_single_number(any()) -> binary().
 mixed_single_number(123) ->
     <<"number"/utf8>>.
--spec mixed_single_tuple(any()) -> integer().
+-spec mixed_single_tuple({any(), any()}) -> integer().
 mixed_single_tuple({A_1, B_2}) ->
     A_1 + B_2.
 '

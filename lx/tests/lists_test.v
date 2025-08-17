@@ -169,21 +169,27 @@ nested() ->
 
 fn test_complex_list_operations() {
 	lx_code := 'def complex() do
-    numbers = [1, 2, 3]
-    extended = [0 | numbers]
-    combined = [1, 2] ++ [3, 4] ++ [5, 6]
-    matrix = [[1, 2], [3, 4], [5, 6]]
-    extended
+numbers = [1, 2, 3]
+extended = [0 | numbers]
+_combined = [1, 2] ++ [3, 4] ++ [5, 6]
+_matrix = [[1, 2], [3, 4], [5, 6]]
+extended
 end'
 
+	expected := '-module(test).
+-export([complex/0]).
+
+-spec complex() -> [integer()].
+complex() ->
+    NUMBERS_1 = [1, 2, 3],
+    EXTENDED_2 = [0 | NUMBERS_1],
+    _COMBINED_3 = [1, 2] ++ [3, 4] ++ [5, 6],
+    _MATRIX_4 = [[1, 2], [3, 4], [5, 6]],
+    EXTENDED_2.
+'
+
 	result := compile_lx(lx_code)
-	assert result.contains('complex() ->')
-	assert result.contains('NUMBERS_1 = [1, 2, 3]')
-	assert result.contains('EXTENDED_2 = [0 | NUMBERS_1]')
-	assert result.contains('COMBINED_3 = [1, 2] ++ [3, 4] ++ [5, 6]')
-	assert result.contains('MATRIX_4 = [[1, 2], [3, 4], [5, 6]]')
-	assert result.contains('EXTENDED_2')
-	assert result.contains('-spec complex() -> [integer()]')
+	assert result == expected
 }
 
 fn test_list_with_variables() {
@@ -237,7 +243,7 @@ fn test_multiple_list_operations() {
     list3 = [5, 6]
     combined = list1 ++ list2 ++ list3
     len = length(combined)
-    has_five = 5 in combined
+    _has_five = 5 in combined
     len
 end'
 
@@ -251,7 +257,7 @@ multiple_ops() ->
     LIST3_3 = [5, 6],
     COMBINED_4 = LIST1_1 ++ LIST2_2 ++ LIST3_3,
     LEN_5 = length(COMBINED_4),
-    HAS_FIVE_6 = lists:member(5, COMBINED_4),
+    _HAS_FIVE_6 = lists:member(5, COMBINED_4),
     LEN_5.
 '
 

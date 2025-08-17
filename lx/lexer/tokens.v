@@ -108,9 +108,9 @@ pub fn new_token(type_ TokenType, value string, pos ast.Position) Token {
 	}
 }
 
-pub fn (t Token) str() string {
-	return '${t.type_}("${t.value}") at ${t.position}'
-}
+// pub fn (t Token) str() string {
+// 	return '${t.type_}("${t.value}") at ${t.position}'
+// }
 
 pub fn (tt TokenType) str() string {
 	return match tt {
@@ -152,7 +152,7 @@ pub fn (tt TokenType) str() string {
 		.module_token { '__MODULE__' }
 		.lparen { '(' }
 		.rparen { ')' }
-		.bind { '=' }
+		.bind { 'bind' }
 		.semicolon { ';' }
 		.comma { ',' }
 		.lbracket { '[' }

@@ -1,12 +1,13 @@
 module ast
 
 pub struct Node {
-pub:
+pub mut:
 	id       int
 	kind     NodeKind
 	value    string
 	children []Node
 	position Position
+	type     Type
 }
 
 pub enum NodeKind {

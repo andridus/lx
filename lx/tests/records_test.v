@@ -11,7 +11,8 @@ end'
 	expected := '-module(test).
 -export([simple_record/0]).
 
--record(person, {name = nil :: binary(), age = nil :: integer()}).
+-include("test.hrl").
+
 -spec simple_record() -> #person{}.
 simple_record() ->
     PERSON_1 = #person{name = <<"João"/utf8>>, age = 30},
@@ -35,7 +36,8 @@ end'
 	expected := '-module(test).
 -export([field_access/0]).
 
--record(person, {name = nil :: binary(), age = nil :: integer()}).
+-include("test.hrl").
+
 -spec field_access() -> {binary(), integer()}.
 field_access() ->
     PERSON_1 = #person{name = <<"Maria"/utf8>>, age = 25},
@@ -60,7 +62,8 @@ end'
 	expected := '-module(test).
 -export([record_update/0]).
 
--record(person, {name = nil :: binary(), age = nil :: integer()}).
+-include("test.hrl").
+
 -spec record_update() -> #person{}.
 record_update() ->
     PERSON_1 = #person{name = <<"João"/utf8>>, age = 30},
@@ -85,7 +88,8 @@ end'
 	expected := '-module(test).
 -export([record_with_vars/0]).
 
--record(person, {name = nil :: binary(), age = nil :: integer()}).
+-include("test.hrl").
+
 -spec record_with_vars() -> #person{}.
 record_with_vars() ->
     NAME_1 = <<"João"/utf8>>,
@@ -111,7 +115,8 @@ end'
 	expected := '-module(test).
 -export([point_with_expr/0]).
 
--record(point, {x = nil :: integer(), y = nil :: integer()}).
+-include("test.hrl").
+
 -spec point_with_expr() -> #point{}.
 point_with_expr() ->
     A_1 = 10,
@@ -137,7 +142,8 @@ end'
 	expected := '-module(test).
 -export([access_with_expr/0]).
 
--record(point, {x = nil :: integer(), y = nil :: integer()}).
+-include("test.hrl").
+
 -spec access_with_expr() -> {integer(), integer()}.
 access_with_expr() ->
     POINT_1 = #point{x = 10, y = 20},
@@ -162,7 +168,8 @@ end'
 	expected := '-module(test).
 -export([access_with_parens/0]).
 
--record(point, {x = nil :: integer(), y = nil :: integer()}).
+-include("test.hrl").
+
 -spec access_with_parens() -> integer().
 access_with_parens() ->
     POINT_1 = #point{x = 10, y = 20},
@@ -186,7 +193,8 @@ end'
 	expected := '-module(test).
 -export([update_with_parens/0]).
 
--record(point, {x = nil :: integer(), y = nil :: integer()}).
+-include("test.hrl").
+
 -spec update_with_parens() -> #point{}.
 update_with_parens() ->
     POINT_1 = #point{x = 5, y = 10},
@@ -218,7 +226,8 @@ end'
 	expected := '-module(test).
 -export([record_with_comparisons/0]).
 
--record(person, {name = nil :: binary(), age = nil :: integer()}).
+-include("test.hrl").
+
 -spec record_with_comparisons() -> {boolean(), boolean(), boolean()}.
 record_with_comparisons() ->
     PERSON1_1 = #person{name = <<"João"/utf8>>, age = 30},
@@ -251,7 +260,8 @@ end'
 	expected := '-module(test).
 -export([record_with_functions/0]).
 
--record(point, {x = nil :: integer(), y = nil :: integer()}).
+-include("test.hrl").
+
 -spec record_with_functions() -> {integer(), integer(), integer()}.
 record_with_functions() ->
     POINT_1 = #point{x = 10, y = 20},
@@ -276,7 +286,8 @@ end'
 	expected := '-module(test).
 -export([multiline_record/0]).
 
--record(person, {name = nil :: binary(), age = nil :: integer()}).
+-include("test.hrl").
+
 -spec multiline_record() -> #person{}.
 multiline_record() ->
     PERSON_1 = #person{name = <<"João Silva"/utf8>>, age = 30},
@@ -298,7 +309,8 @@ end'
 	expected := '-module(test).
 -export([empty_record/0]).
 
--record(empty, {}).
+-include("test.hrl").
+
 -spec empty_record() -> #empty{}.
 empty_record() ->
     EMPTY_1 = #empty{},
@@ -321,7 +333,8 @@ end'
 	expected := '-module(test).
 -export([single_field/0]).
 
--record(single, {value = nil :: integer()}).
+-include("test.hrl").
+
 -spec single_field() -> integer().
 single_field() ->
     SINGLE_1 = #single{value = 42},
@@ -345,7 +358,8 @@ end'
 	expected := '-module(test).
 -export([boolean_fields/0]).
 
--record(settings, {enabled = nil :: boolean()}).
+-include("test.hrl").
+
 -spec boolean_fields() -> boolean().
 boolean_fields() ->
     SETTINGS_1 = #settings{enabled = true},
@@ -369,7 +383,8 @@ end'
 	expected := '-module(test).
 -export([atom_fields/0]).
 
--record(status, {state = nil :: atom()}).
+-include("test.hrl").
+
 -spec atom_fields() -> atom().
 atom_fields() ->
     STATUS_1 = #status{state = ok},
@@ -393,7 +408,8 @@ end'
 	expected := '-module(test).
 -export([float_fields/0]).
 
--record(measurement, {temperature = nil :: float()}).
+-include("test.hrl").
+
 -spec float_fields() -> float().
 float_fields() ->
     MEASUREMENT_1 = #measurement{temperature = 23.5},
@@ -417,7 +433,8 @@ end'
 	expected := '-module(test).
 -export([string_fields/0]).
 
--record(user, {username = nil :: binary()}).
+-include("test.hrl").
+
 -spec string_fields() -> binary().
 string_fields() ->
     USER_1 = #user{username = <<"jsilva"/utf8>>},
@@ -441,7 +458,8 @@ end'
 	expected := '-module(test).
 -export([integer_fields/0]).
 
--record(counter, {count = nil :: integer()}).
+-include("test.hrl").
+
 -spec integer_fields() -> integer().
 integer_fields() ->
     COUNTER_1 = #counter{count = 0},
@@ -466,7 +484,8 @@ end'
 	expected := '-module(test).
 -export([mixed_fields/0]).
 
--record(mixed, {name = nil :: binary(), age = nil :: integer()}).
+-include("test.hrl").
+
 -spec mixed_fields() -> {binary(), integer()}.
 mixed_fields() ->
     MIXED_1 = #mixed{name = <<"Test"/utf8>>, age = 30},
@@ -495,7 +514,8 @@ end'
 	expected := '-module(test).
 -export([complex_expressions/0]).
 
--record(point, {x = nil :: integer(), y = nil :: integer()}).
+-include("test.hrl").
+
 -spec complex_expressions() -> {integer(), integer(), integer()}.
 complex_expressions() ->
     POINT_1 = #point{x = 10, y = 20},
@@ -524,7 +544,8 @@ end'
 	expected := '-module(test).
 -export([main/0]).
 
--record(person, {name = nil :: binary(), age = 10 :: integer(), active = true :: boolean()}).
+-include("test.hrl").
+
 -spec main() -> {#person{}, #person{}, binary(), integer(), boolean()}.
 main() ->
     USER1_1 = #person{name = <<"fulano"/utf8>>, age = 25},
@@ -555,7 +576,8 @@ end'
 	expected := '-module(test).
 -export([main/0]).
 
--record(config, {host = <<"localhost"/utf8>> :: binary(), port = 8080 :: integer(), debug = nil :: boolean(), timeout = 30.0 :: float()}).
+-include("test.hrl").
+
 -spec main() -> {#config{}, #config{}, binary(), integer(), boolean(), float()}.
 main() ->
     CONFIG1_1 = #config{host = <<"example.com"/utf8>>, debug = true},
@@ -587,7 +609,8 @@ end'
 	expected := '-module(test).
 -export([main/0]).
 
--record(config, {host = <<"localhost"/utf8>> :: binary(), port = 8080 :: integer(), debug = nil :: boolean(), timeout = 30.0 :: float()}).
+-include("test.hrl").
+
 -spec main() -> {#config{}, #config{}, binary(), integer(), boolean(), float()}.
 main() ->
     CONFIG1_1 = #config{host = <<"example.com"/utf8>>, debug = true},
@@ -626,8 +649,8 @@ end'
 	expected := '-module(test).
 -export([main/0]).
 
--record(user, {id = nil :: integer(), name = nil :: binary(), email = nil :: binary(), created_at = nil :: integer()}).
--record(session, {user_id = nil :: integer(), token = nil :: binary(), expires_at = nil :: integer()}).
+-include("test.hrl").
+
 -spec main() -> {#user{}, #session{}}.
 main() ->
     USER_1 = #user{id = 1, name = <<"John"/utf8>>, email = <<"john@example.com"/utf8>>, created_at = 1234567890},

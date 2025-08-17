@@ -142,8 +142,8 @@ fn test_complex_tuple_operations() {
     point = {10, 20}
     rectangle = {{0, 0}, {100, 200}}
     user = {1, "João", 30, true}
-    x = element(1, point)
-    y = element(2, point)
+    _x = element(1, point)
+    _y = element(2, point)
     updated_user = setelement(3, user, 31)
     {point, rectangle, updated_user}
 end'
@@ -156,8 +156,8 @@ complex() ->
     POINT_1 = {10, 20},
     RECTANGLE_2 = {{0, 0}, {100, 200}},
     USER_3 = {1, <<"João"/utf8>>, 30, true},
-    X_4 = element(1, POINT_1),
-    Y_5 = element(2, POINT_1),
+    _X_4 = element(1, POINT_1),
+    _Y_5 = element(2, POINT_1),
     UPDATED_USER_6 = setelement(3, USER_3, 31),
     {POINT_1, RECTANGLE_2, UPDATED_USER_6}.
 '

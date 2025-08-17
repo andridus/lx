@@ -12,7 +12,8 @@ end'
 	expected := '-module(test).
 -export([test_function/1]).
 
--type my_type() :: integer().
+-include("test.hrl").
+
 -spec test_function(my_type()) -> my_type().
 test_function(X_1) ->
     X_1.
@@ -31,7 +32,8 @@ end'
 	expected := '-module(test).
 -export([process_status/1]).
 
--type status() :: boolean().
+-include("test.hrl").
+
 -spec process_status(status()) -> status().
 process_status(S_1) ->
     S_1.
@@ -54,9 +56,10 @@ end'
 	expected := '-module(test).
 -export([create_user_id/1, get_user_id/1]).
 
--opaque user_id() :: integer().
+-include("test.hrl").
+
 -spec create_user_id(integer()) -> integer().
-create_user_id(ID_1) ->
+create_user_id(ID_1) when is_integer(ID_1) ->
     ID_1.
 -spec get_user_id(user_id()) -> user_id().
 get_user_id(UID_2) ->
@@ -80,9 +83,10 @@ end'
 	expected := '-module(test).
 -export([create_email/1, send_email/1]).
 
--nominal email() :: binary().
+-include("test.hrl").
+
 -spec create_email(binary()) -> binary().
-create_email(ADDR_1) ->
+create_email(ADDR_1) when is_binary(ADDR_1) ->
     ADDR_1.
 -spec send_email(email()) -> email().
 send_email(E_2) ->
@@ -104,9 +108,8 @@ end'
 	expected := '-module(test).
 -export([create_user/3]).
 
--type user_id() :: integer().
--type email() :: binary().
--type status() :: atom().
+-include("test.hrl").
+
 -spec create_user(user_id(), email(), status()) -> {user_id(), email(), status()}.
 create_user(ID_1, EMAIL_2, STATUS_3) ->
     {ID_1, EMAIL_2, STATUS_3}.
@@ -126,10 +129,10 @@ end'
 	expected := '-module(test).
 -export([create_typed_user/2]).
 
--record(user, {id = nil :: integer(), name = nil :: binary()}).
--type user_type() :: #user{}.
+-include("test.hrl").
+
 -spec create_typed_user(integer(), binary()) -> user_type().
-create_typed_user(ID_1, NAME_2) ->
+create_typed_user(ID_1, NAME_2) when is_integer(ID_1) andalso is_binary(NAME_2) ->
     #user{id = ID_1, name = NAME_2}.
 '
 	result := compile_lx(lx_code)
@@ -173,7 +176,8 @@ end'
 	expected := '-module(test).
 -export([compute/0]).
 
--type result() :: {atom(), atom()}.
+-include("test.hrl").
+
 -spec compute() -> result().
 compute() ->
     VALUE_1 = 42,
@@ -242,7 +246,8 @@ end'
 	expected := '-module(test).
 -export([get_simple/0]).
 
--type simple() :: atom().
+-include("test.hrl").
+
 -spec get_simple() -> simple().
 get_simple() ->
     atom.
@@ -263,8 +268,8 @@ end'
 	expected := '-module(test).
 -export([process_with_type/1]).
 
--record(data, {value = nil :: integer()}).
--type result() :: {atom(), integer()}.
+-include("test.hrl").
+
 -spec process_with_type(#data{}) -> result().
 process_with_type(D_1) ->
     RESULT_2 = success,
@@ -291,7 +296,8 @@ end'
 	expected := '-module(test).
 -export([process_user/1]).
 
--record(user, {name = nil :: binary(), age = nil :: integer()}).
+-include("test.hrl").
+
 -spec process_user(any()) -> binary().
 process_user(U_1) ->
     case U_1 of
@@ -317,9 +323,10 @@ end'
 	expected := '-module(test).
 -export([create_person/2]).
 
--record(person, {name = nil :: binary(), age = nil :: integer()}).
+-include("test.hrl").
+
 -spec create_person(binary(), integer()) -> #person{}.
-create_person(NAME_1, AGE_2) ->
+create_person(NAME_1, AGE_2) when is_binary(NAME_1) andalso is_integer(AGE_2) ->
     #person{name = NAME_1, age = AGE_2}.
 '
 	result := compile_lx(lx_code)
@@ -336,7 +343,8 @@ end'
 	expected := '-module(test).
 -export([get_name/1]).
 
--record(person, {name = nil :: binary(), age = nil :: integer()}).
+-include("test.hrl").
+
 -spec get_name(#person{}) -> binary().
 get_name(PERSON_1) ->
     PERSON_1#person.name.
@@ -372,10 +380,10 @@ end'
 	expected := '-module(test).
 -export([create_typed_user/2]).
 
--record(user, {id = nil :: integer(), name = nil :: binary()}).
--type user_type() :: #user{}.
+-include("test.hrl").
+
 -spec create_typed_user(integer(), binary()) -> user_type().
-create_typed_user(ID_1, NAME_2) ->
+create_typed_user(ID_1, NAME_2) when is_integer(ID_1) andalso is_binary(NAME_2) ->
     #user{id = ID_1, name = NAME_2}.
 '
 	result := compile_lx(lx_code)
@@ -394,7 +402,8 @@ end'
 	expected := '-module(test).
 -export([get_status/0]).
 
--type status() :: atom().
+-include("test.hrl").
+
 -spec get_status() -> status().
 get_status() ->
     ok.
@@ -426,7 +435,8 @@ end'
 	expected := '-module(test).
 -export([get_atom/0]).
 
--type my_atom() :: atom().
+-include("test.hrl").
+
 -spec get_atom() -> my_atom().
 get_atom() ->
     anything.
@@ -446,8 +456,8 @@ end'
 	expected := '-module(test).
 -export([process/0]).
 
--type status() :: atom().
--type result() :: status().
+-include("test.hrl").
+
 -spec process() -> result().
 process() ->
     success.
@@ -466,7 +476,8 @@ end'
 	expected := '-module(test).
 -export([get_id/0]).
 
--type user_id() :: integer().
+-include("test.hrl").
+
 -spec get_id() -> user_id().
 get_id() ->
     42.
@@ -504,9 +515,10 @@ end'
 	expected := '-module(test).
 -export([create_user_id/1, get_user_id/1]).
 
--opaque user_id() :: integer().
+-include("test.hrl").
+
 -spec create_user_id(integer()) -> user_id().
-create_user_id(ID_1) ->
+create_user_id(ID_1) when is_integer(ID_1) ->
     ID_1.
 -spec get_user_id(user_id()) -> user_id().
 get_user_id(UID_2) ->
@@ -530,9 +542,10 @@ end'
 	expected := '-module(test).
 -export([create_temp/1, get_celsius/1]).
 
--nominal temperature() :: float().
+-include("test.hrl").
+
 -spec create_temp(float()) -> temperature().
-create_temp(T_1) ->
+create_temp(T_1) when is_float(T_1) ->
     T_1.
 -spec get_celsius(temperature()) -> temperature().
 get_celsius(TEMP_2) ->

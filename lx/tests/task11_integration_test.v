@@ -49,7 +49,8 @@ end'
 	expected := '-module(test).
 -export([test_function/1]).
 
--type my_type() :: integer().
+-include("test.hrl").
+
 -spec test_function(my_type()) -> my_type().
 test_function(X_1) ->
     X_1.
@@ -67,7 +68,8 @@ end'
 	expected := '-module(test).
 -export([create_user_id/1]).
 
--opaque user_id() :: integer().
+-include("test.hrl").
+
 -spec create_user_id(user_id()) -> user_id().
 create_user_id(ID_1) ->
     ID_1.
@@ -236,7 +238,8 @@ end'
 	expected := '-module(test).
 -export([process_data/1]).
 
--type status() :: {atom(), binary()}.
+-include("test.hrl").
+
 -spec process_data(any()) -> status().
 process_data(INPUT_1) ->
     BINARY_DATA_2 = <<1, 2, 3>>,

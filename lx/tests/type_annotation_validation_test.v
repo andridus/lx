@@ -46,7 +46,7 @@ end'
 -export([valid_param/1]).
 
 -spec valid_param(integer()) -> integer().
-valid_param(X_1) ->
+valid_param(X_1) when is_integer(X_1) ->
     X_1 * 2.
 '
 
@@ -57,15 +57,15 @@ valid_param(X_1) ->
 fn test_valid_type_annotation_in_pattern_matching() {
 	// Type annotations should be allowed in pattern matching contexts
 	lx_code := 'def valid_pattern do
-([head :: integer | tail]) -> head * 2
+([(head :: integer) | _tail]) -> head * 2
 ([]) -> 0
 end'
 
 	expected := '-module(test).
 -export([valid_pattern/1]).
 
--spec valid_pattern(any()) -> integer().
-valid_pattern([HEAD_1]) ->
+-spec valid_pattern([integer()]) -> integer().
+valid_pattern([HEAD_1 | _TAIL_2]) ->
     HEAD_1 * 2;
 valid_pattern([]) ->
     0.
@@ -85,10 +85,10 @@ end'
 	expected := '-module(test).
 -export([valid_head/1]).
 
--spec valid_head(integer() | binary()) -> integer() | binary().
-valid_head(X_1) ->
+-spec valid_head((integer() | binary())) -> integer() | binary().
+valid_head(X_1) when is_integer(X_1) ->
     X_1 + 1;
-valid_head(Y_2) ->
+valid_head(Y_2) when is_binary(Y_2) ->
     Y_2.
 '
 

@@ -57,7 +57,7 @@ fn test_with_expressions() {
     end
 
     def test_with() do
-    with {:ok, value} <- some_operation() do
+    with {:ok, _value} <- some_operation() do
         "success"
     else
         {:error, reason} -> "error"
@@ -72,7 +72,7 @@ some_operation() ->
 -spec test_with() -> binary().
 test_with() ->
     case some_operation() of
-        {ok, VALUE_1} ->
+        {ok, _VALUE_1} ->
             <<"success"/utf8>>;
         {error, REASON_2} ->
             <<"error"/utf8>>
@@ -101,9 +101,7 @@ server_loop() ->
     ok.
 -spec test_spawn() -> pid().
 test_spawn() ->
-    spawn(fun() ->
-        server_loop()
-    end).
+    spawn(fun() -> server_loop() end).
 '
 	result := compile_lx(lx_code)
 	assert result == expected
@@ -239,9 +237,7 @@ end'
 
 -spec test_anon() -> function().
 test_anon() ->
-    fun(X_1) ->
-        X_1 * 2
-    end.
+    fun(X_1) -> X_1 * 2 end.
 '
 	result := compile_lx(lx_code)
 	assert result == expected
@@ -281,9 +277,7 @@ end'
 
 -spec complex_test() -> atom().
 complex_test() ->
-    PID_1 = spawn(fun() ->
-        ok
-    end),
+    PID_1 = spawn(fun() -> ok end),
     case PID_1 /= nil of
         true -> PID_1 ! <<"hello"/utf8>>,
     sent;

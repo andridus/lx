@@ -35,7 +35,7 @@ greeting() ->
 }
 
 fn test_pipeline_and_capture() {
-	lx_code := 'def apply_all(xs) do
+	lx_code := "def apply_all(xs) do
         xs
         |> lists:map(&double/1, _)
         |> lists:filter(&is_even/1, _)
@@ -46,22 +46,22 @@ fn test_pipeline_and_capture() {
     end
 
     def is_even(x) do
-        erlang:rem(x, 2) == 0
-    end'
+        erlang:'rem'(x, 2) == 0
+    end"
 
-	expected := '-module(test).
+	expected := "-module(test).
 -export([apply_all/1, double/1, is_even/1]).
 
 -spec apply_all(any()) -> any().
 apply_all(XS_1) ->
-    lists:filter(fun(ARG1_2) -> is_even(ARG1_2) end, lists:map(fun(ARG1_2) -> double(ARG1_2) end, XS_1)).
+    lists:filter(fun ?MODULE:is_even/1, lists:map(fun ?MODULE:double/1, XS_1)).
 -spec double(any()) -> integer().
-double(X_3) ->
-    X_3 * 2.
+double(X_2) ->
+    X_2 * 2.
 -spec is_even(any()) -> boolean().
-is_even(X_3) ->
-    erlang:rem(X_3, 2) == 0.
-'
+is_even(X_2) ->
+    erlang:'rem'(X_2, 2) == 0.
+"
 
 	result := compile_lx(lx_code)
 	assert result == expected

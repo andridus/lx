@@ -256,8 +256,8 @@ end'
 fn test_constraint_collection() {
 	lx_code := '
 def list_operations(list1, list2, _f) do
-    mapped1 = list1
-    mapped2 = list2
+    _mapped1 = list1
+    _mapped2 = list2
     combined = list1 ++ list2
     reversed = combined
     reversed

@@ -358,7 +358,8 @@ end'
 	expected := '-module(test).
 -export([process_user/1]).
 
--record(user, {name = nil :: binary(), age = nil :: integer()}).
+-include("test.hrl").
+
 -spec process_user(any()) -> binary().
 process_user(U_1) ->
     case U_1 of

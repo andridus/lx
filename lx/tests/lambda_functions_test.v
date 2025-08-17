@@ -12,9 +12,7 @@ end'
 
 -spec test_lambda() -> integer().
 test_lambda() ->
-    LAMBDA_1 = fun(X_2, Y_3) ->
-        X_2 + Y_3
-    end,
+    LAMBDA_1 = fun(X_2, Y_3) -> X_2 + Y_3 end,
     LAMBDA_1(3, 4).
 '
 	result := compile_lx(lx_code)
@@ -279,12 +277,11 @@ end'
 	expected := '-module(test).
 -export([test_lambda_records/0]).
 
--record(person, {name = nil :: binary(), age = nil :: integer()}).
+-include("test.hrl").
+
 -spec test_lambda_records() -> binary().
 test_lambda_records() ->
-    CREATOR_1 = fun(NAME_2, AGE_3) ->
-        #person{name = NAME_2, age = AGE_3}
-    end,
+    CREATOR_1 = fun(NAME_2, AGE_3) -> #person{name = NAME_2, age = AGE_3} end,
     PERSON_4 = CREATOR_1(<<"John"/utf8>>, 30),
     PERSON_4#person.name.
 '

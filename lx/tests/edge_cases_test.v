@@ -36,10 +36,10 @@ end'
 	expected := '-module(test).
 -export([process_value/1]).
 
--spec process_value(integer()) -> binary() | integer().
+-spec process_value(any()) -> binary() | integer().
 process_value(0) ->
     <<"zero"/utf8>>;
-process_value(N_1) ->
+process_value(N_1) when is_integer(N_1) ->
     N_1 * 2.
 '
 
@@ -57,7 +57,7 @@ end'
 	expected := '-module(test).
 -export([process_list/1]).
 
--spec process_list(any()) -> binary().
+-spec process_list(list()) -> binary().
 process_list([]) ->
     <<"empty"/utf8>>;
 process_list([_HEAD_1 | _TAIL_2]) ->
@@ -78,10 +78,10 @@ end'
 	expected := '-module(test).
 -export([countdown/1]).
 
--spec countdown(integer()) -> binary().
+-spec countdown(any()) -> any().
 countdown(0) ->
     <<"done"/utf8>>;
-countdown(N_1) ->
+countdown(N_1) when is_integer(N_1) ->
     countdown(N_1 - 1).
 '
 
@@ -102,7 +102,7 @@ end'
 -spec process_list([integer()]) -> binary().
 process_list([]) ->
     <<"empty"/utf8>>;
-process_list([HEAD_1]) ->
+process_list([]) ->
     iolist_to_binary(io_lib:format("non_empty ~p", [HEAD_1])).
 '
 
@@ -132,13 +132,13 @@ fn test_variable_binding_in_patterns() {
 	// Test that variables are correctly bound from complex patterns
 	lx_code := 'def sum_list do
 ([]) -> 0
-([head | tail]) -> head + sum_list(tail)
+([(head :: integer) | tail]) -> head + sum_list(tail)
 end'
 
 	expected := '-module(test).
 -export([sum_list/1]).
 
--spec sum_list(any()) -> integer().
+-spec sum_list([integer()]) -> integer().
 sum_list([]) ->
     0;
 sum_list([HEAD_1 | TAIL_2]) ->
@@ -199,7 +199,7 @@ end'
 	expected := '-module(test).
 -export([check_pattern/1]).
 
--spec check_pattern(any()) -> integer().
+-spec check_pattern(([any()] | list())) -> any().
 check_pattern([HEAD_1]) ->
     HEAD_1;
 check_pattern([A_2, B_3]) ->

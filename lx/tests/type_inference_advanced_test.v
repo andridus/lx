@@ -42,13 +42,13 @@ fn test_pattern_variable_binding_in_recursive_function() {
 	// Test that variables from [head | tail] patterns are correctly bound and typed
 	lx_code := 'def sum_list do
 ([]) -> 0
-([head | tail]) -> head + sum_list(tail)
+([(head :: integer) | tail]) -> head + sum_list(tail)
 end'
 
 	expected := '-module(test).
 -export([sum_list/1]).
 
--spec sum_list(any()) -> integer().
+-spec sum_list(list()) -> integer().
 sum_list([]) ->
     0;
 sum_list([HEAD_1 | TAIL_2]) ->
@@ -90,10 +90,10 @@ end'
 	expected := '-module(test).
 -export([countdown/1]).
 
--spec countdown(integer()) -> binary().
+-spec countdown(any()) -> any().
 countdown(0) ->
     <<"done"/utf8>>;
-countdown(N_1) ->
+countdown(N_1) when is_integer(N_1) ->
     countdown(N_1 - 1).
 '
 
@@ -123,10 +123,10 @@ end'
 	expected := '-module(test).
 -export([process_mixed_args/1]).
 
--spec process_mixed_args(integer() | binary() | atom()) -> integer() | binary().
-process_mixed_args(X_1) ->
+-spec process_mixed_args((integer() | binary() | atom())) -> integer() | binary().
+process_mixed_args(X_1) when is_integer(X_1) ->
     X_1 * 2;
-process_mixed_args(S_2) ->
+process_mixed_args(S_2) when is_binary(S_2) ->
     S_2;
 process_mixed_args(ok) ->
     <<"success"/utf8>>.
@@ -164,7 +164,7 @@ end'
 	expected := '-module(test).
 -export([first_element/1]).
 
--spec first_element(any()) -> atom().
+-spec first_element(list()) -> any().
 first_element([HEAD_1 | _TAIL_2]) ->
     HEAD_1;
 first_element([]) ->

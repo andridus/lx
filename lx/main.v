@@ -241,7 +241,8 @@ fn compile_project(project_dir string) {
 				build_lx_path := os.join_path(app_src_dir, entry)
 				os.cp(lx_path, build_lx_path) or {}
 				compile.compile_file(build_lx_path)
-				app_src_written = app_src_written || os.exists(os.join_path(app_src_dir, '${app_name}.app.src'))
+				app_src_written = app_src_written
+					|| os.exists(os.join_path(app_src_dir, '${app_name}.app.src'))
 			}
 		}
 
@@ -306,7 +307,7 @@ fn run_single_file(file string) {
 		exit(1)
 	}
 	run_res := os.execute('erl -noshell -eval \'io:format("~p\\n", [' + module_name +
-		':main()]).\' -s init stop')
+		":main()]).' -s init stop")
 	if run_res.exit_code != 0 {
 		eprintln('erl failed: ' + run_res.output)
 		os.chdir(original_dir) or {}
@@ -593,8 +594,8 @@ fn parse_project_yml(yml_content string) ProjectConfig {
 			}
 		}
 		if in_deps {
-			if !trimmed.starts_with('  ') && trimmed.contains(':') && !trimmed.starts_with('git:') &&
-				!trimmed.starts_with('branch:') {
+			if !trimmed.starts_with('  ') && trimmed.contains(':') && !trimmed.starts_with('git:')
+				&& !trimmed.starts_with('branch:') {
 				parts := trimmed.split(':')
 				if parts.len >= 2 {
 					current_dep = parts[0].trim_space()

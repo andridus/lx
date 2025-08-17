@@ -6,20 +6,22 @@ import kernel
 
 pub struct Analyzer {
 mut:
-	error_reporter         errors.ErrorReporter
-	type_table             TypeTable
-	type_envs              []TypeEnv
-	current_env            int
-	analysis_context       AnalysisContext
-	otp_contexts           []OtpContextInfo
-	check_unused_types     bool = true // Control unused type checking
+	error_reporter        errors.ErrorReporter
+	type_table            TypeTable
+	type_envs             []TypeEnv
+	current_env           int
+	analysis_context      AnalysisContext
+	current_function_name string
+	otp_contexts          []OtpContextInfo
+	check_unused_types    bool = true // Control unused type checking
 }
 
 enum AnalysisContext {
-	expression         // Regular expression context
-	pattern            // Pattern matching context
-	function_parameter // Function parameter context
-	record_field       // Record field definition context
+	expression   // Regular expression context
+	pattern      // Pattern matching context
+	function     // Function context
+	lambda       // Lambda context
+	record_field // Record field definition context
 }
 
 struct OtpContextInfo {
@@ -90,20 +92,16 @@ fn (mut a Analyzer) with_context(ctx AnalysisContext, f fn (mut Analyzer) !ast.N
 }
 
 fn (mut a Analyzer) extract_type_from_annotation(node ast.Node) !ast.Type {
-	// Se o nó é um identifier simples (tipo básico), usa type_node_to_type para marcar como usado
 	if node.kind == .identifier {
 		return a.type_node_to_type(node)
 	}
 
-	// Se o nó não é uma anotação de tipo válida, retorna 'any'
 	if node.kind != .type_annotation {
 		return ast.Type{
 			name:   'any'
 			params: []
 		}
 	}
-
-	// Caso contrário, analisa como type_annotation
 	analyzed := a.analyze_type_annotation(node)!
 	return a.type_table.get_type(analyzed.id) or {
 		ast.Type{
@@ -119,8 +117,15 @@ fn (mut a Analyzer) type_node_to_type(node ast.Node) ast.Type {
 	if node.kind == .atom {
 		return ast.Type{
 			name:              'atom'
-			params:            []
 			specialized_value: node.value
+			params:            []
+		}
+	}
+
+	if node.kind == .function {
+		return ast.Type{
+			name:   'any'
+			params: []
 		}
 	}
 
@@ -149,12 +154,19 @@ fn (mut a Analyzer) type_node_to_type(node ast.Node) ast.Type {
 		}
 	}
 
-	// Handle list types (including empty lists)
+	if node.kind == .type_annotation {
+		typ := a.type_node_to_type(node.children[1])
+		a.bind(node.children[0].value, TypeScheme{
+			quantified_vars: []
+			body:            typ
+		})
+		a.type_table.assign_type(node.children[0].id, typ)
+		return typ
+	}
 	if node.kind == .list_literal {
 		if node.children.len == 0 {
-			// Empty list type []
 			return ast.Type{
-				name:   'list'
+				name:   'empty_list'
 				params: []
 			}
 		} else {
@@ -169,8 +181,42 @@ fn (mut a Analyzer) type_node_to_type(node ast.Node) ast.Type {
 			}
 		}
 	}
+	if node.kind == .parentheses {
+		return a.type_node_to_type(node.children[0])
+	}
+	if node.kind == .list_cons {
+		if node.children.len == 0 {
+			return ast.Type{
+				name:   'list'
+				params: []
+			}
+		} else {
+			// List with element types
+			mut element_types := []ast.Type{}
+			head_type := a.type_node_to_type(node.children[0])
+			tail_type := a.type_node_to_type(node.children[1])
+			if head_type.name == 'any' && tail_type.name == 'any' {
+				return ast.Type{
+					name:   'list'
+					params: []
+				}
+			}
+			if head_type.name != 'any' && tail_type.name != 'any' {
+			}
+			if head_type.name == 'any' {
+				element_types << tail_type
+			} else {
+				element_types << head_type
+			}
+			return ast.Type{
+				name:   'list'
+				params: element_types
+			}
+		}
+	}
 
 	// Identifier represents either a basic/custom type, a generic, a record, or an atom literal
+
 	if node.kind == .identifier {
 		// Handle parameterized types: name(T1, T2, ...)
 		if node.children.len > 0 {
@@ -216,6 +262,7 @@ fn (mut a Analyzer) type_node_to_type(node ast.Node) ast.Type {
 		}
 
 		// Check if this identifier is a defined custom type
+
 		if _ := a.type_table.get_custom_type(node.value) {
 			// Mark custom type as used
 			a.type_table.mark_type_used(node.value)
@@ -226,8 +273,6 @@ fn (mut a Analyzer) type_node_to_type(node ast.Node) ast.Type {
 			}
 		}
 
-		// Check if this is a valid built-in type or generic type variable
-		// Single uppercase letters are generic type variables (T, U, V, etc.)
 		if node.value.len == 1 && node.value[0].is_capital() {
 			return ast.Type{
 				name:   node.value
@@ -235,16 +280,12 @@ fn (mut a Analyzer) type_node_to_type(node ast.Node) ast.Type {
 			}
 		}
 
-		// If we reach here, it's potentially an undefined type
-		// During pre-processing, not all types may be available yet
-		// So we return a placeholder and let the actual analysis phase handle validation
 		return ast.Type{
 			name:   node.value
 			params: []
 		}
 	}
 
-	// Fallback for unexpected nodes: treat as 'any'
 	return ast.Type{
 		name:   'any'
 		params: []
@@ -650,815 +691,6 @@ fn (mut a Analyzer) analyze_base_module_like(node ast.Node, module_type string) 
 	}
 }
 
-// Pre-register function signature for forward reference resolution
-fn (mut a Analyzer) preregister_function(node ast.Node) ! {
-	if node.kind != .function && node.kind != .private_function {
-		return
-	}
-
-	function_name := node.value
-	if function_name == '' {
-		return
-	}
-
-	if node.children.len < 2 {
-		return
-	}
-
-	parameters_node := node.children[0]
-	mut parameters := []ast.Type{}
-
-	// Extract parameter types (use 'any' as default)
-	for param in parameters_node.children {
-		param_type := if param.children.len > 0 {
-			a.extract_type_from_annotation(param.children[0]) or {
-				ast.Type{
-					name:   'any'
-					params: []
-				}
-			}
-		} else {
-			ast.Type{
-				name:   'any'
-				params: []
-			}
-		}
-		parameters << param_type
-	}
-
-	// Extract return type (use 'any' as default if not specified)
-	return_type := if node.children.len > 2 {
-		return_type_node := node.children[2]
-		if return_type_node.children.len > 0 {
-			a.extract_type_from_annotation(return_type_node) or {
-				ast.Type{
-					name:   'any'
-					params: []
-				}
-			}
-		} else {
-			ast.Type{
-				name:   'any'
-				params: []
-			}
-		}
-	} else {
-		ast.Type{
-			name:   'any'
-			params: []
-		}
-	}
-
-	// Register function type in global type table for forward references
-	a.type_table.register_function_type(function_name, parameters, return_type)
-}
-
-fn (mut a Analyzer) analyze_function(node ast.Node) !ast.Node {
-	// Only check scope for named functions, not anonymous functions (heads)
-	if node.value != '' && a.current_env > 0 {
-		// Supervisor and worker contexts are treated as global scope since they generate separate files
-		current_scope_name := a.type_envs[a.current_env].scope_name
-		is_otp_context := current_scope_name.starts_with('supervisor_')
-			|| current_scope_name.starts_with('worker_')
-
-		if !is_otp_context {
-			a.error('Function definitions are only allowed in global scope, not inside functions',
-				node.position)
-			return error('Function definitions are only allowed in global scope, not inside functions')
-		}
-	}
-
-	function_name := node.value
-
-	// For function heads (function_name == ''), register pattern variables immediately
-	if function_name == '' && node.children.len >= 2 {
-		args_block := node.children[0]
-
-		// Register variables from patterns in arguments
-		for arg in args_block.children {
-			a.register_pattern_variables(arg)
-		}
-	}
-
-	// Parse args, body, and optional return type from children
-	if node.children.len < 2 {
-		a.error('Function must have args and body', node.position)
-		return error('Function must have args and body')
-	}
-
-	args_block := node.children[0]
-	body := node.children[1]
-
-	// Check for return type annotation (third child)
-	mut return_type_annotation := ast.Type{
-		name:   'any'
-		params: []
-	}
-	if node.children.len > 2 {
-		return_type_annotation = a.extract_type_from_annotation(node.children[2])!
-	}
-
-	// Create a new environment for this function (only for named functions)
-	if function_name != '' {
-		a.type_envs << new_type_env(function_name)
-		a.current_env = a.type_envs.len - 1
-	}
-
-	// Analyze args and add them to the function's environment
-	mut parameters := []ast.Type{}
-	mut parameter_names := []string{}
-
-	for arg in args_block.children {
-		// Set context to function_parameter when analyzing function arguments
-		old_context := a.analysis_context
-		a.analysis_context = .function_parameter
-
-		// Check if this is a pattern argument (has children with patterns)
-		if arg.value == '' && arg.children.len > 0 {
-			// This is a pattern argument, register all variables within the pattern
-			pattern := arg.children[0] // The pattern is the first child
-			a.register_pattern_variables(pattern)
-
-			// For pattern arguments, we use 'any' type for now
-			arg_type := ast.Type{
-				name:   'any'
-				params: []
-			}
-			parameters << arg_type
-			parameter_names << '_pattern' // Placeholder name for pattern
-		} else {
-			// Regular named argument
-			arg_name := arg.value
-			arg_type := if arg.children.len > 0 {
-				a.extract_type_from_annotation(arg.children[0])!
-			} else {
-				ast.Type{
-					name:   'any'
-					params: []
-				}
-			}
-
-			parameters << arg_type
-			parameter_names << arg_name
-
-			// Add argument to the function's environment
-			a.bind(arg_name, TypeScheme{
-				quantified_vars: []
-				body:            arg_type
-			})
-		}
-
-		// Restore context
-		a.analysis_context = old_context
-	}
-
-	// Register function type in global type table FIRST (only for named functions)
-	if function_name != '' {
-		// Check if this is a multi-head function (no args in definition but heads have args)
-		has_function_heads := args_block.children.len == 0 && body.kind == .block
-			&& body.children.len > 0 && body.children[0].kind == .function
-
-		// Validate: cannot have both arguments in definition AND multiple heads in body
-		if args_block.children.len > 0 && body.kind == .block && body.children.len > 0
-			&& body.children[0].kind == .function {
-			a.error('Function ${function_name} cannot have both arguments in definition and multiple heads in body. Use either "def ${function_name}(args) do body end" or "def ${function_name} do (args) -> body end"',
-				node.position)
-			return error('Invalid function definition: cannot mix argument definition with multiple heads')
-		}
-
-		if has_function_heads {
-			// Collect all parameter types from all heads to create union types
-			parameters = [] // Reset parameters array
-			parameter_names = [] // Reset parameter names
-
-			// For single-argument functions, collect all argument types
-			if body.children.len > 0 {
-				first_head := body.children[0]
-				if first_head.children.len > 0 {
-					first_head_args := first_head.children[0]
-
-					// Determine if this is a single-argument or multi-argument function
-					is_single_arg := first_head_args.kind != .block
-						|| first_head_args.children.len == 1
-
-					if is_single_arg {
-						// Single argument function - collect types from all heads
-						mut all_arg_types := []ast.Type{}
-
-						for head in body.children {
-							if head.kind == .function && head.children.len > 0 {
-								head_args := head.children[0]
-
-								// Get the actual argument (handle both direct and block cases)
-								actual_arg := if head_args.kind == .block
-									&& head_args.children.len == 1 {
-									head_args.children[0]
-								} else {
-									head_args
-								}
-
-								// Extract type based on argument kind
-								arg_type := if actual_arg.kind == .identifier
-									&& actual_arg.children.len > 0
-									&& actual_arg.children[0].kind == .identifier {
-									// Has type annotation (like x :: integer)
-									a.extract_type_from_annotation(actual_arg.children[0])!
-								} else {
-									// No type annotation, infer from kind
-									match actual_arg.kind {
-										.integer {
-											ast.Type{
-												name:   'integer'
-												params: []
-											}
-										}
-										.float {
-											ast.Type{
-												name:   'float'
-												params: []
-											}
-										}
-										.string {
-											ast.Type{
-												name:   'string'
-												params: []
-											}
-										}
-										.boolean {
-											ast.Type{
-												name:   'boolean'
-												params: []
-											}
-										}
-										.atom {
-											ast.Type{
-												name:   'atom'
-												params: []
-											}
-										}
-										.nil {
-											ast.Type{
-												name:   'nil'
-												params: []
-											}
-										}
-										.identifier {
-											ast.Type{
-												name:   'any'
-												params: []
-											}
-										} // Variable binding
-										.list_literal {
-											// Analyze elements to infer list element type
-											mut element_types := []ast.Type{}
-											for elem in actual_arg.children {
-												if elem.kind == .identifier && elem.children.len > 0
-													&& elem.children[0].kind == .identifier {
-													// Element has type annotation
-													elem_type := a.extract_type_from_annotation(elem.children[0]) or {
-														ast.Type{
-															name:   'any'
-															params: []
-														}
-													}
-													element_types << elem_type
-												} else {
-													// No annotation, infer from element kind
-													elem_type := match elem.kind {
-														.integer {
-															ast.Type{
-																name:   'integer'
-																params: []
-															}
-														}
-														.float {
-															ast.Type{
-																name:   'float'
-																params: []
-															}
-														}
-														.string {
-															ast.Type{
-																name:   'string'
-																params: []
-															}
-														}
-														.atom {
-															ast.Type{
-																name:   'atom'
-																params: []
-															}
-														}
-														.boolean {
-															ast.Type{
-																name:   'boolean'
-																params: []
-															}
-														}
-														else {
-															ast.Type{
-																name:   'any'
-																params: []
-															}
-														}
-													}
-													element_types << elem_type
-												}
-											}
-											// Use first element type or 'any' if empty
-											elem_type := if element_types.len > 0 {
-												element_types[0]
-											} else {
-												ast.Type{
-													name:   'any'
-													params: []
-												}
-											}
-											ast.Type{
-												name:   'list'
-												params: [elem_type]
-											}
-										}
-										.list_cons {
-											// For list cons [head | tail], analyze head element
-											mut elem_type := ast.Type{
-												name:   'any'
-												params: []
-											}
-											if actual_arg.children.len > 0 {
-												list_head := actual_arg.children[0]
-												// Handle both direct identifiers and parentheses-wrapped identifiers
-												mut actual_head := list_head
-												if list_head.kind == .parentheses
-													&& list_head.children.len > 0 {
-													actual_head = list_head.children[0]
-												}
-
-												if actual_head.kind == .identifier
-													&& actual_head.children.len > 0
-													&& actual_head.children[0].kind == .identifier {
-													// Head has type annotation
-													elem_type = a.extract_type_from_annotation(actual_head.children[0]) or {
-														ast.Type{
-															name:   'any'
-															params: []
-														}
-													}
-												} else {
-													// No annotation, infer from head kind
-													elem_type = match list_head.kind {
-														.integer {
-															ast.Type{
-																name:   'integer'
-																params: []
-															}
-														}
-														.float {
-															ast.Type{
-																name:   'float'
-																params: []
-															}
-														}
-														.string {
-															ast.Type{
-																name:   'string'
-																params: []
-															}
-														}
-														.atom {
-															ast.Type{
-																name:   'atom'
-																params: []
-															}
-														}
-														.boolean {
-															ast.Type{
-																name:   'boolean'
-																params: []
-															}
-														}
-														else {
-															ast.Type{
-																name:   'any'
-																params: []
-															}
-														}
-													}
-												}
-											}
-											ast.Type{
-												name:   'list'
-												params: [elem_type]
-											}
-										}
-										else {
-											ast.Type{
-												name:   'any'
-												params: []
-											}
-										}
-									}
-								}
-								all_arg_types << arg_type
-							}
-						}
-
-						// Create union type from all argument types
-						if all_arg_types.len > 0 {
-							mut unified_type := all_arg_types[0]
-							for i in 1 .. all_arg_types.len {
-								unified_type = a.unify_types(unified_type, all_arg_types[i])
-							}
-							parameters << unified_type
-							parameter_names << 'arg_0'
-						}
-					} else {
-						// Multi-argument function - collect types from all heads for each position
-						// First, determine the number of arguments from the first head
-						num_args := first_head_args.children.len
-
-						// For each argument position, collect all types from all heads
-						for arg_pos in 0 .. num_args {
-							mut all_types_for_position := []ast.Type{}
-
-							for head in body.children {
-								if head.kind == .function && head.children.len > 0 {
-									head_args := head.children[0]
-									if head_args.kind == .block && head_args.children.len > arg_pos {
-										arg := head_args.children[arg_pos]
-
-										// Extract type based on argument kind and annotations
-										arg_type := if arg.kind == .identifier
-											&& arg.children.len > 0
-											&& arg.children[0].kind == .identifier {
-											// Has type annotation (like x :: integer)
-											a.extract_type_from_annotation(arg.children[0])!
-										} else {
-											// No type annotation, infer from kind
-											match arg.kind {
-												.integer {
-													ast.Type{
-														name:   'integer'
-														params: []
-													}
-												}
-												.float {
-													ast.Type{
-														name:   'float'
-														params: []
-													}
-												}
-												.string {
-													ast.Type{
-														name:   'string'
-														params: []
-													}
-												}
-												.boolean {
-													ast.Type{
-														name:   'boolean'
-														params: []
-													}
-												}
-												.atom {
-													ast.Type{
-														name:   'atom'
-														params: []
-													}
-												}
-												.nil {
-													ast.Type{
-														name:   'nil'
-														params: []
-													}
-												}
-												.identifier {
-													ast.Type{
-														name:   'any'
-														params: []
-													}
-												} // Variable binding
-												.list_literal {
-													// Analyze elements to infer list element type
-													mut element_types := []ast.Type{}
-													for elem in arg.children {
-														if elem.kind == .identifier
-															&& elem.children.len > 0
-															&& elem.children[0].kind == .identifier {
-															// Element has type annotation
-															elem_type := a.extract_type_from_annotation(elem.children[0]) or {
-																ast.Type{
-																	name:   'any'
-																	params: []
-																}
-															}
-															element_types << elem_type
-														} else {
-															// No annotation, infer from element kind
-															elem_type := match elem.kind {
-																.integer {
-																	ast.Type{
-																		name:   'integer'
-																		params: []
-																	}
-																}
-																.float {
-																	ast.Type{
-																		name:   'float'
-																		params: []
-																	}
-																}
-																.string {
-																	ast.Type{
-																		name:   'string'
-																		params: []
-																	}
-																}
-																.atom {
-																	ast.Type{
-																		name:   'atom'
-																		params: []
-																	}
-																}
-																.boolean {
-																	ast.Type{
-																		name:   'boolean'
-																		params: []
-																	}
-																}
-																else {
-																	ast.Type{
-																		name:   'any'
-																		params: []
-																	}
-																}
-															}
-															element_types << elem_type
-														}
-													}
-													// Use first element type or 'any' if empty
-													elem_type := if element_types.len > 0 {
-														element_types[0]
-													} else {
-														ast.Type{
-															name:   'any'
-															params: []
-														}
-													}
-													ast.Type{
-														name:   'list'
-														params: [elem_type]
-													}
-												}
-												.list_cons {
-													// For list cons [head | tail], analyze head element
-													mut elem_type := ast.Type{
-														name:   'any'
-														params: []
-													}
-													if arg.children.len > 0 {
-														list_head := arg.children[0]
-														if list_head.kind == .identifier
-															&& list_head.children.len > 0
-															&& list_head.children[0].kind == .identifier {
-															// Head has type annotation
-															elem_type = a.extract_type_from_annotation(list_head.children[0]) or {
-																ast.Type{
-																	name:   'any'
-																	params: []
-																}
-															}
-														} else {
-															// No annotation, infer from head kind
-															elem_type = match list_head.kind {
-																.integer {
-																	ast.Type{
-																		name:   'integer'
-																		params: []
-																	}
-																}
-																.float {
-																	ast.Type{
-																		name:   'float'
-																		params: []
-																	}
-																}
-																.string {
-																	ast.Type{
-																		name:   'string'
-																		params: []
-																	}
-																}
-																.atom {
-																	ast.Type{
-																		name:   'atom'
-																		params: []
-																	}
-																}
-																.boolean {
-																	ast.Type{
-																		name:   'boolean'
-																		params: []
-																	}
-																}
-																else {
-																	ast.Type{
-																		name:   'any'
-																		params: []
-																	}
-																}
-															}
-														}
-													}
-													ast.Type{
-														name:   'list'
-														params: [elem_type]
-													}
-												}
-												else {
-													ast.Type{
-														name:   'any'
-														params: []
-													}
-												}
-											}
-										}
-										all_types_for_position << arg_type
-									}
-								}
-							}
-
-							// Create union type for this argument position
-							if all_types_for_position.len > 0 {
-								mut unified_type := all_types_for_position[0]
-								for i in 1 .. all_types_for_position.len {
-									unified_type = a.unify_types(unified_type, all_types_for_position[i])
-								}
-								parameters << unified_type
-								parameter_names << 'arg_${arg_pos}'
-							}
-						}
-					}
-				}
-			}
-		}
-
-		// Register function with extracted parameters
-		temp_return_type := if return_type_annotation.name != 'any' {
-			return_type_annotation
-		} else {
-			ast.Type{
-				name:   'any'
-				params: []
-			}
-		}
-		a.type_table.register_function_type(function_name, parameters, temp_return_type)
-	}
-
-	// Analyze function body
-	mut analyzed_body := a.analyze_node(body)!
-
-	// Check if function body is empty (only for named functions)
-	if function_name != '' {
-		is_empty_body := (analyzed_body.kind == .block && analyzed_body.children.len == 0)
-			|| (analyzed_body.kind != .block && analyzed_body.value == ''
-			&& analyzed_body.children.len == 0)
-
-		if is_empty_body {
-			a.error('Function ${function_name} cannot have empty body. Functions must contain at least one expression',
-				node.position)
-			return error('Function cannot have empty body')
-		}
-	}
-
-	// Infer return type from body
-	mut return_type := ast.Type{
-		name:   'any'
-		params: []
-	}
-
-	// Check if this is a function with multiple heads
-	if analyzed_body.kind == .block {
-		// Check if this has function heads
-		has_function_heads := analyzed_body.children.len > 0
-			&& analyzed_body.children[0].kind == .function
-
-		if has_function_heads {
-			// Analyze each head and collect return types for unification
-			mut head_return_types := []ast.Type{}
-			for head in analyzed_body.children {
-				if head.kind == .function {
-					// Register head arguments in the function's environment
-					if head.children.len > 0 {
-						head_args := head.children[0]
-						for arg in head_args.children {
-							a.register_pattern_variables(arg)
-						}
-					}
-
-					// Analyze head body and collect return type
-					if head.children.len > 1 {
-						head_body := a.analyze_node(head.children[1])!
-						head_return_type := a.type_table.get_type(head_body.id) or {
-							ast.Type{
-								name:   'any'
-								params: []
-							}
-						}
-						head_return_types << head_return_type
-					}
-				}
-			}
-
-			// Unify return types from all heads
-			if head_return_types.len > 0 {
-				// Filter out 'any' types if we have specific types (for recursive functions)
-				mut specific_types := head_return_types.filter(it.name != 'any')
-
-				if specific_types.len > 0 {
-					// Use only specific types for unification
-					mut unified_type := specific_types[0]
-					for i in 1 .. specific_types.len {
-						unified_type = a.unify_types(unified_type, specific_types[i])
-					}
-					return_type = unified_type
-				} else {
-					// All types are 'any', use standard unification
-					mut unified_type := head_return_types[0]
-					for i in 1 .. head_return_types.len {
-						unified_type = a.unify_types(unified_type, head_return_types[i])
-					}
-					return_type = unified_type
-				}
-			}
-		} else {
-			// Single function body
-			body_type := a.type_table.get_type(analyzed_body.id) or {
-				ast.Type{
-					name:   'unknown'
-					params: []
-				}
-			}
-			return_type = body_type
-		}
-	} else {
-		// Single expression body
-		body_type := a.type_table.get_type(analyzed_body.id) or {
-			ast.Type{
-				name:   'unknown'
-				params: []
-			}
-		}
-		return_type = body_type
-	}
-
-	// Validate and resolve return type annotation if present
-	if return_type_annotation.name != 'any' {
-		// We have a return type annotation, validate it against inferred type
-		inferred_type := return_type
-		annotated_type := return_type_annotation
-
-		// Rule 1: If inferred type is different from annotated type, check compatibility
-		if !a.are_types_compatible(inferred_type, annotated_type) {
-			a.error('Return type mismatch: function returns ${inferred_type.name} but annotated as ${annotated_type.name}',
-				node.position)
-			return error('Return type mismatch')
-		}
-
-		// Rule 2 & 3: If types are compatible, use the annotated type
-		// This handles cases where inferred is 'atom' and annotated is 'custom_type :: atom'
-		// or where inferred is 'any' and annotated is a specific type
-		return_type = annotated_type
-	}
-
-	// Para funções com operadores aritméticos, force parâmetros para 'integer'
-	if body.kind == .function_caller && body.value in ['+', '-', '*', '/'] {
-		for i, _ in parameter_names {
-			if parameters[i].name == 'any' {
-				parameters[i] = ast.Type{
-					name:   'integer'
-					params: []
-				}
-			}
-		}
-	}
-
-	// Update function type in global type table (only for named functions)
-	if function_name != '' {
-		a.type_table.register_function_type(function_name, parameters, return_type)
-		// Create function type for this node - use the actual return type, not 'function'
-		a.type_table.assign_type(node.id, return_type)
-
-		// Check for unused variables before exiting function scope
-		a.check_unused_variables()!
-
-		// Restore the previous environment
-		a.current_env = 0
-	}
-
-	return node
-}
-
 fn (mut a Analyzer) analyze_literal(node ast.Node) !ast.Node {
 	match node.kind {
 		.integer {
@@ -1616,7 +848,6 @@ fn (mut a Analyzer) node_has_lambda_self_call(node ast.Node, var_name string) bo
 
 fn (mut a Analyzer) analyze_variable_ref(node ast.Node) !ast.Node {
 	var_name := node.value
-
 	if a.analysis_context == .pattern {
 		if scheme := a.lookup(var_name) {
 			a.type_table.assign_type(node.id, scheme.body)
@@ -1659,43 +890,17 @@ fn (mut a Analyzer) analyze_identifier(node ast.Node) !ast.Node {
 		// Mark variable as used
 		a.mark_variable_used(var_name)
 		a.type_table.assign_type(node.id, scheme.body)
-		return node
-	} else {
-		// If not found, assign a placeholder type
-		a.type_table.assign_type(node.id, ast.Type{
-			name:   'identifier'
-			params: []
-		})
-		return node
 	}
+	return node
 }
 
 fn (mut a Analyzer) analyze_block(node ast.Node) !ast.Node {
-	// Enter a new scope for this block so that variables declared inside
-	// do not conflict with variables from outer scopes or sibling blocks
-	// But don't create nested scopes within OTP components (supervisor/worker)
-	mut should_create_scope := true
-	if a.current_env > 0 {
-		current_scope_name := a.type_envs[a.current_env].scope_name
-		if current_scope_name.starts_with('supervisor_')
-			|| current_scope_name.starts_with('worker_') {
-			should_create_scope = false
-		}
-	}
-
-	if should_create_scope {
-		a.enter_scope('block')
-		defer { a.exit_scope() }
-	}
-
 	mut analyzed_exprs := []ast.Node{}
-
 	for expr in node.children {
 		analyzed_expr := a.analyze_node(expr)!
 		analyzed_exprs << analyzed_expr
 	}
 
-	// Type of block is type of last expression
 	if analyzed_exprs.len > 0 {
 		last_expr := analyzed_exprs.last()
 
@@ -1713,7 +918,7 @@ fn (mut a Analyzer) analyze_block(node ast.Node) !ast.Node {
 		}
 		a.type_table.assign_type(node.id, last_type)
 	}
-
+	a.check_unused_variables()!
 	return ast.Node{
 		...node
 		children: analyzed_exprs
@@ -1725,11 +930,9 @@ pub fn (a &Analyzer) get_type_table() &TypeTable {
 }
 
 fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
-	function_name := node.value // Nome da função (ex: '+', '*', '>')
+	function_name := node.value
 
-	// Try kernel first
 	function_info := kernel.get_function_info(function_name) or {
-		// In OTP submodule contexts (worker/supervisor), require external qualifier unless the function is local
 		if a.otp_contexts.len > 0 {
 			if function_name !in a.otp_contexts[a.otp_contexts.len - 1].local_functions {
 				a.error('Undefined local function "${function_name}" in OTP context. Use _:${function_name}(...) or {module}:${function_name}(...).',
@@ -1737,12 +940,8 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 				return error('Undefined local function in OTP context')
 			}
 		}
-
-		// First check if it's a variable in scope (e.g., function parameter)
 		if scheme := a.lookup(function_name) {
-			// It's a variable, check if it's a function type
 			if scheme.body.name == 'function' || scheme.body.name == 'any' {
-				// Analyze arguments
 				mut analyzed_args := []ast.Node{}
 				for arg in node.children {
 					analyzed_args << a.analyze_node(arg)!
@@ -1782,10 +981,10 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 			}
 
 			// Validate argument count
-			if analyzed_args.len != function_type.parameters.len {
-				a.error('Function ${function_name} expects ${function_type.parameters.len} arguments, got ${analyzed_args.len}',
+			if !function_type.heads.any(it.patterns.len == analyzed_args.len) {
+				a.error('Function ${function_name} expects ${function_type.heads.map(it.patterns.len.str()).join(', ')} arguments, got ${analyzed_args.len}',
 					node.position)
-				return error('Function ${function_name} expects ${function_type.parameters.len} arguments, got ${analyzed_args.len}')
+				return error('Function ${function_name} expects ${function_type.heads.map(it.patterns.len.str()).join(', ')} arguments, got ${analyzed_args.len}')
 			}
 
 			// Assign return type to this node
@@ -1867,9 +1066,13 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 		// Para operadores infix
 		if function_info.fixity == .infix && analyzed_args.len == 2 {
 			left_type := a.type_table.get_type(analyzed_args[0].id) or {
-				ast.Type{
-					name:   'any'
-					params: []
+				if value := a.lookup(analyzed_args[0].value) {
+					value.body
+				} else {
+					ast.Type{
+						name:   'any'
+						params: []
+					}
 				}
 			}
 			right_type := a.type_table.get_type(analyzed_args[1].id) or {
@@ -1929,8 +1132,6 @@ fn (mut a Analyzer) analyze_function_caller(node ast.Node) !ast.Node {
 					effective_right_type = left_type
 				}
 			}
-
-			// Tenta encontrar uma assinatura válida
 			if return_type := a.check_function_signatures(function_name, effective_left_type,
 				effective_right_type, function_info.signatures)
 			{
@@ -2027,7 +1228,6 @@ fn (mut a Analyzer) check_function_signatures(function_name string, left_type as
 		}
 		expected_left := signature.parameters[0]
 		expected_right := signature.parameters[1]
-
 		if a.types_compatible(left_type, expected_left)
 			&& a.types_compatible(right_type, expected_right) {
 			return signature.return_type
@@ -2039,7 +1239,14 @@ fn (mut a Analyzer) check_function_signatures(function_name string, left_type as
 
 fn (a Analyzer) types_compatible(actual ast.Type, expected ast.Type) bool {
 	// Tipos exatos são sempre compatíveis
-	if actual.name == expected.name {
+	mut params := []string{}
+	if actual.name == 'union' {
+		params = actual.params.map(it.name)
+	} else {
+		params = [actual.name]
+	}
+
+	if expected.name in params {
 		return true
 	}
 
@@ -2188,8 +1395,14 @@ fn (mut a Analyzer) analyze_list_cons(node ast.Node) !ast.Node {
 		}
 	}
 
+	mut params := []string{}
+	if tail_type.name == 'union' {
+		params = tail_type.params.map(it.name)
+	} else {
+		params = [tail_type.name]
+	}
 	// Verify tail is a list
-	if tail_type.name != 'list' {
+	if 'list' !in params {
 		a.error('Tail must be a list, got ${tail_type.name}', node.position)
 		return error('Type mismatch in list cons')
 	}
@@ -2781,209 +1994,6 @@ fn (mut a Analyzer) analyze_record_update(node ast.Node) !ast.Node {
 	}
 }
 
-// Function analysis functions
-fn (mut a Analyzer) analyze_function_definition(node ast.Node) !ast.Node {
-	// Validate that function definitions are only allowed in global scope
-	if a.current_env > 0 {
-		// Supervisor and worker contexts are treated as global scope since they generate separate files
-		current_scope_name := a.type_envs[a.current_env].scope_name
-		is_otp_context := current_scope_name.starts_with('supervisor_')
-			|| current_scope_name.starts_with('worker_')
-
-		if !is_otp_context {
-			a.error('Function definitions are only allowed in global scope, not inside functions',
-				node.position)
-			return error('Function definitions are only allowed in global scope, not inside functions')
-		}
-	}
-
-	function_name := node.value
-	parameters_node := node.children[0]
-	body := node.children[1]
-	return_type_node := node.children[2]
-
-	mut parameters := []ast.Type{}
-	mut parameter_names := []string{}
-
-	// Create a new environment for this function
-	a.type_envs << new_type_env(function_name)
-	a.current_env = a.type_envs.len - 1
-
-	// Analyze parameters and add them to the function's environment
-	for param in parameters_node.children {
-		param_name := param.value
-		param_type := if param.children.len > 0 {
-			a.extract_type_from_annotation(param.children[0])!
-		} else {
-			ast.Type{
-				name:   'any'
-				params: []
-			}
-		}
-
-		parameters << param_type
-		parameter_names << param_name
-
-		// Add parameter to the function's environment
-		a.bind(param_name, TypeScheme{
-			quantified_vars: []
-			body:            param_type
-		})
-	}
-
-	// Analyze return type
-	mut return_type := if return_type_node.children.len > 0 {
-		a.extract_type_from_annotation(return_type_node)!
-	} else {
-		ast.Type{
-			name:   'any'
-			params: []
-		}
-	}
-
-	// Analyze function body
-	mut analyzed_body := a.analyze_node(body)!
-
-	// Se o corpo é um block com múltiplas heads, analise cada head primeiro
-	if analyzed_body.kind == .block {
-		// Check if this has function heads
-		has_function_heads := analyzed_body.children.len > 0
-			&& analyzed_body.children[0].kind == .function
-
-		if has_function_heads {
-			// For multiple heads, infer return type from the first head's body
-			if analyzed_body.children.len > 0 {
-				first_head := analyzed_body.children[0]
-				if first_head.kind == .function && first_head.children.len > 1 {
-					head_body := first_head.children[1]
-					head_body_type := a.type_table.get_type(head_body.id) or {
-						ast.Type{
-							name:   'unknown'
-							params: []
-						}
-					}
-					return_type = head_body_type
-				}
-			}
-
-			for head in analyzed_body.children {
-				if head.kind == .function {
-					a.analyze_node(head)!
-				}
-			}
-			// Agora analise o corpo novamente para propagar os tipos das variáveis
-			analyzed_body = a.analyze_node(body)!
-		}
-	}
-
-	// Para funções com operadores aritméticos, force parâmetros para 'integer'
-	if body.kind == .function_caller && body.value in ['+', '-', '*', '/'] {
-		for i, _ in parameter_names {
-			if parameters[i].name == 'any' {
-				parameters[i] = ast.Type{
-					name:   'integer'
-					params: []
-				}
-			}
-		}
-	}
-
-	// Infer return type from body if not specified
-	if return_type.name == 'any' {
-		body_type := a.type_table.get_type(analyzed_body.id) or {
-			ast.Type{
-				name:   'unknown'
-				params: []
-			}
-		}
-		return_type = body_type
-	}
-
-	// Register function type in global type table
-	a.type_table.register_function_type(function_name, parameters, return_type)
-
-	// Create function type for this node - use the actual return type, not 'function'
-	a.type_table.assign_type(node.id, return_type)
-
-	// Restore the previous environment
-	a.current_env = 0
-
-	return node
-}
-
-fn (mut a Analyzer) analyze_function_head(node ast.Node) !ast.Node {
-	pattern := a.analyze_node(node.children[0])!
-
-	// Register pattern variables in the current function's environment BEFORE analyzing body
-	if pattern.kind == .identifier {
-		// Simple variable pattern
-		a.bind(pattern.value, TypeScheme{
-			quantified_vars: []
-			body:            ast.Type{
-				name:   'any'
-				params: []
-			}
-		})
-	} else if pattern.kind == .variable_ref {
-		// Variable reference pattern
-		a.bind(pattern.value, TypeScheme{
-			quantified_vars: []
-			body:            ast.Type{
-				name:   'any'
-				params: []
-			}
-		})
-	} else if pattern.kind == .tuple_literal {
-		// Tuple pattern (multiple arguments)
-		for arg in pattern.children {
-			if arg.kind == .identifier {
-				a.bind(arg.value, TypeScheme{
-					quantified_vars: []
-					body:            ast.Type{
-						name:   'any'
-						params: []
-					}
-				})
-			}
-		}
-	}
-
-	body := a.analyze_node(node.children[1])!
-	return_type_node := node.children[2]
-
-	// Analyze return type
-	mut return_type := if return_type_node.children.len > 0 {
-		a.extract_type_from_annotation(return_type_node)!
-	} else {
-		ast.Type{
-			name:   'any'
-			params: []
-		}
-	}
-
-	// Infer return type from body if not specified
-	if return_type.name == 'any' {
-		body_type := a.type_table.get_type(body.id) or {
-			ast.Type{
-				name:   'unknown'
-				params: []
-			}
-		}
-		return_type = body_type
-	}
-
-	// Check for unused variables in function head scope
-	a.check_unused_variables()!
-
-	return ast.Node{
-		id:       node.id
-		kind:     node.kind
-		value:    node.value
-		children: [pattern, body, return_type_node]
-		position: node.position
-	}
-}
-
 fn (mut a Analyzer) analyze_function_call(node ast.Node) !ast.Node {
 	function_name := node.value
 	mut analyzed_args := []ast.Node{}
@@ -3328,7 +2338,9 @@ fn (mut a Analyzer) analyze_lambda_expression(node ast.Node) !ast.Node {
 		a.error('Lambda expression must have body', node.position)
 		return error('Invalid lambda expression')
 	}
-
+	old_context := a.analysis_context
+	a.analysis_context = .lambda
+	defer { a.analysis_context = old_context }
 	// Create new type environment for lambda scope
 	a.enter_scope('lambda')
 	defer { a.exit_scope() }
@@ -3337,7 +2349,7 @@ fn (mut a Analyzer) analyze_lambda_expression(node ast.Node) !ast.Node {
 	a.check_lambda_recursion(node)
 
 	// Analyze parameters (all children except the last one, which is the body)
-	params := if node.children.len > 1 {
+	params := if node.children.len > 0 {
 		node.children[0..node.children.len - 1]
 	} else {
 		[]ast.Node{}
@@ -3345,14 +2357,21 @@ fn (mut a Analyzer) analyze_lambda_expression(node ast.Node) !ast.Node {
 	mut param_types := []ast.Type{}
 	for param in params {
 		_ := a.analyze_node(param)!
-		param_type := a.type_table.get_type(param.id) or {
-			ast.Type{
-				name:   'any' // Use 'any' for better compatibility
+		mut annotated_type := ast.Type{}
+		if param.children.len > 0 {
+			annotated_type = a.extract_type_from_annotation(param.children[1])!
+		} else {
+			annotated_type = ast.Type{
+				name:   'any'
 				params: []
 			}
 		}
-		param_types << param_type
-
+		param_type := a.type_table.get_type(param.id) or { annotated_type }
+		if param_type.str() != annotated_type.str() {
+			a.error('Parameter type mismatch. Expected: ${annotated_type.str()}, got: ${param_type.str()}',
+				param.position)
+			return error('Parameter type mismatch')
+		}
 		// Bind parameter in environment
 		scheme := TypeScheme{
 			quantified_vars: []
@@ -3685,7 +2704,7 @@ fn (mut a Analyzer) analyze_pattern_with_type(node ast.Node, expected_type ast.T
 				children: analyzed_children
 			}
 		}
-		.binary_pattern {
+		.binary_literal {
 			// Binary pattern - analyze segments in pattern context
 			mut analyzed_children := []ast.Node{}
 			for child in node.children {
@@ -3790,12 +2809,17 @@ fn (mut a Analyzer) analyze_type_alias(node ast.Node) !ast.Node {
 }
 
 fn (mut a Analyzer) analyze_type_annotation(node ast.Node) !ast.Node {
-	if node.children.len != 1 {
-		a.error('Type annotation must have one type', node.position)
+	if node.children.len != 2 {
+		a.error('Type annotation must have two children', node.position)
 		return error('Invalid type annotation')
 	}
+	ident := node.children[0]
+	type_node := node.children[1]
+	a.bind(ident.value, TypeScheme{
+		quantified_vars: []
+		body:            a.type_node_to_type(type_node)
+	})
 
-	type_node := node.children[0]
 	// Convert the type expression to a concrete type and assign it
 	type_info := a.type_node_to_type(type_node)
 	// Store on both the child and the annotation node ids
@@ -3854,7 +2878,11 @@ fn (mut a Analyzer) register_pattern_variables(pattern ast.Node) {
 				// Handle both direct identifiers and parentheses-wrapped identifiers for head
 				mut actual_head := head
 				if head.kind == .parentheses && head.children.len > 0 {
-					actual_head = head.children[0]
+					if head.children[0].kind == .type_annotation {
+						actual_head = head.children[0].children[0]
+					} else {
+						actual_head = head.children[0]
+					}
 				}
 
 				if actual_head.kind == .identifier {
@@ -3942,6 +2970,12 @@ fn (mut a Analyzer) register_pattern_variables(pattern ast.Node) {
 					a.register_pattern_variables(field.children[0])
 				}
 			}
+		}
+		.pattern_match {
+			a.register_pattern_variables(pattern.children[0])
+		}
+		.type_annotation {
+			a.register_pattern_variables(pattern.children[0])
 		}
 		else {
 			// For literals (integers, strings, etc.), no variables to register
@@ -4169,55 +3203,33 @@ fn (mut a Analyzer) analyze_with_expr_multi(node ast.Node) !ast.Node {
 }
 
 fn (mut a Analyzer) analyze_match_expr(node ast.Node) !ast.Node {
-	if node.children.len < 2 {
+	if node.children[0].kind != .pattern_match {
 		a.error('Match expression must have pattern and expression', node.position)
 		return error('Invalid match expression')
 	}
-
-	// Analyze expression
-	expr := a.analyze_node(node.children[1])!
-
-	// Enter scope for pattern binding and continuation
-	a.enter_scope('match_scope')
-	defer { a.exit_scope() }
+	pattern_expr := node.children[0]
+	expr := a.analyze_node(pattern_expr.children[1])!
 
 	// Register pattern variables first (from original node)
-	a.register_pattern_variables(node.children[0])
+	a.register_pattern_variables(pattern_expr)
 
 	// Analyze pattern in pattern context
-	pattern := a.with_context(.pattern, fn [mut a, node] (mut analyzer Analyzer) !ast.Node {
-		return analyzer.analyze_node(node.children[0])
+	pattern := a.with_context(.pattern, fn [mut a, pattern_expr] (mut analyzer Analyzer) !ast.Node {
+		return analyzer.analyze_node(pattern_expr.children[0])
 	})!
 
-	mut analyzed_children := [pattern, expr]
+	body := a.analyze_node(node.children[1])!
+	mut analyzed_children := [pattern, expr, body]
 
-	// Analyze rescue body if present (child 2)
-	if node.children.len > 2 && node.children[2].kind != .block {
-		rescue_body := a.analyze_node(node.children[2])!
+	if node.children.len == 3 && node.children[2].kind == .tuple_literal {
+		a.enter_scope('error_scope')
+		rescue_expr := node.children[2]
+		rescue_bind := rescue_expr.children[0]
+		rescue_block := rescue_expr.children[1]
+		a.register_pattern_variables(rescue_bind)
+		rescue_body := a.analyze_node(rescue_block)!
 		analyzed_children << rescue_body
-	} else if node.children.len > 2 && node.children[2].kind == .block {
-		// This is a rescue block with error pattern and body
-		rescue_block := node.children[2]
-		if rescue_block.children.len >= 2 {
-			// First child is error pattern, register it as a variable
-			error_pattern := rescue_block.children[0]
-			a.register_pattern_variables(error_pattern)
-
-			// Analyze the rescue block normally
-			rescue_body := a.analyze_node(rescue_block)!
-			analyzed_children << rescue_body
-		}
-	}
-
-	// Analyze continuation body if present (child 2 or 3 depending on rescue)
-	mut continuation_index := 2
-	if node.children.len > 2 && node.children[2].kind != .block {
-		continuation_index = 3
-	}
-
-	if node.children.len > continuation_index {
-		continuation_body := a.analyze_node(node.children[continuation_index])!
-		analyzed_children << continuation_body
+		a.exit_scope()
 	}
 
 	analyzed_node := ast.Node{
@@ -4225,28 +3237,10 @@ fn (mut a Analyzer) analyze_match_expr(node ast.Node) !ast.Node {
 		children: analyzed_children
 	}
 
-	// Match expressions return the type of the continuation or the matched value
-	mut result_type := ast.Type{
-		name:   'any'
-		params: []
-	}
-
-	if continuation_index < analyzed_children.len {
-		// Has continuation - return continuation type
-		continuation := analyzed_children[continuation_index]
-		result_type = a.type_table.get_type(continuation.id) or {
-			ast.Type{
-				name:   'any'
-				params: []
-			}
-		}
-	} else {
-		// No continuation - return matched value type
-		result_type = a.type_table.get_type(expr.id) or {
-			ast.Type{
-				name:   'any'
-				params: []
-			}
+	mut result_type := a.type_table.get_type(body.id) or {
+		ast.Type{
+			name:   'any'
+			params: []
 		}
 	}
 

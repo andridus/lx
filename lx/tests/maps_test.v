@@ -696,10 +696,10 @@ fn test_complex_map_operations() {
 	lx_code := 'def complex_operations() do
     user = %{id: 1, name: "João", age: 30, "email": "joao@example.com", 42: "magic"}
     config = %{database: %{host: "localhost", port: 5432}, "api_key": "secret123"}
-    name = map_get(:name, user)
-    age = map_get(:age, user)
-    email = map_get("email", user)
-    magic = map_get(42, user)
+    _name = map_get(:name, user)
+    _age = map_get(:age, user)
+    _email = map_get("email", user)
+    _magic = map_get(42, user)
     updated_user = map_put(:age, 31, user)
     updated_user2 = map_put("email", "new@example.com", updated_user)
     clean_user = map_remove(:id, updated_user2)
@@ -714,10 +714,10 @@ end'
 complex_operations() ->
     USER_1 = #{id => 1, name => <<"João"/utf8>>, age => 30, <<"email"/utf8>> => <<"joao@example.com"/utf8>>, 42 => <<"magic"/utf8>>},
     CONFIG_2 = #{database => #{host => <<"localhost"/utf8>>, port => 5432}, <<"api_key"/utf8>> => <<"secret123"/utf8>>},
-    NAME_3 = maps:get(name, USER_1),
-    AGE_4 = maps:get(age, USER_1),
-    EMAIL_5 = maps:get(<<"email"/utf8>>, USER_1),
-    MAGIC_6 = maps:get(42, USER_1),
+    _NAME_3 = maps:get(name, USER_1),
+    _AGE_4 = maps:get(age, USER_1),
+    _EMAIL_5 = maps:get(<<"email"/utf8>>, USER_1),
+    _MAGIC_6 = maps:get(42, USER_1),
     UPDATED_USER_7 = maps:put(age, 31, USER_1),
     UPDATED_USER2_8 = maps:put(<<"email"/utf8>>, <<"new@example.com"/utf8>>, UPDATED_USER_7),
     CLEAN_USER_9 = maps:remove(id, UPDATED_USER2_8),

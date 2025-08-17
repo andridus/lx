@@ -27,12 +27,26 @@ pub fn new_type_env(scope_name string) TypeEnv {
 }
 
 pub fn (mut env TypeEnv) bind(name string, scheme TypeScheme) {
-	env.bindings[name] = scheme
+	if typ := env.bindings[name] {
+		if typ.body.name == 'any' {
+			println('shadowing ${name}')
+			env.bindings[name] = scheme
+		}
+	} else {
+		env.bindings[name] = scheme
+	}
 }
 
 pub fn (mut env TypeEnv) bind_with_position(name string, scheme TypeScheme, position ast.Position) {
-	env.bindings[name] = scheme
-	env.variable_positions[name] = position
+	if typ := env.bindings[name] {
+		if typ.body.name == 'any' {
+			env.bindings[name] = scheme
+			env.variable_positions[name] = position
+		}
+	} else {
+		env.bindings[name] = scheme
+		env.variable_positions[name] = position
+	}
 }
 
 pub fn (env TypeEnv) lookup(name string) ?TypeScheme {

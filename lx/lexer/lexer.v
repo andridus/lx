@@ -171,8 +171,9 @@ fn (mut l Lexer) read_colon_or_double_colon() Token {
 		return l.make_token_at(.double_colon, '::', start_pos)
 	}
 
-	prev_is_ident := (prev_ch >= `a` && prev_ch <= `z`) || (prev_ch >= `A` && prev_ch <= `Z`) ||
-		(prev_ch >= `0` && prev_ch <= `9`) || prev_ch == `_`
+	prev_is_ident := (prev_ch >= `a` && prev_ch <= `z`)
+		|| (prev_ch >= `A` && prev_ch <= `Z`) || (prev_ch >= `0` && prev_ch <= `9`)
+		|| prev_ch == `_`
 	prev_is_closer := prev_ch == `]` || prev_ch == `)` || prev_ch == `}`
 
 	if prev_is_ident || prev_is_closer {
@@ -378,9 +379,8 @@ fn (mut l Lexer) read_identifier() Token {
 
 // is_operator_char checks if a character is an operator.
 fn (l Lexer) is_operator_char(ch u8) bool {
-	return ch == `+` || ch == `-` || ch == `*` || ch == `/` || ch == `=` || ch == `!` ||
-		ch == `<` || ch == `>` || ch == `&` || ch == `|` || ch == `^` || ch == `#` ||
-		ch == `@`
+	return ch == `+` || ch == `-` || ch == `*` || ch == `/` || ch == `=` || ch == `!` || ch == `<`
+		|| ch == `>` || ch == `&` || ch == `|` || ch == `^` || ch == `#` || ch == `@`
 }
 
 // read_arrow_or_minus reads a minus or an arrow `->`.

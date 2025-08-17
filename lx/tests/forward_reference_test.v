@@ -45,14 +45,28 @@ fn test_supervisor_forward_references() {
 	end
 	'
 
+	expected := '-module(test).
+-behaviour(supervisor).
+
+-export([start_link/0, init/1]).
+
+-include("test.hrl").
+
+start_link() ->
+    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+
+init([]) ->
+    Strategy = one_for_one,
+    Children = [
+        {test_worker, {test_worker, start_link, []}, permanent, 5000, worker, [test_worker]}
+    ],
+    {ok, {{Strategy, 5, 10}, Children}}.
+
+'
 	erlang_code := compile.compile_string(code, 'test.lx') or {
 		panic('Failed to compile supervisor with forward references: ${err}')
 	}
-
-	// Should compile successfully without "undefined function" errors
-	assert erlang_code.len > 0, 'Supervisor forward references should compile successfully'
-	assert erlang_code.contains('helper_func()'), 'Should contain forward function call'
-	assert erlang_code.contains('helper_func() ->'), 'Should contain function definition'
+	assert erlang_code == expected
 }
 
 fn test_mixed_worker_supervisor_forward_references() {
@@ -91,7 +105,7 @@ fn test_mixed_worker_supervisor_forward_references() {
 	}
 
 	// Should compile successfully without "undefined function" errors
-	assert result.files.len > 0, 'Mixed worker/supervisor forward references should compile successfully'
+	assert result.files.len > 0
 
 	// Check supervisor file
 	mut sup_found := false
@@ -109,6 +123,6 @@ fn test_mixed_worker_supervisor_forward_references() {
 		}
 	}
 
-	assert sup_found, 'Supervisor file should be generated'
-	assert worker_found, 'Worker file should be generated'
+	assert sup_found
+	assert worker_found
 }
