@@ -307,7 +307,7 @@ fn test_complex_control_flow() {
     if input != nil do
         case input do
             {data, _} ->
-                with {success, result} <- data do
+                with {:success, result} <- data do
                     result
                 end
             _ -> "invalid"
@@ -325,8 +325,8 @@ process_data(INPUT_1) ->
         true -> case INPUT_1 of
         {DATA_2, _} ->
             case DATA_2 of
-        {SUCCESS_3, RESULT_4} ->
-            RESULT_4;
+        {success, RESULT_3} ->
+            RESULT_3;
         Error -> Error
     end;
         _ ->
@@ -485,8 +485,8 @@ test_simple_match() ->
     case DATA_1 of
         {ok, RESULT_2} ->
             RESULT_2;
-        Otherwise ->
-            Otherwise
+        Error ->
+            Error
     end.
 '
 
@@ -511,8 +511,8 @@ test_single_variable() ->
     case DATA_1 of
         VALUE_2 ->
             VALUE_2;
-        Otherwise ->
-            Otherwise
+        Error ->
+            Error
     end.
 '
 
@@ -525,24 +525,24 @@ fn test_match_nested() {
 	lx_code := 'def test_complex_match(value) do
     match {:ok, value1} <- value
     match {:ok, value2} <- value1
-    :done
+    value2
 end'
 
 	expected := '-module(test).
 -export([test_complex_match/1]).
 
--spec test_complex_match(any()) -> atom().
+-spec test_complex_match(any()) -> any().
 test_complex_match(VALUE_1) ->
     case VALUE_1 of
         {ok, VALUE1_2} ->
             case VALUE1_2 of
         {ok, VALUE2_3} ->
-            done;
-        Otherwise ->
-            Otherwise
+            VALUE2_3;
+        Error ->
+            Error
     end;
-        Otherwise ->
-            Otherwise
+        Error ->
+            Error
     end.
 '
 
@@ -567,8 +567,8 @@ test_list_match() ->
     case DATA_1 of
         [HEAD_2 | TAIL_3] ->
             {HEAD_2, TAIL_3};
-        Otherwise ->
-            Otherwise
+        Error ->
+            Error
     end.
 '
 
@@ -593,8 +593,8 @@ test_tuple_match() ->
     case DATA_1 of
         {NUM_2, STR_3, ATOM_VAL_4} ->
             {ATOM_VAL_4, STR_3, NUM_2};
-        Otherwise ->
-            Otherwise
+        Error ->
+            Error
     end.
 '
 
@@ -606,7 +606,7 @@ test_tuple_match() ->
 fn test_match_with_rescue() {
 	lx_code := 'def test_match_rescue() do
     data = {:error, "failed"}
-    match {:ok, result} <- data rescue error do
+    match {:ok, _result} <- data rescue error do
         {:failed, error}
     end
     :done
@@ -615,11 +615,11 @@ end'
 	expected := '-module(test).
 -export([test_match_rescue/0]).
 
--spec test_match_rescue() -> {atom(), any()}.
+-spec test_match_rescue() -> atom().
 test_match_rescue() ->
     DATA_1 = {error, <<"failed"/utf8>>},
     case DATA_1 of
-        {ok, RESULT_2} ->
+        {ok, _RESULT_2} ->
             done;
         ERROR_3 ->
             {failed, ERROR_3}
@@ -645,8 +645,8 @@ test_atom_match(STATUS_1) ->
     case STATUS_1 of
         ok ->
             <<"success"/utf8>>;
-        Otherwise ->
-            Otherwise
+        Error ->
+            Error
     end.
 '
 
@@ -701,7 +701,8 @@ end'
 	expected := '-module(test).
 -export([process_user/1]).
 
--record(user, {name = nil :: binary(), age = nil :: integer()}).
+-include("test.hrl").
+
 -spec process_user(any()) -> binary().
 process_user(U_1) ->
     case U_1 of

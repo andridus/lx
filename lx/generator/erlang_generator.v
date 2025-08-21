@@ -1943,16 +1943,15 @@ fn (mut g ErlangGenerator) generate_case_clauses_inline(case_node ast.Node) ! {
 
 // Generate match expressions (try-catch in Erlang)
 fn (mut g ErlangGenerator) generate_match_expr(node ast.Node) ! {
-	pattern_expr := node.children[0]
 	g.output.write_string('case ')
-	g.generate_node(pattern_expr.children[1])! // expression
+	g.generate_node(node.children[1])! // expression
 	g.output.write_string(' of\n        ')
-	g.generate_pattern(pattern_expr.children[0])! // pattern
+	g.generate_pattern(node.children[0])! // pattern
 	g.output.write_string(' ->\n            ')
-	g.generate_node(node.children[1])! // continuation
+	g.generate_node(node.children[2])! // continuation
 	g.output.write_string(';\n        ')
-	if node.children.len == 3 && node.children[2].kind == .tuple_literal {
-		rescue_expr := node.children[2]
+	if node.children.len == 4 && node.children[3].kind == .tuple_literal {
+		rescue_expr := node.children[3]
 		g.generate_node(rescue_expr.children[0])!
 		g.output.write_string(' ->\n            ')
 		g.generate_node(rescue_expr.children[1])!

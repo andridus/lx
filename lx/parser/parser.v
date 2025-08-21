@@ -733,6 +733,7 @@ fn (mut p Parser) parse_string_interpolation(id int, value string, pos ast.Posit
 		interp_end := interp_end_opt or {
 			return p.error_and_return('Interpolação de string não fechada')
 		}
+
 		expr_str := value[interp_start + 2..interp_end]
 		if expr_str.len > 0 {
 			segments << ast.new_variable_ref(p.get_next_id(), expr_str, pos)
@@ -1708,7 +1709,6 @@ fn (mut p Parser) parse_match_expression() !ast.Node {
 		return ast.new_match_expr(p.get_next_id(), pattern_match, continuation_block,
 			rescue_body, start_pos)
 	}
-
 	continuation_block := ast.new_block(p.get_next_id(), [expr], start_pos)
 	return ast.new_match_expr(p.get_next_id(), pattern_match, continuation_block, rescue_body,
 		start_pos)

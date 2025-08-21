@@ -2518,7 +2518,14 @@ fn (mut a Analyzer) analyze_case_clause_with_type(node ast.Node, match_type ast.
 	// Analyze pattern with expected type
 	pattern := node.children[0]
 	analyzed_pattern := a.analyze_pattern_with_type(pattern, match_type)!
-
+	// If there's a guard (3rd child), analyze it
+	mut guards := []ast.Node{}
+	if node.children.len == 3 {
+		guard := node.children[2]
+		analyzed_guard := a.analyze_node(guard)!
+		// Store guard as third child
+		guards << analyzed_guard
+	}
 	// Analyze body
 	body := node.children[1]
 	analyzed_body := a.analyze_node(body)!
@@ -2532,14 +2539,7 @@ fn (mut a Analyzer) analyze_case_clause_with_type(node ast.Node, match_type ast.
 	a.type_table.assign_type(node.id, body_type)
 
 	mut children := [analyzed_pattern, analyzed_body]
-
-	// If there's a guard (3rd child), analyze it
-	if node.children.len == 3 {
-		guard := node.children[2]
-		analyzed_guard := a.analyze_node(guard)!
-		// Store guard as third child
-		children << analyzed_guard
-	}
+	children << guards
 
 	return ast.Node{
 		...node
@@ -3227,8 +3227,8 @@ fn (mut a Analyzer) analyze_match_expr(node ast.Node) !ast.Node {
 		rescue_bind := rescue_expr.children[0]
 		rescue_block := rescue_expr.children[1]
 		a.register_pattern_variables(rescue_bind)
-		rescue_body := a.analyze_node(rescue_block)!
-		analyzed_children << rescue_body
+		_ := a.analyze_node(rescue_block)!
+		analyzed_children << node.children[2]
 		a.exit_scope()
 	}
 
