@@ -2498,7 +2498,7 @@ fn (mut g ErlangGenerator) generate_anonymous_function(node ast.Node) ! {
 		// Regular single-head lambda: fn(params) -> body end
 		caller := node.children[node.children.len - 1]
 		if caller.kind == .function_caller && node.kind != .lambda_expression {
-			g.output.write_string('fun ?MODULE:')
+			g.output.write_string('fun ')
 			g.output.write_string(caller.value)
 			g.output.write_string('/${caller.children.len}')
 			return
