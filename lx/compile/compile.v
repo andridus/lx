@@ -109,54 +109,63 @@ pub fn compile_multi_file(code string, file_path string, base_module_name string
 		}
 		return error('Parse error: ${err}')
 	}
+	mod_name_base := ast_node.value
+	mut modules := [ast_node]
+	modules << p.get_submodules()
 
-	parser_errors := p.get_errors()
-	if parser_errors.len > 0 {
-		file_lines := os.read_file(file_path) or { '' }
-		lines := file_lines.split('\n')
-		mut error_msg := ''
-		for e in parser_errors {
-			error_msg += errors.format_error_detailed(e, lines) + '\n'
-		}
-		return error(error_msg)
-	}
-
-	mut analyzer := analysis.new_analyzer()
-	analyzed_ast := analyzer.analyze(ast_node) or {
-		analysis_errors := analyzer.get_errors()
-		if analysis_errors.len > 0 {
-			file_lines := os.read_file(file_path) or { '' }
-			lines := file_lines.split('\n')
-			mut error_msg := ''
-			for e in analysis_errors {
-				error_msg += errors.format_error_detailed(e, lines) + '\n'
-			}
-			return error(error_msg)
-		}
-		return error('Analysis error: ${err}')
-	}
-
-	analysis_errors := analyzer.get_errors()
-	if analysis_errors.len > 0 {
-		file_lines := os.read_file(file_path) or { '' }
-		lines := file_lines.split('\n')
-		mut error_msg := ''
-		for e in analysis_errors {
-			error_msg += errors.format_error_detailed(e, lines) + '\n'
-		}
-		return error(error_msg)
-	}
-
-	// Extract different constructs from AST
-	modules := extract_modules_from_ast(analyzed_ast, base_module_name)!
-
+	mut modules_infos := []ModuleInfo{}
 	mut result := CompilationResult{
 		main_module: base_module_name
 		files:       map[string]string{}
 	}
+	compiler_config := analysis.CompilerConfig{
+		type_modules: p.get_types(),
+		records:      p.get_records(),
+		application_config: p.get_application_config(),
+	}
+
+	for mod in modules {
+		mut analyzer := analysis.new_analyzer_with_config(compiler_config)
+		analyzed_ast := analyzer.analyze(mod) or {
+			analysis_errors := analyzer.get_errors()
+			if analysis_errors.len > 0 {
+				file_lines := os.read_file(file_path) or { '' }
+				lines := file_lines.split('\n')
+				mut error_msg := ''
+				for e in analysis_errors {
+					error_msg += errors.format_error_detailed(e, lines) + '\n'
+				}
+				return error(error_msg)
+			}
+			return error('Analysis error: ${err}')
+		}
+
+		mut gen := generator.new_generator(directives_table)
+		if p.import_hrl_for(mod.value) {
+			gen.set_module_name(mod_name_base)
+		}
+		erlang_code := gen.generate_with_types(analyzed_ast, analyzer.get_type_table()) or {
+			errs := gen.get_errors()
+			if errs.len > 0 {
+				return error('Generation errors for ${mod.value}:\n${errs.join('\n')}')
+			}
+			return error('Generation error for ${mod.value}: ${err}')
+		}
+
+		generation_errors := gen.get_errors()
+		if generation_errors.len > 0 {
+			return error('Generation errors for ${mod.value}:\n${generation_errors.join('\n')}')
+		}
+
+		result.files[mod.value + '.erl'] = erlang_code
+		println('Compiled module ${mod.value}')
+	}
+
+
+
 
 	// Generate each module
-	for module_info in modules {
+	for module_info in modules_infos {
 		// Analyze each extracted module to apply base rules (like duplicate function validation)
 		// But disable unused type checking since records/types are global across all modules
 		mut module_analyzer := analysis.new_analyzer()
@@ -209,41 +218,15 @@ pub fn compile_multi_file(code string, file_path string, base_module_name string
 		result.files[module_info.filename] = erlang_code
 		println('Compiled module ${module_info.name}')
 	}
-
-	// Ensure an application behaviour module exists so the app can start under rebar3 shell
-	app_module_name := base_module_name + '_app'
-	// Choose a root supervisor if any was defined (first *_sup module)
-	mut root_sup := ''
-	for module_info in modules {
-		if module_info.name.ends_with('_sup') {
-			root_sup = module_info.name
-			break
-		}
+	// // Generate .app.src and .hrl if needed
+	if config := p.get_application_config() {
+		result.app_src_content = generate_app_src(config, base_module_name)!
 	}
-	app_module_filename := app_module_name + '.erl'
-	if app_module_filename !in result.files {
-		result.files[app_module_filename] = generate_application_behaviour_module(app_module_name,
-			root_sup)
+	records := p.get_records()
+	types := p.get_types()
+	if records.len > 0 || types.len > 0 {
+		result.hrl_content = generate_hrl(ast.new_block(ast_node.id, records, ast_node.position), base_module_name)!
 	}
-
-	// Perform global unused type check using the main analyzer that has seen all constructs
-	analyzer.check_unused_types()
-
-	// Check for any additional analysis errors after unused type check
-	final_analysis_errors := analyzer.get_errors()
-	if final_analysis_errors.len > 0 {
-		file_lines := os.read_file(file_path) or { '' }
-		lines := file_lines.split('\n')
-		mut error_msg := ''
-		for e in final_analysis_errors {
-			error_msg += errors.format_error_detailed(e, lines) + '\n'
-		}
-		return error(error_msg)
-	}
-
-	// Generate .app.src and .hrl if needed
-	result.app_src_content = generate_app_src(analyzed_ast, base_module_name)!
-	result.hrl_content = generate_hrl(analyzed_ast, base_module_name)!
 
 	return result
 }

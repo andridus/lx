@@ -4,9 +4,17 @@ import ast
 import errors
 import kernel
 
+pub struct CompilerConfig {
+pub:
+	type_modules          []ast.Node
+	records               []ast.Node
+	application_config     ?ast.Node
+}
+
 pub struct Analyzer {
 mut:
 	error_reporter        errors.ErrorReporter
+	config                CompilerConfig
 	type_table            TypeTable
 	type_envs             []TypeEnv
 	current_env           int
@@ -292,6 +300,16 @@ fn (mut a Analyzer) type_node_to_type(node ast.Node) ast.Type {
 	}
 }
 
+pub fn new_analyzer_with_config(config CompilerConfig) Analyzer {
+	return Analyzer{
+		type_table:       new_type_table()
+		type_envs:        [new_type_env('root')]
+		error_reporter:   errors.new_error_reporter()
+		analysis_context: .expression
+		config:           config
+	}
+}
+
 pub fn new_analyzer() Analyzer {
 	return Analyzer{
 		type_table:       new_type_table()
@@ -302,6 +320,15 @@ pub fn new_analyzer() Analyzer {
 }
 
 pub fn (mut a Analyzer) analyze(node ast.Node) !ast.Node {
+	for record in a.config.records {
+		a.analyze_node(record)!
+	}
+	for type_module in a.config.type_modules {
+		a.analyze_node(type_module)!
+	}
+	if config := a.config.application_config {
+		a.analyze_node(config)!
+	}
 	return a.analyze_node(node)
 }
 

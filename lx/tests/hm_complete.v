@@ -346,7 +346,7 @@ fn compile_and_infer_types(lx_code string) CompileResult {
 	mut analyzer := analysis.new_analyzer()
 	start_time := time.now()
 
-	analyzed := analyzer.analyze(parsed) or {
+	_ := analyzer.analyze(parsed) or {
 		return CompileResult{
 			success:        false
 			function_types: {}

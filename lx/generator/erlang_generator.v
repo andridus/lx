@@ -2065,6 +2065,7 @@ fn (mut g ErlangGenerator) generate_supervisor_def(node ast.Node) ! {
 	}
 
 	// Generate standard supervisor callbacks
+	g.output.write_string('-module(${node.value}).\n\n')
 	g.output.write_string('-behaviour(supervisor).\n\n')
 	g.output.write_string('-export([start_link/0, init/1]).\n\n')
 
@@ -2130,6 +2131,7 @@ fn (mut g ErlangGenerator) generate_worker_def(node ast.Node) ! {
 		return error('Worker definition must have body')
 	}
 
+g.output.write_string('-module(${node.value}).\n\n')
 	// Generate standard gen_server callbacks
 	g.output.write_string('-behaviour(gen_server).\n\n')
 

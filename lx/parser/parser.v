@@ -21,7 +21,37 @@ mut:
 	at_line_start         bool = true // Tracks if we are at the beginning of a new line
 	temp_doc_node         ?ast.Node
 	current_module_name   string
+	records               []ast.Node
+	types                 []ast.Node
+	application_config    ?ast.Node
 	in_supervisor_context bool // Tracks if we are inside a supervisor do...end block
+	in_submodule_context bool // Tracks if we are inside a submodule do...end block
+	submodule_name      string
+	submodules            []ast.Node
+	import_hrl             map[string]bool
+}
+
+pub fn (p Parser) get_submodules() []ast.Node {
+	return p.submodules
+}
+
+pub fn (p Parser) get_application_config() ?ast.Node {
+	return p.application_config
+}
+
+pub fn (p Parser) get_records() []ast.Node {
+	return p.records
+}
+
+pub fn (p Parser) get_types() []ast.Node {
+	return p.types
+}
+
+pub fn (p Parser) import_hrl_for(mod_name string) bool {
+	if m := p.import_hrl[mod_name] {
+		return m
+	}
+	return false
 }
 
 // new_parser creates and initializes a new Parser.
@@ -103,7 +133,6 @@ fn (mut p Parser) error_and_return_with_suggestion(msg string, suggestion string
 // REFACTORED: Unifies the logic of `parse_module` and `parse_module_with_name`.
 fn (mut p Parser) do_parse_module(modname string) !ast.Node {
 	mut functions := []ast.Node{}
-	mut records := []ast.Node{}
 	mut all_nodes := []ast.Node{}
 	start_pos := p.current.position
 	module_id := p.get_next_id()
@@ -117,45 +146,66 @@ fn (mut p Parser) do_parse_module(modname string) !ast.Node {
 		if p.current.type_ == .error {
 			return p.error_and_return('Lexical error: ${p.current.value}')
 		}
-
+		if p.current.type_ == .end && p.in_submodule_context {
+			break
+		}
 		match p.current.type_ {
 			.at_sign {
 				directive := p.parse_directive_new()!
 				all_nodes << directive
 			}
 			.record {
+				if p.in_submodule_context {
+					return p.error_and_return('Record definition not allowed in submodule')
+				}
 				record := p.parse_record_definition()!
-				records << record
+				p.records << record
 			}
 			.def, .defp {
 				func := p.parse_function()!
 				functions << func
 			}
 			.type {
+				if p.in_submodule_context {
+					return p.error_and_return('Type definition not allowed in submodule')
+				}
 				type_def := p.parse_type_def()!
-				all_nodes << type_def
+				p.types << type_def
 			}
 			.application {
+				if p.in_submodule_context {
+					return p.error_and_return('Application config not allowed in submodule')
+				}
 				app := p.parse_application_config()!
-				all_nodes << app
+				p.application_config = app
 			}
 			.import {
 				imp := p.parse_import_statement()!
 				all_nodes << imp
 			}
 			.supervisor {
-				sup := p.parse_supervisor_definition()!
-				functions << sup
+				if p.in_submodule_context {
+					return p.error_and_return('Supervisor definition not allowed in submodule')
+				}
+				_ := p.parse_supervisor_definition()!
 			}
 			.worker {
-				wrk := p.parse_worker_definition()!
-				functions << wrk
+				if p.in_submodule_context {
+					return p.error_and_return('Worker definition not allowed in submodule')
+				}
+				_ := p.parse_worker_definition()!
 			}
 			.describe {
+				if p.in_submodule_context {
+					return p.error_and_return('Describe block not allowed in submodule')
+				}
 				describe_blocks := p.parse_describe_block()!
 				functions << describe_blocks
 			}
 			.test {
+				if p.in_submodule_context {
+					return p.error_and_return('Test block not allowed in submodule')
+				}
 				test_block := p.parse_test_block()!
 				functions << test_block
 			}
@@ -165,7 +215,6 @@ fn (mut p Parser) do_parse_module(modname string) !ast.Node {
 		}
 	}
 
-	all_nodes << records
 	all_nodes << functions
 	return ast.new_module(module_id, modname, all_nodes, start_pos)
 }
@@ -998,6 +1047,9 @@ fn (mut p Parser) parse_record_definition() !ast.Node {
 // parse_record_literal is the unified function to parse record literals.
 // REFACTORED: Unifies `parse_record_literal` and `parse_record_literal_with_name`.
 fn (mut p Parser) parse_record_literal(record_name string, pos ast.Position) !ast.Node {
+	if p.in_submodule_context {
+		p.import_hrl[p.submodule_name] = true
+	}
 	if p.current.type_ != .lbrace {
 		return p.error_and_return('Expected "{" after record name')
 	}
@@ -1041,6 +1093,9 @@ fn (mut p Parser) parse_record_literal(record_name string, pos ast.Position) !as
 }
 
 fn (mut p Parser) parse_record_access(node ast.Node) !ast.Node {
+	if p.in_submodule_context {
+		p.import_hrl[p.submodule_name] = true
+	}
 	if p.current.type_ != .dot {
 		return error('Expected "." for record field access')
 	}
@@ -2137,16 +2192,22 @@ fn (mut p Parser) parse_supervisor_definition() !ast.Node {
 		p.advance()
 	}
 	p.in_supervisor_context = true
+	p.in_submodule_context = false
+	p.submodule_name = name
 	body := p.parse_block()!
+	p.in_submodule_context = false
 	p.in_supervisor_context = false
+	p.submodule_name = ''
 	if p.current.type_ != .end {
 		return p.error_and_return('Expected "end" to close supervisor definition')
 	}
 	p.advance()
-	return ast.new_supervisor_def(p.get_next_id(), name, body, start_pos)
+	p.submodules << ast.new_supervisor_def(p.get_next_id(), name, body, start_pos)
+	return ast.new_nil(p.get_next_id(), start_pos)
 }
 
 fn (mut p Parser) parse_worker_definition() !ast.Node {
+
 	start_pos := p.current.position
 	p.advance() // Skip 'worker'
 	if p.current.type_ != .identifier {
@@ -2161,12 +2222,17 @@ fn (mut p Parser) parse_worker_definition() !ast.Node {
 	for p.current.type_ == .newline {
 		p.advance()
 	}
-	body := p.parse_block()!
+	p.in_submodule_context = true
+	p.submodule_name = name
+	body := p.do_parse_module(name)!
+	p.in_submodule_context = false
+	p.submodule_name = ''
 	if p.current.type_ != .end {
 		return p.error_and_return('Expected "end" to close worker definition')
 	}
 	p.advance()
-	return ast.new_worker_def(p.get_next_id(), name, body, start_pos)
+	p.submodules << ast.new_worker_def(p.get_next_id(), name, body, start_pos)
+	return ast.new_nil(p.get_next_id(), start_pos)
 }
 
 // ===================================================================
