@@ -21,7 +21,7 @@ test_lambda() ->
 
 fn test_lambda_multiline_with_end() {
 	lx_code := 'def test_lambda_multiline() do
-    lambda = fn(x :: integer, y :: integer) ->
+    lambda = fn(x :: integer, y :: integer) do
         result = x + y
         result * 2
     end
@@ -32,10 +32,8 @@ end'
 
 -spec test_lambda_multiline() -> integer().
 test_lambda_multiline() ->
-    LAMBDA_1 = fun(X_2, Y_3) ->
-        RESULT_4 = X_2 + Y_3,
-    RESULT_4 * 2
-    end,
+    LAMBDA_1 = fun(X_2, Y_3) -> RESULT_4 = X_2 + Y_3,
+    RESULT_4 * 2 end,
     LAMBDA_1(5, 6).
 '
 	result := compile_lx(lx_code)
@@ -55,10 +53,8 @@ end'
 
 -spec test_lambda_do() -> integer().
 test_lambda_do() ->
-    LAMBDA_1 = fun(X_2) ->
-        DOUBLED_3 = X_2 * 2,
-    DOUBLED_3 + 1
-    end,
+    LAMBDA_1 = fun(X_2) -> DOUBLED_3 = X_2 * 2,
+    DOUBLED_3 + 1 end,
     LAMBDA_1(10).
 '
 	result := compile_lx(lx_code)
@@ -77,16 +73,16 @@ end'
 	expected := '-module(test).
 -export([test_lambda_multihead/0]).
 
--spec test_lambda_multihead() -> any().
+-spec test_lambda_multihead() -> binary().
 test_lambda_multihead() ->
-    LAMBDA_1 = fun
-        (ok) ->
-            <<"success"/utf8>>;
-        (error) ->
-            <<"failure"/utf8>>;
-        (_) ->
-            <<"unknown"/utf8>>
-    end,
+    LAMBDA_1 = fun(Arg) -> case Arg of
+    ok ->
+        <<"success"/utf8>>;
+    error ->
+        <<"failure"/utf8>>;
+    _ ->
+        <<"unknown"/utf8>>
+end end,
     LAMBDA_1(ok).
 '
 	result := compile_lx(lx_code)
@@ -103,9 +99,7 @@ end'
 
 -spec test_simple_lambda() -> integer().
 test_simple_lambda() ->
-    LAMBDA_1 = fun(X_2, Y_3) ->
-        X_2 + Y_3
-    end,
+    LAMBDA_1 = fun(X_2Y_3) -> X_2 + Y_3 end,
     LAMBDA_1(1, 2).
 '
 	result := compile_lx(lx_code)
@@ -122,9 +116,7 @@ end'
 
 -spec test_no_params() -> integer().
 test_no_params() ->
-    LAMBDA_1 = fun() ->
-        42
-    end,
+    LAMBDA_1 = fun() -> 42 end,
     LAMBDA_1().
 '
 	result := compile_lx(lx_code)
@@ -141,9 +133,7 @@ end'
 
 -spec test_single_param() -> binary().
 test_single_param() ->
-    LAMBDA_1 = fun(X_2) ->
-        X_2
-    end,
+    LAMBDA_1 = fun(X_2) -> X_2 end,
     LAMBDA_1(<<"hello"/utf8>>).
 '
 	result := compile_lx(lx_code)
@@ -162,16 +152,16 @@ end'
 	expected := '-module(test).
 -export([test_complex_multihead/0]).
 
--spec test_complex_multihead() -> any().
+-spec test_complex_multihead() -> binary().
 test_complex_multihead() ->
-    LAMBDA_1 = fun
-        (0) ->
-            <<"zero"/utf8>>;
-        (1) ->
-            <<"one"/utf8>>;
-        (N_2) ->
-            <<"many"/utf8>>
-    end,
+    LAMBDA_1 = fun(Arg) -> case Arg of
+    0 ->
+        <<"zero"/utf8>>;
+    1 ->
+        <<"one"/utf8>>;
+    N_2 ->
+        <<"many"/utf8>>
+end end,
     LAMBDA_1(5).
 '
 	result := compile_lx(lx_code)
@@ -190,12 +180,8 @@ end'
 
 -spec test_nested() -> integer().
 test_nested() ->
-    ADD_1 = fun(X_2, Y_3) ->
-        X_2 + Y_3
-    end,
-    MULTIPLY_4 = fun(X_2, Y_3) ->
-        X_2 * Y_3
-    end,
+    ADD_1 = fun(X_2, Y_3) -> X_2 + Y_3 end,
+    MULTIPLY_4 = fun(X_2, Y_3) -> X_2 * Y_3 end,
     RESULT_5 = MULTIPLY_4(ADD_1(2, 3), 4),
     RESULT_5.
 '
@@ -215,16 +201,16 @@ end'
 	expected := '-module(test).
 -export([test_mixed_types/0]).
 
--spec test_mixed_types() -> any().
+-spec test_mixed_types() -> atom().
 test_mixed_types() ->
-    PROCESSOR_1 = fun
-        (X_2) ->
-            X_2 * 2;
-        (S_3) ->
-            S_3;
-        (_) ->
-            unknown
-    end,
+    PROCESSOR_1 = fun(Arg) -> case Arg of
+     ->
+        X_2 * 2;
+     ->
+        S_3;
+    _ ->
+        unknown
+end end,
     PROCESSOR_1(42).
 '
 	result := compile_lx(lx_code)
@@ -235,12 +221,12 @@ test_mixed_types() ->
 
 fn test_lambda_error_missing_end() {
 	lx_code := 'def test_error() do
-    lambda = fn(x :: integer) ->
+    lambda = fn(x :: integer) do
         x + 1
     lambda.(5)
 end'
 	result := compile_lx_with_error(lx_code)
-	assert result.contains('Expected end keyword')
+	assert result.contains('Expected the "end" keyword')
 }
 
 fn test_lambda_error_invalid_syntax() {
@@ -249,7 +235,7 @@ fn test_lambda_error_invalid_syntax() {
     lambda.(5)
 end'
 	result := compile_lx_with_error(lx_code)
-	assert result.contains('Expected "->" or "do" after lambda parameters')
+	assert result.contains("Expected '->' or 'do' after lambda parameters")
 }
 
 fn test_lambda_error_missing_params() {
@@ -258,7 +244,7 @@ fn test_lambda_error_missing_params() {
     lambda.()
 end'
 	result := compile_lx_with_error(lx_code)
-	assert result.contains('Expected "(" after fn or "do" for multi-head lambda')
+	assert result.contains("Expected '(' or 'do' after 'fn'")
 }
 
 // ============ Lambda Integration Tests ============

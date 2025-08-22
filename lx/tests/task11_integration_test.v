@@ -187,9 +187,7 @@ end'
 
 -spec test_lambda() -> integer().
 test_lambda() ->
-    LAMBDA_1 = fun(X_2, Y_3) ->
-        X_2 + Y_3
-    end,
+    LAMBDA_1 = fun(X_2Y_3) -> X_2 + Y_3 end,
     LAMBDA_1(1, 2).
 '
 	result := compile_lx(lx_code)

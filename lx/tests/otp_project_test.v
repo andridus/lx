@@ -42,13 +42,9 @@ end'
 
 -spec test_lambda_calls() -> {integer(), integer()}.
 test_lambda_calls() ->
-    ADD_1 = fun(X_2, Y_3) ->
-        X_2 + Y_3
-    end,
+    ADD_1 = fun(X_2Y_3) -> X_2 + Y_3 end,
     RESULT1_4 = ADD_1(5, 3),
-    MULTIPLY_5 = fun(A_6, B_7) ->
-        A_6 * B_7
-    end,
+    MULTIPLY_5 = fun(A_6B_7) -> A_6 * B_7 end,
     RESULT2_8 = MULTIPLY_5(4, 6),
     {RESULT1_4, RESULT2_8}.
 '
@@ -72,16 +68,16 @@ end'
 	expected := '-module(test).
 -export([test_multi_clause_lambda/0]).
 
--spec test_multi_clause_lambda() -> any().
+-spec test_multi_clause_lambda() -> binary().
 test_multi_clause_lambda() ->
-    HANDLER_1 = fun
-        (ok) ->
-            <<"success"/utf8>>;
-        (error) ->
-            <<"failure"/utf8>>;
-        (_) ->
-            <<"unknown"/utf8>>
-    end,
+    HANDLER_1 = fun(Arg) -> case Arg of
+    ok ->
+        <<"success"/utf8>>;
+    error ->
+        <<"failure"/utf8>>;
+    _ ->
+        <<"unknown"/utf8>>
+end end,
     RESULT_2 = HANDLER_1(ok),
     RESULT_2.
 '

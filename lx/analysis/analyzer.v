@@ -2377,11 +2377,21 @@ fn (mut a Analyzer) analyze_lambda_expression(node ast.Node) !ast.Node {
 			quantified_vars: []
 			body:            param_type
 		}
-		a.bind(param.value, scheme)
+		if param.children.len == 2 {
+			a.bind(param.children[0].value, scheme)
+		} else {
+			a.bind(param.value, scheme)
+		}
 	}
 
 	// Analyze body
 	body := node.children[node.children.len - 1]
+
+	// Check for multi-head lambda arity consistency
+	if body.kind == .block && body.children.len > 0 && body.children[0].kind == .case_clause {
+		a.validate_lambda_clause_arities(body)!
+	}
+
 	analyzed_body := a.analyze_node(body)!
 	body_type := a.type_table.get_type(body.id) or {
 		ast.Type{
@@ -2408,6 +2418,39 @@ fn (mut a Analyzer) analyze_lambda_expression(node ast.Node) !ast.Node {
 	return ast.Node{
 		...node
 		children: analyzed_children
+	}
+}
+
+// Validate that all clauses in a multi-head lambda have the same arity
+fn (mut a Analyzer) validate_lambda_clause_arities(body ast.Node) ! {
+	if body.children.len == 0 {
+		return
+	}
+
+	mut expected_arity := -1
+
+	for i, clause in body.children {
+		if clause.kind != .case_clause || clause.children.len < 1 {
+			continue
+		}
+
+		pattern := clause.children[0]
+		mut clause_arity := 0
+
+		// Calculate arity based on pattern
+		if pattern.kind == .block {
+			clause_arity = pattern.children.len
+		} else {
+			clause_arity = 1
+		}
+
+		if expected_arity == -1 {
+			expected_arity = clause_arity
+		} else if clause_arity != expected_arity {
+			a.error('All clauses in a multi-head lambda must have the same arity. Expected ${expected_arity} arguments, but clause ${
+				i + 1} has ${clause_arity} arguments', clause.position)
+			return error('Lambda arity mismatch')
+		}
 	}
 }
 

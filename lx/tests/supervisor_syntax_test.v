@@ -1,7 +1,6 @@
 module tests
 
 import parser
-import ast
 
 fn test_supervisor_new_syntax_without_equals() {
 	code := '
@@ -72,7 +71,7 @@ fn test_supervisor_old_syntax_with_equals_is_rejected() {
 	p.parse() or {
 		// Should fail with a parse error about using old syntax
 		error_msg := err.msg()
-		assert error_msg.contains('Supervisor directives must use new syntax without "="')
+		assert error_msg.contains('Supervisor directives should not use "=". Use "strategy :value"')
 		return
 	}
 
@@ -93,7 +92,7 @@ fn test_supervisor_mixed_syntax_rejects_equals() {
 	p.parse() or {
 		// Should fail when encountering the '=' in children line
 		error_msg := err.msg()
-		assert error_msg.contains('Supervisor directives must use new syntax without "="')
+		assert error_msg.contains('Supervisor directives should not use "=". Use "children :value"')
 		return
 	}
 

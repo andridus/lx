@@ -48,7 +48,7 @@ end'
 	expected := '-module(test).
 -export([sum_list/1]).
 
--spec sum_list(list()) -> integer().
+-spec sum_list([integer()]) -> integer().
 sum_list([]) ->
     0;
 sum_list([HEAD_1 | TAIL_2]) ->

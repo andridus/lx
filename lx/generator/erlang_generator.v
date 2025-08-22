@@ -1599,8 +1599,13 @@ fn (mut g ErlangGenerator) generate_case_clause(node ast.Node) ! {
 	pattern := node.children[0]
 	body := node.children[1]
 
-	// Generate pattern
-	g.generate_pattern(pattern)!
+	if pattern.kind == .block {
+		for child in pattern.children {
+			g.generate_pattern(child)!
+		}
+	} else {
+		g.generate_pattern(pattern)!
+	}
 
 	// Generate guard if present
 	if node.children.len == 3 {
@@ -1615,6 +1620,57 @@ fn (mut g ErlangGenerator) generate_case_clause(node ast.Node) ! {
 	g.generate_node(body)!
 
 	// Reset default flag
+}
+
+// Generate case clause specifically for lambda functions (multi-head)
+fn (mut g ErlangGenerator) generate_case_clause_for_lambda(node ast.Node, arity int) ! {
+	if node.children.len < 2 {
+		return error('Case clause must have pattern and body')
+	}
+
+	pattern := node.children[0]
+	body := node.children[1]
+	guard := if node.children.len >= 3 { node.children[2] } else { ast.Node{} }
+
+	// Generate pattern - for lambda, we need to handle tuple patterns for multi-arity
+	if arity == 1 {
+		// Single argument - generate pattern directly
+		g.in_pattern = true
+		g.generate_node(pattern)!
+		g.in_pattern = false
+	} else {
+		// Multiple arguments - generate tuple pattern
+		if pattern.kind == .block {
+			g.output.write_string('{')
+			for i, arg_pattern in pattern.children {
+				if i > 0 {
+					g.output.write_string(', ')
+				}
+				g.in_pattern = true
+				g.generate_node(arg_pattern)!
+				g.in_pattern = false
+			}
+			g.output.write_string('}')
+		} else {
+			// Single pattern for multiple args - wrap in tuple
+			g.output.write_string('{')
+			g.in_pattern = true
+			g.generate_node(pattern)!
+			g.in_pattern = false
+			g.output.write_string('}')
+		}
+	}
+
+	// Generate guard if present
+	if guard.id != 0 {
+		g.output.write_string(' when ')
+		g.generate_node(guard)!
+	}
+
+	g.output.write_string(' ->\n        ')
+
+	// Generate body
+	g.generate_node(body)!
 }
 
 fn (mut g ErlangGenerator) generate_pattern(node ast.Node) ! {
@@ -2382,36 +2438,94 @@ fn (mut g ErlangGenerator) generate_anonymous_function(node ast.Node) ! {
 	if node.children.len == 0 {
 		return error('Anonymous function must have at least a body')
 	}
-	caller := node.children[node.children.len - 1]
-	if caller.kind == .function_caller && node.kind != .lambda_expression {
-		g.output.write_string('fun ?MODULE:')
-		g.output.write_string(caller.value)
-		g.output.write_string('/${caller.children.len}')
-		return
-	} else if caller.kind == .external_function_call {
-		g.output.write_string('fun ')
-		g.output.write_string(caller.value)
-		g.output.write_string('/${caller.children.len}')
-		return
-	}
-	g.output.write_string('fun(')
 
-	// Parameters (all children except the last one)
-	for i in 0 .. node.children.len - 1 {
-		if node.children[i].children.len > 0 {
-			g.generate_node(node.children[i].children[0])!
-			if i < node.children.len - 2 {
-				g.output.write_string(', ')
+	// Check if this is a multi-head lambda (body is a block with case clauses)
+	body := node.children[node.children.len - 1]
+	if body.kind == .block && body.children.len > 0 && body.children[0].kind == .case_clause {
+		// Multi-head lambda: fn do (p1) -> b1; (p2) -> b2 end
+		// Generate as: fun(Args) -> case Args of Pattern1 -> Body1; Pattern2 -> Body2 end end
+
+		// Determine arity based on the first clause pattern
+		first_clause := body.children[0]
+		if first_clause.children.len >= 1 {
+			pattern := first_clause.children[0]
+			arity := if pattern.kind == .block { pattern.children.len } else { 1 }
+
+			// Generate function head with appropriate arity
+			if arity == 1 {
+				g.output.write_string('fun(Arg) -> ')
+			} else {
+				g.output.write_string('fun(')
+				for i in 0 .. arity {
+					if i > 0 {
+						g.output.write_string(', ')
+					}
+					g.output.write_string('Arg${i + 1}')
+				}
+				g.output.write_string(') -> ')
 			}
-		} else {
-			g.generate_node(node.children[i])!
+
+			// Generate case expression
+			if arity == 1 {
+				g.output.write_string('case Arg of\n')
+			} else {
+				g.output.write_string('case {')
+				for i in 0 .. arity {
+					if i > 0 {
+						g.output.write_string(', ')
+					}
+					g.output.write_string('Arg${i + 1}')
+				}
+				g.output.write_string('} of\n')
+			}
+
+			// Generate case clauses
+			for i, clause in body.children {
+				if clause.kind == .case_clause {
+					g.output.write_string('    ')
+					g.generate_case_clause_for_lambda(clause, arity)!
+					if i < body.children.len - 1 {
+						g.output.write_string(';\n')
+					} else {
+						g.output.write_string('\n')
+					}
+				}
+			}
+
+			g.output.write_string('end')
 		}
+	} else {
+		// Regular single-head lambda: fn(params) -> body end
+		caller := node.children[node.children.len - 1]
+		if caller.kind == .function_caller && node.kind != .lambda_expression {
+			g.output.write_string('fun ?MODULE:')
+			g.output.write_string(caller.value)
+			g.output.write_string('/${caller.children.len}')
+			return
+		} else if caller.kind == .external_function_call {
+			g.output.write_string('fun ')
+			g.output.write_string(caller.value)
+			g.output.write_string('/${caller.children.len}')
+			return
+		}
+
+		g.output.write_string('fun(')
+
+		// Parameters (all children except the last one)
+		for i in 0 .. node.children.len - 1 {
+			if node.children[i].children.len > 0 {
+				g.generate_node(node.children[i].children[0])!
+				if i < node.children.len - 2 {
+					g.output.write_string(', ')
+				}
+			} else {
+				g.generate_node(node.children[i])!
+			}
+		}
+
+		g.output.write_string(') -> ')
+		g.generate_node(body)!
 	}
-
-	g.output.write_string(') -> ')
-
-	// Body (last child)
-	g.generate_node(node.children[node.children.len - 1])!
 
 	g.output.write_string(' end')
 }
